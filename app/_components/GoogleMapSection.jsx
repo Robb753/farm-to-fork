@@ -1,96 +1,127 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Wrapper } from "@googlemaps/react-wrapper";
+import { APIProvider, InfoWindow, Map } from "@vis.gl/react-google-maps";
 import GoogleMarkerItem from "./GoogleMarkerItem";
-
-const mapOption = {
-  mapId: process.env.NEXT_PUBLIC_MAP_ID,
-  zoom: 11,
-  disableDefaultUI: true,
-  zoomControl: true,
-};
+import MarkerListingItem from "./MarkerListingItem";
 
 function MyMap({
   coordinates,
   listing,
   setSelectedListing,
-  selectedListing,
-  setVisibleListings, // Ajout d'une fonction pour mettre à jour les fermes visibles
+  onVisibleListingsChange,
   isMapExpanded,
 }) {
+  const mapRef = useRef(null);
   const [map, setMap] = useState(null);
-  const ref = useRef(null);
+  const [isGoogleMapsReady, setIsGoogleMapsReady] = useState(false);
+  const [openInfoWindow, setOpenInfoWindow] = useState(null);
 
   useEffect(() => {
-    if (ref.current && !map) {
-      const newMap = new window.google.maps.Map(ref.current, {
-        ...mapOption,
-        center: coordinates || { lat: 48.8575, lng: 2.23453 },
-      });
-      setMap(newMap);
-    }
-  }, [ref, map, coordinates]);
+    const checkIfLoaded = setInterval(() => {
+      if (window.google && window.google.maps) {
+        setIsGoogleMapsReady(true);
+        clearInterval(checkIfLoaded);
+      }
+    }, 100);
+
+    return () => clearInterval(checkIfLoaded);
+  }, []);
+
+  useEffect(() => {
+    const initializeMap = async () => {
+      if (isGoogleMapsReady && mapRef.current && !map) {
+        const { ColorScheme } = await window.google.maps.importLibrary("core");
+
+        const newMap = new window.google.maps.Map(mapRef.current, {
+          mapId: process.env.NEXT_PUBLIC_MAP_ID,
+          center: coordinates || { lat: 48.8575, lng: 2.23453 },
+          zoom: 12,
+          disableDefaultUI: true,
+          streetViewControl: false,
+          zoomControl: true,
+          gestureHandling: "cooperative",
+          mapTypeId: "roadmap",
+          mapTypeControl: false,
+          colorScheme: ColorScheme.LIGHT,
+        });
+
+        setMap(newMap);
+      }
+    };
+
+    initializeMap();
+  }, [isGoogleMapsReady, map, coordinates]);
 
   useEffect(() => {
     if (map && coordinates) {
       map.setCenter(coordinates);
     }
-  }, [coordinates, map]);
+  }, [map, coordinates]);
 
-  // Ajout d'un useEffect pour écouter les changements de vue de la carte
   useEffect(() => {
-    if (map) {
-      const handleBoundsChanged = () => {
-        const bounds = map.getBounds();
-        if (bounds) {
-          const visibleListings = listing.filter((item) => {
-            const { lat, lng } = item.coordinates;
-            return (
-              bounds.getSouthWest().lat() <= lat &&
-              bounds.getNorthEast().lat() >= lat &&
-              bounds.getSouthWest().lng() <= lng &&
-              bounds.getNorthEast().lng() >= lng
-            );
-          });
-          setVisibleListings(visibleListings);
+    if (!map) return;
+
+    const handleBoundsChanged = () => {
+      const bounds = map.getBounds();
+      if (bounds) {
+        const visibleListings = listing.filter(
+          ({ coordinates: { lat, lng } }) => bounds.contains({ lat, lng })
+        );
+        if (onVisibleListingsChange) {
+          onVisibleListingsChange(visibleListings);
         }
-      };
+      }
+    };
 
-      // Écoute l'événement de changement de vue de la carte
-      map.addListener("bounds_changed", handleBoundsChanged);
+    map.addListener("bounds_changed", handleBoundsChanged);
+    handleBoundsChanged();
 
-      // Effectue le filtrage initial lorsque la carte est chargée
-      handleBoundsChanged();
+    return () => window.google.maps.event.clearListeners(map, "bounds_changed");
+  }, [map, listing, onVisibleListingsChange]);
 
-      // Nettoie l'événement à la désactivation du composant
-      return () => {
-        window.google.maps.event.clearListeners(map, "bounds_changed");
-      };
-    }
-  }, [map, listing, setVisibleListings]);
+  const handleMarkerClick = (item) => {
+    setSelectedListing(item);
+    setOpenInfoWindow(item.id);
+  };
+
+  const handleInfoWindowClose = () => {
+    setOpenInfoWindow(null);
+  };
 
   return (
     <div
-      ref={ref}
+      ref={mapRef}
       id="map"
+      className="flex-grow"
       style={{
         width: "100%",
-        height: "80vh",
+        height: "100%",
         borderRadius: isMapExpanded ? 0 : 10,
       }}
     >
       {map &&
-        listing.map((item, index) => {
-          return (
-            <GoogleMarkerItem
+        listing.map((item) => (
+          <GoogleMarkerItem
+            key={item.id}
+            map={map}
+            item={item}
+            setSelectedListing={setSelectedListing}
+            clearInfoWindows={() => setOpenInfoWindow(null)}
+          />
+        ))}
+
+      {map &&
+        listing.map((item) =>
+          openInfoWindow === item.id ? (
+            <InfoWindow
               key={item.id}
+              position={item.coordinates}
               map={map}
-              item={item}
-              index={index}
-              setSelectedListing={setSelectedListing}
-              selectedListing={selectedListing}
-            />
-          );
-        })}
+              onCloseClick={handleInfoWindowClose}
+            >
+              <MarkerListingItem item={item} />
+            </InfoWindow>
+          ) : null
+        )}
     </div>
   );
 }
@@ -99,24 +130,25 @@ export default function GoogleMapSection({
   coordinates,
   listing,
   isMapExpanded,
-  setVisibleListings, // Ajout de la fonction de filtrage
+  onVisibleListingsChange,
 }) {
   const [selectedListing, setSelectedListing] = useState(null);
+
   return (
-    <div className={isMapExpanded ? "fixed inset-1 z-10" : ""}>
-      <Wrapper
-        apiKey={process.env.NEXT_PUBLIC_GOOGLE_PLACE_API_KEY}
-        version="beta"
-        libraries={["marker"]}
-      >
+    <div
+      className={`flex-grow flex flex-col ${
+        isMapExpanded ? "fixed inset-1 mt-6" : ""
+      }`}
+    >
+      <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_PLACE_API_KEY}>
         <MyMap
           coordinates={coordinates}
           listing={listing}
           setSelectedListing={setSelectedListing}
-          selectedListing={selectedListing}
-          setVisibleListings={setVisibleListings} // Passe la fonction au composant enfant
+          onVisibleListingsChange={onVisibleListingsChange}
+          isMapExpanded={isMapExpanded}
         />
-      </Wrapper>
+      </APIProvider>
     </div>
   );
 }

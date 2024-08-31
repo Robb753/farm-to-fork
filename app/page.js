@@ -2,7 +2,6 @@
 import { useState } from "react";
 import HomeContent from "./_components/HomeContent";
 import ListingMapView from "./_components/ListingMapView";
-import Footer from "./_components/Footer";
 
 export default function Home() {
   const [viewMap, setViewMap] = useState(false);
@@ -12,7 +11,7 @@ export default function Home() {
   };
 
   return (
-    <div className="p-6">
+    <div className="p-4">
       {viewMap ? (
         <ListingMapView typeferme="Productor" />
       ) : (

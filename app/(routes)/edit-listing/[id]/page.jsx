@@ -64,16 +64,16 @@ const certificationsItems = [
 ];
 
 const additionalServicesItems = [
-  { id: "Visite de la ferme", label: "Farm Visit" },
-  { id: "Ateliers de cuisine", label: "Cooking Workshops" },
-  { id: "Hébergement", label: "Accommodation" },
-  { id: "Activités pour enfants", label: "Children Activities" },
-  { id: "Réservation pour événements", label: "Event Booking" },
+  { id: "Visite de la ferme", label: "Visite de la ferme" },
+  { id: "Ateliers de cuisine", label: "Ateliers de cuisine" },
+  { id: "Hébergement", label: "Hébergement" },
+  { id: "Activités pour enfants", label: "Activités pour enfants" },
+  { id: "Réservation pour événements", label: "Réservation pour événements" },
 ];
 
 const availabilityItems = [
   { id: "Saisonnière", label: "Saisonnière" },
-  { id: "Toute lannée", label: "Toute lannée" }, // Remarque : Remplacez "lannée" par "l'année"
+  { id: "Toute l'année", label: "Toute l'année" }, // Remarque : Remplacez "lannée" par "l'année"
   { id: "Pré-commande", label: "Pré-commande" },
   { id: "Sur abonnement", label: "Sur abonnement" },
   { id: "Événements spéciaux", label: "Événements spéciaux" },

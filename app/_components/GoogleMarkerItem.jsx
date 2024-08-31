@@ -1,86 +1,65 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import ReactDOMServer from "react-dom/server";
 import MarkerListingItem from "./MarkerListingItem";
 import Link from "next/link";
 
-function GoogleMarkerItem({ map, item, setSelectedListing, selectedListing }) {
+function GoogleMarkerItem({ map, item, setSelectedListing, clearInfoWindows }) {
   const markerRef = useRef(null);
-  const InfoWindow = useRef(null);
-  const [hovered, setHovered] = useState(false);
+  const infoWindowRef = useRef(null);
 
   useEffect(() => {
-    async function createAdvancedMarker() {
-      if (!map || !item || !item.coordinates) {
-        console.warn("Map, item, or item.coordinates is missing");
-        return;
-      }
+    if (!map || !item?.coordinates) return;
 
-      // Clear previous marker and InfoWindow
-      if (markerRef.current) {
-        markerRef.current.setMap(null);
-      }
-      if (InfoWindow.current) {
-        InfoWindow.current.close();
-      }
+    const initializeMarker = async () => {
+      if (markerRef.current) markerRef.current.setMap(null);
+      if (infoWindowRef.current) infoWindowRef.current.close();
 
-      const { AdvancedMarkerElement } = await window.google.maps.importLibrary(
-        "marker"
-      );
+      try {
+        const { AdvancedMarkerElement } =
+          await window.google.maps.importLibrary("marker");
 
-      markerRef.current = new AdvancedMarkerElement({
-        position: item.coordinates,
-        map,
-        title: item.name,
-      });
+        markerRef.current = new AdvancedMarkerElement({
+          position: item.coordinates,
+          map,
+          title: item.name,
+        });
 
-      // Generate HTML string for InfoWindow
-      const contentString = ReactDOMServer.renderToString(
-        <div>
-          <Link href={"/view-listing/" + item.id}>
+        const contentString = ReactDOMServer.renderToString(
+          <Link href={`/view-listing/${item.id}`}>
             <MarkerListingItem item={item} />
           </Link>
-        </div>
-      );
+        );
 
-      InfoWindow.current = new window.google.maps.InfoWindow({
-        content: contentString,
-        maxWidth: 200,
-      });
-
-      // Event listeners
-      markerRef.current.addListener("click", () => {
-        console.log(item);
-        InfoWindow.current.open({
-          anchor: markerRef.current,
-          map,
-          shouldFocus: false,
+        infoWindowRef.current = new window.google.maps.InfoWindow({
+          content: contentString,
+          maxWidth: 200,
         });
-      });
 
-      markerRef.current.addListener("mouseover", () => {
-        setHovered(true);
-        setSelectedListing(item);
-      });
+        markerRef.current.addListener("click", () => {
+          clearInfoWindows(); // Fermer tous les autres InfoWindows
+          infoWindowRef.current.open({ anchor: markerRef.current, map });
+        });
 
-      markerRef.current.addListener("mouseout", () => {
-        setHovered(false);
-      });
-    }
+        markerRef.current.addListener("mouseover", () => {
+          setSelectedListing(item);
+        });
 
-    createAdvancedMarker();
-
-    return () => {
-      if (markerRef.current) {
-        markerRef.current.setMap(null);
+        markerRef.current.addListener("mouseout", () => {
+          setSelectedListing(null);
+        });
+      } catch (error) {
+        console.error("Error initializing marker:", error);
       }
     };
-  }, [map, item, setSelectedListing]);
 
-  return hovered && selectedListing ? (
-    <MarkerListingItem 
-    closeHandler={()=>setSelectedListing(null)}
-    item={item} index={index} />
-  ) : null;
+    initializeMarker();
+
+    return () => {
+      if (markerRef.current) markerRef.current.setMap(null);
+    };
+  }, [map, item, setSelectedListing, clearInfoWindows]);
+
+  return null;
 }
 
 export default GoogleMarkerItem;

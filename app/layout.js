@@ -4,6 +4,7 @@ import Provider from "./Provider";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "@/components/ui/sonner";
 import { CoordinateProvider } from "./contexts/CoordinateContext";
+import { GoogleMapsProvider } from "./contexts/GoogleMapsContext"; // Importer le GoogleMapsProvider
 import Footer from "./_components/Footer"; // Importer le Footer
 
 const inter = Inter({ subsets: ["latin"] });
@@ -20,8 +21,10 @@ export default function RootLayout({ children }) {
         <body className={inter.className}>
           <Toaster />
           <CoordinateProvider>
-            <Provider>{children}</Provider>
-            <Footer /> {/* Ajouter le Footer ici */}
+            <GoogleMapsProvider>
+              <Provider>{children}</Provider>
+              <Footer />
+            </GoogleMapsProvider>
           </CoordinateProvider>
         </body>
       </html>

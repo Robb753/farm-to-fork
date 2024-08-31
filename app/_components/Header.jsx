@@ -1,6 +1,5 @@
 "use client";
-import { Button } from "@/components/ui/button";
-import { SignOutButton, UserButton, useUser } from "@clerk/nextjs";
+import { SignOutButton, useUser } from "@clerk/nextjs";
 import { Menu, Plus } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -29,7 +28,7 @@ function Header() {
   };
 
   return (
-    <header className="bg-white shadow-md fixed top-0 w-full z-10">
+    <header className="bg-white shadow-md fixed top-0 w-full z-50">
       <div className="mx-auto flex h-24 max-w-screen-xl items-center gap-8 px-4 sm:px-6 lg:px-8">
         <Link href="/">
           <Image
