@@ -1,7 +1,6 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-@tailwind base;
 
 @layer base {
   :root {
@@ -58,13 +57,52 @@
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
   }
-}
 
-@layer base {
   * {
     @apply border-border;
   }
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Marqueur */
+.marker-container {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  background-color: #07e12b;
+  border-radius: 50%;
+  color: #263238;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  width: 35px;
+  height: 35px;
+  padding: 4px;
+  gap: 15px;
+  position: relative;
+  transition: all 0.3s ease-out;
+}
+
+.marker-container::after {
+  border-left: 9px solid transparent;
+  border-right: 9px solid transparent;
+  border-top: 9px solid #07e12b;
+  content: "";
+  position: absolute;
+  top: 95%;
+  left: 50%;
+  transform: translateX(-50%);
+  transition: all 0.3s ease-out;
+  z-index: 1;
+}
+
+.marker-container:hover {
+  transform: scale(1.2);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Cacher la croix de fermeture dans toutes les InfoWindow de Google Maps */
+.gm-style-iw button[title="Fermer"] {
+  display: none !important;
 }

@@ -76,7 +76,7 @@ function ListingMapView({ typeferme }) {
   return (
     <div
       className={`flex gap-4 px-2 ${isMapExpanded ? "flex-col" : "flex-row"}`}
-      style={{ height: "100vh" }} // Assure que l'espace vertical est utilisé pleinement
+      style={{ height: "80vh" }} // Assure que l'espace vertical est utilisé pleinement
     >
       <div className="flex flex-col md:flex-row w-full h-full">
         {/* Colonne pour FilterSection */}

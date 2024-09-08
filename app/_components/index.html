@@ -1,0 +1,64 @@
+<div class="class="custom-container"
+        <div class="icon">
+        <img src="./fourchette.png" alt="Marker" style="width:40px; height:40px;" />
+        </div>
+    <div class="details">
+        <div class="custom-details-container">
+            <h2 class="custom-title">${item.name || "N/A"}</h2>
+            <h2 class="custom-address">
+                <span class="icon-map-pin"></span>
+                <span class="truncate">
+                    <div class="address">${item?.address || "N/A"}</di>
+                </span>
+            </h2>
+        <div class="custom-features">
+    </div>
+</div>
+
+
+
+<div class="class="custom-container"
+        <div class="icon">
+            <img src="./fourchette.png" alt="Marker" style="width:40px; height:40px;" />
+          </div>
+          <div class="details">
+            <div class="custom-container">
+              <div class="custom-image-container">
+                <img src="${
+                  item.listingImages[0]?.url || "/default-image.jpg"
+                }" class="custom-image" />
+              </div>
+              <div class="custom-details-container">
+                <h2 class="custom-title">${item.name || "N/A"}</h2>
+                <h2 class="custom-address">
+                  <span class="icon-map-pin"></span>
+                  <span class="truncate">${item?.address || "N/A"}</span>
+                </h2>
+              </div>
+            </div>
+          </div>
+
+
+
+          <div class="icon">
+            <img src="./fourchette.png" alt="Marker" style="width:40px; height:40px;" />
+          </div>
+          <div class="details">
+            <div class="custom-image-container">
+              <img src="${
+                item.listingImages[0]?.url || "/default-image.jpg"
+              }" alt="${item.name}" class="custom-image" />
+            </div>
+            <div class="custom-details-container">
+              <h2 class="custom-title">${item.name || "N/A"}</h2>
+              <h2 class="custom-address">
+                <span class="icon-map-pin"></span>
+                <span class="truncate">
+                  <div class="address">${item?.address || "N/A"}</div>
+                </span>
+              </h2>
+              <div class="custom-features">
+                <!-- Ajoutez des fonctionnalités ici si nécessaire -->
+              </div>
+            </div>
+          </div>

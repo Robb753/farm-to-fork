@@ -1,5 +1,4 @@
-import { MapPin, Map } from "lucide-react";
-import Image from "next/image";
+import { MapPin, Map, ShieldCheck, Home } from "lucide-react";
 import React, { useState } from "react";
 
 function MarkerListingItem({ item }) {
@@ -14,45 +13,49 @@ function MarkerListingItem({ item }) {
   };
 
   return (
-    <div>
-      <div className="cursor-pointer rounded-lg w-[180px]">
-        <Image
-          src={item.listingImages[0]?.url || "/default-image.jpg"}
-          width={800}
-          height={150}
-          className="rounded-lg object-cover h-[120px] w-[160px]"
-          alt={`Listing image`}
-          priority
-        />
+    <div className="markercontent">
+      <div className="vignette-content">
+        <div className="w-full max-w-md overflow-hidden shadow-lg">
+          {/* Image en haut, occupant toute la largeur */}
+          <div className="relative h-36 w-full">
+            <img
+              src={item.listingImages[0]?.url || "/default-image.jpg"}
+              alt={item.name || "N/A"}
+              className="w-full h-full object-cover"
+            />
+          </div>
 
-        <div className="flex mt-2 py-2 flex-col">
-          <h2 className="font-bold text-xl">{item?.name || "N/A"}</h2>
-          <h2 className="flex gap-2 text-sm text-gray-400">
-            <MapPin className="h-4 w-4 text-gray-800" />
-            {item?.address || "N/A"}
-          </h2>
-          <button
-            onClick={toggleMap}
-            className="mt-2 flex items-center text-primary hover:underline"
-          >
-            <Map className="h-4 w-4 mr-1" />
-            {showMap ? "Hide Map" : "Show Map"}
-          </button>
+          {/* Contenu en dessous de l'image */}
+          <div className="bg-white p-1">
+            <div className="flex items-center gap-2">
+              <svg
+                className="w-8 h-8 text-primary"
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="2" x2="5" y1="12" y2="12" />
+                <line x1="19" x2="22" y1="12" y2="12" />
+                <line x1="12" x2="12" y1="2" y2="5" />
+                <line x1="12" x2="12" y1="19" y2="22" />
+                <circle cx="12" cy="12" r="7" />
+              </svg>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  {item.name || "N/A"}
+                </h3>
+                <p className="text-gray-500">{item?.address || "N/A"}</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-
-      {showMap && (
-        <div className="mt-2 w-full h-[150px] rounded-lg overflow-hidden">
-          <iframe
-            width="100%"
-            height="100%"
-            loading="lazy"
-            allowFullScreen
-            src={`https://www.google.com/maps/embed/v1/view?key=${process.env.NEXT_PUBLIC_GOOGLE_PLACE_API_KEY}&center=${item.coordinates.lat},${item.coordinates.lng}&zoom=15&maptype=roadmap`}
-            title={`Map for ${item.name}`}
-          ></iframe>
-        </div>
-      )}
     </div>
   );
 }

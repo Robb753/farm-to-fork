@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
-import { APIProvider, InfoWindow, Map } from "@vis.gl/react-google-maps";
+import { APIProvider, Map } from "@vis.gl/react-google-maps";
 import GoogleMarkerItem from "./GoogleMarkerItem";
-import MarkerListingItem from "./MarkerListingItem";
 
 function MyMap({
   coordinates,
@@ -13,7 +12,6 @@ function MyMap({
   const mapRef = useRef(null);
   const [map, setMap] = useState(null);
   const [isGoogleMapsReady, setIsGoogleMapsReady] = useState(false);
-  const [openInfoWindow, setOpenInfoWindow] = useState(null);
 
   useEffect(() => {
     const checkIfLoaded = setInterval(() => {
@@ -35,6 +33,7 @@ function MyMap({
           mapId: process.env.NEXT_PUBLIC_MAP_ID,
           center: coordinates || { lat: 48.8575, lng: 2.23453 },
           zoom: 12,
+          scaleControlOptions: 1,
           disableDefaultUI: true,
           streetViewControl: false,
           zoomControl: true,
@@ -78,15 +77,6 @@ function MyMap({
     return () => window.google.maps.event.clearListeners(map, "bounds_changed");
   }, [map, listing, onVisibleListingsChange]);
 
-  const handleMarkerClick = (item) => {
-    setSelectedListing(item);
-    setOpenInfoWindow(item.id);
-  };
-
-  const handleInfoWindowClose = () => {
-    setOpenInfoWindow(null);
-  };
-
   return (
     <div
       ref={mapRef}
@@ -105,23 +95,9 @@ function MyMap({
             map={map}
             item={item}
             setSelectedListing={setSelectedListing}
-            clearInfoWindows={() => setOpenInfoWindow(null)}
+            clearInfoWindows={() => {}}
           />
         ))}
-
-      {map &&
-        listing.map((item) =>
-          openInfoWindow === item.id ? (
-            <InfoWindow
-              key={item.id}
-              position={item.coordinates}
-              map={map}
-              onCloseClick={handleInfoWindowClose}
-            >
-              <MarkerListingItem item={item} />
-            </InfoWindow>
-          ) : null
-        )}
     </div>
   );
 }
