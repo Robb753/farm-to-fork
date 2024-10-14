@@ -1,4 +1,5 @@
 import { MapPin, Map, ShieldCheck, Home } from "lucide-react";
+import Link from "next/link";
 import React, { useState } from "react";
 
 function MarkerListingItem({ item }) {
@@ -17,17 +18,19 @@ function MarkerListingItem({ item }) {
       <div className="vignette-content">
         <div className="w-full max-w-md overflow-hidden shadow-lg">
           {/* Image en haut, occupant toute la largeur */}
-          <div className="relative h-36 w-full">
-            <img
-              src={item.listingImages[0]?.url || "/default-image.jpg"}
-              alt={item.name || "N/A"}
-              className="w-full h-full object-cover"
-            />
+          <div className="relative h-24 w-full">
+            <Link href={`/view-listing/${item.id}`}>
+              <img
+                src={item.listingImages[0]?.url || "/default-image.jpg"}
+                alt={item.name || "N/A"}
+                className="w-full h-full object-cover cursor-pointer"
+              />
+            </Link>
           </div>
 
           {/* Contenu en dessous de l'image */}
-          <div className="bg-white p-1">
-            <div className="flex items-center gap-2">
+          <div className="bg-white mt-1 py-1 m-1">
+            <div className="flex items-center gap-4">
               <svg
                 className="w-8 h-8 text-primary"
                 xmlns="http://www.w3.org/2000/svg"

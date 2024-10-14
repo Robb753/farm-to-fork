@@ -103,6 +103,6 @@
 }
 
 /* Cacher la croix de fermeture dans toutes les InfoWindow de Google Maps */
-.gm-style-iw button[title="Fermer"] {
-  display: none !important;
+.gm-style-iw .domready {
+  display: none;
 }

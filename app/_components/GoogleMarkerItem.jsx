@@ -10,7 +10,6 @@ function GoogleMarkerItem({ map, item }) {
   const markerRef = useRef(null);
   const infoWindowRef = useRef(null); // Référence pour l'InfoWindow de ce marqueur
 
-  // Fonction pour créer le contenu du marqueur personnalisé en JSX
   const createMarkerContent = () => {
     return (
       <div className="marker-container">
@@ -36,9 +35,6 @@ function GoogleMarkerItem({ map, item }) {
           await window.google.maps.importLibrary("marker");
 
         const markerDiv = document.createElement("div");
-        markerDiv.className = "markercontent";
-
-        // Utiliser createRoot pour rendre le marqueur personnalisé
         const root = createRoot(markerDiv);
         root.render(createMarkerContent());
 
@@ -51,22 +47,19 @@ function GoogleMarkerItem({ map, item }) {
 
         // Listener pour ouvrir ou fermer la vignette au clic
         markerRef.current.addListener("click", () => {
-          // Si la vignette pour ce marqueur est déjà ouverte, on la ferme
           if (activeInfoWindow && activeMarker === markerRef.current) {
             activeInfoWindow.close();
-            activeInfoWindow = null; // Réinitialise la variable globale
-            activeMarker = null; // Réinitialise le marqueur actif
+            activeInfoWindow = null;
+            activeMarker = null;
             return;
           }
 
-          // Si une autre InfoWindow est ouverte, on la ferme
           if (activeInfoWindow) {
             activeInfoWindow.close();
-            activeInfoWindow = null; // Réinitialise la variable globale
+            activeInfoWindow = null;
             activeMarker = null;
           }
 
-          // Crée l'InfoWindow uniquement si elle n'est pas déjà créée
           if (!infoWindowRef.current) {
             const infoWindowDiv = document.createElement("div");
             const infoRoot = createRoot(infoWindowDiv);
@@ -78,44 +71,41 @@ function GoogleMarkerItem({ map, item }) {
             });
           }
 
-          // Ouvre l'InfoWindow pour le marqueur actuel
           infoWindowRef.current.open({
             anchor: markerRef.current,
             map,
           });
 
-          // Masquer la croix de fermeture avec du CSS
+          // Masquer la croix de fermeture avec JavaScript dans l'événement domready
           google.maps.event.addListenerOnce(
             infoWindowRef.current,
             "domready",
             () => {
-              const closeButton =
-                infoWindowRef.current.content.closest(
-                  ".gm-style-iw"
-                ).nextSibling;
-              if (closeButton) {
-                closeButton.style.display = "none"; // Masquer la croix de fermeture
+              const iwOuter = document.querySelector(".gm-style-iw");
+              if (iwOuter) {
+                const closeButton = iwOuter.nextSibling;
+                if (closeButton) {
+                  closeButton.style.display = "none"; // Masquer la croix de fermeture
+                }
               }
             }
           );
 
-          // Définit cette InfoWindow comme l'actuelle active et enregistre le marqueur actif
           activeInfoWindow = infoWindowRef.current;
           activeMarker = markerRef.current;
 
           // Listener pour réinitialiser si l'InfoWindow est fermée manuellement
           infoWindowRef.current.addListener("closeclick", () => {
-            activeInfoWindow = null; // Réinitialise la variable globale
-            activeMarker = null; // Réinitialise le marqueur actif
+            activeInfoWindow = null;
+            activeMarker = null;
           });
         });
 
-        // Listener pour fermer l'InfoWindow si l'utilisateur clique ailleurs sur la carte
         map.addListener("click", () => {
           if (activeInfoWindow) {
             activeInfoWindow.close();
-            activeInfoWindow = null; // Réinitialise la variable globale
-            activeMarker = null; // Réinitialise le marqueur actif
+            activeInfoWindow = null;
+            activeMarker = null;
           }
         });
       } catch (error) {

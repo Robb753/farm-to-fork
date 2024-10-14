@@ -11,9 +11,8 @@ import GoogleAddressSearch from "./GoogleAddressSearch";
 import FilterSection from "./FilterSection";
 
 function ListingMapView({ typeferme }) {
-  // État pour gérer les listings et les filtres
   const [listing, setListing] = useState([]);
-  const [visibleListings, setVisibleListings] = useState([]);
+  const [visibleListings, setVisibleListings] = useState([]); // Listings visibles
   const [searchAddress, setSearchAddress] = useState(null);
   const [isMapExpanded, setIsMapExpanded] = useState(false);
   const { coordinates, setCoordinates } = useCoordinates();
@@ -26,21 +25,19 @@ function ListingMapView({ typeferme }) {
     availability: [],
   });
 
-  // Si les coordonnées ne sont pas définies, les définir par défaut
   useEffect(() => {
     if (!coordinates) {
       setCoordinates({ lat: 0, lng: 0 });
     }
   }, [coordinates, setCoordinates]);
 
-  // Charger les listings lorsque les filtres ou les coordonnées changent
+  // Recharger les listings lorsque les filtres ou les coordonnées changent
   useEffect(() => {
     if (coordinates && coordinates.lat && coordinates.lng) {
       getLatestListing();
     }
   }, [typeferme, coordinates, searchAddress, filters]);
 
-  // Fonction pour récupérer les derniers listings depuis Supabase
   const getLatestListing = async () => {
     let query = supabase
       .from("listing")
@@ -48,7 +45,6 @@ function ListingMapView({ typeferme }) {
       .eq("active", true)
       .eq("typeferme", typeferme);
 
-    // Appliquer les filtres sélectionnés
     Object.keys(filters).forEach((key) => {
       if (filters[key]?.length > 0) {
         const filterQuery = filters[key]
@@ -64,11 +60,10 @@ function ListingMapView({ typeferme }) {
       toast.error("Search Error");
     } else {
       setListing(data);
-      setVisibleListings(data);
+      setVisibleListings(data); // Initialement, tous les listings sont visibles
     }
   };
 
-  // Fonction pour basculer l'état d'expansion de la carte
   const toggleMapSize = () => {
     setIsMapExpanded(!isMapExpanded);
   };
@@ -76,24 +71,21 @@ function ListingMapView({ typeferme }) {
   return (
     <div
       className={`flex gap-4 px-2 ${isMapExpanded ? "flex-col" : "flex-row"}`}
-      style={{ height: "80vh" }} // Assure que l'espace vertical est utilisé pleinement
+      style={{ height: "80vh" }}
     >
       <div className="flex flex-col md:flex-row w-full h-full">
-        {/* Colonne pour FilterSection */}
         <div className="basis-1/5 bg-white order-2 z-30 overflow-y-auto">
           <FilterSection onChangeFilters={setFilters} />
         </div>
 
-        {/* Colonne pour Listing */}
         <div className="basis-1/4 bg-white order-3 z-30 overflow-y-auto">
           <Listing
-            listing={visibleListings}
+            listing={visibleListings} // Utilise les listings visibles ici
             filters={filters}
             searchAddress={searchAddress}
           />
         </div>
 
-        {/* Colonne pour la carte */}
         <div
           className={`${
             isMapExpanded
@@ -107,13 +99,12 @@ function ListingMapView({ typeferme }) {
           }}
         >
           <GoogleMapSection
-            listing={listing}
+            listing={listing} // Envoie tous les listings à GoogleMapSection
             coordinates={coordinates}
             isMapExpanded={isMapExpanded}
-            setVisibleListings={setVisibleListings}
+            onVisibleListingsChange={setVisibleListings} // Mets à jour les listings visibles
           />
 
-          {/* Affiche GoogleAddressSearch seulement si la carte n'est pas étendue */}
           {!isMapExpanded && (
             <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-40 w-[60%] max-w-[600px]">
               <GoogleAddressSearch
@@ -127,9 +118,9 @@ function ListingMapView({ typeferme }) {
                 setCoordinates={setCoordinates}
                 onAddressChange={(place) => {
                   if (!place) {
-                    setCoordinates({ lat: 48.8575, lng: 2.23453 }); // Réinitialise les coordonnées à Paris
-                    setSearchAddress(null); // Réinitialise l'adresse de recherche
-                    getLatestListing(); // Recharge les listings
+                    setCoordinates({ lat: 48.8575, lng: 2.23453 });
+                    setSearchAddress(null);
+                    getLatestListing();
                   }
                 }}
               />

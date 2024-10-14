@@ -1,14 +1,33 @@
 import React, { useEffect, useRef } from "react";
-import { MapPin } from "lucide-react";
+import { SearchIcon } from "lucide-react";
 import { useGoogleMaps } from "../contexts/GoogleMapsContext";
+import { useCoordinates } from "../contexts/CoordinateContext";
+import { toast, Toaster } from "sonner";
+import { useRouter } from "next/navigation";
 
 function GoogleAddressSearch({
   selectedAddress,
-  setCoordinates,
+  setParentCoordinates, // Renommé ici
   onAddressChange,
 }) {
   const { isApiLoaded } = useGoogleMaps();
   const inputRef = useRef(null);
+  const { coordinates, setCoordinates } = useCoordinates(); // Pas de conflit avec `setParentCoordinates`
+  const router = useRouter();
+
+  // Déplace `handleViewMapClick` ici pour qu'il soit accessible
+  const handleViewMapClick = () => {
+    if (coordinates?.lat && coordinates?.lng) {
+      const query = new URLSearchParams({
+        lat: coordinates.lat.toString(),
+        lng: coordinates.lng.toString(),
+      }).toString();
+      router.push(`/productor?${query}`);
+    } else {
+      toast.error("Veuillez sélectionner une adresse valide");
+      <Toaster richColors />;
+    }
+  };
 
   useEffect(() => {
     if (isApiLoaded && inputRef.current) {
@@ -35,6 +54,7 @@ function GoogleAddressSearch({
           lng: place.geometry.location.lng(),
         };
         setCoordinates(latLng);
+        setParentCoordinates(latLng); // Utilisation de setParentCoordinates ici
         if (onAddressChange) onAddressChange(place);
       };
 
@@ -58,13 +78,16 @@ function GoogleAddressSearch({
   }, [isApiLoaded, selectedAddress, setCoordinates, onAddressChange]);
 
   return (
-    <div className="flex items-center bg-slate-200">
-      <MapPin className="h-8 w-8 p-2 bg-primary sm:h-10 sm:w-10" />
+    <div className="flex items-center md:border-2 rounded-full py-2 md:shadow-sm">
       <input
+        type="text"
         ref={inputRef}
-        placeholder="Search"
-        className="w-full text-sm sm:text-base p-2"
+        placeholder="Start Your Search"
+        className="flex-grow pl-5 bg-transparent outline-none"
       />
+      <div onClick={handleViewMapClick}>
+        <SearchIcon className="hidden md:inline-flex h-7 w-7 mr-4 bg-primary text-white rounded-full p-1 cursor-pointer md:mx-2" />
+      </div>
     </div>
   );
 }
