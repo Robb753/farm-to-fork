@@ -7,7 +7,6 @@ import { toast } from "sonner";
 import GoogleMapSection from "./GoogleMapSection";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useCoordinates } from "../contexts/CoordinateContext";
-import GoogleAddressSearch from "./GoogleAddressSearch";
 import FilterSection from "./FilterSection";
 
 function ListingMapView({ typeferme }) {
@@ -105,27 +104,7 @@ function ListingMapView({ typeferme }) {
             onVisibleListingsChange={setVisibleListings} // Mets à jour les listings visibles
           />
 
-          {!isMapExpanded && (
-            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-40 w-[60%] max-w-[600px]">
-              <GoogleAddressSearch
-                selectedAddress={(v) => {
-                  setSearchAddress(v);
-                  setCoordinates({
-                    lat: v?.geometry?.location?.lat() || 0,
-                    lng: v?.geometry?.location?.lng() || 0,
-                  });
-                }}
-                setCoordinates={setCoordinates}
-                onAddressChange={(place) => {
-                  if (!place) {
-                    setCoordinates({ lat: 48.8575, lng: 2.23453 });
-                    setSearchAddress(null);
-                    getLatestListing();
-                  }
-                }}
-              />
-            </div>
-          )}
+          {/* Supprimé la section de GoogleAddressSearch */}
 
           <button
             onClick={toggleMapSize}

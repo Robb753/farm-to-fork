@@ -4,6 +4,7 @@
   import { useCoordinates } from "../contexts/CoordinateContext";
   import { useRouter } from "next/navigation";
   import { Toaster } from "sonner";
+import LargeCards from "./LargeCards";
 
   function HomeContent() {
     const { coordinates, setCoordinates } = useCoordinates();
@@ -31,6 +32,17 @@
             </p>
           </div>
         </div>
+        <main className="max-w-7xl mx-auto px-8 sm:px-16">
+          <section className="pt-6">
+            <h2 className="text-4xl font-semibold pb-2">Explore Nearby</h2>
+            <LargeCards
+              img="/pexels-pixabay-235985.jpg"
+              title="The Greatest Outdoors"
+              description="Whishlist curated by Me"
+              buttonText="Get Inspired"
+            />
+          </section>
+        </main>
       </div>
     );
   }
