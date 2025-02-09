@@ -1,8 +1,8 @@
-import GoogleMapSection from '@/app/_components/GoogleMapSection';
 import { Button } from '@/components/ui/button'
 import { Bath, BedDouble, CarFront, Drill, Home, LandPlot, MapPin, Share } from 'lucide-react'
 import React from 'react'
 import AgentDetail from './AgentDetail';
+import GoogleMapSection from '@/app/_components/GoogleMapSection';
 
 function Details({listingDetail}) {
   return (
@@ -55,10 +55,19 @@ function Details({listingDetail}) {
 
         <div>
           <h2 className="font-bold text-2xl">Find on Map</h2>
-          <GoogleMapSection
-            coordinates={listingDetail.coordinates}
-            listing={[listingDetail]}
-          />
+          {listingDetail.coordinates ? (
+
+            console.log("Coordinates passed to GoogleMapSection:", listingDetail.coordinates),
+            <GoogleMapSection
+              coordinates={listingDetail.coordinates}
+              listing={[listingDetail]}
+            />
+          ) : (
+            <p className="text-gray-500">
+              No coordinates available for this listing.
+            </p>
+          )}
+          
         </div>
 
         <div>

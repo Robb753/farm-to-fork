@@ -40,6 +40,7 @@ import LargeCards from "./LargeCards";
               title="The Greatest Outdoors"
               description="Whishlist curated by Me"
               buttonText="Get Inspired"
+              priority
             />
           </section>
         </main>

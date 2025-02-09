@@ -1,77 +1,97 @@
-import { BathIcon, BedDouble, MapPin, RulerIcon } from "lucide-react";
+import {
+  BathIcon,
+  BedDouble,
+  HeartIcon,
+  MapPin,
+  RulerIcon,
+} from "lucide-react";
 import Image from "next/image";
-import React, { useEffect, useState } from "react";
+import React from "react";
 import Link from "next/link";
+import { useMapListing } from "../contexts/MapListingContext";
 
-function Listing({ listing, searchAddress, filters }) {
-  const [address, setAddress] = useState(searchAddress);
-
-  useEffect(() => {
-    setAddress(searchAddress);
-  }, [searchAddress]);
-
-  const filteredListing = listing.filter((item) =>
-    ["product_type", "certifications", "purchase_mode"].every(
-      (filterKey) =>
-        filters[filterKey].length === 0 ||
-        filters[filterKey].some((filter) => item[filterKey].includes(filter))
-    )
-  );
+function Listing({ searchAddress }) {
+  const mapListingContext = useMapListing();
+  const { visibleListings } = mapListingContext || { visibleListings: [] };
 
   return (
-    <div className="p-2 sm:p-4 md:p-6">
-      {address && (
-        <div className="px-3 my-5">
-          <h2 className="text-sm sm:text-xl font-semibold">
-            Found <span className="font-bold">{filteredListing.length}</span>{" "}
+    <div className="p-4 md:p-6 min-h-screen">
+      {searchAddress && (
+        <div className="mb-4 md:mb-6">
+          <h2 className="text-sm md:text-xl font-semibold text-gray-700">
+            Found{" "}
+            <span className="font-bold text-primary">
+              {visibleListings?.length || 0}
+            </span>{" "}
             Results in{" "}
-            <span className="text-primary font-bold">{address?.label}</span>
+            <span className="text-primary font-bold">
+              {searchAddress?.label}
+            </span>
           </h2>
         </div>
       )}
-      <div className="grid grid-cols-1 gap-4">
-        {filteredListing.length > 0
-          ? filteredListing.map((item) => (
+
+      <div className="flex flex-col gap-4">
+        {visibleListings?.length > 0
+          ? visibleListings.map((item) => (
               <Link key={item.id} href={`/view-listing/${item.id}`}>
-                <div className="p-3 hover:border hover:border-primary cursor-pointer rounded-lg transition-shadow duration-200 hover:shadow-lg">
-                  <Image
-                    src={item.listingImages[0]?.url || "/default-image.jpg"}
-                    width={800}
-                    height={150}
-                    className="rounded-lg object-cover h-[170px] w-full"
-                    alt={`Listing image ${item.id}`}
-                    priority
-                  />
-                  <div className="flex mt-2 flex-col gap-2 overflow-hidden">
-                    <h2 className="font-bold text-lg sm:text-xl truncate">
-                      {item.name}
+                <div className="flex flex-col sm:flex-row items-start p-4 bg-white border-b py-7 px-2 pr-4 hover:opacity-80 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 cursor-pointer gap-4">
+                  {/* Image Section */}
+                  <div className="relative h-40 w-full sm:h-52 sm:w-52 md:w-64 lg:w-80 flex-shrink-0 rounded-lg overflow-hidden">
+                    <Image
+                      src={
+                        item?.listingImages?.[0]?.url || "/default-image.jpg"
+                      }
+                      width={150}
+                      height={100}
+                      className="object-cover w-full h-full"
+                      alt={`Listing image ${item.id}`}
+                      priority
+                    />
+                  </div>
+
+                  {/* Text Section */}
+                  <div className="flex flex-col flex-grow justify-between min-w-0">
+                    {/* Title and Heart Icon */}
+                    <div className="flex justify-between items-center">
+                      <p className="font-normal text-base md:text-lg text-gray-600 truncate">
+                        {item.name || "No name provided"}
+                      </p>
+                      <HeartIcon className="h-6 w-6 text-gray-400 cursor-pointer transition-transform transform hover:scale-110" />
+                    </div>
+                    <div className="border-b w-20 pt-2" />
+
+                    {/* Address Section */}
+                    <h2 className="flex items-center gap-2 text-sm text-gray-500 mt-2 truncate">
+                      <MapPin className="h-4 w-4 text-primary" />
+                      <span className="truncate">
+                        {item?.address || "No address available"}
+                      </span>
                     </h2>
-                    <h2 className="flex gap-2 text-sm text-gray-400">
-                      <MapPin className="h-4 w-4 text-gray-800" />
-                      <span className="truncate">{item.address}</span>
-                    </h2>
-                    <div className="flex mt-2 gap-2 justify-between flex-wrap">
+
+                    {/* Additional Information */}
+                    <div className="flex flex-wrap mt-3 gap-2">
                       {[
                         {
                           icon: BedDouble,
-                          text: item.product_type?.join(", "),
+                          text: item?.product_type?.join(", ") || "N/A",
                         },
                         {
                           icon: BathIcon,
-                          text: item.certification?.join(", "),
+                          text: item?.certifications?.join(", ") || "N/A",
                         },
                         {
                           icon: RulerIcon,
-                          text: item.purchase_mode?.join(", "),
+                          text: item?.purchase_mode?.join(", ") || "N/A",
                         },
                       ].map(({ icon: Icon, text }, index) => (
-                        <h2
+                        <div
                           key={index}
-                          className="flex gap-2 text-sm bg-slate-100 rounded-md p-2 text-gray-600 justify-center items-center"
+                          className="flex items-center gap-1 text-xs md:text-sm bg-gray-100 rounded-full px-3 py-1 text-gray-700"
                         >
-                          <Icon className="h-4 w-4" />
-                          {text || "N/A"}
-                        </h2>
+                          <Icon className="h-4 w-4 text-primary" />
+                          <span>{text}</span>
+                        </div>
                       ))}
                     </div>
                   </div>

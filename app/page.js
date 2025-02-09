@@ -1,4 +1,4 @@
-"use client"
+"use client";
 import { useState } from "react";
 import HomeContent from "./_components/HomeContent";
 import ListingMapView from "./_components/ListingMapView";
@@ -11,14 +11,13 @@ export default function Home() {
   };
 
   return (
-    <div>
-      {viewMap ? (
-        <ListingMapView typeferme="Productor" />
-      ) : (
-        <HomeContent onViewMap={handleViewMap} />
-      )}
-      
-    </div>
+      <div>
+        {viewMap ? (
+          <ListingMapView typeferme="Productor" />
+        ) : (
+          <HomeContent onViewMap={handleViewMap} />
+        )}
+      </div>
     
   );
 }

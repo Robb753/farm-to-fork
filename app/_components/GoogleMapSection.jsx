@@ -1,32 +1,28 @@
 import React, { useEffect, useRef, useState } from "react";
 import { APIProvider, Map } from "@vis.gl/react-google-maps";
 import GoogleMarkerItem from "./GoogleMarkerItem";
+import { useMapListing } from "../contexts/MapListingContext";
 
-function MyMap({
-  coordinates,
-  listing,
-  setSelectedListing,
-  onVisibleListingsChange,
-  isMapExpanded,
-}) {
+function MyMap({ coordinates, setSelectedListing, isMapExpanded }) {
   const mapRef = useRef(null);
   const [map, setMap] = useState(null);
-  const [isGoogleMapsReady, setIsGoogleMapsReady] = useState(false);
+  const mapListingContext = useMapListing();
+  const { visibleListings, listings, setVisibleListings } =
+    mapListingContext || {
+      listings: [], // Toutes les fermes disponibles
+      visibleListings: [],
+      setVisibleListings: () => {},
+    };
 
+  // Vérifier si Google Maps est prêt
   useEffect(() => {
-    const checkIfLoaded = setInterval(() => {
-      if (window.google && window.google.maps) {
-        setIsGoogleMapsReady(true);
-        clearInterval(checkIfLoaded);
-      }
-    }, 100);
+    if (!window.google || !window.google.maps) {
+      console.error("Google Maps API not loaded");
+      return;
+    }
 
-    return () => clearInterval(checkIfLoaded);
-  }, []);
-
-  useEffect(() => {
-    const initializeMap = async () => {
-      if (isGoogleMapsReady && mapRef.current && !map) {
+    if (mapRef.current && !map) {
+      const initializeMap = async () => {
         const { ColorScheme } = await window.google.maps.importLibrary("core");
 
         const newMap = new window.google.maps.Map(mapRef.current, {
@@ -44,38 +40,52 @@ function MyMap({
         });
 
         setMap(newMap);
-      }
-    };
+      };
 
-    initializeMap();
-  }, [isGoogleMapsReady, map, coordinates]);
+      initializeMap();
+    }
+  }, [map, coordinates]);
 
+  // Centrer la carte quand les coordonnées changent
   useEffect(() => {
     if (map && coordinates) {
       map.setCenter(coordinates);
     }
   }, [map, coordinates]);
 
+  // Gérer l'affichage des fermes visibles selon les limites de la carte
   useEffect(() => {
-    if (!map) return;
+    if (!map || !listings) return; // Assurer que la carte et les fermes sont disponibles
 
     const handleBoundsChanged = () => {
       const bounds = map.getBounds();
       if (bounds) {
-        const visibleListings = listing.filter(
+        // Filtrer les fermes visibles dans la zone actuelle de la carte
+        const filteredListings = listings.filter(
           ({ coordinates: { lat, lng } }) => bounds.contains({ lat, lng })
         );
-        if (onVisibleListingsChange) {
-          onVisibleListingsChange(visibleListings);
-        }
+
+        // Mettre à jour les fermes visibles dans le contexte uniquement si elles changent
+        setVisibleListings((prevListings) => {
+          const prevIds = prevListings.map((item) => item.id);
+          const newIds = filteredListings.map((item) => item.id);
+          if (JSON.stringify(prevIds) !== JSON.stringify(newIds)) {
+            return filteredListings;
+          }
+          return prevListings; // Ne change rien si c'est la même liste
+        });
       }
     };
 
-    map.addListener("bounds_changed", handleBoundsChanged);
-    handleBoundsChanged();
+    const boundsListener = map.addListener("idle", handleBoundsChanged);
 
-    return () => window.google.maps.event.clearListeners(map, "bounds_changed");
-  }, [map, listing, onVisibleListingsChange]);
+    // Nettoyage du listener lors du démontage
+    return () => {
+      if (boundsListener) {
+        window.google.maps.event.removeListener(boundsListener);
+      }
+    };
+  }, [map, listings]); // Retirer `setVisibleListings` des dépendances
 
   return (
     <div
@@ -89,7 +99,7 @@ function MyMap({
       }}
     >
       {map &&
-        listing.map((item) => (
+        visibleListings.map((item) => (
           <GoogleMarkerItem
             key={item.id}
             map={map}
@@ -102,12 +112,7 @@ function MyMap({
   );
 }
 
-export default function GoogleMapSection({
-  coordinates,
-  listing,
-  isMapExpanded,
-  onVisibleListingsChange,
-}) {
+export default function GoogleMapSection({ coordinates, isMapExpanded }) {
   const [selectedListing, setSelectedListing] = useState(null);
 
   return (
@@ -119,9 +124,7 @@ export default function GoogleMapSection({
       <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_PLACE_API_KEY}>
         <MyMap
           coordinates={coordinates}
-          listing={listing}
           setSelectedListing={setSelectedListing}
-          onVisibleListingsChange={onVisibleListingsChange}
           isMapExpanded={isMapExpanded}
         />
       </APIProvider>

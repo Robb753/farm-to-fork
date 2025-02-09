@@ -3,7 +3,7 @@ import { SearchIcon } from "lucide-react";
 import { useGoogleMaps } from "../contexts/GoogleMapsContext";
 import { useCoordinates } from "../contexts/CoordinateContext";
 import { toast, Toaster } from "sonner";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 function GoogleAddressSearchForHeader({
   selectedAddress,
@@ -14,6 +14,7 @@ function GoogleAddressSearchForHeader({
   const inputRef = useRef(null);
   const { coordinates, setCoordinates } = useCoordinates();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (isApiLoaded && inputRef.current) {
@@ -64,6 +65,24 @@ function GoogleAddressSearchForHeader({
     router,
   ]);
 
+  // Réinitialiser le champ de recherche quand on revient sur la page d'accueil
+  useEffect(() => {
+    if (pathname === "/") {
+      if (inputRef.current) {
+        inputRef.current.value = ""; // Réinitialise la valeur de l'input
+      }
+      setCoordinates({ lat: 48.8575, lng: 2.23453 }); // Optionnel : Réinitialise les coordonnées
+      if (onAddressChange) onAddressChange(null);
+    }
+  }, [pathname, setCoordinates, onAddressChange]);
+
+  // Fonction pour sélectionner tout le texte lors du focus
+  const handleFocus = () => {
+    if (inputRef.current) {
+      inputRef.current.select();
+    }
+  };
+
   return (
     <div className="flex items-center md:border-2 rounded-full py-2 md:shadow-sm px-2 sm:px-4">
       <input
@@ -71,6 +90,7 @@ function GoogleAddressSearchForHeader({
         ref={inputRef}
         placeholder="Start Your Search"
         className="flex-grow pl-2 sm:pl-5 bg-transparent outline-none text-sm sm:text-base"
+        onFocus={handleFocus} // Ajout du gestionnaire d'événement onFocus
       />
 
       <div

@@ -106,27 +106,43 @@ function EditListing({ params }) {
     }
   };
 
-  const onSubmitHandler = async (formValue) => {
+  const onSubmitHandler = async (formValue, isPublishing = false) => {
+    // 🔥 Ajout d'une valeur par défaut pour éviter les erreurs de "undefined"
     const transformedValues = {
       ...formValue,
       additional_services: Array.isArray(formValue.additional_services)
         ? formValue.additional_services
-        : [formValue.additional_services],
+        : formValue.additional_services
+        ? [formValue.additional_services]
+        : [], // 🔥 Assure que c'est toujours un tableau
       product_type: Array.isArray(formValue.product_type)
         ? formValue.product_type
-        : [formValue.product_type],
+        : formValue.product_type
+        ? [formValue.product_type]
+        : [],
       production_method: Array.isArray(formValue.production_method)
         ? formValue.production_method
-        : [formValue.production_method],
+        : formValue.production_method
+        ? [formValue.production_method]
+        : [],
       certifications: Array.isArray(formValue.certifications)
         ? formValue.certifications
-        : [formValue.certifications],
+        : formValue.certifications
+        ? [formValue.certifications]
+        : [],
       availability: Array.isArray(formValue.availability)
-        ? formValue.availability
-        : [formValue.availability],
+        ? formValue.availability.map((item) =>
+            item === "Toute l'année" ? "Toute lannée" : item
+          )
+        : formValue.availability
+        ? [formValue.availability]
+        : [],
       purchase_mode: Array.isArray(formValue.purchase_mode)
         ? formValue.purchase_mode
-        : [formValue.purchase_mode],
+        : formValue.purchase_mode
+        ? [formValue.purchase_mode]
+        : [],
+      active: isPublishing, // Détermine si l'annonce est publiée ou reste un brouillon
     };
 
     console.log("Submitting transformed values:", transformedValues);
@@ -139,15 +155,23 @@ function EditListing({ params }) {
         .eq("id", params.id)
         .select();
 
-        if (error) {
-          console.error("Error from Supabase:", error);
-          toast("An error occurred during submission");
-        }
-
-        if (data) {
-          toast("Listing updated and Published");
+      if (error) {
+        console.error("Error from Supabase:", error);
+        toast("An error occurred during submission");
       }
-      
+
+      if (data) {
+        if (isPublishing) {
+          // Si publication : message et redirection
+          toast("Listing updated and Published");
+          setTimeout(() => {
+            router.push(`/user#my-listing`);
+         }, 2000);
+        } else {
+          toast("Listing updated");
+        }
+      }
+
       for (const image of images) {
         const file = image;
         const fileName = Date.now().toString() + "-" + file.name;
@@ -454,45 +478,47 @@ function EditListing({ params }) {
 
                   {/* Buttons */}
                   <div className="col-span-3 flex justify-end gap-2">
+                    {/* 🔹 Bouton Save (Brouillon) */}
                     <Button
                       disabled={loading}
                       variant="outline"
                       className="text-primary"
-                      type="submit"
+                      type="button"
+                      onClick={() => onSubmitHandler(values, false)}
                     >
                       {loading ? <Loader className="animate-spin" /> : "Save"}
                     </Button>
 
+                    {/* 🔹 Bouton Publish (avec confirmation) */}
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button type="button" disabled={loading}>
                           {loading ? (
                             <Loader className="animate-spin" />
                           ) : (
-                            "Save & Publish"
+                            "Publish"
                           )}
                         </Button>
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
                           <AlertDialogTitle>
-                            Are you absolutely sure?
+                            Are you sure you want to publish this listing?
                           </AlertDialogTitle>
                           <AlertDialogDescription>
-                            This action cannot be undone. This will permanently
-                            delete your account and remove your data from our
-                            servers.
+                            Once published, your listing will be visible to all
+                            users.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>Cancel</AlertDialogCancel>
                           <AlertDialogAction
-                            onClick={() => publishBtnHandler()}
+                            onClick={() => onSubmitHandler(values, true)}
                           >
                             {loading ? (
                               <Loader className="animate-spin" />
                             ) : (
-                              "Continue"
+                              "Confirm & Publish"
                             )}
                           </AlertDialogAction>
                         </AlertDialogFooter>

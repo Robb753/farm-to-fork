@@ -19,7 +19,7 @@ import GoogleAddressSearchForHeader from "./GoogleAddressSearchForHeader";
 function Header() {
   const path = usePathname();
   const { user, isSignedIn } = useUser();
-   const { coordinates, setCoordinates } = useCoordinates();  
+  const { coordinates, setCoordinates } = useCoordinates();
 
   return (
     <header className="sticky top-0 z-50 grid grid-cols-3 md:grid-cols-[1fr_2fr_1fr] items-center bg-white shadow-md p-3 sm:p-5 md:px-10 lg:px-16">
@@ -50,11 +50,11 @@ function Header() {
               lng: v?.value?.geometry?.location?.lng() || 0,
             });
           }}
-          setParentCoordinates={setCoordinates} // Utilise setParentCoordinates ici
+          setParentCoordinates={setCoordinates}
         />
       </div>
 
-      {/* right*/}
+      {/* right */}
       <div className="flex items-center justify-end text-gray-400 gap-2 sm:gap-4 text-primary">
         <Link className="hidden lg:inline" href="add-new-listing">
           <Plus className="h-4 w-4 md:h-5 md:w-5 inline-flex" /> Register your

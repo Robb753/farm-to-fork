@@ -7,12 +7,12 @@ import { useRouter } from "next/navigation";
 
 function GoogleAddressSearch({
   selectedAddress,
-  setParentCoordinates, // Renommé ici
+  setCoordinates,
   onAddressChange,
 }) {
   const { isApiLoaded } = useGoogleMaps();
   const inputRef = useRef(null);
-  const { coordinates, setCoordinates } = useCoordinates(); // Pas de conflit avec `setParentCoordinates`
+  const { coordinates, setCoordinates: setLocalCoordinates } = useCoordinates();
   const router = useRouter();
 
   // Déplace `handleViewMapClick` ici pour qu'il soit accessible
@@ -34,7 +34,7 @@ function GoogleAddressSearch({
       const autocompleteInstance = new window.google.maps.places.Autocomplete(
         inputRef.current,
         {
-          types: ["(cities)"],
+          types: ["geocode"],
           componentRestrictions: { country: "fr" },
         }
       );
@@ -43,7 +43,7 @@ function GoogleAddressSearch({
         const place = autocompleteInstance.getPlace();
         if (!place || !place.geometry) {
           selectedAddress(null);
-          setCoordinates({ lat: 48.8575, lng: 2.23453 }); // Coordonnées par défaut (Paris)
+          setLocalCoordinates({ lat: 48.8575, lng: 2.23453 }); // Coordonnées par défaut (Paris)
           if (onAddressChange) onAddressChange(null);
           return;
         }
@@ -53,8 +53,8 @@ function GoogleAddressSearch({
           lat: place.geometry.location.lat(),
           lng: place.geometry.location.lng(),
         };
+        setLocalCoordinates(latLng);
         setCoordinates(latLng);
-        setParentCoordinates(latLng); // Utilisation de setParentCoordinates ici
         if (onAddressChange) onAddressChange(place);
       };
 
@@ -75,7 +75,13 @@ function GoogleAddressSearch({
         }
       };
     }
-  }, [isApiLoaded, selectedAddress, setCoordinates, onAddressChange]);
+  }, [
+    isApiLoaded,
+    selectedAddress,
+    setLocalCoordinates,
+    setCoordinates,
+    onAddressChange,
+  ]);
 
   return (
     <div className="flex items-center md:border-2 rounded-full py-2 md:shadow-sm px-2 sm:px-4">
