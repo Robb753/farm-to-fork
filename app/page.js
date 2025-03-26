@@ -1,7 +1,9 @@
 "use client";
 import { useState } from "react";
-import HomeContent from "./_components/HomeContent";
-import ListingMapView from "./_components/ListingMapView";
+
+import Explore from "./_components/layout/Explore";
+import HomeContent from "./_components/layout/HomeContent";
+
 
 export default function Home() {
   const [viewMap, setViewMap] = useState(false);
@@ -11,13 +13,12 @@ export default function Home() {
   };
 
   return (
-      <div>
-        {viewMap ? (
-          <ListingMapView typeferme="Productor" />
-        ) : (
-          <HomeContent onViewMap={handleViewMap} />
-        )}
-      </div>
-    
+    <div>
+      {viewMap ? (
+        <Explore /> // ✅ Afficher Explore au lieu de ListingMapView
+      ) : (
+        <HomeContent onViewMap={handleViewMap} />
+      )}
+    </div>
   );
 }

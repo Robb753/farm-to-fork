@@ -1,14 +1,8 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea"; // Ajout d'un Textarea pour la description
 import { Formik, Form } from "formik";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/utils/supabase/client";
@@ -16,7 +10,7 @@ import { toast } from "sonner";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import FileUpload from "../_components/FileUpload";
-import { Loader } from "lucide-react";
+import { Loader, Save, Globe, Send } from "lucide-react"; // Ajout d'icônes pour les boutons
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,6 +23,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"; // Ajout de Card pour une meilleure organisation
+import * as Yup from "yup"; // Ajout de Yup pour une meilleure validation
 
 // Define the product types
 const productTypeItems = [
@@ -73,11 +69,62 @@ const additionalServicesItems = [
 
 const availabilityItems = [
   { id: "Saisonnière", label: "Saisonnière" },
-  { id: "Toute l'année", label: "Toute l'année" }, // Remarque : Remplacez "lannée" par "l'année"
+  { id: "Toute l'année", label: "Toute l'année" },
   { id: "Pré-commande", label: "Pré-commande" },
   { id: "Sur abonnement", label: "Sur abonnement" },
   { id: "Événements spéciaux", label: "Événements spéciaux" },
 ];
+
+// Validation schema
+const validationSchema = Yup.object({
+  name: Yup.string().required("Le nom de la ferme est requis"),
+  email: Yup.string().email("Email invalide").required("L'email est requis"),
+  phoneNumber: Yup.string().matches(
+    /^[0-9]{10}$/,
+    "Le numéro de téléphone doit contenir 10 chiffres"
+  ),
+  description: Yup.string().min(
+    10,
+    "La description doit contenir au moins 10 caractères"
+  ),
+  product_type: Yup.array().min(1, "Sélectionnez au moins un type de produit"),
+});
+
+// Composant pour les sections de checkbox
+function CheckboxSection({ title, items, values, onChange }) {
+  return (
+    <Card className="shadow-sm">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg font-semibold">{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 gap-3">
+          {items.map((item) => (
+            <div key={item.id} className="flex items-center space-x-3">
+              <Checkbox
+                checked={values.includes(item.id)}
+                onCheckedChange={(checked) => {
+                  onChange(
+                    checked
+                      ? [...values, item.id]
+                      : values.filter((value) => value !== item.id)
+                  );
+                }}
+                id={`${item.id.replace(/\s+/g, "-")}`}
+              />
+              <Label
+                htmlFor={`${item.id.replace(/\s+/g, "-")}`}
+                className="cursor-pointer"
+              >
+                {item.label}
+              </Label>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 function EditListing({ params }) {
   const { user } = useUser();
@@ -85,6 +132,7 @@ function EditListing({ params }) {
   const [listing, setListing] = useState(null);
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [isLoadingInitialData, setIsLoadingInitialData] = useState(true);
 
   useEffect(() => {
     if (user) {
@@ -93,28 +141,39 @@ function EditListing({ params }) {
   }, [user]);
 
   const verifyUserRecord = async () => {
-    const { data, error } = await supabase
-      .from("listing")
-      .select("*,listingImages(listing_id,url)")
-      .eq("createdBy", user?.primaryEmailAddress.emailAddress)
-      .eq("id", params.id);
+    setIsLoadingInitialData(true);
+    try {
+      const { data, error } = await supabase
+        .from("listing")
+        .select("*,listingImages(listing_id,url)")
+        .eq("createdBy", user?.primaryEmailAddress.emailAddress)
+        .eq("id", params.id);
 
-    if (data && data.length > 0) {
-      setListing(data[0]);
-    } else {
-      router.replace("/");
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        setListing(data[0]);
+      } else {
+        toast.error("Aucun listing trouvé ou autorisations insuffisantes");
+        router.replace("/");
+      }
+    } catch (error) {
+      console.error("Erreur lors de la récupération du listing:", error);
+      toast.error("Une erreur est survenue lors du chargement des données");
+    } finally {
+      setIsLoadingInitialData(false);
     }
   };
 
   const onSubmitHandler = async (formValue, isPublishing = false) => {
-    // 🔥 Ajout d'une valeur par défaut pour éviter les erreurs de "undefined"
+    // Transformation des valeurs pour s'assurer qu'elles sont dans le bon format
     const transformedValues = {
       ...formValue,
       additional_services: Array.isArray(formValue.additional_services)
         ? formValue.additional_services
         : formValue.additional_services
         ? [formValue.additional_services]
-        : [], // 🔥 Assure que c'est toujours un tableau
+        : [],
       product_type: Array.isArray(formValue.product_type)
         ? formValue.product_type
         : formValue.product_type
@@ -131,9 +190,7 @@ function EditListing({ params }) {
         ? [formValue.certifications]
         : [],
       availability: Array.isArray(formValue.availability)
-        ? formValue.availability.map((item) =>
-            item === "Toute l'année" ? "Toute lannée" : item
-          )
+        ? formValue.availability
         : formValue.availability
         ? [formValue.availability]
         : [],
@@ -145,10 +202,9 @@ function EditListing({ params }) {
       active: isPublishing, // Détermine si l'annonce est publiée ou reste un brouillon
     };
 
-    console.log("Submitting transformed values:", transformedValues);
-
     setLoading(true);
     try {
+      // Mise à jour du listing
       const { data, error } = await supabase
         .from("listing")
         .update(transformedValues)
@@ -157,68 +213,81 @@ function EditListing({ params }) {
 
       if (error) {
         console.error("Error from Supabase:", error);
-        toast("An error occurred during submission");
+        toast.error("Une erreur est survenue lors de la sauvegarde");
+        return;
       }
 
-      if (data) {
-        if (isPublishing) {
-          // Si publication : message et redirection
-          toast("Listing updated and Published");
-          setTimeout(() => {
-            router.push(`/user#my-listing`);
-         }, 2000);
-        } else {
-          toast("Listing updated");
-        }
-      }
+      // Traitement des images si elles existent
+      if (images.length > 0) {
+        for (const image of images) {
+          const file = image;
+          const fileName = Date.now().toString() + "-" + file.name;
+          const fileExt = fileName.split(".").pop();
+          const { data: uploadData, error: uploadError } =
+            await supabase.storage
+              .from("listingImages")
+              .upload(`${fileName}`, file, {
+                contentType: `image/${fileExt}`,
+                upsert: false,
+              });
 
-      for (const image of images) {
-        const file = image;
-        const fileName = Date.now().toString() + "-" + file.name;
-        const fileExt = fileName.split(".").pop();
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from("listingImages")
-          .upload(`${fileName}`, file, {
-            contentType: `image/${fileExt}`,
-            upsert: false,
-          });
-        if (uploadError) {
-          toast("Error while uploading images");
-        } else {
-          const imageUrl = process.env.NEXT_PUBLIC_IMAGE_URL + fileName;
-          const { data: insertData, error: insertError } = await supabase
-            .from("listingImages")
-            .insert([{ url: imageUrl, listing_id: params?.id }])
-            .select();
-          if (insertError) {
-            toast("Error while saving image URLs");
+          if (uploadError) {
+            toast.error("Erreur lors du téléchargement des images");
+            console.error("Upload error:", uploadError);
+          } else {
+            const imageUrl = process.env.NEXT_PUBLIC_IMAGE_URL + fileName;
+            const { data: insertData, error: insertError } = await supabase
+              .from("listingImages")
+              .insert([{ url: imageUrl, listing_id: params?.id }])
+              .select();
+
+            if (insertError) {
+              toast.error("Erreur lors de l'enregistrement des URLs d'images");
+              console.error("Insert error:", insertError);
+            }
           }
         }
       }
+
+      if (isPublishing) {
+        toast.success("Votre ferme a été publiée avec succès!");
+        setTimeout(() => {
+          router.push(`/user#my-listing`);
+        }, 2000);
+      } else {
+        toast.success("Modifications enregistrées");
+      }
     } catch (error) {
-      toast("An error occurred during submission");
+      console.error("Submit error:", error);
+      toast.error("Une erreur inattendue est survenue");
     } finally {
       setLoading(false);
     }
   };
 
-  const publishBtnHandler = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("listing")
-      .update({ active: true })
-      .eq("id", params?.id)
-      .select();
-
-    if (data) {
-      setLoading(false);
-      toast("Listing Published!");
-    }
-  };
+  if (isLoadingInitialData) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
+          <p className="text-gray-600">Chargement des données...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="px-10 md:px-36 my-10">
-      <h2 className="font-bold text-2xl">Enter details about your listing</h2>
+    <div className="px-4 md:px-8 lg:px-12 xl:px-20 py-8">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-800">
+          Modifier votre ferme
+        </h1>
+        <p className="text-gray-600 mt-2">
+          Complétez les informations ci-dessous pour mettre à jour votre
+          listing.
+        </p>
+      </div>
+
       {listing && (
         <Formik
           enableReinitialize
@@ -230,24 +299,14 @@ function EditListing({ params }) {
             description: listing.description || "",
             profileImage: listing.profileImage || user?.imageUrl || "",
             fullName: listing.fullName || user?.fullName || "",
-            production_method: listing.production_method || "",
+            production_method: listing.production_method || [],
             certifications: listing.certifications || [],
             additional_services: listing.additional_services || [],
             availability: listing.availability || [],
             product_type: listing.product_type || [],
             purchase_mode: listing.purchase_mode || [],
           }}
-          validate={(values) => {
-            const errors = {};
-            if (!values.email) {
-              errors.email = "Required";
-            } else if (
-              !/^[A-Z0-9._%+-]+@[A-Z.-]+\.[A-Z]{2,}$/i.test(values.email)
-            ) {
-              errors.email = "Invalid email address";
-            }
-            return errors;
-          }}
+          validationSchema={validationSchema}
           onSubmit={(values, { setSubmitting }) => {
             onSubmitHandler(values);
             setTimeout(() => {
@@ -255,276 +314,276 @@ function EditListing({ params }) {
             }, 400);
           }}
         >
-          {({ values, handleChange, handleSubmit, setFieldValue }) => (
+          {({
+            values,
+            errors,
+            touched,
+            handleChange,
+            handleBlur,
+            handleSubmit,
+            setFieldValue,
+          }) => (
             <Form onSubmit={handleSubmit}>
-              <div className="p-8 rounded-lg shadow-md w-full">
-                <div className="grid grid-cols-3 gap-4 md:grid-cols-3">
-                  {/* Nom de la ferme */}
-                  <div className="col-span-3 flex flex-col gap-2">
-                    <Label htmlFor="name">Nom de la ferme</Label>
-                    <Input
-                      id="name"
-                      placeholder="Nom de la ferme"
-                      name="name"
-                      onChange={handleChange}
-                      value={values.name}
-                    />
-                  </div>
-
-                  {/* Product Types (Checkboxes) */}
-                  <div className="grid grid-cols-1 gap-20">
-                    <Label className="font-bold text-xl">Product Types</Label>
-                    {productTypeItems.map((item) => (
-                      <div key={item.id} className="flex items-start space-x-3">
-                        <Checkbox
-                          checked={values.product_type.includes(item.id)}
-                          onCheckedChange={(checked) => {
-                            const newProductTypes = checked
-                              ? [...values.product_type, item.id]
-                              : values.product_type.filter(
-                                  (value) => value !== item.id
-                                );
-                            setFieldValue("product_type", newProductTypes);
-                          }}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Informations générales */}
+                <Card className="lg:col-span-3 shadow-sm">
+                  <CardHeader>
+                    <CardTitle>Informations générales</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {/* Nom de la ferme */}
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="name" className="font-medium">
+                          Nom de la ferme*
+                        </Label>
+                        <Input
+                          id="name"
+                          placeholder="Nom de votre ferme"
+                          name="name"
+                          onChange={handleChange}
+                          onBlur={handleBlur}
+                          value={values.name}
+                          className={
+                            errors.name && touched.name ? "border-red-500" : ""
+                          }
                         />
-                        <Label>{item.label}</Label>
+                        {errors.name && touched.name && (
+                          <p className="text-red-500 text-sm mt-1">
+                            {errors.name}
+                          </p>
+                        )}
                       </div>
-                    ))}
-                  </div>
 
-                  {/* Production Method (Checkboxes) */}
-                  <div className="grid grid-cols-1 gap-2">
-                    <Label className="font-bold text-xl">
-                      Production Method
-                    </Label>
-                    {productionMethodItems.map((item) => (
-                      <div key={item.id} className="flex items-start space-x-3">
-                        <Checkbox
-                          checked={values.production_method.includes(item.id)}
-                          onCheckedChange={(checked) => {
-                            const newProductionMethod = checked
-                              ? [...values.production_method, item.id]
-                              : values.production_method.filter(
-                                  (value) => value !== item.id
-                                );
-                            setFieldValue(
-                              "production_method",
-                              newProductionMethod
-                            );
-                          }}
+                      {/* Email */}
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="email" className="font-medium">
+                          Email*
+                        </Label>
+                        <Input
+                          id="email"
+                          placeholder="contact@exemple.com"
+                          type="email"
+                          name="email"
+                          onChange={handleChange}
+                          onBlur={handleBlur}
+                          value={values.email}
+                          className={
+                            errors.email && touched.email
+                              ? "border-red-500"
+                              : ""
+                          }
                         />
-                        <Label>{item.label}</Label>
+                        {errors.email && touched.email && (
+                          <p className="text-red-500 text-sm mt-1">
+                            {errors.email}
+                          </p>
+                        )}
                       </div>
-                    ))}
-                  </div>
 
-                  {/* Certifications (Checkboxes) */}
-                  <div className="grid grid-cols-1 gap-2">
-                    <Label className="font-bold text-xl">Certifications</Label>
-                    {certificationsItems.map((item) => (
-                      <div key={item.id} className="flex items-start space-x-3">
-                        <Checkbox
-                          checked={values.certifications.includes(item.id)}
-                          onCheckedChange={(checked) => {
-                            const newCertifications = checked
-                              ? [...values.certifications, item.id]
-                              : values.certifications.filter(
-                                  (value) => value !== item.id
-                                );
-                            setFieldValue("certifications", newCertifications);
-                          }}
+                      {/* Phone Number */}
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="phoneNumber" className="font-medium">
+                          Téléphone
+                        </Label>
+                        <Input
+                          id="phoneNumber"
+                          placeholder="0612345678"
+                          name="phoneNumber"
+                          onChange={handleChange}
+                          onBlur={handleBlur}
+                          value={values.phoneNumber}
+                          className={
+                            errors.phoneNumber && touched.phoneNumber
+                              ? "border-red-500"
+                              : ""
+                          }
                         />
-                        <Label>{item.label}</Label>
+                        {errors.phoneNumber && touched.phoneNumber && (
+                          <p className="text-red-500 text-sm mt-1">
+                            {errors.phoneNumber}
+                          </p>
+                        )}
                       </div>
-                    ))}
-                  </div>
 
-                  {/* Additional Services (Checkboxes) */}
-                  <div className="grid grid-cols-1 gap-2">
-                    <Label className="font-bold text-xl">
-                      Additional Services
-                    </Label>
-                    {additionalServicesItems.map((item) => (
-                      <div key={item.id} className="flex items-start space-x-3">
-                        <Checkbox
-                          checked={values.additional_services.includes(item.id)}
-                          onCheckedChange={(checked) => {
-                            const newAdditionalServices = checked
-                              ? [...values.additional_services, item.id]
-                              : values.additional_services.filter(
-                                  (value) => value !== item.id
-                                );
-                            setFieldValue(
-                              "additional_services",
-                              newAdditionalServices
-                            );
-                          }}
+                      {/* Website */}
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="website" className="font-medium">
+                          Site web
+                        </Label>
+                        <Input
+                          id="website"
+                          placeholder="https://www.exemple.com"
+                          type="url"
+                          name="website"
+                          onChange={handleChange}
+                          value={values.website}
                         />
-                        <Label>{item.label}</Label>
                       </div>
-                    ))}
-                  </div>
 
-                  {/* Availability (Checkboxes) */}
-                  <div className="grid grid-cols-1 gap-2">
-                    <Label className="font-bold text-xl">
-                      Products Availability
-                    </Label>
-                    {availabilityItems.map((item) => (
-                      <div key={item.id} className="flex items-start space-x-3">
-                        <Checkbox
-                          checked={values.availability.includes(item.id)}
-                          onCheckedChange={(checked) => {
-                            const newAvailability = checked
-                              ? [...values.availability, item.id]
-                              : values.availability.filter(
-                                  (value) => value !== item.id
-                                );
-                            setFieldValue("availability", newAvailability);
-                          }}
+                      {/* Description - Changé pour un textarea */}
+                      <div className="md:col-span-2 flex flex-col gap-2">
+                        <Label htmlFor="description" className="font-medium">
+                          Description
+                        </Label>
+                        <Textarea
+                          id="description"
+                          placeholder="Décrivez votre ferme, vos produits et services..."
+                          name="description"
+                          onChange={handleChange}
+                          onBlur={handleBlur}
+                          value={values.description}
+                          className={`min-h-32 ${
+                            errors.description && touched.description
+                              ? "border-red-500"
+                              : ""
+                          }`}
                         />
-                        <Label>{item.label}</Label>
+                        {errors.description && touched.description && (
+                          <p className="text-red-500 text-sm mt-1">
+                            {errors.description}
+                          </p>
+                        )}
                       </div>
-                    ))}
-                  </div>
-
-                  {/* Purchase Mode (Checkboxes) */}
-                  <div className="grid grid-cols-1 gap-2">
-                    <Label className="font-bold text-xl">Purchase Mode</Label>
-                    {purchaseModeItems.map((item) => (
-                      <div key={item.id} className="flex items-start space-x-3">
-                        <Checkbox
-                          checked={values.purchase_mode.includes(item.id)}
-                          onCheckedChange={(checked) => {
-                            const newPurchase_mode = checked
-                              ? [...values.purchase_mode, item.id]
-                              : values.purchase_mode.filter(
-                                  (value) => value !== item.id
-                                );
-                            setFieldValue("purchase_mode", newPurchase_mode);
-                          }}
-                        />
-                        <Label>{item.label}</Label>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Phone Number */}
-                  <div className="grid grid-cols-1 gap-2">
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor="phoneNumber">Phone Number</Label>
-                      <Input
-                        id="phoneNumber"
-                        placeholder="Numéro de téléphone"
-                        name="phoneNumber"
-                        onChange={handleChange}
-                        value={values.phoneNumber}
-                      />
                     </div>
-                  </div>
+                  </CardContent>
+                </Card>
 
-                  {/* Email */}
-                  <div className="grid grid-cols-1 gap-10">
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor="email">Email</Label>
-                      <Input
-                        id="email"
-                        placeholder="Email"
-                        type="email"
-                        name="email"
-                        onChange={handleChange}
-                        value={values.email}
-                      />
-                    </div>
-                  </div>
+                {/* Product Types */}
+                <CheckboxSection
+                  title="Types de produits"
+                  items={productTypeItems}
+                  values={values.product_type}
+                  onChange={(newValues) =>
+                    setFieldValue("product_type", newValues)
+                  }
+                />
 
-                  {/* Website */}
-                  <div className="grid grid-cols-1 gap-10">
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor="website">Web Site</Label>
-                      <Input
-                        id="website"
-                        placeholder="Site web"
-                        type="url"
-                        name="website"
-                        onChange={handleChange}
-                        value={values.website}
-                      />
-                    </div>
-                  </div>
+                {/* Production Method */}
+                <CheckboxSection
+                  title="Méthodes de production"
+                  items={productionMethodItems}
+                  values={values.production_method}
+                  onChange={(newValues) =>
+                    setFieldValue("production_method", newValues)
+                  }
+                />
 
-                  {/* Description */}
-                  <div className="col-span-3 flex flex-col gap-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Input
-                      id="description"
-                      placeholder="Description"
-                      name="description"
-                      onChange={handleChange}
-                      value={values.description}
-                    />
-                  </div>
+                {/* Certifications */}
+                <CheckboxSection
+                  title="Certifications"
+                  items={certificationsItems}
+                  values={values.certifications}
+                  onChange={(newValues) =>
+                    setFieldValue("certifications", newValues)
+                  }
+                />
 
-                  {/* File Upload */}
-                  <div className="col-span-3">
-                    <h2 className="font-lg text-grey-500 mt-2">
-                      Upload Farm Images
-                    </h2>
+                {/* Purchase Mode */}
+                <CheckboxSection
+                  title="Modes d'achat"
+                  items={purchaseModeItems}
+                  values={values.purchase_mode}
+                  onChange={(newValues) =>
+                    setFieldValue("purchase_mode", newValues)
+                  }
+                />
+
+                {/* Availability */}
+                <CheckboxSection
+                  title="Disponibilité des produits"
+                  items={availabilityItems}
+                  values={values.availability}
+                  onChange={(newValues) =>
+                    setFieldValue("availability", newValues)
+                  }
+                />
+
+                {/* Additional Services */}
+                <CheckboxSection
+                  title="Services additionnels"
+                  items={additionalServicesItems}
+                  values={values.additional_services}
+                  onChange={(newValues) =>
+                    setFieldValue("additional_services", newValues)
+                  }
+                />
+
+                {/* File Upload */}
+                <Card className="lg:col-span-3 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg font-semibold">
+                      Photos de la ferme
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
                     <FileUpload
                       setImages={(value) => setImages(value)}
                       imageList={listing?.listingImages}
                     />
-                  </div>
+                  </CardContent>
+                </Card>
 
-                  {/* Buttons */}
-                  <div className="col-span-3 flex justify-end gap-2">
-                    {/* 🔹 Bouton Save (Brouillon) */}
-                    <Button
-                      disabled={loading}
-                      variant="outline"
-                      className="text-primary"
-                      type="button"
-                      onClick={() => onSubmitHandler(values, false)}
-                    >
-                      {loading ? <Loader className="animate-spin" /> : "Save"}
-                    </Button>
+                {/* Buttons */}
+                <div className="lg:col-span-3 flex justify-end gap-4 mt-6">
+                  {/* Bouton Save (Brouillon) */}
+                  <Button
+                    disabled={loading}
+                    variant="outline"
+                    className="text-primary flex items-center gap-2"
+                    type="button"
+                    onClick={() => onSubmitHandler(values, false)}
+                  >
+                    {loading ? (
+                      <Loader className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4" />
+                    )}
+                    Enregistrer
+                  </Button>
 
-                    {/* 🔹 Bouton Publish (avec confirmation) */}
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button type="button" disabled={loading}>
+                  {/* Bouton Publish (avec confirmation) */}
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        type="button"
+                        disabled={loading}
+                        className="bg-green-600 hover:bg-green-700 flex items-center gap-2"
+                      >
+                        {loading ? (
+                          <Loader className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Globe className="h-4 w-4" />
+                        )}
+                        Publier
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>
+                          Êtes-vous sûr de vouloir publier cette ferme ?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Une fois publiée, votre ferme sera visible par tous
+                          les utilisateurs.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Annuler</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => onSubmitHandler(values, true)}
+                          className="bg-green-600 hover:bg-green-700"
+                        >
                           {loading ? (
-                            <Loader className="animate-spin" />
+                            <Loader className="h-4 w-4 animate-spin mr-2" />
                           ) : (
-                            "Publish"
+                            <Send className="h-4 w-4 mr-2" />
                           )}
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>
-                            Are you sure you want to publish this listing?
-                          </AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Once published, your listing will be visible to all
-                            users.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => onSubmitHandler(values, true)}
-                          >
-                            {loading ? (
-                              <Loader className="animate-spin" />
-                            ) : (
-                              "Confirm & Publish"
-                            )}
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
+                          Confirmer et publier
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </div>
             </Form>

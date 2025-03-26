@@ -4,23 +4,30 @@ import Provider from "./Provider";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "@/components/ui/sonner";
 import { CoordinateProvider } from "./contexts/CoordinateContext";
-import { GoogleMapsProvider } from "./contexts/GoogleMapsContext"; // Importer le GoogleMapsProvider
+import { GoogleMapsProvider } from "./contexts/GoogleMapsContext";
 import { MapListingProvider } from "./contexts/MapListingContext";
-import Footer from "./_components/Footer"; // Importer le Footer
+import { LanguageProvider } from "./contexts/Language-context";
+import { FiltersProvider } from "./contexts/FiltersContext";
 import Script from "next/script";
+import Footer from "./_components/layout/Footer";
+import ClientModalWrapper from "./_components/ui/ClientModalWrapper";
+import UserSyncProvider from "./_components/UserSyncProvider"; // Nouveau composant
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
-  title: "My Farm To Fork",
-  description: "The best way to connect local producers",
+  title: "Farm To Fork",
+  description: "Connectez-vous directement aux producteurs locaux",
 };
 
 export default function RootLayout({ children }) {
   return (
     <ClerkProvider>
-      <html lang="en">
+      <html lang="fr">
         <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <meta charSet="UTF-8" />
+          <link rel="icon" href="/favicon.ico" />
           <Script
             id="gtm-script"
             strategy="afterInteractive"
@@ -34,7 +41,6 @@ export default function RootLayout({ children }) {
           />
         </head>
         <body className={inter.className}>
-          {/* Noscript pour les navigateurs sans JS */}
           <noscript>
             <iframe
               src="https://www.googletagmanager.com/ns.html?id=GTM-NCRFL8R7"
@@ -43,15 +49,30 @@ export default function RootLayout({ children }) {
               style={{ display: "none", visibility: "hidden" }}
             ></iframe>
           </noscript>
-          <Toaster />
-          <CoordinateProvider>
-            <GoogleMapsProvider>
-              <MapListingProvider>
-                <Provider>{children}</Provider>
-                <Footer />
-              </MapListingProvider>
-            </GoogleMapsProvider>
-          </CoordinateProvider>
+
+          {/* Nouveau UserSyncProvider qui remplace les 3 composants précédents */}
+          <UserSyncProvider>
+            {/* Composants d'interface utilisateur */}
+            <Toaster />
+            <ClientModalWrapper />
+
+            {/* Providers pour le contexte de l'application */}
+            <FiltersProvider>
+              <LanguageProvider>
+                <CoordinateProvider>
+                  <GoogleMapsProvider>
+                    <MapListingProvider>
+                      <Provider>
+                        {/* Contenu principal */}
+                        <main className="min-h-screen">{children}</main>
+                        <Footer />
+                      </Provider>
+                    </MapListingProvider>
+                  </GoogleMapsProvider>
+                </CoordinateProvider>
+              </LanguageProvider>
+            </FiltersProvider>
+          </UserSyncProvider>
         </body>
       </html>
     </ClerkProvider>

@@ -1,26 +1,32 @@
-"use client"
-
+"use client";
 import React, { createContext, useContext, useState } from "react";
 
 const MapListingContext = createContext();
 
-export const MapListingProvider = ({ children }) => {
-  const [listings, setListings] = useState([]); // Toutes les fermes
-  const [visibleListings, setVisibleListings] = useState([]); // Fermes visibles
+export function MapListingProvider({ children }) {
+  const [listings, setListings] = useState([]);
+  const [visibleListings, setVisibleListings] = useState([]);
+  const [hoveredListingId, setHoveredListingId] = useState(null);
+  const [selectedListingId, setSelectedListingId] = useState(null);
+
+  const value = {
+    listings,
+    setListings,
+    visibleListings,
+    setVisibleListings,
+    hoveredListingId,
+    setHoveredListingId,
+    selectedListingId,
+    setSelectedListingId,
+  };
 
   return (
-    <MapListingContext.Provider
-      value={{ listings, setListings, visibleListings, setVisibleListings }}
-    >
+    <MapListingContext.Provider value={value}>
       {children}
     </MapListingContext.Provider>
   );
-};
+}
 
-export const useMapListing = () => {
-  const context = useContext(MapListingContext);
-  if (!context) {
-    throw new Error("useMapListing must be used within a MapListingProvider");
-  }
-  return context;
-};
+export function useMapListing() {
+  return useContext(MapListingContext);
+}

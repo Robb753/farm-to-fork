@@ -1,6 +1,15 @@
-"use client"
-import React, { createContext, useContext, useState, useEffect } from "react";
+"use client";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useMemo,
+} from "react";
 import { useJsApiLoader } from "@react-google-maps/api";
+
+// Définir la bibliothèque en dehors du composant
+const libraries = ["places"];
 
 const GoogleMapsContext = createContext();
 
@@ -9,7 +18,7 @@ export function GoogleMapsProvider({ children }) {
 
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_PLACE_API_KEY,
-    libraries: ["places"],
+    libraries, // Utiliser la référence constante
   });
 
   useEffect(() => {
