@@ -86,7 +86,7 @@ function Header() {
                   <>
                     <DropdownMenuItem asChild>
                       <Link
-                        href="/dashboard"
+                        href="/dashboard/farms"
                         className="flex items-center gap-2"
                       >
                         <svg

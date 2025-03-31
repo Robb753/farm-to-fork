@@ -1,10 +1,15 @@
+// hooks/useUserSync.js
 "use client";
 
 import { useUser } from "@clerk/nextjs";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import {
+  updateClerkRole,
+  syncProfileToSupabase,
+  ensureFarmerListing,
+} from "@/lib/syncUserUtils";
 import { supabase } from "@/utils/supabase/client";
-import { toast } from "sonner";
 
 export default function useUserSync() {
   const { user, isLoaded, isSignedIn } = useUser();
@@ -14,13 +19,14 @@ export default function useUserSync() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [userRole, setUserRole] = useState(null);
   const [isReady, setIsReady] = useState(false);
+  const processedRef = useRef(false);
+  const initialSyncCompleted = useRef(false);
 
-  // Vérifier et synchroniser l'utilisateur
   useEffect(() => {
     if (!isLoaded) return;
+    if (processedRef.current && initialSyncCompleted.current) return;
 
     const syncUser = async () => {
-      // Si l'utilisateur n'est pas connecté
       if (!isSignedIn || !user) {
         setUserRole(null);
         setIsReady(true);
@@ -29,135 +35,74 @@ export default function useUserSync() {
 
       setIsSyncing(true);
       try {
-        // Vérifier si c'est une nouvelle inscription avec rôle spécifié dans l'URL
         const isNewSignup = searchParams.get("newSignup") === "true";
         const urlRole = searchParams.get("role");
 
+        console.log(
+          `[DEBUG] Nouvelle inscription: ${isNewSignup}, Rôle URL: ${urlRole}`
+        );
+        console.log(`[DEBUG] Chemin actuel: ${pathname}`);
+
+        if (
+          isNewSignup &&
+          urlRole === "farmer" &&
+          pathname !== "/dashboard/farms"
+        ) {
+          console.log(
+            "[DEBUG] Redirection immédiate d'un nouvel agriculteur vers dashboard"
+          );
+          localStorage.setItem("isNewFarmer", "true");
+          localStorage.setItem("userRole", "farmer");
+
+          if (user) {
+            console.log(
+              "[DEBUG] Mise à jour forcée du rôle farmer avant redirection"
+            );
+            await updateClerkRole(user.id, "farmer").catch((err) => {
+              console.error(
+                "[DEBUG] Erreur lors de la mise à jour du rôle:",
+                err
+              );
+            });
+          }
+
+          processedRef.current = true;
+          initialSyncCompleted.current = true;
+
+          console.log("[DEBUG] Redirection vers /dashboard/farms");
+          setTimeout(() => {
+            window.location.href = "/dashboard/farms";
+          }, 100);
+          return;
+        }
+
         if (isNewSignup && urlRole) {
-          console.log("Nouvelle inscription détectée avec rôle:", urlRole);
-          // Nettoyer l'URL tout en gardant le reste des paramètres
+          console.log(
+            "[DEBUG] Nouvelle inscription détectée avec rôle:",
+            urlRole
+          );
+
+          const role = urlRole;
           const newParams = new URLSearchParams(searchParams);
           newParams.delete("newSignup");
           newParams.delete("role");
+
           if (newParams.toString()) {
             router.replace(`${pathname}?${newParams.toString()}`);
           } else {
             router.replace(pathname);
           }
-        }
 
-        // 1. Sources de vérité pour le rôle, par ordre de priorité:
-        let role = null;
-
-        // a) Paramètre d'URL pour nouvelle inscription
-        if (isNewSignup && urlRole) {
-          role = urlRole;
-
-          // Mise à jour immédiate dans Clerk
-          try {
-            await fetch("/api/update-user-role", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ userId: user.id, role }),
-            });
-          } catch (err) {
-            console.error("Erreur mise à jour rôle:", err);
+          if (role) {
+            await processRole(role);
           }
+        } else {
+          await determineAndProcessRole();
         }
 
-        // b) Métadonnées publiques de Clerk
-        if (!role) {
-          role = user.publicMetadata?.role;
-        }
-
-        // c) SessionStorage (stockage temporaire de l'inscription)
-        if (!role) {
-          const pendingRole = sessionStorage.getItem("pendingUserRole");
-
-          if (pendingRole) {
-            role = pendingRole;
-
-            // Nettoyer après utilisation
-            sessionStorage.removeItem("pendingUserRole");
-            sessionStorage.removeItem("pendingUserId");
-
-            // Mise à jour dans Clerk
-            try {
-              await fetch("/api/update-user-role", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ userId: user.id, role }),
-              });
-            } catch (err) {
-              console.error("Erreur mise à jour rôle:", err);
-            }
-          }
-        }
-
-        // d) Profil Supabase
-        if (!role) {
-          try {
-            const { data: profileData } = await supabase
-              .from("profiles")
-              .select("role")
-              .eq("user_id", user.id)
-              .single();
-
-            if (profileData?.role) {
-              role = profileData.role;
-
-              // Synchroniser avec Clerk
-              try {
-                await fetch("/api/update-user-role", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ userId: user.id, role }),
-                });
-              } catch (err) {
-                console.error("Erreur mise à jour rôle:", err);
-              }
-            }
-          } catch (err) {
-            console.error("Erreur vérification profil:", err);
-          }
-        }
-
-        // e) localStorage (stockage persistant)
-        if (!role) {
-          const storedRole = localStorage.getItem("userRole");
-
-          if (storedRole) {
-            role = storedRole;
-
-            // Nettoyer après utilisation
-            localStorage.removeItem("userRole");
-
-            // Mise à jour dans Clerk et Supabase
-            try {
-              await fetch("/api/update-user-role", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ userId: user.id, role }),
-              });
-            } catch (err) {
-              console.error("Erreur mise à jour rôle:", err);
-            }
-          }
-        }
-
-        // f) Fallback vers "user" si aucun rôle n'est trouvé
-        role = role || "user";
-        console.log("Rôle utilisateur:", role);
-        setUserRole(role);
-
-        // 2. Synchroniser le profil avec Supabase
-        await syncProfileToSupabase(user, role);
-
-        // 3. Redirection basée sur le rôle si nécessaire
-        handleRoleBasedRedirection(role);
+        initialSyncCompleted.current = true;
       } catch (error) {
-        console.error("Erreur de synchronisation:", error);
-        toast.error("Erreur lors de la synchronisation de votre profil");
+        console.error("[DEBUG] Erreur de synchronisation:", error);
       } finally {
         setIsSyncing(false);
         setIsReady(true);
@@ -167,230 +112,109 @@ export default function useUserSync() {
     syncUser();
   }, [isLoaded, isSignedIn, user, router, pathname, searchParams]);
 
-  // Fonction de synchronisation du profil avec Supabase
-  const syncProfileToSupabase = async (user, role) => {
+  const determineAndProcessRole = async () => {
     try {
-      const email =
-        user.primaryEmailAddress?.emailAddress ||
-        user.emailAddresses[0]?.emailAddress;
-
-      if (!email) {
-        return;
+      let role = null;
+      const isNewFarmer = localStorage.getItem("isNewFarmer") === "true";
+      if (isNewFarmer) {
+        role = "farmer";
+        console.log("[DEBUG] Rôle 'farmer' récupéré depuis flag isNewFarmer");
       }
 
-      // Gérer les erreurs de clé dupliquée
-      try {
-        // Vérifier si le profil existe
-        const { data: existingProfile, error: checkError } = await supabase
-          .from("profiles")
-          .select("id, role")
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        if (checkError) {
-          console.error("Erreur vérification profil:", checkError);
-          return;
+      if (!role) {
+        role = user.publicMetadata?.role;
+        if (role) {
+          console.log("[DEBUG] Rôle récupéré depuis Clerk:", role);
         }
-
-        if (existingProfile) {
-          // Mettre à jour seulement si le rôle est différent
-          if (existingProfile.role !== role) {
-            const { error: updateError } = await supabase
-              .from("profiles")
-              .update({
-                email,
-                role,
-                updated_at: new Date().toISOString(),
-              })
-              .eq("user_id", user.id);
-
-            if (updateError) {
-              console.error("Erreur mise à jour profil:", updateError);
-            }
-          }
-        } else {
-          // Tenter de créer un nouveau profil avec gestion des erreurs
-          try {
-            const { error: insertError } = await supabase
-              .from("profiles")
-              .insert({
-                user_id: user.id,
-                email,
-                role,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-                favorites: [],
-              });
-
-            if (insertError) {
-              if (insertError.code === "23505") {
-                // Essayer une mise à jour
-                const { error: fallbackError } = await supabase
-                  .from("profiles")
-                  .update({
-                    email,
-                    role,
-                    updated_at: new Date().toISOString(),
-                  })
-                  .eq("user_id", user.id);
-
-                if (fallbackError) {
-                  console.error(
-                    "Erreur mise à jour après collision:",
-                    fallbackError
-                  );
-                }
-              } else {
-                console.error("Erreur création profil:", insertError);
-              }
-            }
-          } catch (insertCatchError) {
-            console.error("Exception création profil:", insertCatchError);
-          }
-        }
-      } catch (supabaseError) {
-        console.error("Erreur Supabase:", supabaseError);
       }
 
-      // Si c'est un agriculteur, vérifier/créer un listing
-      if (role === "farmer") {
+      if (!role) {
+        const pendingRole =
+          sessionStorage.getItem("pendingUserRole") ||
+          localStorage.getItem("userRole");
+        if (pendingRole) {
+          role = pendingRole;
+          console.log("[DEBUG] Rôle récupéré depuis Storage:", role);
+        }
+      }
+
+      if (!role) {
         try {
-          const { data: existingListing, error: listingCheckError } =
-            await supabase
-              .from("listing")
-              .select("id")
-              .eq("createdBy", email)
-              .maybeSingle();
+          const { data: profileData, error } = await supabase
+            .from("profiles")
+            .select("role")
+            .eq("user_id", user.id)
+            .maybeSingle();
 
-          if (listingCheckError) {
-            console.error("Erreur vérification listing:", listingCheckError);
-            return;
+          if (error) {
+            console.error("[DEBUG] Erreur récupération profil:", error);
+          } else if (profileData?.role) {
+            role = profileData.role;
+            console.log("[DEBUG] Rôle récupéré depuis Supabase:", role);
           }
-
-          if (!existingListing) {
-            const { error: createListingError } = await supabase
-              .from("listing")
-              .insert({
-                createdBy: email,
-                active: false,
-                created_at: new Date().toISOString(),
-              });
-
-            if (createListingError) {
-              console.error("Erreur création listing:", createListingError);
-            }
-          }
-        } catch (listingError) {
-          console.error("Exception gestion listing:", listingError);
+        } catch (err) {
+          console.error("[DEBUG] Exception récupération profil:", err);
         }
       }
-    } catch (error) {
-      console.error("Erreur synchronisation Supabase:", error);
-    }
-  };
 
-  // Fonction de redirection basée sur le rôle
-  const handleRoleBasedRedirection = (role) => {
-    // Pages spéciales qui ne déclenchent pas de redirection
-    const authPages = ["/sign-in", "/sign-up", "/signup-role"];
-    const isOnAuthPage = authPages.includes(pathname);
+      if (!role) {
+        const wasRedirectedFromSignup =
+          document.referrer.includes("sign-up") ||
+          document.referrer.includes("signup-role");
 
-    // Pages autorisées pour les agriculteurs
-    const farmerAllowedPages = [
-      "/", // Accueil
-      "/add-new-listing", // Ajouter listing
-      "/view-listing", // Voir listing
-      "/farmer-dashboard", // Dashboard farmer
-      "/profile", // Profil utilisateur
-      "/forum", // Forum
-      "/map-view", // Carte
-      "/user", // Page utilisateur
-    ];
-
-    // Vérifier si la page actuelle est une page edit-listing
-    const isOnEditListingPage = pathname.startsWith("/edit-listing/");
-
-    // Si on est sur une page d'authentification alors qu'on est déjà connecté
-    if (isOnAuthPage && isSignedIn) {
-      router.push("/");
-      return;
-    }
-
-    // Gestion spécifique pour les agriculteurs
-    if (role === "farmer") {
-      // Vérifier si l'utilisateur est sur une page autorisée
-      const isOnAllowedPage = farmerAllowedPages.some(
-        (page) =>
-          pathname === page || (page !== "/" && pathname.startsWith(page))
-      );
-
-      if (!isOnAllowedPage && !isOnEditListingPage) {
-        checkFarmerListing();
+        if (
+          wasRedirectedFromSignup &&
+          (sessionStorage.getItem("isNewFarmer") === "true" ||
+            document.referrer.includes("farmer") ||
+            pathname.includes("dashboard") ||
+            pathname.includes("farm"))
+        ) {
+          console.log("[DEBUG] Traces d'inscription farmer détectées");
+          role = "farmer";
+          localStorage.setItem("userRole", "farmer");
+          localStorage.setItem("isNewFarmer", "true");
+        } else {
+          console.log("[DEBUG] Aucun rôle trouvé, fallback 'user'");
+          role = "user";
+        }
       }
+
+      processedRef.current = true;
+      await processRole(role);
+    } catch (error) {
+      console.error("[DEBUG] Erreur détermination rôle:", error);
     }
   };
 
-  // Vérifier si l'agriculteur a un listing
-  const checkFarmerListing = async () => {
+  const processRole = async (role) => {
+    console.log("[DEBUG] Traitement du rôle:", role);
+    setUserRole(role);
+
     try {
-      const email =
-        user.primaryEmailAddress?.emailAddress ||
-        user.emailAddresses[0]?.emailAddress;
-
-      if (!email) {
-        return;
+      if (role === "farmer") {
+        localStorage.setItem("userRole", "farmer");
       }
 
-      const { data: listingData, error } = await supabase
-        .from("listing")
-        .select("id")
-        .eq("createdBy", email)
-        .maybeSingle();
+      const currentClerkRole = user.publicMetadata?.role;
+      if (!currentClerkRole || currentClerkRole !== role) {
+        console.log(
+          `[DEBUG] Différence de rôle: Clerk=${currentClerkRole}, Local=${role}`
+        );
+        const updated = await updateClerkRole(user.id, role);
 
-      if (error) {
-        console.error("Erreur vérification listing:", error);
-        return;
-      }
-
-      if (listingData?.id) {
-        router.push(`/edit-listing/${listingData.id}`);
+        if (updated && role !== "farmer") {
+          sessionStorage.removeItem("pendingUserRole");
+          localStorage.removeItem("userRole");
+        }
       } else {
-        router.push("/add-new-listing");
+        console.log(`[DEBUG] Rôle déjà à jour dans Clerk: ${currentClerkRole}`);
       }
-    } catch (error) {
-      console.error("Erreur vérification listing:", error);
+
+      await syncProfileToSupabase(user, role);
+    } catch (err) {
+      console.error("[DEBUG] Erreur processRole:", err);
     }
   };
-
-  // Fermer modaux si nécessaire (fonctionnalité de ModalCloser)
-  useEffect(() => {
-    if (!isLoaded || !isSignedIn) return;
-
-    const closeModals = () => {
-      // Essayer de fermer via les boutons de fermeture
-      const closeButtons = document.querySelectorAll(
-        'button[aria-label="Fermer la fenêtre"]'
-      );
-
-      if (closeButtons.length > 0) {
-        closeButtons.forEach((button) => button.click());
-      }
-
-      // Si nous sommes sur la page signup-role, rediriger vers l'accueil
-      if (pathname === "/signup-role") {
-        router.push("/");
-      }
-    };
-
-    closeModals();
-
-    // Exécuter également après un court délai
-    const timeout = setTimeout(() => {
-      closeModals();
-    }, 1000);
-
-    return () => clearTimeout(timeout);
-  }, [isLoaded, isSignedIn, pathname, router]);
 
   return {
     user,

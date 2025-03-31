@@ -63,25 +63,8 @@ export default function SignInPage() {
         {/* Section formulaire à droite */}
         <main className="flex items-center justify-center px-4 py-8 sm:px-8 sm:py-12 md:px-12 lg:col-span-7 lg:px-16 lg:py-12 xl:col-span-6">
           <div className="max-w-lg sm:max-w-xl md:max-w-2xl lg:max-w-3xl w-full">
-            <div className="relative block lg:hidden mb-4 text-center">
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900">
-                Bienvenue sur Farm To Fork !
-              </h1>
-              <p className="mt-2 text-gray-500">
-                Connectez-vous pour continuer.
-              </p>
-            </div>
 
-            <SignIn
-              path="/sign-in"
-              routing="hash"
-              signUpUrl="/sign-up" // Modifié pour pointer vers sign-up au lieu de signup-role
-              appearance={{
-                elements: {
-                  formButtonPrimary: "bg-green-600 hover:bg-green-700",
-                },
-              }}
-            />
+            <SignIn            />
           </div>
         </main>
       </div>
