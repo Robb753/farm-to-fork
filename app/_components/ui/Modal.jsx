@@ -1,15 +1,27 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useImperativeHandle, forwardRef } from "react";
 import { X } from "lucide-react";
 
-export default function Modal({ children, onClose }) {
+const Modal = forwardRef(({ children, onClose }, ref) => {
   const modalRef = useRef(null);
+  const isClosingRef = useRef(false);
+
+  // Exposer une méthode forceClose via la référence
+  useImperativeHandle(ref, () => ({
+    forceClose: () => {
+      if (!isClosingRef.current) {
+        isClosingRef.current = true;
+        document.body.style.overflow = "auto";
+        if (onClose) onClose();
+      }
+    }
+  }));
 
   // Fermer le modal avec la touche Échap
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && !isClosingRef.current) onClose();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
@@ -17,7 +29,7 @@ export default function Modal({ children, onClose }) {
 
   // Fermer le modal en cliquant à l'extérieur
   const handleBackdropClick = (e) => {
-    if (modalRef.current && !modalRef.current.contains(e.target)) {
+    if (modalRef.current && !modalRef.current.contains(e.target) && !isClosingRef.current) {
       onClose();
     }
   };
@@ -55,4 +67,8 @@ export default function Modal({ children, onClose }) {
       </div>
     </div>
   );
-}
+});
+
+Modal.displayName = "Modal";
+
+export default Modal;

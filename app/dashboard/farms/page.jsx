@@ -1,4 +1,3 @@
-// FarmerDashboard.jsx
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -33,66 +32,6 @@ export default function FarmerDashboard() {
         return;
       }
 
-      const urlParams = new URLSearchParams(window.location.search);
-      const newSignup = urlParams.get("newSignup") === "true";
-      const urlRole = urlParams.get("role");
-
-      if (newSignup && urlRole === "farmer") {
-        localStorage.setItem("userRole", "farmer");
-        localStorage.setItem("isNewFarmer", "true");
-        const cleanUrl = window.location.pathname;
-        window.history.replaceState({}, "", cleanUrl);
-
-        try {
-          const response = await fetch("/api/update-user-role", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              userId: user.id,
-              role: "farmer",
-              emergency: true,
-            }),
-          });
-          if (response.ok) {
-            await client.session.refresh();
-            toast.success("Compte agriculteur configuré");
-          }
-        } catch (error) {
-          console.error("Erreur de mise à jour d'urgence:", error);
-        }
-      }
-
-      const userRole = user.publicMetadata?.role;
-      const storedRole = localStorage.getItem("userRole");
-      const isNewFarmer = localStorage.getItem("isNewFarmer") === "true";
-
-      if (userRole && userRole !== "farmer") {
-        if (storedRole === "farmer" || isNewFarmer) {
-          try {
-            const response = await fetch("/api/update-user-role", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                userId: user.id,
-                role: "farmer",
-                emergency: true,
-              }),
-            });
-            if (response.ok) await client.session.refresh();
-          } catch (err) {
-            toast.error(
-              "Redirection... Cette page est réservée aux agriculteurs"
-            );
-            router.push("/");
-            return;
-          }
-        } else {
-          toast.error("Cette page est réservée aux agriculteurs");
-          router.push("/");
-          return;
-        }
-      }
-
       try {
         const email =
           user?.primaryEmailAddress?.emailAddress ||
@@ -121,6 +60,66 @@ export default function FarmerDashboard() {
     checkUserAndListing();
   }, [isLoaded, isSignedIn, user, router, client]);
 
+  const handleDeleteListing = async () => {
+    if (!listing) return;
+
+    const confirmed = window.confirm(
+      "Voulez-vous vraiment supprimer cette ferme ?"
+    );
+    if (!confirmed) return;
+
+    try {
+      const listingId = listing.id;
+
+      if (listing.listingImages && listing.listingImages.length > 0) {
+        const pathsToDelete = listing.listingImages.map((img) => {
+          const fullUrl = img.url;
+          const path = fullUrl.split("/storage/v1/object/public/")[1];
+          return path;
+        });
+
+        const { error: storageError } = await supabase.storage
+          .from("listingImages")
+          .remove(pathsToDelete);
+
+        if (storageError) {
+          console.error("Erreur suppression image storage:", storageError);
+          toast.error("Erreur suppression images");
+          return;
+        }
+
+        const { error: dbImgError } = await supabase
+          .from("listingImages")
+          .delete()
+          .eq("listing_id", listingId);
+
+        if (dbImgError) {
+          console.error("Erreur suppression DB images:", dbImgError);
+          toast.error("Erreur suppression images associées");
+          return;
+        }
+      }
+
+      const { error: deleteListingError } = await supabase
+        .from("listing")
+        .delete()
+        .eq("id", listingId);
+
+      if (deleteListingError) {
+        console.error("Erreur suppression listing:", deleteListingError);
+        toast.error("Erreur suppression ferme");
+        return;
+      }
+
+      toast.success("Ferme supprimée avec succès");
+      router.push("/dashboard/farms");
+      router.refresh();
+    } catch (err) {
+      console.error("Erreur lors de la suppression:", err);
+      toast.error("Erreur pendant la suppression");
+    }
+  };
+
   if (isChecking) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -129,43 +128,51 @@ export default function FarmerDashboard() {
     );
   }
 
-  if (!listing) {
+  if (!listing || !listing.coordinates) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="text-center mb-10">
-          <h1 className="text-3xl font-bold text-gray-800">
+          <h1 className="text-4xl font-bold text-green-800">
             Bienvenue sur votre espace Agriculteur
           </h1>
-          <p className="text-gray-600 mt-2">
+          <p className="text-gray-600 mt-3 text-lg">
             Commencez par créer votre première fiche de ferme
           </p>
         </div>
 
-        <Card className="max-w-2xl mx-auto">
-          <CardHeader>
-            <CardTitle>Créer votre ferme</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-gray-600 mb-6">
+        <div className="border border-gray-200 shadow-sm rounded-lg overflow-hidden bg-white">
+          <div className="border-b border-gray-200 px-6 py-5">
+            <h2 className="text-2xl font-medium text-green-800">
+              Créer votre ferme
+            </h2>
+          </div>
+
+          <div className="py-5 px-6">
+            <p className="text-gray-700 mb-6">
               Vous n'avez pas encore de ferme enregistrée. Créez votre fiche
               pour apparaître sur la carte.
             </p>
-            <div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center mb-4">
+
+            <div className="border border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-8 aspect-video bg-gray-50">
               <img
-                src="/images/farm-placeholder.jpg"
+                src="/placeholder.jpg"
                 alt="Placeholder"
-                className="h-48 opacity-50"
+                className="h-24 w-24 opacity-25"
               />
             </div>
-          </CardContent>
-          <CardFooter className="flex justify-center">
-            <Button asChild className="bg-green-600 hover:bg-green-700 gap-2">
-              <Link href="/add-new-listing">
-                <Plus size={16} /> Créer ma ferme
+          </div>
+
+          <div className="border-t border-gray-200 px-6 py-4 flex justify-center">
+            <Button
+              asChild
+              className="bg-green-600 hover:bg-green-700 rounded-md font-medium py-3 px-4"
+            >
+              <Link href="/add-new-listing" className="flex items-center gap-2">
+                <Plus className="w-5 h-5" /> Créer ma ferme
               </Link>
             </Button>
-          </CardFooter>
-        </Card>
+          </div>
+        </div>
       </div>
     );
   }
@@ -237,6 +244,9 @@ export default function FarmerDashboard() {
             </Button>
             <Button className="bg-green-600 hover:bg-green-700" asChild>
               <Link href={`/edit-listing/${listing.id}`}>Modifier</Link>
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteListing}>
+              Supprimer
             </Button>
           </CardFooter>
         </Card>

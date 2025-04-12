@@ -4,7 +4,7 @@ import Modal from "@/app/_components/ui/Modal";
 import { SignUp, useClerk } from "@clerk/nextjs";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 
 export default function SignupRoleModal({ onClose }) {
@@ -12,6 +12,7 @@ export default function SignupRoleModal({ onClose }) {
   const [selectedRole, setSelectedRole] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { client } = useClerk();
+  const modalCloseRef = useRef(false);
 
   useEffect(() => {
     const storedRole = sessionStorage.getItem("pendingUserRole");
@@ -23,27 +24,46 @@ export default function SignupRoleModal({ onClose }) {
 
   useEffect(() => {
     if (selectedRole === "user" || selectedRole === "farmer") {
-      console.log(
-        "[DEBUG] Mise à jour du rôle dans sessionStorage:",
-        selectedRole
-      );
       sessionStorage.setItem("pendingUserRole", selectedRole);
     }
   }, [selectedRole]);
 
+  // Effet pour gérer la redirection après fermeture du modal
+  useEffect(() => {
+    const pendingRedirect = sessionStorage.getItem("pendingRedirect");
+    if (pendingRedirect && modalCloseRef.current) {
+      const timeoutId = setTimeout(() => {
+        sessionStorage.removeItem("pendingRedirect");
+        console.log(`[REDIRECTION] Vers ${pendingRedirect}`);
+        window.location.href = pendingRedirect;
+      }, 100);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, []);
+
+  // Nettoyage lors du démontage du composant
+  useEffect(() => {
+    return () => {
+      if (!modalCloseRef.current && !isSubmitting) {
+        // Nettoyer uniquement si on n'a pas complété l'inscription
+        sessionStorage.removeItem("pendingUserRole");
+      }
+    };
+  }, [isSubmitting]);
+
   const handleClose = () => {
     if (isSubmitting) return;
-    sessionStorage.removeItem("pendingUserRole");
-    onClose ? onClose() : router.push("/");
-  };
 
-  const forceRedirect = (url, reason = "") => {
-    console.log(`[REDIRECTION] Vers ${url} | Raison : ${reason}`);
-    window.location.replace(url);
-    setTimeout(() => {
-      console.warn("[REDIRECTION] Fallback activé après 1s");
-      window.location.href = url;
-    }, 1000);
+    modalCloseRef.current = true;
+    sessionStorage.removeItem("pendingUserRole");
+    sessionStorage.removeItem("pendingRedirect");
+
+    if (onClose) {
+      onClose();
+    } else {
+      router.push("/");
+    }
   };
 
   const handleComplete = async (result) => {
@@ -59,10 +79,9 @@ export default function SignupRoleModal({ onClose }) {
 
     const userId = result.createdUserId;
     setIsSubmitting(true);
-    console.log("[DEBUG] Inscription complète, userId:", userId);
-    console.log("[DEBUG] Rôle sélectionné:", selectedRole);
 
     try {
+      // Stocker les informations localement
       sessionStorage.setItem("pendingUserRole", selectedRole);
       sessionStorage.setItem("pendingUserId", userId);
       localStorage.setItem("userRole", selectedRole);
@@ -78,6 +97,7 @@ export default function SignupRoleModal({ onClose }) {
         }...`
       );
 
+      // Tentatives de mise à jour du rôle dans Clerk
       let success = false;
       let attempts = 0;
       const maxAttempts = 5;
@@ -85,11 +105,7 @@ export default function SignupRoleModal({ onClose }) {
       while (!success && attempts < maxAttempts) {
         attempts++;
         const delay = Math.pow(2, attempts - 1) * 500;
-
-        if (attempts > 1) {
-          console.log(`[DEBUG] Attente ${delay}ms avant tentative ${attempts}`);
-          await new Promise((r) => setTimeout(r, delay));
-        }
+        if (attempts > 1) await new Promise((r) => setTimeout(r, delay));
 
         try {
           const response = await fetch("/api/update-user-role", {
@@ -105,36 +121,16 @@ export default function SignupRoleModal({ onClose }) {
           console.log(`[DEBUG] Réponse tentative ${attempts}:`, responseData);
 
           if (response.ok) {
-            console.log("[DEBUG] Mise à jour du rôle réussie");
-            try {
-              console.log("[DEBUG] Rafraîchissement de la session Clerk...");
-              await client.session.refresh();
-              console.log("[DEBUG] Session Clerk actualisée");
-            } catch (err) {
-              console.warn("[DEBUG] Erreur session.refresh():", err);
-            }
+            await client.session.refresh();
 
-            // Attendre que Clerk reflète bien le rôle mis à jour
             let sessionReady = false;
             let sessionTries = 0;
-            const maxSessionTries = 10;
-
-            while (!sessionReady && sessionTries < maxSessionTries) {
+            while (!sessionReady && sessionTries < 10) {
               sessionTries++;
               await new Promise((res) => setTimeout(res, 500));
               const user = await client.getUser();
               const currentRole = user?.publicMetadata?.role;
-              console.log(
-                `[DEBUG] Vérif session ${sessionTries} : rôle =`,
-                currentRole
-              );
-
-              if (currentRole === selectedRole) {
-                sessionReady = true;
-                console.log(
-                  "[DEBUG] 🎉 Session Clerk synchronisée avec le rôle"
-                );
-              }
+              if (currentRole === selectedRole) sessionReady = true;
             }
 
             success = true;
@@ -158,17 +154,19 @@ export default function SignupRoleModal({ onClose }) {
         await new Promise((r) => setTimeout(r, 1000));
       }
 
+      // Nettoyage des données temporaires
       sessionStorage.removeItem("pendingUserRole");
       sessionStorage.removeItem("pendingUserId");
       localStorage.removeItem("isNewFarmer");
 
+      // Redirection immédiate selon le rôle
       const redirectUrl =
         selectedRole === "farmer"
           ? "/signup/syncing"
           : `/?newSignup=true&role=user&t=${Date.now()}`;
 
-console.log("[DEBUG] Redirection finale vers :", redirectUrl);
-      forceRedirect(redirectUrl, "Session Clerk synchronisée");
+      console.log(`[DEBUG] Redirection immédiate vers ${redirectUrl}`);
+      window.location.href = redirectUrl;
     } catch (error) {
       console.error("[DEBUG] Erreur lors de l'inscription:", error);
       toast.error(
@@ -206,38 +204,45 @@ console.log("[DEBUG] Redirection finale vers :", redirectUrl);
               <h3 className="text-lg font-medium text-gray-900 mb-2">
                 Je suis...
               </h3>
-              <div className="flex space-x-4">
+              <div className="flex flex-col space-y-3 md:flex-row md:space-y-0 md:space-x-4">
                 {["user", "farmer"].map((role) => (
                   <label
                     key={role}
-                    className={`flex items-center p-3 border rounded-md cursor-pointer transition w-full ${
+                    className={`flex flex-col p-4 border rounded-md cursor-pointer transition w-full ${
                       selectedRole === role
                         ? "border-green-500 bg-green-50"
                         : "hover:bg-gray-50"
                     }`}
                   >
-                    <input
-                      type="radio"
-                      name="role"
-                      value={role}
-                      checked={selectedRole === role}
-                      onChange={() => setSelectedRole(role)}
-                      className="mr-2 h-4 w-4 text-green-600"
-                      disabled={isSubmitting}
-                    />
-                    <span>
-                      {role === "user" ? "Utilisateur" : "Agriculteur"}
-                    </span>
+                    <div className="flex items-center">
+                      <input
+                        type="radio"
+                        name="role"
+                        value={role}
+                        checked={selectedRole === role}
+                        onChange={() => setSelectedRole(role)}
+                        className="mr-2 h-4 w-4 text-green-600"
+                        disabled={isSubmitting}
+                      />
+                      <span className="font-medium">
+                        {role === "user" ? "Utilisateur" : "Agriculteur"}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm text-gray-600 pl-6">
+                      {role === "user"
+                        ? "Je souhaite acheter des produits directement des agriculteurs."
+                        : "Je souhaite vendre mes produits sur la plateforme."}
+                    </p>
                   </label>
                 ))}
               </div>
+              {!selectedRole && (
+                <p className="text-sm text-red-500 mt-2">
+                  <span className="inline-block mr-1">⚠️</span>
+                  Veuillez sélectionner un rôle pour activer le formulaire.
+                </p>
+              )}
             </div>
-
-            {!selectedRole && (
-              <p className="text-sm text-red-500 mb-4">
-                Veuillez sélectionner un rôle pour activer le formulaire.
-              </p>
-            )}
 
             <SignUp
               routing="hash"
@@ -249,6 +254,10 @@ console.log("[DEBUG] Redirection finale vers :", redirectUrl);
                   formButtonPrimary: selectedRole
                     ? "bg-green-600 hover:bg-green-700"
                     : "pointer-events-none opacity-50 cursor-not-allowed",
+                  formButtonPrimaryContent: isSubmitting ? "hidden" : "block",
+                  formButtonPrimaryLoading: isSubmitting
+                    ? "flex items-center justify-center gap-2"
+                    : "hidden",
                 },
                 variables: {
                   colorPrimary: "#16a34a",

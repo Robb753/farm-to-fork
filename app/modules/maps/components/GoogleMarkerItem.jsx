@@ -1,187 +1,158 @@
-import React, { useEffect, useRef } from "react";
-import { useMapListing } from "@/app/contexts/MapListingContext";
+"use client";
 
-// Variable globale pour stocker l'infoWindow active
-let activeInfoWindow = null;
+import React, { useEffect, useRef, useCallback, memo } from "react";
+import { useListingState } from "@/app/contexts/MapDataContext/ListingStateContext";
 
-function GoogleMarkerItem({ map, item }) {
+const GoogleMarkerItem = ({ map, item, isVisible = true }) => {
   const markerRef = useRef(null);
-  const infoWindowRef = useRef(null);
+  const markerElementRef = useRef(null);
+  const mountedRef = useRef(false);
+  const markerLibraryPromise = useRef(null);
 
   const {
     hoveredListingId,
     setHoveredListingId,
     selectedListingId,
     setSelectedListingId,
-  } = useMapListing();
+    openInfoWindowId,
+    setOpenInfoWindowId,
+  } = useListingState();
+
+  const loadMarkerLibrary = useCallback(async () => {
+    if (!window.google?.maps) return null;
+    if (!markerLibraryPromise.current) {
+      markerLibraryPromise.current = window.google.maps.importLibrary("marker");
+    }
+    return markerLibraryPromise.current;
+  }, []);
 
   useEffect(() => {
-    if (!map || !item?.coordinates) return;
+    if (!map || !item?.lat || !item?.lng || !isVisible || mountedRef.current)
+      return;
 
-    let marker = null;
+    mountedRef.current = true;
 
     const setupMarker = async () => {
       try {
-        // Importer la bibliothèque de marqueurs
-        const { AdvancedMarkerElement } = await google.maps.importLibrary(
-          "marker"
-        );
+        const { AdvancedMarkerElement } = await loadMarkerLibrary();
+        if (!AdvancedMarkerElement) return;
 
-        // Créer l'élément de marqueur simple (un div avec une image)
-        const markerElement = document.createElement("div");
-        markerElement.innerHTML = `
+        const el = document.createElement("div");
+        el.className = "marker-element";
+
+        el.innerHTML = `
           <img 
-            src="./fourchette.png" 
-            alt="Marker" 
-            style="width: 32px; height: 32px; cursor: pointer; transition: transform 0.2s ease-out;" 
+            src="${
+              item.availability === "open"
+                ? "/marker-green.svg"
+                : "/marker-red.svg"
+            }"
+            alt="${item.name || "Ferme"}"
+            class="w-8 h-8 transition-all duration-200 marker-icon"
             data-listing-id="${item.id}"
           />
         `;
 
-        // Créer le marqueur avancé
-        marker = new AdvancedMarkerElement({
+        markerElementRef.current = el;
+
+        const marker = new AdvancedMarkerElement({
           map,
-          position: item.coordinates,
-          content: markerElement,
+          position: { lat: parseFloat(item.lat), lng: parseFloat(item.lng) },
+          content: el,
           title: item.name || "Ferme",
+          zIndex: selectedListingId === item.id ? 1000 : 1,
         });
 
         markerRef.current = marker;
 
-        // Créer l'infoWindow pour ce marqueur
-        const infoWindow = new google.maps.InfoWindow({
-          content: `
-            <div style="padding: 8px; max-width: 200px;">
-              <h3 style="font-weight: bold; margin-bottom: 4px;">${
-                item.name || "Sans nom"
-              }</h3>
-              <p style="font-size: 0.875rem; margin-bottom: 4px;">${
-                item.address || ""
-              }</p>
-              <p style="font-size: 0.75rem;">${
-                item.description?.substring(0, 100) || ""
-              }${item.description?.length > 100 ? "..." : ""}</p>
-              <a href="/view-listing/${
-                item.id
-              }" style="display: inline-block; margin-top: 8px; padding: 4px 8px; background-color: #16a34a; color: white; border-radius: 4px; font-size: 0.75rem; text-decoration: none;">
-                Voir détails
-              </a>
-            </div>
-          `,
-          maxWidth: 250,
-        });
+        marker.addListener("gmp-click", () => {
+          const alreadyOpen = openInfoWindowId === item.id;
+          setSelectedListingId(alreadyOpen ? null : item.id);
+          setOpenInfoWindowId(alreadyOpen ? null : item.id);
 
-        infoWindowRef.current = infoWindow;
-
-        // Ajouter les écouteurs d'événements
-        marker.addEventListener("gmp-click", () => {
-          // Fermer l'infoWindow active si elle existe
-          if (activeInfoWindow) {
-            activeInfoWindow.close();
-          }
-
-          infoWindow.open({
-            anchor: marker,
-            map,
+          requestAnimationFrame(() => {
+            const el = document.getElementById(`listing-${item.id}`);
+            if (el) {
+              el.scrollIntoView({ behavior: "smooth", block: "center" });
+              el.classList.add("selected-listing");
+              setTimeout(() => el.classList.remove("selected-listing"), 1500);
+            }
           });
-
-          activeInfoWindow = infoWindow;
-          setSelectedListingId(item.id);
-
-          // Faire défiler jusqu'à l'élément correspondant dans la liste
-          const listingElement = document.getElementById(`listing-${item.id}`);
-          if (listingElement) {
-            listingElement.scrollIntoView({
-              behavior: "smooth",
-              block: "center",
-            });
-          }
         });
 
-        // Ajouter des écouteurs pour le survol
-        marker.addEventListener("gmp-mouseover", () => {
-          const imgElement = markerElement.querySelector("img");
-          if (imgElement) {
-            imgElement.style.transform = "scale(1.2)";
-            imgElement.style.filter = "drop-shadow(0 0 3px rgba(0,0,0,0.3))";
+        marker.addListener("gmp-mouseover", () => {
+          const img = el.querySelector("img");
+          if (img) {
+            img.style.transform = "scale(1.3)";
+            img.style.filter = "drop-shadow(0 0 4px rgba(0,0,0,0.4))";
           }
           setHoveredListingId(item.id);
         });
 
-        marker.addEventListener("gmp-mouseout", () => {
-          const imgElement = markerElement.querySelector("img");
-          if (imgElement) {
-            imgElement.style.transform = "scale(1)";
-            imgElement.style.filter = "none";
+        marker.addListener("gmp-mouseout", () => {
+          if (selectedListingId !== item.id) {
+            const img = el.querySelector("img");
+            if (img) {
+              img.style.transform = "scale(1)";
+              img.style.filter = "none";
+            }
           }
           setHoveredListingId(null);
         });
-
-        // Fermer l'infoWindow lorsqu'on clique sur la carte
-        map.addListener("click", () => {
-          if (activeInfoWindow) {
-            activeInfoWindow.close();
-            activeInfoWindow = null;
-            setSelectedListingId(null);
-          }
-        });
-      } catch (error) {
-        console.error("Error creating marker:", error);
+      } catch (err) {
+        console.error("Erreur lors de la création du marqueur :", err);
       }
     };
 
     setupMarker();
 
-    // Nettoyage au démontage
     return () => {
       if (markerRef.current) {
         markerRef.current.map = null;
+        markerRef.current = null;
       }
-      if (infoWindowRef.current) {
-        infoWindowRef.current.close();
-        if (activeInfoWindow === infoWindowRef.current) {
-          activeInfoWindow = null;
-        }
-      }
+      markerElementRef.current = null;
+      mountedRef.current = false;
     };
-  }, [map, item, setHoveredListingId, setSelectedListingId]);
+  }, [
+    map,
+    item,
+    isVisible,
+    selectedListingId,
+    openInfoWindowId,
+    loadMarkerLibrary,
+    setHoveredListingId,
+    setOpenInfoWindowId,
+    setSelectedListingId,
+  ]);
 
-  // Effet pour gérer les changements d'état externes
   useEffect(() => {
-    if (!markerRef.current) return;
+    if (!markerElementRef.current || !markerRef.current) return;
 
-    const markerElement = markerRef.current.content;
-    if (!markerElement) return;
+    const img = markerElementRef.current.querySelector("img");
+    if (!img) return;
 
-    const imgElement = markerElement.querySelector("img");
-    if (!imgElement) return;
+    const isActive =
+      hoveredListingId === item.id || selectedListingId === item.id;
 
-    // Mettre à jour l'apparence du marqueur lorsqu'il est survolé ou sélectionné
-    if (hoveredListingId === item.id || selectedListingId === item.id) {
-      imgElement.style.transform = "scale(1.2)";
-      imgElement.style.filter = "drop-shadow(0 0 3px rgba(0,0,0,0.3))";
-    } else {
-      imgElement.style.transform = "scale(1)";
-      imgElement.style.filter = "none";
-    }
-
-    // Ouvrir l'infoWindow si ce marqueur est sélectionné
-    if (selectedListingId === item.id && infoWindowRef.current) {
-      if (activeInfoWindow && activeInfoWindow !== infoWindowRef.current) {
-        activeInfoWindow.close();
-      }
-
-      if (activeInfoWindow !== infoWindowRef.current) {
-        infoWindowRef.current.open({
-          anchor: markerRef.current,
-          map,
-        });
-        activeInfoWindow = infoWindowRef.current;
-      }
-    }
-  }, [hoveredListingId, selectedListingId, item.id, map]);
+    img.style.transform = isActive ? "scale(1.3)" : "scale(1)";
+    img.style.filter = isActive
+      ? "drop-shadow(0 0 4px rgba(0,0,0,0.4))"
+      : "none";
+    markerRef.current.zIndex = isActive ? 1000 : 1;
+  }, [hoveredListingId, selectedListingId, item.id]);
 
   return null;
-}
+};
 
-export default GoogleMarkerItem;
+const arePropsEqual = (prev, next) => {
+  return (
+    prev.item?.id === next.item?.id &&
+    prev.isVisible === next.isVisible &&
+    prev.item?.lat === next.item?.lat &&
+    prev.item?.lng === next.item?.lng &&
+    prev.item?.availability === next.item?.availability
+  );
+};
+
+export default memo(GoogleMarkerItem, arePropsEqual);

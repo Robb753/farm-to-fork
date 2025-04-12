@@ -1,6 +1,6 @@
 "use client";
 
-import GoogleAddressSearch from "@/app/modules/maps/components/GoogleAddressSearch";
+import GoogleAddressSearch from "@/app/modules/maps/components/shared/ExploreMapSearch";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/utils/supabase/client";
 import { useUser } from "@clerk/nextjs";

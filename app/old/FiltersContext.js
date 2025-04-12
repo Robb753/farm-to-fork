@@ -1,3 +1,4 @@
+// contexts/FiltersContext.js - Version corrigée
 "use client";
 import { createContext, useContext, useReducer, useMemo } from "react";
 import { debounce } from "lodash";
@@ -103,7 +104,13 @@ export const FiltersProvider = ({ children }) => {
 export const useFilters = () => {
   const context = useContext(FiltersContext);
   if (!context) {
-    throw new Error("useFilters must be used within a FiltersProvider");
+    console.warn("useFilters doit être utilisé dans un FiltersProvider");
+    // Retourner un objet par défaut au lieu de lancer une erreur
+    return {
+      filters: initialState,
+      dispatch: () => {},
+      debouncedFilters: (newFilters) => newFilters,
+    };
   }
   return context;
 };

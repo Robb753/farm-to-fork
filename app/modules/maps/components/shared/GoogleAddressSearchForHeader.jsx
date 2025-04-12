@@ -1,4 +1,6 @@
-"use client";
+{
+  /* Indicateur de chargement 
+("use client");
 
 import React, { useEffect, useRef } from "react";
 import { Search } from "lucide-react";
@@ -69,3 +71,5 @@ function GoogleAddressSearchForHeader({ selectedAddress, onAddressChange }) {
 }
 
 export default GoogleAddressSearchForHeader;
+*/
+}

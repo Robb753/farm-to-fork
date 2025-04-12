@@ -3,26 +3,22 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { Toaster } from "sonner";
-import GoogleAddressSearchForHeader from "../../modules/maps/components/GoogleAddressSearchForHeader";
 import ExploreNearby from "./ExploreNearby";
 import EuropeanFeatures from "./EuropeanFeatures";
-import { useCoordinates } from "@/app/contexts/CoordinateContext";
 import { useLanguage } from "@/app/contexts/Language-context";
+import BaseGoogleAddressSearch from "@/app/modules/maps/components/shared/BaseGoogleAddressSearch";
+import { useMapState } from "@/app/contexts/MapDataContext/MapStateContext";
 
 function HomeContent() {
-  const { setCoordinates } = useCoordinates();
-  const { t } = useLanguage(); // ✅ Utilisation du hook de traduction
-  const router = useRouter(); // ✅ Ajout du routeur Next.js
+  const { setCoordinates } = useMapState();
+  const { t } = useLanguage();
+  const router = useRouter();
 
-  // ✅ Gestion de la sélection d'une ville
   const handleCitySelect = (v) => {
     const lat = v?.value?.geometry?.location?.lat() || 0;
     const lng = v?.value?.geometry?.location?.lng() || 0;
 
-    // ✅ Mettre à jour les coordonnées globales
     setCoordinates({ lat, lng });
-
-    // ✅ Redirection vers la page Explore
     router.push(`/explore?lat=${lat}&lng=${lng}`);
   };
 
@@ -48,8 +44,7 @@ function HomeContent() {
             {t("connect")}
           </p>
           <div className="w-full max-w-lg bg-white shadow-md rounded-full px-4 py-2 flex items-center">
-            {/* ✅ Utilisation de `handleCitySelect` pour la redirection */}
-            <GoogleAddressSearchForHeader selectedAddress={handleCitySelect} />
+            <BaseGoogleAddressSearch selectedAddress={handleCitySelect} />
           </div>
         </div>
       </div>
