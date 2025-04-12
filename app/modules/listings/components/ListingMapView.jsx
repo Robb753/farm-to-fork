@@ -74,7 +74,6 @@ function ListingMapView() {
         // 👉 Déplacement fluide de la carte
         if (mapInstance) {
           mapInstance.panTo(new window.google.maps.LatLng(newCoords));
-          mapInstance.setZoom(8);
         }
       }
     }
@@ -123,7 +122,6 @@ function ListingMapView() {
       setCoordinates(newCoords);
       if (mapInstance) {
         mapInstance.panTo(new window.google.maps.LatLng(newCoords));
-        mapInstance.setZoom(12);
       }
     }
   };
@@ -178,7 +176,7 @@ function ListingMapView() {
         </div>
       </div>
 
-      <div className="relative flex flex-col md:flex-row transition-all duration-300 h-[calc(100vh-125px)]">
+      <div className="relative flex flex-col md:flex-row transition-all duration-300 h-[calc(100vh-200px)]">
         <div
           className={`overflow-y-auto transition-all duration-300 ${
             isMapExpanded

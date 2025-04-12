@@ -1,5 +1,5 @@
-// Dans votre Provider.jsx
 "use client";
+
 import React, { useState, useEffect } from "react";
 import Header from "./_components/layout/Header";
 import Footer from "./_components/layout/Footer";
@@ -13,11 +13,7 @@ function Provider({ children }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Simuler un délai pour permettre aux ressources de se charger
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 100);
-
+    const timer = setTimeout(() => setIsLoading(false), 100);
     return () => clearTimeout(timer);
   }, []);
 
@@ -30,17 +26,19 @@ function Provider({ children }) {
   }
 
   return (
-    <LanguageProvider>
-      <UserRoleProvider>
-        <MapDataProvider>
-          <Toaster />
-          <ClientModalWrapper />
-          <Header />
-          <main className="min-h-screen">{children}</main>
-          <Footer />
-        </MapDataProvider>
-      </UserRoleProvider>
-    </LanguageProvider>
+    <>
+      <LanguageProvider>
+        <UserRoleProvider>
+          <MapDataProvider>
+            <Toaster />
+            <ClientModalWrapper />
+            <Header />
+            <main className="min-h-screen">{children}</main>
+            <Footer />
+          </MapDataProvider>
+        </UserRoleProvider>
+      </LanguageProvider>
+    </>
   );
 }
 

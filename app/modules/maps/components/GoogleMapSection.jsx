@@ -14,7 +14,7 @@ import GoogleMarkerItem from "./GoogleMarkerItem";
 import CustomInfoWindow from "./CustomInfoWindow";
 import FarmInfoWindow from "./FarmInfoWindow";
 import { Heart } from "lucide-react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 
 const mapOptions = {
   disableDefaultUI: true,
@@ -27,7 +27,7 @@ const mapOptions = {
   mapId: process.env.NEXT_PUBLIC_MAP_ID,
 };
 
-function GoogleMapSection({ isMapExpanded }) {
+function GoogleMapSection({ isMapExpanded, onMapLoad }) {
   const { isApiLoaded, coordinates, setCoordinates } = useMapState();
   const {
     visibleListings,
@@ -35,6 +35,8 @@ function GoogleMapSection({ isMapExpanded }) {
     setOpenInfoWindowId,
     clearSelection,
     selectedListingId,
+    hoveredListingId,
+    setHoveredListingId,
   } = useListingState();
 
   const mapInstanceRef = useRef(null);
@@ -42,7 +44,7 @@ function GoogleMapSection({ isMapExpanded }) {
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const initialUrlParsed = useRef(false);
   const searchParams = useSearchParams();
-  const DEFAULT_CITY_ZOOM = 12;
+  const router = useRouter();
 
   useEffect(() => {
     if (!initialUrlParsed.current) {
@@ -60,33 +62,7 @@ function GoogleMapSection({ isMapExpanded }) {
 
   useEffect(() => {
     if (mapInstanceRef.current && coordinates) {
-      const map = mapInstanceRef.current;
-      const currentZoom = map.getZoom();
-      const targetZoom = DEFAULT_CITY_ZOOM;
-
-      if (typeof currentZoom !== "number" || isNaN(currentZoom)) {
-        map.setZoom(targetZoom);
-        map.panTo(coordinates);
-        return;
-      }
-
-      map.panTo(coordinates);
-
-      if (currentZoom !== targetZoom) {
-        const step = currentZoom > targetZoom ? -1 : 1;
-        let zoom = currentZoom;
-
-        const interval = setInterval(() => {
-          zoom += step;
-          if (typeof zoom === "number" && zoom >= 0 && zoom <= 22) {
-            map.setZoom(zoom);
-          }
-
-          if (zoom === targetZoom) clearInterval(interval);
-        }, 150);
-      } else {
-        map.setZoom(targetZoom);
-      }
+      mapInstanceRef.current.panTo(coordinates);
     }
   }, [coordinates]);
 
@@ -111,33 +87,42 @@ function GoogleMapSection({ isMapExpanded }) {
     });
   }, []);
 
-  const handleMapLoad = useCallback((map) => {
-    mapInstanceRef.current = map;
-  }, []);
+  const updateUrlWithCenter = useCallback(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    const center = map.getCenter();
+    if (!center) return;
+
+    const lat = center.lat().toFixed(6);
+    const lng = center.lng().toFixed(6);
+
+    router.replace(`/explore?lat=${lat}&lng=${lng}`, { scroll: false });
+  }, [router]);
 
   const handleCloseInfoWindow = useCallback(() => {
     setOpenInfoWindowId(null);
     clearSelection();
   }, [setOpenInfoWindowId, clearSelection]);
 
+  const handleMapLoad = useCallback(
+    (map) => {
+      mapInstanceRef.current = map;
+
+      map.addListener("idle", updateUrlWithCenter);
+      map.addListener("click", handleCloseInfoWindow);
+
+      if (typeof onMapLoad === "function") {
+        onMapLoad(map);
+      }
+    },
+    [updateUrlWithCenter, handleCloseInfoWindow, onMapLoad]
+  );
+
   const mapContainerStyle = useMemo(
     () => ({ width: "100%", height: "100%" }),
     []
   );
-
-  const handleZoomIn = () => {
-    if (mapInstanceRef.current) {
-      const zoom = mapInstanceRef.current.getZoom();
-      if (typeof zoom === "number") mapInstanceRef.current.setZoom(zoom + 1);
-    }
-  };
-
-  const handleZoomOut = () => {
-    if (mapInstanceRef.current) {
-      const zoom = mapInstanceRef.current.getZoom();
-      if (typeof zoom === "number") mapInstanceRef.current.setZoom(zoom - 1);
-    }
-  };
 
   const filteredListings = useMemo(() => {
     if (showFavoritesOnly) {
@@ -164,6 +149,7 @@ function GoogleMapSection({ isMapExpanded }) {
       <GoogleMap
         mapContainerStyle={mapContainerStyle}
         center={coordinates || { lat: 46.6, lng: 1.88 }}
+        zoom={12}
         options={mapOptions}
         onLoad={handleMapLoad}
       >
@@ -172,6 +158,9 @@ function GoogleMapSection({ isMapExpanded }) {
             key={`marker-${listing.id}`}
             map={mapInstanceRef.current}
             item={listing}
+            isHovered={hoveredListingId === listing.id}
+            onMouseEnter={() => setHoveredListingId(listing.id)}
+            onMouseLeave={() => setHoveredListingId(null)}
           />
         ))}
 
@@ -199,16 +188,6 @@ function GoogleMapSection({ isMapExpanded }) {
             );
           })()}
       </GoogleMap>
-
-      <div className="absolute bottom-4 left-4 z-20 flex gap-2">
-        <button
-          onClick={() => setShowFavoritesOnly((prev) => !prev)}
-          className="bg-white text-gray-800 px-3 py-1.5 rounded shadow text-sm hover:bg-gray-100 flex items-center gap-1"
-        >
-          <Heart className="h-4 w-4 text-gray-500" />
-          <span>{showFavoritesOnly ? "Voir tout" : "Voir mes favoris"}</span>
-        </button>
-      </div>
     </div>
   );
 }

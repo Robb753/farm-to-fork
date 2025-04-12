@@ -65,3 +65,20 @@
     @apply bg-background text-foreground;
   }
 }
+
+@keyframes marker-bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-10px);
+  }
+  60% {
+    transform: translateY(-5px);
+  }
+}
+
+.marker-hover-effect {
+  animation: marker-bounce 0.6s ease-in-out;
+}

@@ -1,8 +1,9 @@
 "use client";
+
 import React, { useEffect, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea"; // Ajout d'un Textarea pour la description
+import { Textarea } from "@/components/ui/textarea";
 import { Formik, Form } from "formik";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/utils/supabase/client";
@@ -10,7 +11,7 @@ import { toast } from "sonner";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import FileUpload from "../_components/FileUpload";
-import { Loader, Save, Globe, Send } from "lucide-react"; // Ajout d'icônes pour les boutons
+import { Loader, Save, Globe, Send } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,8 +24,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"; // Ajout de Card pour une meilleure organisation
-import * as Yup from "yup"; // Ajout de Yup pour une meilleure validation
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import * as Yup from "yup";
 
 // Define the product types
 const productTypeItems = [
@@ -88,6 +89,11 @@ const validationSchema = Yup.object({
     "La description doit contenir au moins 10 caractères"
   ),
   product_type: Yup.array().min(1, "Sélectionnez au moins un type de produit"),
+  production_method: Yup.array().min(
+    1,
+    "Sélectionnez une méthode de production"
+  ),
+  purchase_mode: Yup.array().min(1, "Sélectionnez un mode d'achat"),
 });
 
 // Composant pour les sections de checkbox

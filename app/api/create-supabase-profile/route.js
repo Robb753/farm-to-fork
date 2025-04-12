@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
-import { clerkClient } from "@clerk/nextjs";
-import { supabase } from "@/utils/supabase/client"; // Ajustez le chemin selon votre structure
+import { clerkClient } from "@clerk/nextjs/server";
+import { createClient } from "@supabase/supabase-js";
+
+// Récupération des variables d'environnement côté serveur (sans NEXT_PUBLIC)
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export async function POST(request) {
   try {
@@ -13,17 +18,9 @@ export async function POST(request) {
       );
     }
 
-    // Récupérer les données de l'utilisateur depuis Clerk
+    // Récupérer l'utilisateur depuis Clerk
     const user = await clerkClient.users.getUser(userId);
-
-    if (!user) {
-      return NextResponse.json(
-        { error: "Utilisateur non trouvé" },
-        { status: 404 }
-      );
-    }
-
-    const email = user.primaryEmailAddress?.emailAddress;
+    const email = user?.primaryEmailAddress?.emailAddress;
 
     if (!email) {
       return NextResponse.json(
@@ -32,25 +29,24 @@ export async function POST(request) {
       );
     }
 
-    // Créer une entrée dans la table profiles avec le rôle approprié
     const { error: profileError } = await supabase.from("profiles").insert({
       user_id: userId,
-      role: role,
-      email: email,
+      role,
+      email,
       favorites: [],
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
 
     if (profileError) {
-      console.error("Erreur lors de la création du profil:", profileError);
+      console.error("Erreur création profil:", profileError);
       return NextResponse.json(
         { error: "Erreur lors de la création du profil" },
         { status: 500 }
       );
     }
 
-    // Si c'est un farmer, créer aussi une entrée vide dans listing
+    // Si rôle = farmer, créer une entrée vide dans listing
     if (role === "farmer") {
       const { error: listingError } = await supabase.from("listing").insert({
         createdBy: email,
@@ -59,7 +55,7 @@ export async function POST(request) {
       });
 
       if (listingError) {
-        console.error("Erreur lors de la création du listing:", listingError);
+        console.error("Erreur création listing:", listingError);
         return NextResponse.json(
           { error: "Erreur lors de la création du listing" },
           { status: 500 }

@@ -3,6 +3,7 @@
 import React, { useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
+import { useFilterState } from "@/app/contexts/MapDataContext/FilterStateContext";
 import { useMapData } from "@/app/contexts/MapDataContext/useMapData";
 
 const ListingMapView = dynamic(
@@ -19,11 +20,11 @@ const ListingMapView = dynamic(
 
 function Explore() {
   const searchParams = useSearchParams();
-  const { setCoordinates, filters, dispatchFilters } = useMapData();
+  const { setCoordinates } = useMapData();
+  const { filters, toggleFilter } = useFilterState();
 
   const lat = parseFloat(searchParams.get("lat") || "46.6033");
   const lng = parseFloat(searchParams.get("lng") || "1.8883");
-  const zoom = parseInt(searchParams.get("zoom") || "6");
 
   useEffect(() => {
     const filterKeys = Object.keys(filters);
@@ -32,33 +33,33 @@ function Explore() {
     filterKeys.forEach((key) => {
       const paramValue = searchParams.get(key);
       if (paramValue) {
-        const values = paramValue.split(",");
+        const valuesFromUrl = paramValue.split(",");
 
-        values.forEach((value) => {
+        valuesFromUrl.forEach((value) => {
           if (!filters[key].includes(value)) {
-            dispatchFilters({ type: "TOGGLE_FILTER", filterKey: key, value });
+            toggleFilter(key, value);
             hasChanges = true;
           }
         });
 
         filters[key].forEach((value) => {
-          if (!values.includes(value)) {
-            dispatchFilters({ type: "TOGGLE_FILTER", filterKey: key, value });
+          if (!valuesFromUrl.includes(value)) {
+            toggleFilter(key, value);
             hasChanges = true;
           }
         });
       } else if (filters[key].length > 0) {
         filters[key].forEach((value) => {
-          dispatchFilters({ type: "TOGGLE_FILTER", filterKey: key, value });
+          toggleFilter(key, value);
         });
         hasChanges = true;
       }
     });
 
     if (hasChanges) {
-      console.log("Filtres mis à jour depuis l'URL");
+      console.log("🎯 Filtres mis à jour depuis l'URL");
     }
-  }, [searchParams, filters, dispatchFilters]);
+  }, [searchParams]);
 
   useEffect(() => {
     try {
@@ -66,14 +67,11 @@ function Explore() {
         lat: !isNaN(lat) ? lat : 46.6033,
         lng: !isNaN(lng) ? lng : 1.8883,
       };
-      if (!isNaN(zoom) && zoom >= 3 && zoom <= 20) {
-        coords.zoom = zoom;
-      }
       setCoordinates(coords);
     } catch (error) {
       console.error("Erreur lors de la mise à jour des coordonnées:", error);
     }
-  }, [lat, lng, zoom, setCoordinates]);
+  }, [lat, lng, setCoordinates]);
 
   return (
     <div className="relative flex flex-col h-full">
@@ -81,7 +79,6 @@ function Explore() {
         initialCoordinates={{
           lat: !isNaN(lat) ? lat : 46.6033,
           lng: !isNaN(lng) ? lng : 1.8883,
-          zoom: !isNaN(zoom) ? zoom : 6,
         }}
       />
     </div>

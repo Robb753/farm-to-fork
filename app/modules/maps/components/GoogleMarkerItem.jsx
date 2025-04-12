@@ -85,17 +85,17 @@ const GoogleMarkerItem = ({ map, item, isVisible = true }) => {
           if (img) {
             img.style.transform = "scale(1.3)";
             img.style.filter = "drop-shadow(0 0 4px rgba(0,0,0,0.4))";
+            img.classList.add("marker-hover-effect");
           }
           setHoveredListingId(item.id);
         });
 
         marker.addListener("gmp-mouseout", () => {
-          if (selectedListingId !== item.id) {
-            const img = el.querySelector("img");
-            if (img) {
-              img.style.transform = "scale(1)";
-              img.style.filter = "none";
-            }
+          const img = el.querySelector("img");
+          if (img && selectedListingId !== item.id) {
+            img.style.transform = "scale(1)";
+            img.style.filter = "none";
+            img.classList.remove("marker-hover-effect");
           }
           setHoveredListingId(null);
         });
@@ -140,6 +140,14 @@ const GoogleMarkerItem = ({ map, item, isVisible = true }) => {
       ? "drop-shadow(0 0 4px rgba(0,0,0,0.4))"
       : "none";
     markerRef.current.zIndex = isActive ? 1000 : 1;
+
+    // Rebond lors du survol depuis la liste
+    if (hoveredListingId === item.id) {
+      img.classList.add("marker-hover-effect");
+      setTimeout(() => {
+        img.classList.remove("marker-hover-effect");
+      }, 600);
+    }
   }, [hoveredListingId, selectedListingId, item.id]);
 
   return null;

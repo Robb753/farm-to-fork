@@ -171,6 +171,8 @@ const ListItem = React.memo(
 
 ListItem.displayName = "ListItem";
 
+
+
 function Listing({ onLoadMore, hasMore, isLoading }) {
   const {
     visibleListings = [],
@@ -314,6 +316,8 @@ function Listing({ onLoadMore, hasMore, isLoading }) {
     },
     [selectedListingId, clearSelection, selectListing]
   );
+
+
 
   return (
     <div className="p-4 min-h-screen">
