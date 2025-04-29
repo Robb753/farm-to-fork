@@ -7,7 +7,8 @@ const LanguageContext = createContext();
 const translations = {
   fr: {
     welcome: "Bienvenue sur Farm To Fork",
-    connect: "Connectez-vous avec les producteurs locaux.",
+    connect:
+      "Trouvez des producteurs près de chez vous. 📍 Entrez une ville pour commencer.",
     explore: "Explorer à proximité",
     philosophy: "Notre Philosophie",
     quality: "Qualité Européenne",
@@ -19,7 +20,7 @@ const translations = {
   },
   en: {
     welcome: "Welcome to Farm To Fork",
-    connect: "Connect with local producers.",
+    connect: "Find producers near you. 📍 Enter a city to get started.",
     explore: "Explore Nearby",
     philosophy: "Our Philosophy",
     quality: "European Quality",
@@ -34,12 +35,18 @@ const translations = {
 export function LanguageProvider({ children }) {
   const [currentLanguage, setCurrentLanguage] = useState("fr");
 
-  const t = (key) => translations[currentLanguage]?.[key] || key;
+  const t = (key) => translations?.[currentLanguage]?.[key] || key;
+
+  const setLanguage = (lang) => {
+    if (typeof lang === "string") {
+      setCurrentLanguage(lang);
+    } else if (typeof lang === "object" && lang?.code) {
+      setCurrentLanguage(lang.code);
+    }
+  };
 
   return (
-    <LanguageContext.Provider
-      value={{ t, currentLanguage, setCurrentLanguage }}
-    >
+    <LanguageContext.Provider value={{ t, currentLanguage, setLanguage }}>
       {children}
     </LanguageContext.Provider>
   );

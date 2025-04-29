@@ -7,6 +7,7 @@ import { MapStateProvider } from "./MapStateContext";
 import { FilterStateProvider } from "./FilterStateContext";
 import { ListingStateProvider } from "./ListingStateContext";
 
+// Ce provider contient déjà MapStateProvider à l'intérieur
 export function MapDataProvider({ children }) {
   return (
     <MapStateProvider>

@@ -1,0 +1,26 @@
+[
+  {
+    "id": 1,
+    "title": "Atelier Dégustation de Fromages Fermiers",
+    "description": "Venez découvrir les secrets de fabrication de fromages artisanaux et dégustez des produits d'exception en circuit court.",
+    "date": "2025-06-15",
+    "location": "Ferme du Bonheur, Alsace",
+    "category": "Dégustation"
+  },
+  {
+    "id": 2,
+    "title": "Marché Bio de Printemps",
+    "description": "Marché de producteurs bio avec fruits, légumes, fromages et produits artisanaux, animations toute la journée.",
+    "date": "2025-04-20",
+    "location": "Place du Marché, Strasbourg",
+    "category": "Marché"
+  },
+  {
+    "id": 3,
+    "title": "Atelier Pain Maison",
+    "description": "Apprenez à faire votre propre pain avec des farines locales. Atelier animé par un artisan boulanger passionné.",
+    "date": "2025-05-10",
+    "location": "Maison Rurale, Colmar",
+    "category": "Atelier"
+  }
+]

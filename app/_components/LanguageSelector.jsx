@@ -12,14 +12,6 @@ import { useLanguage } from "../contexts/Language-context"; // ✅ Vérifie que 
 const languages = [
   { code: "fr", name: "Français", flag: "🇫🇷" },
   { code: "en", name: "English", flag: "🇬🇧" },
-  { code: "de", name: "Deutsch", flag: "🇩🇪" },
-  { code: "es", name: "Español", flag: "🇪🇸" },
-  { code: "it", name: "Italiano", flag: "🇮🇹" },
-  { code: "nl", name: "Nederlands", flag: "🇳🇱" },
-  { code: "pt", name: "Português", flag: "🇵🇹" },
-  { code: "pl", name: "Polski", flag: "🇵🇱" },
-  { code: "sv", name: "Svenska", flag: "🇸🇪" },
-  { code: "el", name: "Ελληνικά", flag: "🇬🇷" },
 ];
 
 export function LanguageSelector() {

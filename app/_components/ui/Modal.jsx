@@ -44,7 +44,7 @@ const Modal = forwardRef(({ children, onClose }, ref) => {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm overflow-y-auto py-12"
+      className="fixed inset-0 z-1000 flex items-center justify-center bg-black/50 backdrop-blur-sm overflow-y-auto py-12"
       aria-modal="true"
       role="dialog"
       onClick={handleBackdropClick}

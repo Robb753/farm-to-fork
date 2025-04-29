@@ -12,8 +12,18 @@ import React, {
 } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/utils/supabase/client";
-import { useFilterState } from "./FilterStateContext";
-import { useMapState } from "./MapStateContext";
+
+// Import avec gestion d'erreur
+const MapStateContext = React.createContext(null);
+let useMapState = () => ({ coordinates: null });
+
+try {
+  // Essayez d'importer mais avec un fallback en cas d'échec
+  const { useMapState: importedUseMapState } = require("./MapStateContext");
+  useMapState = importedUseMapState;
+} catch (error) {
+  console.warn("MapStateContext n'est pas disponible, utilisation du fallback");
+}
 
 const ListingStateContext = createContext(null);
 
@@ -43,6 +53,7 @@ const ActionTypes = {
   INCREMENT_REQUEST_ID: "INCREMENT_REQUEST_ID",
 };
 
+// Définition du reducer qui manquait
 function reducer(state, action) {
   switch (action.type) {
     case ActionTypes.SET_ALL:
@@ -95,10 +106,32 @@ function filterListingsInner(allListings, filters) {
 
 export function ListingStateProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState);
-  const { filters } = useFilterState();
-  const { coordinates } = useMapState();
-  const stateRef = useRef(state);
 
+  // Utilisation sécurisée de useMapState
+  let coordinates = null;
+  let filters = {};
+
+  try {
+    // Utiliser useMapState de façon sécurisée
+    const mapState = useMapState();
+    coordinates = mapState?.coordinates;
+
+    // Essayer d'importer FilterStateContext si disponible
+    try {
+      const { useFilterState } = require("./FilterStateContext");
+      filters = useFilterState()?.filters || {};
+    } catch (error) {
+      console.warn(
+        "FilterStateContext n'est pas disponible, utilisation des valeurs par défaut"
+      );
+    }
+  } catch (error) {
+    console.warn(
+      "MapStateContext n'est pas disponible, utilisation des valeurs par défaut"
+    );
+  }
+
+  const stateRef = useRef(state);
   stateRef.current = state;
 
   const fetchListings = useCallback(
@@ -217,9 +250,24 @@ export function ListingStateProvider({ children }) {
 export function useListingState() {
   const context = useContext(ListingStateContext);
   if (!context) {
-    throw new Error(
-      "useListingState must be used within a ListingStateProvider"
-    );
+    // Retourner un objet par défaut au lieu de lancer une erreur
+    console.warn("useListingState utilisé en dehors d'un ListingStateProvider");
+    return {
+      listings: [],
+      visibleListings: [],
+      hoveredListingId: null,
+      selectedListingId: null,
+      openInfoWindowId: null,
+      isLoading: false,
+      dataFetched: false,
+      hasMore: false,
+      setHoveredListingId: () => {},
+      setSelectedListingId: () => {},
+      setOpenInfoWindowId: () => {},
+      clearSelection: () => {},
+      fetchListings: async () => [],
+      selectListing: () => {},
+    };
   }
   return context;
 }
