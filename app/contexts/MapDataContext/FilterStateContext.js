@@ -2,7 +2,14 @@
 
 "use client";
 
-import React, { createContext, useContext, useReducer, useMemo } from "react";
+import React, {
+  createContext,
+  useContext,
+  useReducer,
+  useMemo,
+  useEffect,
+} from "react";
+import { useListingState } from "./ListingStateContext";
 
 export const filterSections = [
   {
@@ -94,8 +101,73 @@ function reducer(state, action) {
   }
 }
 
+// Fonction de filtrage à utiliser globalement
+export function filterListings(allListings, filters) {
+  const hasActive = Object.values(filters).some((arr) => arr.length > 0);
+  if (!hasActive || !allListings) return allListings || [];
+
+  return allListings.filter((listing) =>
+    Object.entries(filters).every(([key, values]) => {
+      // Si aucun filtre n'est activé pour cette catégorie, on accepte tout
+      if (values.length === 0) return true;
+
+      // Récupérer les valeurs du listing pour cette catégorie
+      const listingValues = Array.isArray(listing[key])
+        ? listing[key]
+        : listing[key]
+        ? [listing[key]]
+        : [];
+
+      // Si le listing n'a pas de valeurs pour cette catégorie mais que des filtres
+      // sont actifs pour cette catégorie, il ne doit pas être inclus
+      if (listingValues.length === 0) return false;
+
+      // Vérifier si au moins une valeur du filtre correspond à une valeur du listing
+      return values.some((v) => listingValues.includes(v));
+    })
+  );
+}
+
 export function FilterStateProvider({ children }) {
   const [filters, dispatch] = useReducer(reducer, initialFilters);
+  const {
+    allListings,
+    setVisibleListings,
+    setFilteredListings,
+    setCurrentFilters,
+  } = useListingState() || {};
+
+  // Effet pour mettre à jour les listings visibles quand les filtres changent
+  useEffect(() => {
+    if (allListings && allListings.length > 0) {
+      // Mettre à jour les filtres courants dans le contexte ListingState
+      if (setCurrentFilters) {
+        setCurrentFilters(filters);
+      }
+
+      // Filtrer les listings en fonction des filtres actuels
+      const filtered = filterListings(allListings, filters);
+
+      console.log("Filtres actifs:", filters);
+      console.log("Listings avant filtrage:", allListings.length);
+      console.log("Listings après filtrage:", filtered.length);
+
+      // Mettre à jour à la fois filteredListings et visibleListings
+      if (setFilteredListings) {
+        setFilteredListings(filtered);
+      }
+
+      if (setVisibleListings) {
+        setVisibleListings(filtered);
+      }
+    }
+  }, [
+    filters,
+    allListings,
+    setVisibleListings,
+    setFilteredListings,
+    setCurrentFilters,
+  ]);
 
   const value = useMemo(() => {
     return {
@@ -106,6 +178,7 @@ export function FilterStateProvider({ children }) {
           payload: { filterKey, value },
         }),
       resetFilters: () => dispatch({ type: ActionTypes.RESET_FILTERS }),
+      filterListings: (listings) => filterListings(listings, filters),
     };
   }, [filters]);
 

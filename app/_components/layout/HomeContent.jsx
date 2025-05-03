@@ -6,8 +6,8 @@ import { Toaster } from "sonner";
 import ExploreNearby from "./ExploreNearby";
 import EuropeanFeatures from "./EuropeanFeatures";
 import { useLanguage } from "@/app/contexts/Language-context";
-import BaseGoogleAddressSearch from "@/app/modules/maps/components/shared/BaseGoogleAddressSearch";
 import { useMapState } from "@/app/contexts/MapDataContext/MapStateContext";
+import GoogleAddressSearchForHeader from "@/app/modules/maps/components/shared/GoogleAddressSearchForHeader";
 
 function HomeContent() {
   const { setCoordinates } = useMapState();
@@ -44,7 +44,7 @@ function HomeContent() {
             {t("connect")}
           </p>
           <div className="w-full max-w-lg bg-white shadow-md rounded-full px-4 py-2 flex items-center">
-            <BaseGoogleAddressSearch selectedAddress={handleCitySelect} />
+            <GoogleAddressSearchForHeader selectedAddress={handleCitySelect} />
           </div>
         </div>
       </div>

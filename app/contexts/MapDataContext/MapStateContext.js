@@ -1,65 +1,120 @@
-// app/contexts/MapDataContext/MapStateContext.js
-
-"use client";
-
+// app/contexts/MapDataContext/MapStateContext.jsx
+import { GoogleMapsLoader } from "@/utils/googleMapsLoader";
 import React, {
   createContext,
   useContext,
-  useReducer,
-  useMemo,
+  useState,
   useCallback,
+  useRef,
+  useEffect,
 } from "react";
-import { useJsApiLoader } from "@react-google-maps/api";
-
-const GOOGLE_MAPS_LIBRARIES = ["places"];
+import { toast } from "sonner";
 
 const MapStateContext = createContext(null);
 
-const initialState = {
-  coordinates: null,
-};
-
-const ActionTypes = {
-  SET_COORDINATES: "SET_COORDINATES",
-};
-
-function reducer(state, action) {
-  switch (action.type) {
-    case ActionTypes.SET_COORDINATES:
-      return { ...state, coordinates: action.payload };
-    default:
-      return state;
-  }
-}
-
 export function MapStateProvider({ children }) {
-  const [state, dispatch] = useReducer(reducer, initialState);
+  const [isApiLoaded, setIsApiLoaded] = useState(false);
+  const [isApiLoading, setIsApiLoading] = useState(false);
+  const [coordinates, setCoordinates] = useState(null);
+  const [mapBounds, setMapBounds] = useState(null);
+  const [mapZoom, setMapZoom] = useState(12);
+  const [mapInstance, setMapInstance] = useState(null);
 
-  const { isLoaded } = useJsApiLoader({
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_PLACE_API_KEY,
-    libraries: GOOGLE_MAPS_LIBRARIES,
-  });
+  // Référence pour éviter des mises à jour trop fréquentes
+  const boundsChangeTimeoutRef = useRef(null);
 
-  // ✅ Callback stable et mémoïsée pour éviter les changements inutiles
-  const setCoordinates = useCallback((coords) => {
-    if (
-      !coords ||
-      typeof coords.lat !== "number" ||
-      typeof coords.lng !== "number"
-    )
+  // Chargement de l'API Google Maps
+  useEffect(() => {
+    // Vérifier si l'API est déjà chargée
+    if (GoogleMapsLoader.checkLoaded()) {
+      setIsApiLoaded(true);
       return;
-    dispatch({ type: ActionTypes.SET_COORDINATES, payload: coords });
+    }
+
+    // Si l'API est en cours de chargement, ne rien faire
+    if (isApiLoading) return;
+
+    // Commencer le chargement
+    setIsApiLoading(true);
+
+    GoogleMapsLoader.load()
+      .then(() => {
+        console.log("✅ API Google Maps chargée avec succès");
+        setIsApiLoaded(true);
+      })
+      .catch((error) => {
+        console.error(
+          "❌ Erreur lors du chargement de l'API Google Maps:",
+          error
+        );
+        toast.error("Impossible de charger la carte. Veuillez réessayer.");
+      })
+      .finally(() => {
+        setIsApiLoading(false);
+      });
+  }, [isApiLoading]);
+
+  // Fonction pour mettre à jour les bounds avec debounce
+  const updateMapBounds = useCallback((newBounds) => {
+    if (boundsChangeTimeoutRef.current) {
+      clearTimeout(boundsChangeTimeoutRef.current);
+    }
+
+    boundsChangeTimeoutRef.current = setTimeout(() => {
+      setMapBounds(newBounds);
+    }, 300); // Debounce de 300ms pour éviter les mises à jour trop fréquentes
   }, []);
 
-  // ✅ Valeur mémoïsée sans dépendance inutile sur state entier
-  const value = useMemo(
-    () => ({
-      coordinates: state.coordinates,
-      setCoordinates,
-      isApiLoaded: isLoaded,
-    }),
-    [state.coordinates, setCoordinates, isLoaded]
+  // Fonction pour capturer les instances Map et les bounds lors du chargement
+  const handleMapLoad = useCallback(
+    (map) => {
+      setMapInstance(map);
+      console.log("✅ Instance de carte Google Maps chargée");
+
+      // Capture des bounds initiaux
+      if (map && map.getBounds()) {
+        updateMapBounds({
+          ne: {
+            lat: map.getBounds().getNorthEast().lat(),
+            lng: map.getBounds().getNorthEast().lng(),
+          },
+          sw: {
+            lat: map.getBounds().getSouthWest().lat(),
+            lng: map.getBounds().getSouthWest().lng(),
+          },
+        });
+      }
+
+      // Écouter les événements de zoom et déplacement
+      map.addListener("idle", () => {
+        setMapZoom(map.getZoom());
+        if (map.getBounds()) {
+          updateMapBounds({
+            ne: {
+              lat: map.getBounds().getNorthEast().lat(),
+              lng: map.getBounds().getNorthEast().lng(),
+            },
+            sw: {
+              lat: map.getBounds().getSouthWest().lat(),
+              lng: map.getBounds().getSouthWest().lng(),
+            },
+          });
+        }
+      });
+    },
+    [updateMapBounds]
   );
+
+  const value = {
+    isApiLoaded,
+    isApiLoading,
+    coordinates,
+    setCoordinates,
+    mapBounds,
+    mapZoom,
+    mapInstance,
+    handleMapLoad,
+  };
 
   return (
     <MapStateContext.Provider value={value}>
@@ -68,10 +123,10 @@ export function MapStateProvider({ children }) {
   );
 }
 
-export function useMapState() {
+export const useMapState = () => {
   const context = useContext(MapStateContext);
   if (!context) {
     throw new Error("useMapState must be used within a MapStateProvider");
   }
   return context;
-}
+};

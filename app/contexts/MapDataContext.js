@@ -405,11 +405,8 @@ export function MapDataProvider({ children }) {
       selectListing: actions.selectListing,
       clearSelection: actions.clearSelection,
       filters: state.filters,
-      dispatchFilters: (action) => {
-        if (action.type === "TOGGLE_FILTER")
-          actions.toggleFilter(action.filterKey, action.value);
-        else if (action.type === "RESET_FILTERS") actions.resetFilters();
-      },
+      toggleFilter: actions.toggleFilter,
+      resetFilters: actions.resetFilters,
       isLoading: state.dataState.isLoading,
       dataFetched: state.dataState.dataFetched,
       hasMore: state.dataState.hasMore,

@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useFilterState } from "@/app/contexts/MapDataContext/FilterStateContext";
 import { useMapData } from "@/app/contexts/MapDataContext/useMapData";
+import { useAllListingsWithImages } from "@/app/hooks/useAllListingsWithImages";
+import { useListingState } from "@/app/contexts/MapDataContext/ListingStateContext";
 
 const ListingMapView = dynamic(
   () => import("../../modules/listings/components/ListingMapView"),
@@ -21,10 +23,15 @@ const ListingMapView = dynamic(
 function Explore() {
   const searchParams = useSearchParams();
   const { setCoordinates } = useMapData();
+  const { setListings } = useListingState();
   const { filters, toggleFilter } = useFilterState();
+  const { listings, isLoading, error } = useAllListingsWithImages();
 
-  const lat = parseFloat(searchParams.get("lat") || "46.6033");
-  const lng = parseFloat(searchParams.get("lng") || "1.8883");
+  const latParam = searchParams.get("lat");
+  const lngParam = searchParams.get("lng");
+
+  const lat = latParam ? parseFloat(latParam) : undefined;
+  const lng = lngParam ? parseFloat(lngParam) : undefined;
 
   useEffect(() => {
     const filterKeys = Object.keys(filters);
@@ -62,24 +69,23 @@ function Explore() {
   }, [searchParams]);
 
   useEffect(() => {
-    try {
-      const coords = {
-        lat: !isNaN(lat) ? lat : 46.6033,
-        lng: !isNaN(lng) ? lng : 1.8883,
-      };
-      setCoordinates(coords);
-    } catch (error) {
-      console.error("Erreur lors de la mise à jour des coordonnées:", error);
+    if (!isNaN(lat) && !isNaN(lng)) {
+      setCoordinates({ lat, lng });
     }
   }, [lat, lng, setCoordinates]);
+
+  useEffect(() => {
+    if (listings && listings.length > 0) {
+      setListings(listings);
+    }
+  }, [listings, setListings]);
 
   return (
     <div className="relative flex flex-col h-full">
       <ListingMapView
-        initialCoordinates={{
-          lat: !isNaN(lat) ? lat : 46.6033,
-          lng: !isNaN(lng) ? lng : 1.8883,
-        }}
+        initialCoordinates={
+          !isNaN(lat) && !isNaN(lng) ? { lat, lng } : undefined
+        }
       />
     </div>
   );

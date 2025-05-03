@@ -37,7 +37,7 @@ export default function FeedbackHomePage() {
         <div className="mt-12">
           <p className="text-sm text-gray-500">
             Vous pouvez consulter notre{" "}
-            <Link href="/legal" className="underline hover:text-green-700">
+            <Link href="/legal/privacy-policy" className="underline hover:text-green-700">
               Politique de confidentialité
             </Link>{" "}
             pour savoir comment nous protégeons vos données.

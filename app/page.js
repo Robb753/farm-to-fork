@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { MapStateProvider } from "@/app/contexts/MapDataContext/MapStateContext";
+import { MapDataProvider } from "@/app/contexts/MapDataContext/MapDataProvider";
 import Explore from "./_components/layout/Explore";
 import HomeContent from "./_components/layout/HomeContent";
 
@@ -11,12 +11,12 @@ export default function Home() {
     setViewMap(true);
   };
 
-  // Envelopper le contenu avec MapStateProvider
+  // Envelopper avec MapDataProvider unifié (qui contient tous les providers nécessaires)
   return (
-    <MapStateProvider>
+    <MapDataProvider>
       <div>
         {viewMap ? <Explore /> : <HomeContent onViewMap={handleViewMap} />}
       </div>
-    </MapStateProvider>
+    </MapDataProvider>
   );
 }
