@@ -15,6 +15,7 @@ import CustomInfoWindow from "./CustomInfoWindow";
 import FarmInfoWindow from "./FarmInfoWindow";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useMapData } from "@/app/contexts/MapDataContext/useMapData";
+import debounce from "lodash.debounce";
 
 const mapOptions = {
   disableDefaultUI: true,
@@ -84,47 +85,53 @@ function GoogleMapSection({ isMapExpanded }) {
   const markersRef = useRef(new Map());
 
   // Effet pour filtrer les listings et créer/mettre à jour les marqueurs
+  const previousListingIdsRef = useRef([]);
+
   useEffect(() => {
     if (!mapInstanceRef.current || !allListings) return;
 
-    // Filtrer les listings selon les filtres actifs
     const filteredListings = filterListingsByType(allListings, filters);
-    console.log(
-      `Filtrage : ${filteredListings.length} listings après filtrage`
-    );
 
-    // Nettoyer tous les marqueurs existants
+    // 🔁 Comparer les IDs pour éviter de recréer les marqueurs si les listings ne changent pas
+    const newIds = filteredListings
+      .map((l) => l.id)
+      .sort()
+      .join(",");
+    const prevIds = previousListingIdsRef.current.sort().join(",");
+
+    if (newIds === prevIds) {
+      console.log("✅ Listings identiques, pas de recréation de marqueurs.");
+      return;
+    }
+
+    previousListingIdsRef.current = filteredListings.map((l) => l.id);
+
+    // Nettoyer tous les anciens marqueurs
     activeMarkers.forEach((marker) => {
       if (marker) marker.setMap(null);
     });
     markersRef.current.clear();
 
-    // Fonction pour créer les marqueurs
     const createMarkers = async () => {
-      // Attendre le chargement de la bibliothèque de marqueurs avancés
       const { AdvancedMarkerElement } = await google.maps.importLibrary(
         "marker"
       );
 
-      // Créer de nouveaux marqueurs pour les listings filtrés
       const newMarkers = filteredListings.map((listing) => {
-        // Créer l'élément SVG du marqueur
+        // Créer l'élément SVG
         const el = document.createElement("div");
         el.className = "marker-wrapper";
         el.innerHTML = `
-          <div class="pin-marker">
-            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 384 512">
-              <path 
-                fill="${
-                  listing.availability === "open" ? "#22c55e" : "#ef4444"
-                }" 
-                d="M172.268 501.67C26.97 291.031 0 269.413 0 192 0 85.961 85.961 0 192 0s192 85.961 192 192c0 77.413-26.97 99.031-172.268 309.67-9.535 13.774-29.93 13.773-39.464 0z"
-              />
-            </svg>
-          </div>
-        `;
+        <div class="pin-marker">
+          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 384 512">
+            <path 
+              fill="${listing.availability === "open" ? "#22c55e" : "#ef4444"}"
+              d="M172.268 501.67C26.97 291.031 0 269.413 0 192 0 85.961 85.961 0 192 0s192 85.961 192 192c0 77.413-26.97 99.031-172.268 309.67-9.535 13.774-29.93 13.773-39.464 0z"
+            />
+          </svg>
+        </div>
+      `;
 
-        // Créer le marqueur avancé
         const marker = new AdvancedMarkerElement({
           map: mapInstanceRef.current,
           position: {
@@ -135,10 +142,8 @@ function GoogleMapSection({ isMapExpanded }) {
           title: listing.name || "Ferme",
         });
 
-        // Stocker le marqueur dans la référence
         markersRef.current.set(listing.id, { marker, element: el });
 
-        // Ajouter les écouteurs d'événements
         marker.addListener("gmp-click", () => {
           setOpenInfoWindowId(
             openInfoWindowId === listing.id ? null : listing.id
@@ -147,7 +152,6 @@ function GoogleMapSection({ isMapExpanded }) {
 
         marker.addListener("gmp-mouseover", () => {
           setHoveredListingId(listing.id);
-          // Animation de survol
           const svg = el.querySelector("svg");
           if (svg) {
             svg.style.transition =
@@ -159,7 +163,6 @@ function GoogleMapSection({ isMapExpanded }) {
 
         marker.addListener("gmp-mouseout", () => {
           setHoveredListingId(null);
-          // Réinitialiser l'animation
           const svg = el.querySelector("svg");
           if (svg) {
             svg.style.transition = "transform 0.3s ease, filter 0.3s ease";
@@ -174,17 +177,15 @@ function GoogleMapSection({ isMapExpanded }) {
       setActiveMarkers(newMarkers);
     };
 
-    // Créer les marqueurs
     createMarkers();
 
-    // Nettoyage lors du démontage
     return () => {
       activeMarkers.forEach((marker) => {
         if (marker) marker.setMap(null);
       });
       markersRef.current.clear();
     };
-  }, [allListings, filters, mapInstanceRef.current]);
+  }, [allListings, filters]);
 
   useEffect(() => {
     if (!initialUrlParsed.current) {
@@ -206,12 +207,25 @@ function GoogleMapSection({ isMapExpanded }) {
   const updateUrlWithCenter = useCallback(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
+
     const center = map.getCenter();
     if (!center) return;
+
     const lat = center.lat().toFixed(6);
     const lng = center.lng().toFixed(6);
-    router.replace(`/explore?lat=${lat}&lng=${lng}`, { scroll: false });
-  }, [router]);
+
+    const searchParams = new URLSearchParams();
+    searchParams.set("lat", lat);
+    searchParams.set("lng", lng);
+
+    Object.entries(filters).forEach(([key, values]) => {
+      if (Array.isArray(values) && values.length > 0) {
+        searchParams.set(key, values.join(","));
+      }
+    });
+
+    router.replace(`/explore?${searchParams.toString()}`, { scroll: false });
+  }, [router, filters]);
 
   const handleCloseInfoWindow = useCallback(() => {
     setOpenInfoWindowId(null);
@@ -286,19 +300,9 @@ function GoogleMapSection({ isMapExpanded }) {
     );
   }
 
-  // Compter les filtres actifs pour l'affichage du débogage
-  const activeFilterCount = Object.values(filters).flat().length;
-
   return (
     <div className="w-full h-full relative">
-      {/* Panneau de débogage */}
-      <div className="absolute top-20 right-4 z-50 bg-white p-2 rounded shadow text-xs">
-        <div>Filtres actifs: {activeFilterCount}</div>
-        <div>Listings total: {allListings?.length || 0}</div>
-        <div>Marqueurs affichés: {activeMarkers.length}</div>
-      </div>
-
-      <GoogleMap
+     <GoogleMap
         mapContainerStyle={mapContainerStyle}
         center={coordinates || { lat: 46.6, lng: 1.88 }}
         zoom={12}

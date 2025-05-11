@@ -8,8 +8,10 @@ import React, {
   useReducer,
   useMemo,
   useEffect,
+  useState,
 } from "react";
 import { useListingState } from "./ListingStateContext";
+import { usePathname, useSearchParams, useRouter } from "next/navigation";
 
 export const filterSections = [
   {
@@ -82,6 +84,7 @@ const FilterStateContext = createContext(null);
 const ActionTypes = {
   TOGGLE_FILTER: "TOGGLE_FILTER",
   RESET_FILTERS: "RESET_FILTERS",
+  SET_ALL: "SET_ALL",
 };
 
 function reducer(state, action) {
@@ -96,6 +99,8 @@ function reducer(state, action) {
     }
     case ActionTypes.RESET_FILTERS:
       return initialFilters;
+    case ActionTypes.SET_ALL:
+      return { ...initialFilters, ...action.payload };
     default:
       return state;
   }
@@ -108,21 +113,16 @@ export function filterListings(allListings, filters) {
 
   return allListings.filter((listing) =>
     Object.entries(filters).every(([key, values]) => {
-      // Si aucun filtre n'est activé pour cette catégorie, on accepte tout
       if (values.length === 0) return true;
 
-      // Récupérer les valeurs du listing pour cette catégorie
       const listingValues = Array.isArray(listing[key])
         ? listing[key]
         : listing[key]
         ? [listing[key]]
         : [];
 
-      // Si le listing n'a pas de valeurs pour cette catégorie mais que des filtres
-      // sont actifs pour cette catégorie, il ne doit pas être inclus
       if (listingValues.length === 0) return false;
 
-      // Vérifier si au moins une valeur du filtre correspond à une valeur du listing
       return values.some((v) => listingValues.includes(v));
     })
   );
@@ -130,6 +130,8 @@ export function filterListings(allListings, filters) {
 
 export function FilterStateProvider({ children }) {
   const [filters, dispatch] = useReducer(reducer, initialFilters);
+  const [filtersHydrated, setFiltersHydrated] = useState(false);
+
   const {
     allListings,
     setVisibleListings,
@@ -137,29 +139,36 @@ export function FilterStateProvider({ children }) {
     setCurrentFilters,
   } = useListingState() || {};
 
-  // Effet pour mettre à jour les listings visibles quand les filtres changent
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  // Hydratation initiale depuis l'URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlFilters = {};
+
+    filterSections.forEach(({ key }) => {
+      const val = params.get(key);
+      if (val) urlFilters[key] = val.split(",");
+    });
+
+    if (Object.keys(urlFilters).length > 0) {
+      dispatch({ type: ActionTypes.SET_ALL, payload: urlFilters });
+    }
+
+    setFiltersHydrated(true);
+  }, []);
+
+  // Mise à jour des listings filtrés
   useEffect(() => {
     if (allListings && allListings.length > 0) {
-      // Mettre à jour les filtres courants dans le contexte ListingState
-      if (setCurrentFilters) {
-        setCurrentFilters(filters);
-      }
+      if (setCurrentFilters) setCurrentFilters(filters);
 
-      // Filtrer les listings en fonction des filtres actuels
       const filtered = filterListings(allListings, filters);
 
-      console.log("Filtres actifs:", filters);
-      console.log("Listings avant filtrage:", allListings.length);
-      console.log("Listings après filtrage:", filtered.length);
-
-      // Mettre à jour à la fois filteredListings et visibleListings
-      if (setFilteredListings) {
-        setFilteredListings(filtered);
-      }
-
-      if (setVisibleListings) {
-        setVisibleListings(filtered);
-      }
+      if (setFilteredListings) setFilteredListings(filtered);
+      if (setVisibleListings) setVisibleListings(filtered);
     }
   }, [
     filters,
@@ -168,6 +177,27 @@ export function FilterStateProvider({ children }) {
     setFilteredListings,
     setCurrentFilters,
   ]);
+
+  // Synchronisation des filtres avec l'URL (si lat/lng sont présents)
+  useEffect(() => {
+    if (!filtersHydrated) return;
+
+    const lat = searchParams.get("lat");
+    const lng = searchParams.get("lng");
+    if (!lat || !lng) return;
+
+    const params = new URLSearchParams();
+    params.set("lat", lat);
+    params.set("lng", lng);
+
+    Object.entries(filters).forEach(([key, values]) => {
+      if (values.length > 0) {
+        params.set(key, values.join(","));
+      }
+    });
+
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }, [filters, filtersHydrated]);
 
   const value = useMemo(() => {
     return {
@@ -179,8 +209,9 @@ export function FilterStateProvider({ children }) {
         }),
       resetFilters: () => dispatch({ type: ActionTypes.RESET_FILTERS }),
       filterListings: (listings) => filterListings(listings, filters),
+      filtersHydrated,
     };
-  }, [filters]);
+  }, [filters, filtersHydrated]);
 
   return (
     <FilterStateContext.Provider value={value}>
