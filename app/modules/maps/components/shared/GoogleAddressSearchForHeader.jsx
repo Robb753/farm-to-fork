@@ -71,7 +71,7 @@ function GoogleAddressSearchForHeader({ selectedAddress, onAddressChange }) {
         inputRef.current,
         {
           types: ["(cities)"],
-          componentRestrictions: { country: "fr" },
+         // componentRestrictions: { country: "fr" },
           fields: ["geometry", "name", "formatted_address", "place_id"],
         }
       );
@@ -123,7 +123,7 @@ function GoogleAddressSearchForHeader({ selectedAddress, onAddressChange }) {
       {
         input: searchText,
         types: ["(cities)"],
-        componentRestrictions: { country: "fr" },
+        //componentRestrictions: { country: "fr" },
       },
       (predictions, status) => {
         if (
