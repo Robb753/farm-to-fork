@@ -1,10 +1,7 @@
 "use client";
 
 import React, { useEffect } from "react";
-import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
-import { useFilterState } from "@/app/contexts/MapDataContext/FilterStateContext";
-import { useMapData } from "@/app/contexts/MapDataContext/useMapData";
 import { useAllListingsWithImages } from "@/app/hooks/useAllListingsWithImages";
 import { useListingState } from "@/app/contexts/MapDataContext/ListingStateContext";
 
@@ -21,10 +18,7 @@ const ListingMapView = dynamic(
 );
 
 export default function Explore() {
-  const searchParams = useSearchParams();
-  const { filters, toggleFilter } = useFilterState();
   const { listingsWithImages } = useAllListingsWithImages();
-  const { fetchAllListings } = useMapData();
   const { setAllListings } = useListingState();
 
   useEffect(() => {

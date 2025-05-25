@@ -5,29 +5,16 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { updateClerkRole, syncProfileToSupabase } from "@/lib/syncUserUtils";
 
-export default function SignUpPage() {
+export default function SignUpFarmerPage() {
+  const { isSignedIn, isLoaded } = useUser();
   const router = useRouter();
-  const { isSignedIn, isLoaded, user } = useUser();
 
   useEffect(() => {
-    if (isLoaded && isSignedIn && user) {
-      // Mettre à jour Clerk et Supabase avec le rôle par défaut
-      const sync = async () => {
-        try {
-          await updateClerkRole(user.id, "user");
-          await syncProfileToSupabase(user, "user");
-        } catch (err) {
-          console.error("[SignUpPage] Échec de synchronisation:", err);
-        } finally {
-          router.push("/");
-        }
-      };
-
-      sync();
+    if (isLoaded && isSignedIn) {
+      router.push("/request-farmer-access");
     }
-  }, [isLoaded, isSignedIn, user, router]);
+  }, [isLoaded, isSignedIn, router]);
 
   if (isLoaded && isSignedIn) return null;
 
@@ -45,9 +32,18 @@ export default function SignUpPage() {
           <div className="hidden lg:block lg:relative lg:p-12">
             <Link className="block text-white" href="/">
               <span className="sr-only">Accueil</span>
-              {/* Icône ou logo */}
-              <svg className="h-8 sm:h-10" viewBox="0 0 28 24" fill="none">
-                <path d="..." fill="currentColor" />
+              <svg
+                className="h-8 sm:h-10"
+                viewBox="0 0 28 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M4 12L12 20L24 4"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  fill="none"
+                />
               </svg>
             </Link>
             <h2 className="mt-6 text-3xl font-bold text-white">
@@ -74,6 +70,7 @@ export default function SignUpPage() {
             <SignUp
               routing="hash"
               signInUrl="/sign-in"
+              fallbackRedirectUrl="/request-farmer-access"
               appearance={{
                 elements: {
                   formButtonPrimary: "bg-green-600 hover:bg-green-700",

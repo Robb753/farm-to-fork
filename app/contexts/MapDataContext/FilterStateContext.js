@@ -1,5 +1,3 @@
-// app/contexts/MapDataContext/FilterStateContext.js
-
 "use client";
 
 import React, {
@@ -11,7 +9,8 @@ import React, {
   useState,
 } from "react";
 import { useListingState } from "./ListingStateContext";
-import { usePathname, useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useUpdateExploreUrl } from "@/utils/updateExploreUrl";
 
 export const filterSections = [
   {
@@ -106,31 +105,21 @@ function reducer(state, action) {
   }
 }
 
-// Fonction de filtrage à utiliser globalement
-export function filterListings(allListings, filters) {
-  const hasActive = Object.values(filters).some((arr) => arr.length > 0);
-  if (!hasActive || !allListings) return allListings || [];
-
-  return allListings.filter((listing) =>
-    Object.entries(filters).every(([key, values]) => {
-      if (values.length === 0) return true;
-
-      const listingValues = Array.isArray(listing[key])
-        ? listing[key]
-        : listing[key]
-        ? [listing[key]]
-        : [];
-
-      if (listingValues.length === 0) return false;
-
-      return values.some((v) => listingValues.includes(v));
-    })
-  );
+function filtersToUrlParams(filters) {
+  const params = {};
+  Object.entries(filters).forEach(([key, values]) => {
+    if (values.length > 0) {
+      params[key] = values.join(",");
+    }
+  });
+  return params;
 }
 
 export function FilterStateProvider({ children }) {
   const [filters, dispatch] = useReducer(reducer, initialFilters);
   const [filtersHydrated, setFiltersHydrated] = useState(false);
+  const searchParams = useSearchParams();
+  const updateExploreUrl = useUpdateExploreUrl();
 
   const {
     allListings,
@@ -139,11 +128,7 @@ export function FilterStateProvider({ children }) {
     setCurrentFilters,
   } = useListingState() || {};
 
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const router = useRouter();
-
-  // Hydratation initiale depuis l'URL
+  // Hydrater les filtres depuis l’URL au chargement
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const urlFilters = {};
@@ -160,13 +145,11 @@ export function FilterStateProvider({ children }) {
     setFiltersHydrated(true);
   }, []);
 
-  // Mise à jour des listings filtrés
+  // Mise à jour des listings lorsqu’un filtre est modifié
   useEffect(() => {
     if (allListings && allListings.length > 0) {
       if (setCurrentFilters) setCurrentFilters(filters);
-
       const filtered = filterListings(allListings, filters);
-
       if (setFilteredListings) setFilteredListings(filtered);
       if (setVisibleListings) setVisibleListings(filtered);
     }
@@ -178,7 +161,7 @@ export function FilterStateProvider({ children }) {
     setCurrentFilters,
   ]);
 
-  // Synchronisation des filtres avec l'URL (si lat/lng sont présents)
+  // Synchroniser l’URL avec les filtres (sans écraser lat/lng)
   useEffect(() => {
     if (!filtersHydrated) return;
 
@@ -186,17 +169,11 @@ export function FilterStateProvider({ children }) {
     const lng = searchParams.get("lng");
     if (!lat || !lng) return;
 
-    const params = new URLSearchParams();
-    params.set("lat", lat);
-    params.set("lng", lng);
-
-    Object.entries(filters).forEach(([key, values]) => {
-      if (values.length > 0) {
-        params.set(key, values.join(","));
-      }
+    updateExploreUrl({
+      lat,
+      lng,
+      ...filtersToUrlParams(filters),
     });
-
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   }, [filters, filtersHydrated]);
 
   const value = useMemo(() => {
@@ -217,6 +194,27 @@ export function FilterStateProvider({ children }) {
     <FilterStateContext.Provider value={value}>
       {children}
     </FilterStateContext.Provider>
+  );
+}
+
+function filterListings(allListings, filters) {
+  const hasActive = Object.values(filters).some((arr) => arr.length > 0);
+  if (!hasActive || !allListings) return allListings || [];
+
+  return allListings.filter((listing) =>
+    Object.entries(filters).every(([key, values]) => {
+      if (values.length === 0) return true;
+
+      const listingValues = Array.isArray(listing[key])
+        ? listing[key]
+        : listing[key]
+        ? [listing[key]]
+        : [];
+
+      if (listingValues.length === 0) return false;
+
+      return values.some((v) => listingValues.includes(v));
+    })
   );
 }
 

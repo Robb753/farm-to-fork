@@ -1,4 +1,3 @@
-// app/modules/maps/components/shared/GoogleAddressSearchForHeader.jsx
 "use client";
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
@@ -11,12 +10,12 @@ function GoogleAddressSearchForHeader({ selectedAddress, onAddressChange }) {
   const { isApiLoaded, setCoordinates } = useMapState();
   const inputRef = useRef(null);
   const autocompleteRef = useRef(null);
+  const selectedPlaceRef = useRef(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
-  // Fonction pour gérer le changement de lieu
   const handlePlaceChanged = useCallback(() => {
     try {
       setIsLoading(true);
@@ -31,8 +30,8 @@ function GoogleAddressSearchForHeader({ selectedAddress, onAddressChange }) {
       }
 
       console.log("✅ Lieu sélectionné:", place.formatted_address);
+      selectedPlaceRef.current = place;
 
-      // Mise à jour du texte de recherche avec le nom complet
       if (place.formatted_address) {
         setSearchText(place.formatted_address);
       }
@@ -41,14 +40,10 @@ function GoogleAddressSearchForHeader({ selectedAddress, onAddressChange }) {
       const lng = place.geometry.location.lng();
       const latLng = { lat, lng };
 
-      // Mettre à jour les coordonnées dans le contexte
       setCoordinates(latLng);
-
-      // Appeler les callbacks
       if (selectedAddress) selectedAddress({ value: place });
       if (onAddressChange) onAddressChange(place);
 
-      // Rediriger vers la page explore avec les nouvelles coordonnées
       router.push(`/explore?lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}`);
       setIsLoading(false);
     } catch (error) {
@@ -58,39 +53,27 @@ function GoogleAddressSearchForHeader({ selectedAddress, onAddressChange }) {
     }
   }, [selectedAddress, onAddressChange, setCoordinates, router]);
 
-  // Initialiser l'autocomplétion
   useEffect(() => {
-    // Vérifier si l'API est chargée et si le composant n'est pas déjà initialisé
     if (!isApiLoaded || !inputRef.current || isInitialized) return;
 
     try {
-      console.log("⚡ Initialisation de l'autocomplétion Google");
-
-      // Créer l'instance d'autocomplétion
       const autocomplete = new window.google.maps.places.Autocomplete(
         inputRef.current,
         {
           types: ["(cities)"],
-         // componentRestrictions: { country: "fr" },
           fields: ["geometry", "name", "formatted_address", "place_id"],
         }
       );
 
-      // Stocker l'instance
       autocompleteRef.current = autocomplete;
 
-      // Ajouter l'écouteur d'événements directement pour le changement de lieu
-      autocomplete.addListener("place_changed", function () {
+      autocomplete.addListener("place_changed", () => {
         console.log("🎯 Événement place_changed déclenché");
         handlePlaceChanged();
       });
 
-      // Marquer comme initialisé
       setIsInitialized(true);
 
-      console.log("✅ Autocomplétion initialisée avec succès");
-
-      // Cleanup lors du démontage
       return () => {
         if (autocompleteRef.current) {
           google.maps.event.clearInstanceListeners(autocompleteRef.current);
@@ -107,29 +90,43 @@ function GoogleAddressSearchForHeader({ selectedAddress, onAddressChange }) {
     }
   }, [isApiLoaded, handlePlaceChanged, isInitialized]);
 
-  // Fonction de recherche manuelle qui sera utilisée à la fois pour le bouton et la touche Entrée
   const handleManualSearch = () => {
-    // Vérification du champ vide
     if (!searchText.trim()) return;
 
     console.log("⚡ Recherche manuelle déclenchée, texte:", searchText);
-
-    // Récupérer directement le premier résultat de l'autocomplétion
-    const autocompleteService = new google.maps.places.AutocompleteService();
-
     setIsLoading(true);
+
+    if (!selectedPlaceRef.current && autocompleteRef.current?.getPlace) {
+      const place = autocompleteRef.current.getPlace();
+      if (place?.geometry) {
+        selectedPlaceRef.current = place;
+      }
+    }
+
+    if (selectedPlaceRef.current?.geometry) {
+      const place = selectedPlaceRef.current;
+      const lat = place.geometry.location.lat();
+      const lng = place.geometry.location.lng();
+
+      setCoordinates({ lat, lng });
+      if (selectedAddress) selectedAddress({ value: place });
+      if (onAddressChange) onAddressChange(place);
+      router.push(`/explore?lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}`);
+      setIsLoading(false);
+      return;
+    }
+
+    const autocompleteService = new google.maps.places.AutocompleteService();
 
     autocompleteService.getPlacePredictions(
       {
         input: searchText,
         types: ["(cities)"],
-        //componentRestrictions: { country: "fr" },
       },
       (predictions, status) => {
         if (
           status !== google.maps.places.PlacesServiceStatus.OK ||
-          !predictions ||
-          !predictions.length
+          !predictions?.length
         ) {
           console.warn("Aucune suggestion trouvée");
           setIsLoading(false);
@@ -141,10 +138,16 @@ function GoogleAddressSearchForHeader({ selectedAddress, onAddressChange }) {
 
         console.log("✅ Suggestions trouvées:", predictions);
 
-        // Utiliser le premier résultat (le plus pertinent)
-        const topPrediction = predictions[0];
+        const exactMatch = predictions.find(
+          (p) =>
+            p.description
+              .toLowerCase()
+              .includes(searchText.trim().toLowerCase()) &&
+            searchText.trim().length > 3
+        );
 
-        // Créer un service PlacesService pour obtenir les détails du lieu
+        const topPrediction = exactMatch || predictions[0];
+
         const placesService = new google.maps.places.PlacesService(
           document.createElement("div")
         );
@@ -169,25 +172,17 @@ function GoogleAddressSearchForHeader({ selectedAddress, onAddressChange }) {
 
             console.log("✅ Détails du lieu récupérés:", place);
 
-            // Mettre à jour le texte de recherche
             if (place.formatted_address) {
               setSearchText(place.formatted_address);
             }
 
-            // Récupérer les coordonnées
             const lat = place.geometry.location.lat();
             const lng = place.geometry.location.lng();
 
-            // Mettre à jour les coordonnées dans le contexte
             setCoordinates({ lat, lng });
-
-            // Appeler les callbacks
             if (selectedAddress) selectedAddress({ value: place });
             if (onAddressChange) onAddressChange(place);
-
-            // Rediriger vers la page explore
             router.push(`/explore?lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}`);
-
             setIsLoading(false);
           }
         );
@@ -195,11 +190,12 @@ function GoogleAddressSearchForHeader({ selectedAddress, onAddressChange }) {
     );
   };
 
-  // Gérer la soumission par appui sur Entrée
   const handleKeyDown = (e) => {
-    if (e.key === "Enter") {
+    if (e.key === "Enter" && !isLoading) {
       e.preventDefault();
-      handleManualSearch();
+      setTimeout(() => {
+        handleManualSearch();
+      }, 100); // ⏳ Petit délai pour que Google enregistre correctement le lieu sélectionné au clavier
     }
   };
 

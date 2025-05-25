@@ -86,8 +86,14 @@ const mapFilterTypes = [
 
 const SimpleCheckbox = ({ checked, onChange, id, label }) => (
   <div className="flex items-center space-x-3">
-    <div
+    <input
       id={id}
+      type="checkbox"
+      checked={checked}
+      onChange={onChange}
+      className="sr-only"
+    />
+    <div
       onClick={onChange}
       className={`w-4 h-4 flex items-center justify-center border rounded cursor-pointer ${
         checked
@@ -97,11 +103,7 @@ const SimpleCheckbox = ({ checked, onChange, id, label }) => (
     >
       {checked && <CheckIcon className="h-3 w-3" />}
     </div>
-    <label
-      htmlFor={id}
-      className="text-gray-700 text-sm cursor-pointer"
-      onClick={onChange}
-    >
+    <label htmlFor={id} className="text-gray-700 text-sm cursor-pointer">
       {label}
     </label>
   </div>

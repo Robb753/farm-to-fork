@@ -4,10 +4,18 @@ import GoogleAddressSearch from "@/app/modules/maps/components/shared/ExploreMap
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/utils/supabase/client";
 import { useUser } from "@clerk/nextjs";
-import { Loader } from "lucide-react";
+import { Loader2, MapPin } from "lucide-react";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  CardFooter,
+} from "@/components/ui/card";
 
 function AddNewListing() {
   const [selectedAddress, setSelectedAddress] = useState(null);
@@ -124,32 +132,69 @@ function AddNewListing() {
   if (isChecking) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
+          <p className="text-gray-600">Vérification des accès...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="mt-10 md:mx-56 lg:mx-80">
-      <div className="p-10 flex flex-col gap-5 items-center justify-center">
-        <h2 className="font-bold text-2xl">Add New Listing</h2>
-        <div className="p-10 rounded-lg shadow-lg flex flex-col gap-5 w-full">
-          <h2 className="text-center text-gray-500">
-            Enter Address which you want to list
-          </h2>
-          <GoogleAddressSearch
-            selectedAddress={(value) => setSelectedAddress(value)}
-            setCoordinates={(value) => setCoordinates(value)}
-          />
+    <div className="container max-w-2xl mx-auto py-12 px-4">
+      <Card className="border-t-4 border-t-green-600 shadow-sm hover:shadow transition-shadow duration-300">
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold text-green-700">
+            Ajouter votre ferme
+          </CardTitle>
+          <CardDescription>
+            Commencez par indiquer l'adresse de votre ferme ou lieu de
+            production
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex flex-col items-center text-center gap-4 mb-4">
+            <MapPin className="h-8 w-8 text-green-600" />
+            <p className="text-gray-600">
+              Renseignez l'adresse exacte où se situe votre exploitation. Cette
+              information est importante pour les acheteurs locaux.
+            </p>
+          </div>
+
+          <div className="rounded-lg border p-4 bg-gray-50">
+            <GoogleAddressSearch
+              selectedAddress={(value) => setSelectedAddress(value)}
+              setCoordinates={(value) => setCoordinates(value)}
+            />
+          </div>
+
+          {selectedAddress && (
+            <div className="p-3 bg-green-50 border border-green-100 rounded-md text-sm text-green-800">
+              <strong>Adresse sélectionnée :</strong>{" "}
+              {selectedAddress.formatted_address}
+            </div>
+          )}
+        </CardContent>
+        <CardFooter className="border-t pt-6 flex justify-between">
+          <Button variant="outline" onClick={() => router.back()}>
+            Retour
+          </Button>
           <Button
             disabled={!selectedAddress || !coordinates || loader}
             onClick={nexthandler}
             className="bg-green-600 hover:bg-green-700"
           >
-            {loader ? <Loader className="animate-spin" /> : "Next"}
+            {loader ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Chargement...
+              </>
+            ) : (
+              "Continuer"
+            )}
           </Button>
-        </div>
-      </div>
+        </CardFooter>
+      </Card>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
 import Script from "next/script";
 import Provider from "./Provider";
+import AppLoadingNotifier from "@/utils/AppLoadingNotifier";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -40,7 +41,10 @@ export default function RootLayout({ children }) {
             ></iframe>
           </noscript>
 
-          <Provider>{children}</Provider>
+          <Provider>
+            <AppLoadingNotifier />
+            {children}
+          </Provider>
         </body>
       </html>
     </ClerkProvider>

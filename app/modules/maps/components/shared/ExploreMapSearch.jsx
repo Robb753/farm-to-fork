@@ -1,4 +1,3 @@
-// app/modules/maps/components/shared/ExploreMapSearch.jsx
 "use client";
 
 import React, { useEffect, useRef, useCallback, useState } from "react";
@@ -12,11 +11,11 @@ const ExploreMapSearch = () => {
   const router = useRouter();
   const inputRef = useRef(null);
   const autocompleteRef = useRef(null);
+  const selectedPlaceRef = useRef(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  // Fonction pour gérer le changement de lieu
   const handlePlaceChanged = useCallback(() => {
     try {
       setIsLoading(true);
@@ -35,21 +34,16 @@ const ExploreMapSearch = () => {
         "✅ Lieu sélectionné dans ExploreMapSearch:",
         place.formatted_address
       );
+      selectedPlaceRef.current = place;
 
-      // Mise à jour du texte de recherche avec le nom complet
       if (place.formatted_address) {
         setSearchText(place.formatted_address);
       }
 
       const lat = place.geometry.location.lat();
       const lng = place.geometry.location.lng();
-
-      // Mettre à jour les coordonnées dans le contexte
       setCoordinates({ lat, lng });
-
-      // Rediriger vers la page explore avec les nouvelles coordonnées
       router.push(`/explore?lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}`);
-
       setIsLoading(false);
     } catch (error) {
       console.error("Erreur lors de la sélection du lieu:", error);
@@ -58,9 +52,7 @@ const ExploreMapSearch = () => {
     }
   }, [setCoordinates, searchText, router]);
 
-  // Initialiser l'autocomplétion
   useEffect(() => {
-    // Vérifier si l'API est chargée et si le composant n'est pas déjà initialisé
     if (!isApiLoaded || !inputRef.current || isInitialized) return;
 
     try {
@@ -68,7 +60,6 @@ const ExploreMapSearch = () => {
         "⚡ Initialisation de l'autocomplétion Google dans ExploreMapSearch"
       );
 
-      // Créer l'instance d'autocomplétion
       const autocomplete = new window.google.maps.places.Autocomplete(
         inputRef.current,
         {
@@ -78,25 +69,17 @@ const ExploreMapSearch = () => {
         }
       );
 
-      // Stocker l'instance
       autocompleteRef.current = autocomplete;
 
-      // Ajouter l'écouteur d'événements directement pour le changement de lieu
-      autocomplete.addListener("place_changed", function () {
+      autocomplete.addListener("place_changed", () => {
         console.log(
           "🎯 Événement place_changed déclenché dans ExploreMapSearch"
         );
         handlePlaceChanged();
       });
 
-      // Marquer comme initialisé
       setIsInitialized(true);
 
-      console.log(
-        "✅ Autocomplétion initialisée avec succès dans ExploreMapSearch"
-      );
-
-      // Cleanup lors du démontage
       return () => {
         window.google.maps.event.clearInstanceListeners(autocomplete);
       };
@@ -111,15 +94,30 @@ const ExploreMapSearch = () => {
     }
   }, [isApiLoaded, handlePlaceChanged, isInitialized]);
 
-  // Fonction de recherche manuelle qui sera utilisée à la fois pour le bouton et la touche Entrée
   const handleManualSearch = () => {
-    // Ne rien faire si le champ est vide
     if (!searchText.trim()) return;
 
     console.log("⚡ Recherche manuelle déclenchée, texte:", searchText);
     setIsLoading(true);
 
-    // Récupérer directement le premier résultat de l'autocomplétion
+    // 🔁 Fallback getPlace si place_changed pas déclenché
+    if (!selectedPlaceRef.current && autocompleteRef.current?.getPlace) {
+      const place = autocompleteRef.current.getPlace();
+      if (place?.geometry) {
+        selectedPlaceRef.current = place;
+      }
+    }
+
+    if (selectedPlaceRef.current?.geometry) {
+      const place = selectedPlaceRef.current;
+      const lat = place.geometry.location.lat();
+      const lng = place.geometry.location.lng();
+      setCoordinates({ lat, lng });
+      router.push(`/explore?lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}`);
+      setIsLoading(false);
+      return;
+    }
+
     const autocompleteService = new google.maps.places.AutocompleteService();
 
     autocompleteService.getPlacePredictions(
@@ -131,8 +129,7 @@ const ExploreMapSearch = () => {
       (predictions, status) => {
         if (
           status !== google.maps.places.PlacesServiceStatus.OK ||
-          !predictions ||
-          !predictions.length
+          !predictions?.length
         ) {
           console.warn("Aucune suggestion trouvée");
           setIsLoading(false);
@@ -144,10 +141,16 @@ const ExploreMapSearch = () => {
 
         console.log("✅ Suggestions trouvées:", predictions);
 
-        // Utiliser le premier résultat (le plus pertinent)
-        const topPrediction = predictions[0];
+        const exactMatch = predictions.find(
+          (p) =>
+            p.description
+              .toLowerCase()
+              .includes(searchText.trim().toLowerCase()) &&
+            searchText.trim().length > 3
+        );
 
-        // Créer un service PlacesService pour obtenir les détails du lieu
+        const topPrediction = exactMatch || predictions[0];
+
         const placesService = new google.maps.places.PlacesService(
           document.createElement("div")
         );
@@ -171,22 +174,14 @@ const ExploreMapSearch = () => {
             }
 
             console.log("✅ Détails du lieu récupérés:", place);
-
-            // Mettre à jour le texte de recherche
             if (place.formatted_address) {
               setSearchText(place.formatted_address);
             }
 
-            // Récupérer les coordonnées
             const lat = place.geometry.location.lat();
             const lng = place.geometry.location.lng();
-
-            // Mettre à jour les coordonnées dans le contexte
             setCoordinates({ lat, lng });
-
-            // Rediriger vers la page explore
             router.push(`/explore?lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}`);
-
             setIsLoading(false);
           }
         );
@@ -194,11 +189,12 @@ const ExploreMapSearch = () => {
     );
   };
 
-  // Gérer les entrées clavier
   const handleKeyDown = (e) => {
-    if (e.key === "Enter") {
+    if (e.key === "Enter" && !isLoading) {
       e.preventDefault();
-      handleManualSearch();
+      setTimeout(() => {
+        handleManualSearch();
+      }, 100); // ⏳ Laisse le temps à getPlace de s'initialiser correctement
     }
   };
 
@@ -209,7 +205,10 @@ const ExploreMapSearch = () => {
         type="text"
         ref={inputRef}
         value={searchText}
-        onChange={(e) => setSearchText(e.target.value)}
+        onChange={(e) => {
+          setSearchText(e.target.value);
+          selectedPlaceRef.current = null; // ✅ Reset pour permettre une nouvelle recherche correcte
+        }}
         onKeyDown={handleKeyDown}
         placeholder={isApiLoaded ? "Rechercher une ville..." : "Chargement..."}
         className="flex-grow bg-transparent outline-none text-sm text-black"

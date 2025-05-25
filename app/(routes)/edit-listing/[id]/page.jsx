@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,9 +10,8 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/utils/supabase/client";
 import { toast } from "sonner";
 import { useUser } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
 import FileUpload from "../_components/FileUpload";
-import { Loader, Save, Globe, Send } from "lucide-react";
+import { Loader2, Save, Globe, Send, ArrowLeft, MapPin } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,7 +24,14 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardFooter,
+} from "@/components/ui/card";
 import * as Yup from "yup";
 
 // Define the product types
@@ -99,9 +106,11 @@ const validationSchema = Yup.object({
 // Composant pour les sections de checkbox
 function CheckboxSection({ title, items, values, onChange }) {
   return (
-    <Card className="shadow-sm">
+    <Card className="shadow-sm hover:shadow transition-shadow duration-300">
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg font-semibold">{title}</CardTitle>
+        <CardTitle className="text-lg font-semibold text-green-700">
+          {title}
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 gap-3">
@@ -275,7 +284,7 @@ function EditListing({ params }) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="flex flex-col items-center gap-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
+          <Loader2 className="h-12 w-12 animate-spin text-green-500" />
           <p className="text-gray-600">Chargement des données...</p>
         </div>
       </div>
@@ -283,16 +292,33 @@ function EditListing({ params }) {
   }
 
   return (
-    <div className="px-4 md:px-8 lg:px-12 xl:px-20 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-800">
-          Modifier votre ferme
-        </h1>
-        <p className="text-gray-600 mt-2">
-          Complétez les informations ci-dessous pour mettre à jour votre
-          listing.
-        </p>
-      </div>
+    <div className="container mx-auto px-4 py-8">
+      <Card className="border-t-4 border-t-green-600 mb-8 shadow-sm hover:shadow transition-shadow duration-300">
+        <CardHeader>
+          <div className="flex items-start justify-between">
+            <div>
+              <CardTitle className="text-2xl font-bold text-green-700">
+                Modifier votre ferme
+              </CardTitle>
+              {listing?.address && (
+                <CardDescription className="mt-2 flex items-center gap-1">
+                  <MapPin className="h-4 w-4 text-gray-500" />
+                  <span>{listing.address}</span>
+                </CardDescription>
+              )}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+              onClick={() => router.back()}
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Retour
+            </Button>
+          </div>
+        </CardHeader>
+      </Card>
 
       {listing && (
         <Formik
@@ -332,9 +358,14 @@ function EditListing({ params }) {
             <Form onSubmit={handleSubmit}>
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Informations générales */}
-                <Card className="lg:col-span-3 shadow-sm">
+                <Card className="lg:col-span-3 shadow-sm hover:shadow transition-shadow duration-300">
                   <CardHeader>
-                    <CardTitle>Informations générales</CardTitle>
+                    <CardTitle className="text-xl font-semibold text-green-700">
+                      Informations générales
+                    </CardTitle>
+                    <CardDescription>
+                      Détails principaux de votre exploitation
+                    </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -351,7 +382,9 @@ function EditListing({ params }) {
                           onBlur={handleBlur}
                           value={values.name}
                           className={
-                            errors.name && touched.name ? "border-red-500" : ""
+                            errors.name && touched.name
+                              ? "border-red-500 focus-visible:ring-red-200"
+                              : "focus-visible:ring-green-200"
                           }
                         />
                         {errors.name && touched.name && (
@@ -376,8 +409,8 @@ function EditListing({ params }) {
                           value={values.email}
                           className={
                             errors.email && touched.email
-                              ? "border-red-500"
-                              : ""
+                              ? "border-red-500 focus-visible:ring-red-200"
+                              : "focus-visible:ring-green-200"
                           }
                         />
                         {errors.email && touched.email && (
@@ -401,8 +434,8 @@ function EditListing({ params }) {
                           value={values.phoneNumber}
                           className={
                             errors.phoneNumber && touched.phoneNumber
-                              ? "border-red-500"
-                              : ""
+                              ? "border-red-500 focus-visible:ring-red-200"
+                              : "focus-visible:ring-green-200"
                           }
                         />
                         {errors.phoneNumber && touched.phoneNumber && (
@@ -424,10 +457,11 @@ function EditListing({ params }) {
                           name="website"
                           onChange={handleChange}
                           value={values.website}
+                          className="focus-visible:ring-green-200"
                         />
                       </div>
 
-                      {/* Description - Changé pour un textarea */}
+                      {/* Description */}
                       <div className="md:col-span-2 flex flex-col gap-2">
                         <Label htmlFor="description" className="font-medium">
                           Description
@@ -441,8 +475,8 @@ function EditListing({ params }) {
                           value={values.description}
                           className={`min-h-32 ${
                             errors.description && touched.description
-                              ? "border-red-500"
-                              : ""
+                              ? "border-red-500 focus-visible:ring-red-200"
+                              : "focus-visible:ring-green-200"
                           }`}
                         />
                         {errors.description && touched.description && (
@@ -516,11 +550,15 @@ function EditListing({ params }) {
                 />
 
                 {/* File Upload */}
-                <Card className="lg:col-span-3 shadow-sm">
+                <Card className="lg:col-span-3 shadow-sm hover:shadow transition-shadow duration-300">
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-lg font-semibold">
+                    <CardTitle className="text-lg font-semibold text-green-700">
                       Photos de la ferme
                     </CardTitle>
+                    <CardDescription>
+                      Des photos attrayantes augmenteront l'intérêt pour votre
+                      ferme
+                    </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <FileUpload
@@ -531,65 +569,71 @@ function EditListing({ params }) {
                 </Card>
 
                 {/* Buttons */}
-                <div className="lg:col-span-3 flex justify-end gap-4 mt-6">
-                  {/* Bouton Save (Brouillon) */}
-                  <Button
-                    disabled={loading}
-                    variant="outline"
-                    className="text-primary flex items-center gap-2"
-                    type="button"
-                    onClick={() => onSubmitHandler(values, false)}
-                  >
-                    {loading ? (
-                      <Loader className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Save className="h-4 w-4" />
-                    )}
-                    Enregistrer
-                  </Button>
-
-                  {/* Bouton Publish (avec confirmation) */}
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        type="button"
-                        disabled={loading}
-                        className="bg-green-600 hover:bg-green-700 flex items-center gap-2"
-                      >
-                        {loading ? (
-                          <Loader className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Globe className="h-4 w-4" />
-                        )}
-                        Publier
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>
-                          Êtes-vous sûr de vouloir publier cette ferme ?
-                        </AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Une fois publiée, votre ferme sera visible par tous
-                          les utilisateurs.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Annuler</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => onSubmitHandler(values, true)}
-                          className="bg-green-600 hover:bg-green-700"
+                <div className="lg:col-span-3">
+                  <Card className="shadow-sm hover:shadow transition-shadow duration-300">
+                    <CardContent className="pt-6">
+                      <div className="flex justify-end gap-4">
+                        {/* Bouton Save (Brouillon) */}
+                        <Button
+                          disabled={loading}
+                          variant="outline"
+                          className="text-green-600 border-green-200 hover:bg-green-50 hover:text-green-700 flex items-center gap-2"
+                          type="button"
+                          onClick={() => onSubmitHandler(values, false)}
                         >
                           {loading ? (
-                            <Loader className="h-4 w-4 animate-spin mr-2" />
+                            <Loader2 className="h-4 w-4 animate-spin" />
                           ) : (
-                            <Send className="h-4 w-4 mr-2" />
+                            <Save className="h-4 w-4" />
                           )}
-                          Confirmer et publier
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                          Enregistrer
+                        </Button>
+
+                        {/* Bouton Publish (avec confirmation) */}
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              type="button"
+                              disabled={loading}
+                              className="bg-green-600 hover:bg-green-700 flex items-center gap-2"
+                            >
+                              {loading ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Globe className="h-4 w-4" />
+                              )}
+                              Publier
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent className="border-green-100">
+                            <AlertDialogHeader>
+                              <AlertDialogTitle className="text-green-700">
+                                Êtes-vous sûr de vouloir publier cette ferme ?
+                              </AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Une fois publiée, votre ferme sera visible par
+                                tous les utilisateurs.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Annuler</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => onSubmitHandler(values, true)}
+                                className="bg-green-600 hover:bg-green-700"
+                              >
+                                {loading ? (
+                                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                ) : (
+                                  <Send className="h-4 w-4 mr-2" />
+                                )}
+                                Confirmer et publier
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
               </div>
             </Form>
