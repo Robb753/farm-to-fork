@@ -31,9 +31,9 @@ import {
   Search
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import AppPieChart from "@/components/AppPieChart";
-import AppBarChart from "@/components/AppBarChart";
 import useUserSync from "../hooks/useUserSync";
+import AppPieChart from "@/components/ui/AppPieChart";
+import AppBarChart from "@/components/ui/AppBarChart";
 
 export default function AdminDashboard() {
   const { user, isLoaded, isSignedIn, role } = useUserSync();
