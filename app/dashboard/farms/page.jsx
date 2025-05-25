@@ -21,19 +21,12 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
-import AppBarChart from "@/components/AppBarChart";
+import AppBarChart from "@/components/ui/AppBarChart";
+
 
 export default function FarmerDashboard() {
   const { user, isLoaded, isSignedIn } = useUser();
