@@ -28,8 +28,6 @@ function GoogleAddressSearchForHeader({ selectedAddress, onAddressChange }) {
         if (onAddressChange) onAddressChange(null);
         return;
       }
-
-      console.log("✅ Lieu sélectionné:", place.formatted_address);
       selectedPlaceRef.current = place;
 
       if (place.formatted_address) {
@@ -68,7 +66,6 @@ function GoogleAddressSearchForHeader({ selectedAddress, onAddressChange }) {
       autocompleteRef.current = autocomplete;
 
       autocomplete.addListener("place_changed", () => {
-        console.log("🎯 Événement place_changed déclenché");
         handlePlaceChanged();
       });
 
@@ -92,8 +89,6 @@ function GoogleAddressSearchForHeader({ selectedAddress, onAddressChange }) {
 
   const handleManualSearch = () => {
     if (!searchText.trim()) return;
-
-    console.log("⚡ Recherche manuelle déclenchée, texte:", searchText);
     setIsLoading(true);
 
     if (!selectedPlaceRef.current && autocompleteRef.current?.getPlace) {
@@ -136,8 +131,6 @@ function GoogleAddressSearchForHeader({ selectedAddress, onAddressChange }) {
           return;
         }
 
-        console.log("✅ Suggestions trouvées:", predictions);
-
         const exactMatch = predictions.find(
           (p) =>
             p.description
@@ -169,8 +162,6 @@ function GoogleAddressSearchForHeader({ selectedAddress, onAddressChange }) {
               );
               return;
             }
-
-            console.log("✅ Détails du lieu récupérés:", place);
 
             if (place.formatted_address) {
               setSearchText(place.formatted_address);

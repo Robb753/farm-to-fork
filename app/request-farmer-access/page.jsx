@@ -1,7 +1,8 @@
+// Partie client uniquement
 "use client";
 
-import { useState } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useState, useEffect } from "react";
+import { useUser, useAuth } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,8 +22,11 @@ import { Loader2 } from "lucide-react";
 
 export default function RequestFarmerAccessPage() {
   const { user } = useUser();
+  const { getToken, isSignedIn } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [hasSubmitted, setHasSubmitted] = useState(false);
+
   const [formData, setFormData] = useState({
     farm_name: "",
     location: "",
@@ -32,6 +36,30 @@ export default function RequestFarmerAccessPage() {
     website: "",
   });
 
+  const [isDuplicate, setIsDuplicate] = useState(false);
+
+  useEffect(() => {
+    const checkIfAlreadySubmitted = async () => {
+      if (!isSignedIn) return;
+
+      const email =
+        user?.primaryEmailAddress?.emailAddress ||
+        user?.emailAddresses?.[0]?.emailAddress;
+
+      const { data, error } = await supabase
+        .from("farmer_requests")
+        .select("id")
+        .eq("email", email)
+        .maybeSingle();
+
+      if (data) {
+        setIsDuplicate(true);
+      }
+    };
+
+    checkIfAlreadySubmitted();
+  }, [isSignedIn, user]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -40,8 +68,22 @@ export default function RequestFarmerAccessPage() {
     }));
   };
 
+  const normalizePhoneNumber = (input) => {
+    if (!input) return null;
+    const raw = input.replace(/\s|-/g, "");
+    if (raw.startsWith("+")) return raw;
+    if (raw.startsWith("00")) return "+" + raw.slice(2);
+    if (raw.startsWith("0")) return "+33" + raw.slice(1);
+    return null;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!isSignedIn) {
+      toast.error("Veuillez vous connecter pour envoyer votre demande.");
+      return;
+    }
 
     const email =
       user?.primaryEmailAddress?.emailAddress ||
@@ -50,22 +92,32 @@ export default function RequestFarmerAccessPage() {
 
     if (
       !email ||
+      !userId ||
       !formData.farm_name ||
       !formData.location ||
       !formData.description
     ) {
-      toast.error("Veuillez remplir tous les champs obligatoires");
+      toast.error("Veuillez remplir tous les champs obligatoires.");
       return;
     }
 
-    if (formData.phone && !/^[0-9]{10}$/.test(formData.phone)) {
-      toast.error("Le numéro de téléphone doit contenir 10 chiffres.");
+    const cleanedPhone = normalizePhoneNumber(formData.phone);
+
+    if (formData.phone && !/^\+?[1-9][0-9]{6,14}$/.test(cleanedPhone)) {
+      toast.error("Numéro de téléphone invalide (format attendu : +XX...).");
       return;
     }
 
+    formData.phone = cleanedPhone;
     setLoading(true);
 
     try {
+      const token = await getToken();
+      await supabase.auth.setSession({
+        access_token: token,
+        refresh_token: null,
+      });
+
       const requestData = {
         user_id: userId,
         email,
@@ -83,35 +135,37 @@ export default function RequestFarmerAccessPage() {
         .insert([requestData]);
 
       if (error) {
-        console.error("Erreur Supabase:", error);
+        if (
+          error.message.includes("duplicate key") ||
+          error.message.includes("farmer_requests_email_key")
+        ) {
+          toast.warning(
+            "Vous avez déjà soumis une demande. Merci de patienter."
+          );
+          setIsDuplicate(true);
+          return;
+        }
         throw new Error(error.message);
       }
 
-      try {
-        await fetch("/api/send-admin-notification", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(requestData),
-        });
-      } catch (emailError) {
-        console.warn("Notification email non envoyée:", emailError);
-      }
+      await fetch("/api/send-admin-notification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestData),
+      });
 
-      toast.success(
-        "Demande envoyée avec succès! Nous l'examinerons dans les plus brefs délais."
-      );
+      toast.success("Demande envoyée avec succès !");
       router.push("/request-confirmation");
     } catch (err) {
       console.error("Erreur lors de l'envoi:", err);
-      toast.error("Erreur lors de l'envoi de la demande: " + err.message);
+      toast.error("Erreur : " + err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const isFormValid = () => {
-    return formData.farm_name && formData.location && formData.description;
-  };
+  const isFormValid = () =>
+    formData.farm_name && formData.location && formData.description;
 
   return (
     <div className="container max-w-2xl mx-auto py-12 px-4">
@@ -128,103 +182,72 @@ export default function RequestFarmerAccessPage() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="farm_name" className="font-medium">
-                Nom de votre ferme / exploitation *
-              </Label>
+              <Label htmlFor="farm_name">Nom de votre ferme *</Label>
               <Input
                 id="farm_name"
                 name="farm_name"
                 value={formData.farm_name}
                 onChange={handleChange}
-                autoComplete="organization"
                 required
-                placeholder="Ferme du Soleil Levant"
-                className="focus-visible:ring-green-200"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="location" className="font-medium">
-                Localisation *
-              </Label>
+              <Label htmlFor="location">Localisation *</Label>
               <Input
                 id="location"
                 name="location"
                 value={formData.location}
                 onChange={handleChange}
-                autoComplete="address-level2"
                 required
-                placeholder="Ville, département"
-                className="focus-visible:ring-green-200"
               />
-              <p className="text-sm text-gray-500">
-                Région où se situe votre exploitation
-              </p>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="phone" className="font-medium">
-                Téléphone
-              </Label>
+              <Label htmlFor="phone">Téléphone</Label>
               <Input
                 id="phone"
                 name="phone"
                 value={formData.phone}
                 onChange={handleChange}
-                autoComplete="tel"
-                placeholder="0612345678"
-                className="focus-visible:ring-green-200"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="description" className="font-medium">
-                Description de votre activité *
-              </Label>
+              <Label htmlFor="description">Description *</Label>
               <Textarea
                 id="description"
                 name="description"
                 value={formData.description}
                 onChange={handleChange}
                 required
-                placeholder="Décrivez votre ferme, votre histoire, votre philosophie..."
-                className="min-h-[120px] focus-visible:ring-green-200"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="products" className="font-medium">
-                Produits proposés
-              </Label>
+              <Label htmlFor="products">Produits proposés</Label>
               <Textarea
                 id="products"
                 name="products"
                 value={formData.products}
                 onChange={handleChange}
-                placeholder="Légumes de saison, fruits, produits laitiers, viandes..."
-                className="min-h-[80px] focus-visible:ring-green-200"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="website" className="font-medium">
-                Site web ou page sociale
-              </Label>
+              <Label htmlFor="website">Site web / page sociale</Label>
               <Input
                 id="website"
                 name="website"
                 value={formData.website}
                 onChange={handleChange}
-                autoComplete="url"
-                placeholder="https://www.votresite.fr"
-                className="focus-visible:ring-green-200"
               />
             </div>
 
             <CardFooter className="border-t pt-6">
               <Button
                 type="submit"
-                disabled={loading || !isFormValid()}
+                disabled={loading || !isFormValid() || isDuplicate}
                 className="w-full bg-green-600 hover:bg-green-700"
               >
                 {loading ? (
@@ -232,6 +255,8 @@ export default function RequestFarmerAccessPage() {
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Envoi en cours...
                   </>
+                ) : isDuplicate ? (
+                  "Une demande existe déjà"
                 ) : (
                   "Envoyer ma demande"
                 )}

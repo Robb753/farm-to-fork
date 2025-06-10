@@ -8,14 +8,13 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { LogIn, Menu, User, Heart, PlusCircle } from "lucide-react";
+import { LogIn, Menu, User, Heart, PlusCircle, ListChecks } from "lucide-react";
 import { useUser, SignOutButton } from "@clerk/nextjs";
 import SignInModal from "@/app/modules/auth/SignInModal";
+import SignupModalSimple from "@/app/modules/auth/SignupModalSimple";
 import { LanguageSelector } from "../LanguageSelector";
 import useUserSync from "@/app/hooks/useUserSync";
-import SignupModalSimple from "@/app/modules/auth/SignupModalSimple";
 
 function Header() {
   const { user, isSignedIn } = useUser();
@@ -23,6 +22,7 @@ function Header() {
   const [modalType, setModalType] = useState(null);
   const [userRole, setUserRole] = useState(null);
 
+  // 🔁 Sync Clerk role
   useEffect(() => {
     if (!isSignedIn) return;
 
@@ -46,11 +46,17 @@ function Header() {
     setUserRole("user");
   }, [isSignedIn, user, role, isReady]);
 
+  // ✅ Emit modal state globally
+  useEffect(() => {
+    const isOpen = modalType === "signin" || modalType === "signup-role";
+    window.dispatchEvent(new CustomEvent("modalOpen", { detail: isOpen }));
+  }, [modalType]);
+
   const handleCloseModal = () => setModalType(null);
   const isFarmerUser = userRole === "farmer";
 
   return (
-    <header className="flex items-center justify-between px-4 py-3 bg-white md:px-8 shadow-sm relative z-10">
+    <header className="flex items-center justify-between px-4 py-3 bg-white md:px-8 shadow-sm relative z-40">
       <div className="flex items-center">
         <div className="relative w-10 h-10 mr-2">
           <div className="absolute inset-0 bg-green-200 rounded-full shadow-inner" />
@@ -116,11 +122,13 @@ function Header() {
             ) : (
               <>
                 <DropdownMenuLabel className="text-lg font-medium py-3 text-gray-800 px-4">
-                  Mon Compte{" "}
-                  {userRole &&
-                    `(${
-                      userRole === "farmer" ? "Agriculteur" : "Utilisateur"
-                    })`}
+                  Mon Compte (
+                  {userRole === "admin"
+                    ? "Administrateur"
+                    : userRole === "farmer"
+                      ? "Agriculteur"
+                      : "Utilisateur"}
+                  )
                 </DropdownMenuLabel>
 
                 <div className="bg-white rounded-md shadow-sm overflow-hidden">
@@ -131,17 +139,19 @@ function Header() {
                     </Link>
                   </DropdownMenuItem>
 
-                  <DropdownMenuItem asChild className="py-3 hover:bg-gray-50">
-                    <Link
-                      href="/user/favorites"
-                      className="flex items-center gap-3 px-4"
-                    >
-                      <Heart className="w-5 h-5 text-green-600" />
-                      <span className="text-gray-700">Mes favoris</span>
-                    </Link>
-                  </DropdownMenuItem>
+                  {userRole === "admin" && (
+                    <DropdownMenuItem asChild className="py-3 hover:bg-gray-50">
+                      <Link
+                        href="/admin"
+                        className="flex items-center gap-3 px-4"
+                      >
+                        <ListChecks className="w-5 h-5 text-green-600" />
+                        <span className="text-gray-700">Admin Dashboard</span>
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
 
-                  {isFarmerUser && (
+                  {userRole === "farmer" && (
                     <DropdownMenuItem asChild className="py-3 hover:bg-gray-50">
                       <Link
                         href="/dashboard/farms"
@@ -210,6 +220,7 @@ function Header() {
         </DropdownMenu>
       </div>
 
+      {/* Modales conditionnelles */}
       {modalType === "signin" && <SignInModal onClose={handleCloseModal} />}
       {modalType === "signup-role" && (
         <SignupModalSimple onClose={handleCloseModal} />

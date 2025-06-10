@@ -39,7 +39,6 @@ export function MapStateProvider({ children }) {
 
     GoogleMapsLoader.load()
       .then(() => {
-        console.log("✅ API Google Maps chargée avec succès");
         setIsApiLoaded(true);
       })
       .catch((error) => {
@@ -69,7 +68,6 @@ export function MapStateProvider({ children }) {
   const handleMapLoad = useCallback(
     (map) => {
       setMapInstance(map);
-      console.log("✅ Instance de carte Google Maps chargée");
 
       // Capture des bounds initiaux
       if (map && map.getBounds()) {

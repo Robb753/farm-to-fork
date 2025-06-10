@@ -6,6 +6,8 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { updateClerkRole, syncProfileToSupabase } from "@/lib/syncUserUtils";
 import { supabase } from "@/utils/supabase/client";
 
+const ADMIN_EMAILS = ["admin@farm2fork.fr"];
+
 export default function useUserSync() {
   const { user, isLoaded, isSignedIn } = useUser();
   const router = useRouter();
@@ -24,6 +26,16 @@ export default function useUserSync() {
     const syncUser = async () => {
       if (!isSignedIn || !user) {
         setUserRole(null);
+        setIsReady(true);
+        return;
+      }
+
+      // ✅ Rôle admin prioritaire par email
+      const email =
+        user?.primaryEmailAddress?.emailAddress ||
+        user?.emailAddresses?.[0]?.emailAddress;
+      if (email && ADMIN_EMAILS.includes(email)) {
+        setUserRole("admin");
         setIsReady(true);
         return;
       }
@@ -65,19 +77,16 @@ export default function useUserSync() {
     try {
       let role = "user";
 
-      if (!role) {
-        const { data: profileData, error } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("user_id", user.id)
-          .maybeSingle();
+      const { data: profileData, error } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("user_id", user.id)
+        .maybeSingle();
 
-        if (profileData?.role && !error) {
-          role = profileData.role;
-        }
+      if (profileData?.role && !error) {
+        role = profileData.role;
       }
 
-      // fallback safe
       if (!["user", "farmer"].includes(role)) {
         console.warn("[DEBUG] Aucun rôle sûr trouvé, fallback 'user'");
         role = "user";
@@ -124,5 +133,6 @@ export default function useUserSync() {
     role: userRole,
     isFarmer: userRole === "farmer",
     isUser: userRole === "user" || !userRole,
+    isAdmin: userRole === "admin",
   };
 }

@@ -29,11 +29,6 @@ const ExploreMapSearch = () => {
         }
         return;
       }
-
-      console.log(
-        "✅ Lieu sélectionné dans ExploreMapSearch:",
-        place.formatted_address
-      );
       selectedPlaceRef.current = place;
 
       if (place.formatted_address) {
@@ -56,10 +51,6 @@ const ExploreMapSearch = () => {
     if (!isApiLoaded || !inputRef.current || isInitialized) return;
 
     try {
-      console.log(
-        "⚡ Initialisation de l'autocomplétion Google dans ExploreMapSearch"
-      );
-
       const autocomplete = new window.google.maps.places.Autocomplete(
         inputRef.current,
         {
@@ -72,9 +63,6 @@ const ExploreMapSearch = () => {
       autocompleteRef.current = autocomplete;
 
       autocomplete.addListener("place_changed", () => {
-        console.log(
-          "🎯 Événement place_changed déclenché dans ExploreMapSearch"
-        );
         handlePlaceChanged();
       });
 
@@ -96,8 +84,6 @@ const ExploreMapSearch = () => {
 
   const handleManualSearch = () => {
     if (!searchText.trim()) return;
-
-    console.log("⚡ Recherche manuelle déclenchée, texte:", searchText);
     setIsLoading(true);
 
     // 🔁 Fallback getPlace si place_changed pas déclenché
@@ -138,9 +124,6 @@ const ExploreMapSearch = () => {
           );
           return;
         }
-
-        console.log("✅ Suggestions trouvées:", predictions);
-
         const exactMatch = predictions.find(
           (p) =>
             p.description
@@ -173,7 +156,6 @@ const ExploreMapSearch = () => {
               return;
             }
 
-            console.log("✅ Détails du lieu récupérés:", place);
             if (place.formatted_address) {
               setSearchText(place.formatted_address);
             }

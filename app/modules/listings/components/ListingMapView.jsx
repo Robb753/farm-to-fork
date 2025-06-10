@@ -31,14 +31,24 @@ function ListingMapView() {
   const [page, setPage] = useState(1);
   const [totalResults, setTotalResults] = useState(0);
 
-  // Mise à jour du nombre total de résultats
+  // ✅ Nouvel état pour gérer si une modale est ouverte
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  useEffect(() => {
+    const handleModalEvent = (e) => {
+      setIsModalOpen(e.detail === true);
+    };
+
+    window.addEventListener("modalOpen", handleModalEvent);
+    return () => window.removeEventListener("modalOpen", handleModalEvent);
+  }, []);
+
   useEffect(() => {
     if (visibleListings) {
       setTotalResults(visibleListings.length);
     }
   }, [visibleListings]);
 
-  // Chargement de plus de résultats
   const loadMoreListings = useCallback(() => {
     if (isLoading || !hasMore) return;
     const newPage = page + 1;
@@ -46,7 +56,6 @@ function ListingMapView() {
     fetchListings({ page: newPage, append: true });
   }, [page, hasMore, isLoading, fetchListings]);
 
-  // Rafraîchir les résultats
   const refreshListings = useCallback(() => {
     setPage(1);
     fetchListings({ page: 1, forceRefresh: true }).then((data) => {
@@ -58,18 +67,28 @@ function ListingMapView() {
     });
   }, [fetchListings]);
 
-  // Basculer entre les modes d'affichage
   const toggleMapSize = useCallback(() => {
     setIsMapExpanded((prev) => !prev);
   }, []);
 
   return (
     <div className="relative flex flex-col bg-white">
-      <div className="sticky top-0 z-50 bg-white shadow-sm border-b border-gray-200">
+      {/* ✅ Backdrop semi-transparent quand une modale est ouverte */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-white/60 backdrop-blur-sm z-20 pointer-events-none" />
+      )}
+
+      <div
+        className={`sticky top-0 ${isModalOpen ? "z-20" : "z-50"} bg-white shadow-sm border-b border-gray-200`}
+      >
         <FilterSection />
       </div>
 
-      <div className="bg-gray-50 py-2 px-4 border-b border-gray-200 flex items-center justify-between">
+      <div
+        className={`bg-gray-50 py-2 px-4 border-b border-gray-200 flex items-center justify-between ${
+          isModalOpen ? "pointer-events-none opacity-50" : ""
+        }`}
+      >
         <div className="flex items-center gap-2">
           <span className="text-gray-600 text-sm font-medium">
             {totalResults} résultat{totalResults !== 1 ? "s" : ""} sur la carte
@@ -115,18 +134,13 @@ function ListingMapView() {
         </div>
       </div>
 
-      {mapBounds && (
-        <div className="px-4 py-2 bg-green-50 border-b border-green-100 text-sm text-green-800">
-        </div>
-      )}
-
       <div className="relative flex flex-col md:flex-row transition-all duration-300 h-[calc(100vh-230px)]">
         <div
           className={`overflow-y-auto transition-all duration-300 ${
             isMapExpanded
               ? "hidden md:block md:w-0 opacity-0 md:opacity-100"
               : "w-full md:w-1/2 opacity-100"
-          }`}
+          } ${isModalOpen ? "pointer-events-none opacity-50" : ""}`}
         >
           <Listing
             onLoadMore={loadMoreListings}
@@ -138,14 +152,13 @@ function ListingMapView() {
         <div
           className={`relative transition-all duration-300 ${
             isMapExpanded ? "w-full h-full" : "w-full md:w-1/2 h-full"
-          }`}
+          } ${isModalOpen ? "pointer-events-none opacity-50" : ""}`}
         >
-          <div className="absolute top-4 left-4 z-20 w-[300px] max-w-[90vw]">
+          <div className="absolute top-4 left-4 z-10 w-[300px] max-w-[90vw]">
             <ExploreMapSearch />
           </div>
           <GoogleMapSection isMapExpanded={isMapExpanded} />
 
-          {/* 🧭 Contrôles */}
           <div className="absolute top-4 right-4 z-20 flex flex-col gap-2">
             <button
               onClick={toggleMapSize}
@@ -165,7 +178,7 @@ function ListingMapView() {
         </div>
       </div>
 
-      {/* Bouton mobile pour basculer entre carte et liste */}
+      {/* Bouton mobile */}
       <div className="md:hidden fixed bottom-4 right-4 z-50">
         <button
           onClick={toggleMapSize}

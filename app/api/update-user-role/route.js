@@ -16,10 +16,8 @@ export async function POST(req) {
     }
 
     // Mettre à jour le champ publicMetadata du user dans Clerk
-    await clerkClient.users.updateUserMetadata(userId, {
-      publicMetadata: {
-        role,
-      },
+    await clerkClient.users.updateUser(userId, {
+      publicMetadata: { role },
     });
 
     return NextResponse.json({ success: true });

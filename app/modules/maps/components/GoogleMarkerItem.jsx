@@ -209,9 +209,6 @@ const GoogleMarkerItem = ({ map, item }) => {
     // Mettre à jour la visibilité du marqueur
     if (markerRef.current.map !== (isVisible ? map : null)) {
       markerRef.current.map = isVisible ? map : null;
-      console.log(
-        `Marqueur ${item.id} - Visibilité: ${isVisible ? "Visible" : "Caché"}`
-      );
     }
   }, [filters, item.id, map, shouldShowMarker]);
 

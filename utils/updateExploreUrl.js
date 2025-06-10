@@ -19,7 +19,6 @@ export function useUpdateExploreUrl() {
     });
 
     const newUrl = `/explore?${currentParams.toString()}`;
-    console.log("🔁 URL construite:", newUrl);
 
     if (updates.returnUrlOnly) {
       return newUrl;

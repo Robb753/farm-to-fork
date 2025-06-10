@@ -17,22 +17,17 @@ export default function ModalCloser() {
         'button[aria-label="Fermer la fenêtre"]'
       );
       if (closeButtons.length > 0) {
-        console.log("Bouton de fermeture trouvé, tentative de clic");
         closeButtons.forEach((button) => button.click());
       }
 
       // Si nous sommes sur la page signup-role, rediriger vers l'accueil
       if (pathname === "/signup-role" && isLoaded) {
-        console.log("Redirection depuis /signup-role vers l'accueil");
         router.push("/");
       }
 
       // Si un modal de sélection de rôle est présent et qu'on est connecté
       const roleModal = document.querySelector('div[role="dialog"]');
       if (roleModal && isSignedIn) {
-        console.log(
-          "Modal trouvé et utilisateur connecté, tentative de fermeture"
-        );
 
         // Essayer de simuler un clic en dehors du modal pour le fermer
         const backdrop = document.querySelector(".fixed.inset-0.z-50");
@@ -48,7 +43,6 @@ export default function ModalCloser() {
         // Si toujours présent, forcer la redirection
         setTimeout(() => {
           if (document.querySelector('div[role="dialog"]')) {
-            console.log("Modal toujours présent, forçage de la redirection");
             router.push("/");
           }
         }, 500);
@@ -73,7 +67,6 @@ export default function ModalCloser() {
               node.querySelector &&
               node.querySelector('div[role="dialog"]')
             ) {
-              console.log("Nouveau modal détecté via MutationObserver");
               closeModals();
             }
           });

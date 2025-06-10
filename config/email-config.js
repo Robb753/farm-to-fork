@@ -15,6 +15,6 @@ export const mailConfigs = {
   subjects: {
     newFarmerRequest: "[Action Requise] Nouvelle demande producteur",
     farmerRequestApproved: "Votre demande d'accès producteur a été approuvée !",
-    farmerRequestRejected: "Mise à jour de votre demande d'accès producteur",
+    farmerRequestRejected: "❌ Votre demande d'a pas été approuvée",
   },
 };
