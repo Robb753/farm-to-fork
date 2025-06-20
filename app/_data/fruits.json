@@ -1,0 +1,260 @@
+[
+  {
+    "name": "Pomme",
+    "category": "à pépins",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Poire",
+    "category": "à pépins",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Coing",
+    "category": "à pépins",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Nashi",
+    "category": "à pépins",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Raisin",
+    "category": "à pépins",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Fraise",
+    "category": "petit fruit",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Framboise",
+    "category": "petit fruit",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Groseille",
+    "category": "petit fruit",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Cassis",
+    "category": "petit fruit",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Mûre",
+    "category": "petit fruit",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Myrtille",
+    "category": "petit fruit",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Cerise",
+    "category": "à noyau",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Prune",
+    "category": "à noyau",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Mirabelle",
+    "category": "à noyau",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Reine-claude",
+    "category": "à noyau",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Pêche",
+    "category": "à noyau",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Nectarine",
+    "category": "à noyau",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Abricot",
+    "category": "à noyau",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Figue",
+    "category": "méditerranéen",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Kaki",
+    "category": "méditerranéen",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Châtaigne",
+    "category": "fruit sec",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Noisette",
+    "category": "fruit sec",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Noix",
+    "category": "fruit sec",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Amande",
+    "category": "fruit sec",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Melon",
+    "category": "cucurbitacée",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Pastèque",
+    "category": "cucurbitacée",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Sureau",
+    "category": "petit fruit",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Argousier",
+    "category": "petit fruit",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Aronia",
+    "category": "petit fruit",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Sorbe",
+    "category": "ancien",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Nèfle",
+    "category": "ancien",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Cornouille",
+    "category": "ancien",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Plaquebière",
+    "category": "petit fruit",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Cynorrhodon",
+    "category": "fruit sauvage",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Églantine",
+    "category": "fruit sauvage",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Citron (sous serre)",
+    "category": "agrume",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Clémentine (sous serre)",
+    "category": "agrume",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Orange douce (sous serre)",
+    "category": "agrume",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Kiwi",
+    "category": "exotique acclimaté",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Feijoa",
+    "category": "exotique acclimaté",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Grenade",
+    "category": "méditerranéen",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Baie de goji",
+    "category": "petit fruit",
+    "type": "fruit",
+    "labels": []
+  },
+  {
+    "name": "Actinidia arguta (kiwaï)",
+    "category": "exotique acclimaté",
+    "type": "fruit",
+    "labels": []
+  }
+]

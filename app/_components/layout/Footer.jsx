@@ -7,7 +7,7 @@ import {
   Linkedin,
   X as TwitterX,
   MessageCircle,
-} from "lucide-react";
+} from "@/utils/icons";
 import React from "react";
 
 function Footer() {

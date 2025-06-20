@@ -1,0 +1,290 @@
+[
+  {
+    "name": "Lait cru de vache",
+    "category": "lait",
+    "type": "produit laitier",
+    "labels": []
+  },
+  {
+    "name": "Lait cru de chèvre",
+    "category": "lait",
+    "type": "produit laitier",
+    "labels": ["fermier"]
+  },
+  {
+    "name": "Lait cru de brebis",
+    "category": "lait",
+    "type": "produit laitier",
+    "labels": ["fermier"]
+  },
+  {
+    "name": "Lait pasteurisé de vache",
+    "category": "lait",
+    "type": "produit laitier",
+    "labels": []
+  },
+  {
+    "name": "Lait pasteurisé de chèvre",
+    "category": "lait",
+    "type": "produit laitier",
+    "labels": ["fermier"]
+  },
+  {
+    "name": "Lait pasteurisé de brebis",
+    "category": "lait",
+    "type": "produit laitier",
+    "labels": ["fermier"]
+  },
+  {
+    "name": "Lait entier",
+    "category": "lait",
+    "type": "produit laitier",
+    "labels": []
+  },
+  {
+    "name": "Lait demi-écrémé",
+    "category": "lait",
+    "type": "produit laitier",
+    "labels": []
+  },
+  {
+    "name": "Lait écrémé",
+    "category": "lait",
+    "type": "produit laitier",
+    "labels": []
+  },
+  {
+    "name": "Lait fermenté",
+    "category": "lait fermenté",
+    "type": "produit laitier",
+    "labels": []
+  },
+  {
+    "name": "Kéfir de lait",
+    "category": "lait fermenté",
+    "type": "produit laitier",
+    "labels": []
+  },
+  {
+    "name": "Lait ribot",
+    "category": "lait fermenté",
+    "type": "produit laitier",
+    "labels": []
+  },
+  {
+    "name": "Yaourt nature",
+    "category": "yaourt",
+    "type": "produit laitier",
+    "labels": []
+  },
+  {
+    "name": "Yaourt sucré",
+    "category": "yaourt",
+    "type": "produit laitier",
+    "labels": []
+  },
+  {
+    "name": "Yaourt aux fruits",
+    "category": "yaourt",
+    "type": "produit laitier",
+    "labels": []
+  },
+  {
+    "name": "Yaourt de chèvre",
+    "category": "yaourt",
+    "type": "produit laitier",
+    "labels": ["fermier"]
+  },
+  {
+    "name": "Yaourt de brebis",
+    "category": "yaourt",
+    "type": "produit laitier",
+    "labels": ["fermier"]
+  },
+  {
+    "name": "Faisselle",
+    "category": "fromage frais",
+    "type": "produit laitier",
+    "labels": []
+  },
+  {
+    "name": "Petit-suisse",
+    "category": "fromage frais",
+    "type": "produit laitier",
+    "labels": []
+  },
+  {
+    "name": "Fromage blanc",
+    "category": "fromage frais",
+    "type": "produit laitier",
+    "labels": []
+  },
+  {
+    "name": "Crème fraîche",
+    "category": "crème",
+    "type": "produit laitier",
+    "labels": []
+  },
+  {
+    "name": "Crème épaisse",
+    "category": "crème",
+    "type": "produit laitier",
+    "labels": []
+  },
+  {
+    "name": "Crème liquide",
+    "category": "crème",
+    "type": "produit laitier",
+    "labels": []
+  },
+  {
+    "name": "Beurre doux",
+    "category": "beurre",
+    "type": "produit laitier",
+    "labels": []
+  },
+  {
+    "name": "Beurre demi-sel",
+    "category": "beurre",
+    "type": "produit laitier",
+    "labels": []
+  },
+  {
+    "name": "Beurre cru",
+    "category": "beurre",
+    "type": "produit laitier",
+    "labels": []
+  },
+  {
+    "name": "Beurre baratte",
+    "category": "beurre",
+    "type": "produit laitier",
+    "labels": ["fermier"]
+  },
+  {
+    "name": "Fromage de vache à pâte molle (Camembert, Brie...)",
+    "category": "fromage affiné",
+    "type": "produit laitier",
+    "labels": []
+  },
+  {
+    "name": "Fromage de vache à pâte pressée (Cantal, Tomme...)",
+    "category": "fromage affiné",
+    "type": "produit laitier",
+    "labels": ["fermier"]
+  },
+  {
+    "name": "Fromage de vache à pâte persillée (Bleu...)",
+    "category": "fromage affiné",
+    "type": "produit laitier",
+    "labels": []
+  },
+  {
+    "name": "Fromage de chèvre frais",
+    "category": "fromage de chèvre",
+    "type": "produit laitier",
+    "labels": ["fermier"]
+  },
+  {
+    "name": "Fromage de chèvre affiné",
+    "category": "fromage de chèvre",
+    "type": "produit laitier",
+    "labels": ["fermier"]
+  },
+  {
+    "name": "Fromage de brebis (Ossau-Iraty, Roquefort...)",
+    "category": "fromage de brebis",
+    "type": "produit laitier",
+    "labels": ["AOP", "fermier"]
+  },
+  {
+    "name": "Fromage à tartiner",
+    "category": "fromage frais",
+    "type": "produit laitier",
+    "labels": []
+  },
+  {
+    "name": "Tomme fermière",
+    "category": "fromage affiné",
+    "type": "produit laitier",
+    "labels": ["fermier"]
+  },
+  {
+    "name": "Reblochon",
+    "category": "fromage AOP",
+    "type": "produit laitier",
+    "labels": ["AOP"]
+  },
+  {
+    "name": "Comté",
+    "category": "fromage AOP",
+    "type": "produit laitier",
+    "labels": ["AOP"]
+  },
+  {
+    "name": "Roquefort",
+    "category": "fromage AOP",
+    "type": "produit laitier",
+    "labels": ["AOP"]
+  },
+  {
+    "name": "Bleu d'Auvergne",
+    "category": "fromage AOP",
+    "type": "produit laitier",
+    "labels": ["AOP"]
+  },
+  {
+    "name": "Chèvre cendré",
+    "category": "fromage de chèvre",
+    "type": "produit laitier",
+    "labels": ["fermier"]
+  },
+  {
+    "name": "Mozzarella au lait cru",
+    "category": "fromage frais",
+    "type": "produit laitier",
+    "labels": ["fermier"]
+  },
+  {
+    "name": "Raclette fermière",
+    "category": "fromage affiné",
+    "type": "produit laitier",
+    "labels": []
+  },
+  {
+    "name": "Yaourt à boire",
+    "category": "yaourt",
+    "type": "produit laitier",
+    "labels": []
+  },
+  {
+    "name": "Lait chocolaté",
+    "category": "boisson lactée",
+    "type": "produit laitier",
+    "labels": []
+  },
+  {
+    "name": "Dessert lacté (crème caramel, riz au lait)",
+    "category": "dessert",
+    "type": "produit laitier",
+    "labels": []
+  },
+  {
+    "name": "Glace au lait entier",
+    "category": "dessert",
+    "type": "produit laitier",
+    "labels": []
+  },
+  {
+    "name": "Fromage à pâte fondue (type Vache qui rit)",
+    "category": "fromage fondu",
+    "type": "produit laitier",
+    "labels": []
+  },
+  {
+    "name": "Beurre clarifié (ghee artisanal)",
+    "category": "beurre",
+    "type": "produit laitier",
+    "labels": []
+  }
+]

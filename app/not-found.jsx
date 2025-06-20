@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Ghost } from "lucide-react";
+import { Ghost } from "@/utils/icons"; // Assurez-vous que le chemin est correct
 import React from "react";
 
 export default function NotFound() {

@@ -1,23 +1,25 @@
-// app/(routes)/view-listing/[id]/page.jsx
-// Server Component (pas de directive "use client")
-import { supabaseServerClient } from "@/utils/supabase/server-client"; // Client Supabase côté serveur
-import { notFound } from "next/navigation";
-import ViewListing from "./viewlisting";
+// view-listing/[id]/page.jsx
+import { supabase } from "@/utils/supabase/client";
 
-export default async function ViewListingPage({ params }) {
-  // Chargement des données côté serveur
-  const { data: listing, error } = await supabaseServerClient
+import ViewListing from "./viewlisting";
+import NotFound from "./not-found";
+import { notFound } from "next/navigation";
+
+export default async function Page({ params }) {
+  const { id } = params;
+
+  if (!id || isNaN(Number(id))) return NotFound();
+
+  const { data, error } = await supabase
     .from("listing")
-    .select("*, listingImages(url, listing_id)")
-    .eq("id", params.id)
-    .eq("active", true)
+    .select("*, listingImages(url)")
+    .eq("id", id)
     .single();
 
-  // Gestion des erreurs
-  if (error || !listing) {
-    notFound();
+  if (error || !data) {
+    console.error("[Supabase ERROR]", error);
+    return notFound();
   }
 
-  // Transmission des données au composant client
-  return <ViewListing listing={listing} />;
+  return <ViewListing listing={data} />;
 }

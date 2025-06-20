@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Inbox, Clock, CheckCircle, XCircle } from "lucide-react";
+import { Loader2, Inbox, Clock, CheckCircle, XCircle } from "@/utils/icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";

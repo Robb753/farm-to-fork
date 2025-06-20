@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Target, Handshake, Leaf } from "lucide-react";
+import { Target, Handshake, Leaf } from "@/utils/icons"; // Assurez-vous que le chemin est correct
 import React from "react";
 import Breadcrumb from "@/app/_components/Breadcrumb";
 

@@ -7,19 +7,20 @@ import ExploreNearby from "./ExploreNearby";
 import EuropeanFeatures from "./EuropeanFeatures";
 import { useLanguage } from "@/app/contexts/Language-context";
 import { useMapState } from "@/app/contexts/MapDataContext/MapStateContext";
-import GoogleAddressSearchForHeader from "@/app/modules/maps/components/shared/GoogleAddressSearchForHeader";
+import CitySearch from "@/app/modules/maps/components/shared/CitySearch";
 
 function HomeContent() {
   const { setCoordinates } = useMapState();
   const { t } = useLanguage();
   const router = useRouter();
 
-  const handleCitySelect = (v) => {
-    const lat = v?.value?.geometry?.location?.lat() || 0;
-    const lng = v?.value?.geometry?.location?.lng() || 0;
+  const handleCitySelect = (cityData) => {
+    if (!cityData?.value?.geometry) return;
+
+    const lat = cityData.value.geometry.location.lat();
+    const lng = cityData.value.geometry.location.lng();
 
     setCoordinates({ lat, lng });
-    router.push(`/explore?lat=${lat}&lng=${lng}`);
   };
 
   return (
@@ -43,13 +44,15 @@ function HomeContent() {
           <p className="text-xl md:text-2xl max-w-3xl font-light leading-relaxed drop-shadow-md mb-6">
             {t("connect")}
           </p>
-          <div className="w-full max-w-lg bg-white shadow-md rounded-full px-4 py-2 flex items-center">
-            <GoogleAddressSearchForHeader selectedAddress={handleCitySelect} />
+          <div className="w-full max-w-lg">
+            <CitySearch
+              onCitySelect={handleCitySelect}
+              placeholder="Entrez une ville pour explorer..."
+            />
           </div>
         </div>
       </div>
 
-      {/* Sections modifiées */}
       <ExploreNearby />
       <EuropeanFeatures />
     </div>

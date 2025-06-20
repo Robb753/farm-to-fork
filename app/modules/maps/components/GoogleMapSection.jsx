@@ -11,12 +11,29 @@ import { GoogleMap } from "@react-google-maps/api";
 import { useMapState } from "@/app/contexts/MapDataContext/MapStateContext";
 import { useListingState } from "@/app/contexts/MapDataContext/ListingStateContext";
 import { useFilterState } from "@/app/contexts/MapDataContext/FilterStateContext";
-import CustomInfoWindow from "./CustomInfoWindow";
-import FarmInfoWindow from "./FarmInfoWindow";
 import { useSearchParams } from "next/navigation";
 import { useUpdateExploreUrl } from "@/utils/updateExploreUrl";
+import GoogleMarkerItem from "@/app/modules/maps/components/GoogleMarkerItem";
 
-const mapOptions = {
+// Hook pour détecter si on est sur mobile
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  return isMobile;
+};
+
+// Options de carte pour desktop
+const getDesktopMapOptions = () => ({
   disableDefaultUI: true,
   zoomControl: true,
   mapTypeControl: false,
@@ -24,8 +41,22 @@ const mapOptions = {
   streetViewControl: false,
   rotateControl: false,
   fullscreenControl: false,
+  gestureHandling: "cooperative", // Comportement normal sur desktop
   mapId: process.env.NEXT_PUBLIC_MAP_ID,
-};
+});
+
+// Options de carte pour mobile
+const getMobileMapOptions = () => ({
+  disableDefaultUI: true,
+  zoomControl: false, // ✅ Supprime les boutons zoom/dezoom
+  mapTypeControl: false,
+  scaleControl: false,
+  streetViewControl: false,
+  rotateControl: false,
+  fullscreenControl: false,
+  gestureHandling: "greedy", // ✅ Supprime "utiliser deux doigts"
+  mapId: process.env.NEXT_PUBLIC_MAP_ID,
+});
 
 function filtersToUrlParams(filters) {
   const result = {};
@@ -37,7 +68,7 @@ function filtersToUrlParams(filters) {
   return result;
 }
 
-function GoogleMapSection({ isMapExpanded }) {
+function GoogleMapSection({ isMapExpanded, isMobile: forceMobile = null }) {
   const {
     isApiLoaded,
     coordinates,
@@ -45,14 +76,8 @@ function GoogleMapSection({ isMapExpanded }) {
     handleMapLoad: contextHandleMapLoad,
   } = useMapState();
 
-  const {
-    allListings,
-    hoveredListingId,
-    setHoveredListingId,
-    openInfoWindowId,
-    setOpenInfoWindowId,
-    clearSelection,
-  } = useListingState();
+  const { visibleListings, setOpenInfoWindowId, clearSelection } =
+    useListingState();
 
   const { filters, filtersHydrated } = useFilterState();
   const updateExploreUrl = useUpdateExploreUrl();
@@ -61,6 +86,27 @@ function GoogleMapSection({ isMapExpanded }) {
   const searchParams = useSearchParams();
   const initialUrlParsed = useRef(false);
 
+  // Détection mobile avec possibilité de forcer via prop
+  const detectedMobile = useIsMobile();
+  const isMobile = forceMobile !== null ? forceMobile : detectedMobile;
+
+  const [initialZoom, setInitialZoom] = useState(12);
+
+  // ✅ Options de carte conditionnelles selon la plateforme
+  const mapOptions = useMemo(() => {
+    return isMobile ? getMobileMapOptions() : getDesktopMapOptions();
+  }, [isMobile]);
+
+  // Détecte viewport pour zoom initial
+  useEffect(() => {
+    if (isMobile || window.innerWidth < 640) {
+      setInitialZoom(11);
+    } else {
+      setInitialZoom(12);
+    }
+  }, [isMobile]);
+
+  // Lis lat/lng depuis URL
   useEffect(() => {
     if (!initialUrlParsed.current) {
       const urlLat = parseFloat(searchParams.get("lat"));
@@ -99,11 +145,17 @@ function GoogleMapSection({ isMapExpanded }) {
   const handleMapLoad = useCallback(
     (map) => {
       mapInstanceRef.current = map;
-      map.addListener("idle", updateUrlWithCenter);
+
+      // ✅ Sur mobile, on évite de mettre à jour l'URL à chaque mouvement
+      if (!isMobile) {
+        map.addListener("idle", updateUrlWithCenter);
+      }
+
       map.addListener("click", () => {
         setOpenInfoWindowId(null);
         clearSelection();
       });
+
       if (contextHandleMapLoad) {
         contextHandleMapLoad(map);
       }
@@ -113,6 +165,7 @@ function GoogleMapSection({ isMapExpanded }) {
       setOpenInfoWindowId,
       clearSelection,
       contextHandleMapLoad,
+      isMobile,
     ]
   );
 
@@ -137,10 +190,19 @@ function GoogleMapSection({ isMapExpanded }) {
       <GoogleMap
         mapContainerStyle={mapContainerStyle}
         center={coordinates || { lat: 46.6, lng: 1.88 }}
-        zoom={12}
-        options={mapOptions}
+        zoom={initialZoom}
+        options={mapOptions} // ✅ Options conditionnelles mobile/desktop
         onLoad={handleMapLoad}
-      />
+      >
+        {/* ✅ Boucle sur les listings visibles */}
+        {visibleListings.map((item) => (
+          <GoogleMarkerItem
+            key={item.id}
+            map={mapInstanceRef.current}
+            item={item}
+          />
+        ))}
+      </GoogleMap>
     </div>
   );
 }

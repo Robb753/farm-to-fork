@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Heart } from "lucide-react";
+import { Heart } from "@/utils/icons";
 import { useUser, useClerk } from "@clerk/nextjs";
 import { toast } from "sonner";
 import { supabase } from "@/utils/supabase/client";

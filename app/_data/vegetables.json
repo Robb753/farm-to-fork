@@ -1,0 +1,422 @@
+[
+  {
+    "name": "Carotte",
+    "category": "racine",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Betterave rouge",
+    "category": "racine",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Radis rose",
+    "category": "racine",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Radis noir",
+    "category": "racine",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Panais",
+    "category": "racine",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Topinambour",
+    "category": "racine",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Navet",
+    "category": "racine",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Rutabaga",
+    "category": "racine",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Salsifis",
+    "category": "racine",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Scorsonère",
+    "category": "racine",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Oignon jaune",
+    "category": "bulbe",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Oignon rouge",
+    "category": "bulbe",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Oignon blanc",
+    "category": "bulbe",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Échalote",
+    "category": "bulbe",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Ail",
+    "category": "bulbe",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Ciboule",
+    "category": "bulbe",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Poireau",
+    "category": "bulbe",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Ciboulette",
+    "category": "feuille",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Pomme de terre",
+    "category": "tubercule",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Patate douce",
+    "category": "tubercule",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Crosne du Japon",
+    "category": "tubercule",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Taro",
+    "category": "tubercule",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Wasabi",
+    "category": "racine",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Laitue",
+    "category": "feuille",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Feuille de chêne",
+    "category": "feuille",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Batavia",
+    "category": "feuille",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Iceberg",
+    "category": "feuille",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Romaine",
+    "category": "feuille",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Mâche",
+    "category": "feuille",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Épinard",
+    "category": "feuille",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Blette",
+    "category": "feuille",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Chou frisé",
+    "category": "feuille",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Chou kale",
+    "category": "feuille",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Chou chinois",
+    "category": "feuille",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Roquette",
+    "category": "feuille",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Cresson",
+    "category": "feuille",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Pourpier",
+    "category": "feuille",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Oseille",
+    "category": "feuille",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Persil",
+    "category": "feuille",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Menthe",
+    "category": "feuille",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Coriandre",
+    "category": "feuille",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Basilic",
+    "category": "feuille",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Tomate",
+    "category": "fruit",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Poivron",
+    "category": "fruit",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Piment",
+    "category": "fruit",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Aubergine",
+    "category": "fruit",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Courgette",
+    "category": "fruit",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Potimarron",
+    "category": "fruit",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Courge butternut",
+    "category": "fruit",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Melon",
+    "category": "fruit",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Pastèque",
+    "category": "fruit",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Concombre",
+    "category": "fruit",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Cornichon",
+    "category": "fruit",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Tomatillo",
+    "category": "fruit",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Physalis",
+    "category": "fruit",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Gombo",
+    "category": "fruit",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Haricot vert",
+    "category": "légumineuse",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Haricot beurre",
+    "category": "légumineuse",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Haricot à rame",
+    "category": "légumineuse",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Pois gourmand",
+    "category": "légumineuse",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Petit pois",
+    "category": "légumineuse",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Fève",
+    "category": "légumineuse",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Pois chiche",
+    "category": "légumineuse",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Lentille",
+    "category": "légumineuse",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Brocoli",
+    "category": "inflorescence",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Chou-fleur",
+    "category": "inflorescence",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Romanesco",
+    "category": "inflorescence",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Chou de Bruxelles",
+    "category": "inflorescence",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Artichaut",
+    "category": "inflorescence",
+    "type": "légume",
+    "labels": []
+  },
+  {
+    "name": "Cardon",
+    "category": "tige",
+    "type": "légume",
+    "labels": []
+  }
+]

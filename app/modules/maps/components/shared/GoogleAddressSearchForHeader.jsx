@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { Search, MapPin } from "lucide-react";
+import { Search, MapPin } from "@/utils/icons";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useMapState } from "@/app/contexts/MapDataContext/MapStateContext";
@@ -58,8 +58,14 @@ function GoogleAddressSearchForHeader({ selectedAddress, onAddressChange }) {
       const autocomplete = new window.google.maps.places.Autocomplete(
         inputRef.current,
         {
-          types: ["(cities)"],
-          fields: ["geometry", "name", "formatted_address", "place_id"],
+          types: ["address"],
+          componentRestrictions: { country: "fr" },
+          fields: [
+            "geometry",
+            "formatted_address",
+            "place_id",
+            "address_components",
+          ],
         }
       );
 

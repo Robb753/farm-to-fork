@@ -29,7 +29,7 @@
     ShoppingBasket,
     Eye,
     Search
-  } from "lucide-react";
+  } from "@/utils/icons";
   import { Input } from "@/components/ui/input";
   import useUserSync from "../hooks/useUserSync";
   import AppPieChart from "@/components/ui/AppPieChart";

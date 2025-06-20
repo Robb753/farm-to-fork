@@ -32,8 +32,8 @@ function Provider({ children }) {
       <UserRoleProvider>
         <Toaster />
         <ClientModalWrapper />
-        <Header />
-        <main className="min-h-screen">{children}</main>
+          <Header />
+          <main className="min-h-screen">{children}</main>
         <Footer />
       </UserRoleProvider>
     </LanguageProvider>

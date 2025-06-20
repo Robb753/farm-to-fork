@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { CheckCircle } from "lucide-react";
+import { CheckCircle } from "@/utils/icons"; // Assurez-vous que le chemin est correct
 import {
   Card,
   CardContent,

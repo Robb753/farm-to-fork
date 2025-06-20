@@ -7,13 +7,18 @@ import React, {
   useMemo,
 } from "react";
 import {
-  ChevronDownIcon,
-  ChevronUpIcon,
-  XIcon,
-  FilterIcon,
-  CheckIcon,
-} from "lucide-react";
+  ChevronDown,
+  ChevronUp,
+  X,
+  Filter,
+  Check,
+  ArrowLeft,
+} from "@/utils/icons";
 import { useFilterState } from "@/app/contexts/MapDataContext/FilterStateContext";
+
+export const openMobileFilters = () => {
+  window.dispatchEvent(new CustomEvent("openMobileFilters"));
+};
 
 export const filterSections = [
   {
@@ -101,7 +106,7 @@ const SimpleCheckbox = ({ checked, onChange, id, label }) => (
           : "border-gray-300 bg-white"
       }`}
     >
-      {checked && <CheckIcon className="h-3 w-3" />}
+      {checked && <Check className="h-3 w-3" />}
     </div>
     <label htmlFor={id} className="text-gray-700 text-sm cursor-pointer">
       {label}
@@ -115,6 +120,37 @@ const FilterSection = () => {
   const [isMapFilterOpen, setIsMapFilterOpen] = useState(false);
   const containerRef = useRef(null);
   const mapFilterRef = useRef(null);
+
+  const [isMobileModalOpen, setIsMobileModalOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+
+    const handleOpenMobileFilters = () => {
+      setIsMobileModalOpen(true);
+      // Émettre l'événement modal pour le backdrop
+      window.dispatchEvent(new CustomEvent("modalOpen", { detail: true }));
+    };
+
+    window.addEventListener("openMobileFilters", handleOpenMobileFilters);
+
+    return () => {
+      window.removeEventListener("resize", checkMobile);
+      window.removeEventListener("openMobileFilters", handleOpenMobileFilters);
+    };
+  }, []);
+
+  const closeMobileModal = () => {
+    setIsMobileModalOpen(false);
+    // Émettre l'événement pour fermer le backdrop
+    window.dispatchEvent(new CustomEvent("modalOpen", { detail: false }));
+  };
 
   const toggleSection = useCallback((section) => {
     setIsOpen((prev) => (prev === section ? null : section));
@@ -169,6 +205,94 @@ const FilterSection = () => {
     });
   }, [filters.mapType, handleFilterChange]);
 
+  if (isMobile && isMobileModalOpen) {
+    return (
+      <div className="fixed inset-0 bg-white z-50 overflow-y-auto">
+        {/* Header mobile */}
+        <div className="sticky top-0 bg-white border-b border-gray-200 p-4">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={closeMobileModal}
+              className="flex items-center gap-2 text-gray-600"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              <span>Retour</span>
+            </button>
+            <h1 className="text-lg font-semibold">Filtres</h1>
+            <button
+              onClick={() => {
+                resetFilters();
+                closeMobileModal();
+              }}
+              className="text-green-600 font-medium"
+            >
+              Effacer
+            </button>
+          </div>
+        </div>
+
+        {/* Filtres en version mobile - layout vertical */}
+        <div className="p-4 space-y-6">
+          {filterSections.map(({ title, key, items }) => (
+            <div
+              key={key}
+              className="border-b border-gray-200 pb-6 last:border-b-0"
+            >
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                {title}
+              </h3>
+              <div className="space-y-3">
+                {items.map((item) => {
+                  const isChecked = filters[key]?.includes(item) || false;
+                  return (
+                    <SimpleCheckbox
+                      key={`mobile-${key}-${item}`}
+                      id={`mobile-${key}-${item}`}
+                      checked={isChecked}
+                      onChange={() => handleFilterChange(key, item)}
+                      label={item}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+
+          {/* Section Type d'agriculture en mobile */}
+          <div className="border-b border-gray-200 pb-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Type d'agriculture
+            </h3>
+            <div className="space-y-3">
+              {mapFilterTypes.map((type) => {
+                const isChecked = filters.mapType?.includes(type.id) || false;
+                return (
+                  <SimpleCheckbox
+                    key={`mobile-map-filter-${type.id}`}
+                    id={`mobile-map-filter-${type.id}`}
+                    checked={isChecked}
+                    onChange={() => handleFilterChange("mapType", type.id)}
+                    label={type.label}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer mobile avec bouton de validation */}
+        <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4">
+          <button
+            onClick={closeMobileModal}
+            className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-medium text-base"
+          >
+            Appliquer les filtres ({activeFilterCount})
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-4 w-full">
       <div
@@ -199,9 +323,9 @@ const FilterSection = () => {
                 }}
               >
                 {isOpen === key ? (
-                  <ChevronUpIcon className="text-gray-500 h-5 w-5" />
+                  <ChevronUp className="text-gray-500 h-5 w-5" />
                 ) : (
-                  <ChevronDownIcon className="text-gray-500 h-5 w-5" />
+                  <ChevronDown className="text-gray-500 h-5 w-5" />
                 )}
               </div>
             </div>
@@ -239,7 +363,7 @@ const FilterSection = () => {
                 : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
             }`}
           >
-            <FilterIcon className="h-4 w-4" />
+            <Filter className="h-4 w-4" />
             <span className="font-medium">Type d'agriculture</span>
             {filters.mapType?.length > 0 && (
               <span className="inline-flex items-center justify-center bg-green-100 text-green-800 text-xs font-medium rounded-full h-5 min-w-5 px-1.5">
@@ -247,9 +371,9 @@ const FilterSection = () => {
               </span>
             )}
             {isMapFilterOpen ? (
-              <ChevronUpIcon className="h-4 w-4" />
+              <ChevronUp className="h-4 w-4" />
             ) : (
-              <ChevronDownIcon className="h-4 w-4" />
+              <ChevronDown className="h-4 w-4" />
             )}
           </button>
 
@@ -303,7 +427,7 @@ const FilterSection = () => {
                   onClick={() => handleFilterChange(key, value)}
                   className="text-green-600 hover:text-green-800"
                 >
-                  <XIcon className="h-3 w-3" />
+                  <X className="h-3 w-3" />
                 </button>
               </div>
             ))

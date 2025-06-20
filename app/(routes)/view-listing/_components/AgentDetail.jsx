@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Mail, Phone, MapPin, User, MessageCircle } from "lucide-react";
+import { Mail, Phone, MapPin, User, MessageCircle } from "@/utils/icons";
 import Image from "next/image";
 import React from "react";
 

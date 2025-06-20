@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, ArrowLeft, Save, Send } from "lucide-react";
+import { Loader2, ArrowLeft, Save, Send } from "@/utils/icons";
 import { useUser } from "@clerk/nextjs";
 import { supabase } from "@/utils/supabase/client";
 import {

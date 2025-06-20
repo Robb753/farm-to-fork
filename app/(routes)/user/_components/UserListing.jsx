@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/utils/supabase/client";
 import { useUser } from "@clerk/nextjs";
-import { BathIcon, BedDouble, MapPin, RulerIcon } from "lucide-react";
+import { Globe, MapPin } from "@/utils/icons";
 import Image from "next/image";
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
@@ -87,15 +87,15 @@ function UserListing() {
                 </h2>
                 <div className="flex mt-2 gap-2 justify-between">
                   <h2 className="flex gap-2 text-sm bg-slate-100 rounded-md p-2 text-gray-600 justify-center items-center">
-                    <BedDouble className="h-4 w-4" />
+                    <Globe className="h-4 w-4" />
                     {item?.product_type}
                   </h2>
                   <h2 className="flex gap-2 text-sm bg-slate-100 rounded-md p-2 text-gray-600 justify-center items-center">
-                    <BathIcon className="h-4 w-4" />
+                    <Globe className="h-4 w-4" />
                     {item?.certification}
                   </h2>
                   <h2 className="flex gap-2 text-sm bg-slate-100 rounded-md p-2 text-gray-600 justify-center items-center">
-                    <RulerIcon className="h-4 w-4" />
+                    <Globe className="h-4 w-4" />
                     {item?.purchase_mode}
                   </h2>
                 </div>

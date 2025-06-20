@@ -1,7 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +14,7 @@ import SignInModal from "@/app/modules/auth/SignInModal";
 import SignupModalSimple from "@/app/modules/auth/SignupModalSimple";
 import { LanguageSelector } from "../LanguageSelector";
 import useUserSync from "@/app/hooks/useUserSync";
+import { AvatarImage } from "@/components/ui/OptimizedImage";
 
 function Header() {
   const { user, isSignedIn } = useUser();
@@ -55,9 +55,42 @@ function Header() {
   const handleCloseModal = () => setModalType(null);
   const isFarmerUser = userRole === "farmer";
 
+  // Fonction pour obtenir l'URL de l'avatar utilisateur
+  const getUserAvatarUrl = () => {
+    if (!user) return "/default-avatar.png";
+
+    // Priorité : imageUrl de Clerk
+    if (user.imageUrl) return user.imageUrl;
+
+    // Fallback : image de profil depuis les métadonnées
+    if (user.publicMetadata?.profileImage)
+      return user.publicMetadata.profileImage;
+
+    // Fallback : avatar par défaut
+    return "/default-avatar.png";
+  };
+
+  // Fonction pour obtenir le nom d'utilisateur pour l'alt text
+  const getUserDisplayName = () => {
+    if (!user) return "Utilisateur";
+
+    // Priorité : nom complet
+    if (user.fullName) return user.fullName;
+
+    // Fallback : prénom
+    if (user.firstName) return user.firstName;
+
+    // Fallback : email ou "Utilisateur"
+    const email =
+      user.primaryEmailAddress?.emailAddress ||
+      user.emailAddresses?.[0]?.emailAddress;
+    return email ? email.split("@")[0] : "Utilisateur";
+  };
+
   return (
     <header className="flex items-center justify-between px-4 py-3 bg-white md:px-8 shadow-sm relative z-40">
       <div className="flex items-center">
+        {/* Logo avec optimisation d'image */}
         <div className="relative w-10 h-10 mr-2">
           <div className="absolute inset-0 bg-green-200 rounded-full shadow-inner" />
           <div className="absolute inset-[25%] bg-green-600 rounded-full" />
@@ -82,16 +115,23 @@ function Header() {
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="flex items-center gap-1 px-3 py-2 border rounded-md shadow-sm hover:bg-gray-50">
+            <button className="flex items-center gap-1 px-3 py-2 border rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">
               <Menu className="w-5 h-5" />
               {!isSignedIn && <LogIn className="w-5 h-5" />}
               {isSignedIn && (
-                <Image
-                  src={user?.imageUrl || "/default-avatar.png"}
-                  alt="User"
-                  width={28}
-                  height={28}
-                  className="rounded-full"
+                <AvatarImage
+                  src={getUserAvatarUrl()}
+                  alt={`Photo de profil de ${getUserDisplayName()}`}
+                  size={28}
+                  className="ring-2 ring-green-100 hover:ring-green-200 transition-colors"
+                  fallbackSrc="/default-avatar.png"
+                  priority={false}
+                  quality={90}
+                  onError={() => {
+                    console.warn(
+                      `Erreur de chargement de l'avatar pour ${getUserDisplayName()}`
+                    );
+                  }}
                 />
               )}
             </button>
@@ -102,7 +142,7 @@ function Header() {
               <div className="bg-white rounded-md shadow-sm overflow-hidden">
                 <DropdownMenuItem
                   onClick={() => setModalType("signup-role")}
-                  className="py-3 hover:bg-gray-50"
+                  className="py-3 hover:bg-gray-50 focus:bg-gray-50"
                 >
                   <div className="flex items-center gap-3 px-4">
                     <PlusCircle className="w-5 h-5 text-green-600" />
@@ -111,7 +151,7 @@ function Header() {
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => setModalType("signin")}
-                  className="py-3 hover:bg-gray-50"
+                  className="py-3 hover:bg-gray-50 focus:bg-gray-50"
                 >
                   <div className="flex items-center gap-3 px-4">
                     <LogIn className="w-5 h-5 text-green-600" />
@@ -122,17 +162,36 @@ function Header() {
             ) : (
               <>
                 <DropdownMenuLabel className="text-lg font-medium py-3 text-gray-800 px-4">
-                  Mon Compte (
-                  {userRole === "admin"
-                    ? "Administrateur"
-                    : userRole === "farmer"
-                      ? "Agriculteur"
-                      : "Utilisateur"}
-                  )
+                  <div className="flex items-center gap-3">
+                    <AvatarImage
+                      src={getUserAvatarUrl()}
+                      alt={`Photo de profil de ${getUserDisplayName()}`}
+                      size={32}
+                      className="ring-2 ring-green-100"
+                      fallbackSrc="/default-avatar.png"
+                      priority={false}
+                      quality={95}
+                    />
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium text-gray-900">
+                        {getUserDisplayName()}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {userRole === "admin"
+                          ? "Administrateur"
+                          : userRole === "farmer"
+                            ? "Agriculteur"
+                            : "Utilisateur"}
+                      </span>
+                    </div>
+                  </div>
                 </DropdownMenuLabel>
 
                 <div className="bg-white rounded-md shadow-sm overflow-hidden">
-                  <DropdownMenuItem asChild className="py-3 hover:bg-gray-50">
+                  <DropdownMenuItem
+                    asChild
+                    className="py-3 hover:bg-gray-50 focus:bg-gray-50"
+                  >
                     <Link href="/user" className="flex items-center gap-3 px-4">
                       <User className="w-5 h-5 text-green-600" />
                       <span className="text-gray-700">Profil</span>
@@ -140,7 +199,10 @@ function Header() {
                   </DropdownMenuItem>
 
                   {userRole === "admin" && (
-                    <DropdownMenuItem asChild className="py-3 hover:bg-gray-50">
+                    <DropdownMenuItem
+                      asChild
+                      className="py-3 hover:bg-gray-50 focus:bg-gray-50"
+                    >
                       <Link
                         href="/admin"
                         className="flex items-center gap-3 px-4"
@@ -152,7 +214,10 @@ function Header() {
                   )}
 
                   {userRole === "farmer" && (
-                    <DropdownMenuItem asChild className="py-3 hover:bg-gray-50">
+                    <DropdownMenuItem
+                      asChild
+                      className="py-3 hover:bg-gray-50 focus:bg-gray-50"
+                    >
                       <Link
                         href="/dashboard/farms"
                         className="flex items-center gap-3 px-4"
@@ -175,10 +240,24 @@ function Header() {
                       </Link>
                     </DropdownMenuItem>
                   )}
+
+                  {/* Lien vers les favoris pour tous les utilisateurs connectés */}
+                  <DropdownMenuItem
+                    asChild
+                    className="py-3 hover:bg-gray-50 focus:bg-gray-50"
+                  >
+                    <Link
+                      href="/user#favorites"
+                      className="flex items-center gap-3 px-4"
+                    >
+                      <Heart className="w-5 h-5 text-red-500" />
+                      <span className="text-gray-700">Mes favoris</span>
+                    </Link>
+                  </DropdownMenuItem>
                 </div>
 
                 <div className="mt-2 bg-white rounded-md shadow-sm overflow-hidden">
-                  <DropdownMenuItem className="py-3 hover:bg-gray-50">
+                  <DropdownMenuItem className="py-3 hover:bg-gray-50 focus:bg-gray-50">
                     <SignOutButton className="w-full flex justify-start">
                       <div className="flex items-center gap-3 px-4">
                         <svg

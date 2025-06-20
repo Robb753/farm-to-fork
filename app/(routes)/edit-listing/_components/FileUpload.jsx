@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Trash2, RefreshCcw } from "lucide-react";
+import { Trash2, RefreshCcw, Globe } from "@/utils/icons";
 import { toast } from "sonner";
 
 function FileUpload({ setImages, imageList }) {
@@ -103,7 +103,7 @@ function FileUpload({ setImages, imageList }) {
             onClick={resetAll}
             className="ml-4 text-sm flex items-center gap-1 text-red-600 hover:text-red-800"
           >
-            <RefreshCcw size={16} /> Réinitialiser
+            <Globe size={16} /> Réinitialiser
           </button>
         )}
       </div>

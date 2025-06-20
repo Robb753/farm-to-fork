@@ -1,7 +1,7 @@
 "use client";
 
 import { UserButton, UserProfile } from "@clerk/nextjs";
-import { Building2, Heart } from "lucide-react";
+import { Building2, Heart } from "@/utils/icons";
 import React from "react";
 import UserListing from "../_components/UserListing";
 import FavoriteListings from "../_components/FavoriteListings";

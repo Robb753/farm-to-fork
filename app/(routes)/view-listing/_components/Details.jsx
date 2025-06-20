@@ -12,7 +12,7 @@ import {
   CalendarCheck,
   Truck,
   Home,
-} from "lucide-react";
+} from "@/utils/icons";
 import AgentDetail from "./AgentDetail";
 import GoogleMapSection from "@/app/modules/maps/components/GoogleMapSection";
 

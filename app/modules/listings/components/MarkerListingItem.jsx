@@ -1,8 +1,8 @@
 // modules/listings/components/MarkerListingItem.jsx
 import React from "react";
 import { useRouter } from "next/navigation";
+import { Heart } from "@/utils/icons";
 import Image from "next/image";
-import { Heart } from "lucide-react";
 
 function MarkerListingItem({ item }) {
   const router = useRouter();

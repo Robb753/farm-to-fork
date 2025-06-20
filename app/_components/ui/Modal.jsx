@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useImperativeHandle, forwardRef } from "react";
-import { X } from "lucide-react";
+import { X } from "@/utils/icons";
 
 const Modal = forwardRef(({ children, onClose }, ref) => {
   const modalRef = useRef(null);

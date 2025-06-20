@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home } from "lucide-react";
+import { Home } from "@/utils/icons"; // Assurez-vous que le chemin est correct
 import React from "react";
 
 export default function Breadcrumb() {

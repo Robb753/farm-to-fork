@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Check, Globe } from "lucide-react";
+import { ChevronDown, Check, Globe } from "@/utils/icons"; // Assurez-vous que le chemin est correct
 import {
   DropdownMenu,
   DropdownMenuContent,

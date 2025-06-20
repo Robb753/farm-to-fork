@@ -18,7 +18,7 @@ import {
   CardContent,
   CardFooter,
 } from "@/components/ui/card";
-import { Loader2 } from "lucide-react";
+import { Loader2 } from "@/utils/icons";
 
 export default function RequestFarmerAccessPage() {
   const { user } = useUser();

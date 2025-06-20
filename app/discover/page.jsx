@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Wheat, ShoppingBasket, MapPinned } from "lucide-react";
+import { Wheat, ShoppingBasket, MapPinned } from "@/utils/icons";
 import React from "react";
 import Breadcrumb from "@/app/_components/Breadcrumb";
 
