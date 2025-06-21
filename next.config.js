@@ -1,6 +1,6 @@
-const { PHASE_PRODUCTION_BUILD } = require('next/constants');
-const withBundleAnalyzer = require('@next/bundle-analyzer')({
-  enabled: process.env.ANALYZE === 'true',
+const { PHASE_PRODUCTION_BUILD } = require("next/constants");
+const withBundleAnalyzer = require("@next/bundle-analyzer")({
+  enabled: process.env.ANALYZE === "true",
 });
 
 /** @type {import('next').NextConfig} */
@@ -9,16 +9,16 @@ const baseConfig = {
   images: {
     remotePatterns: [
       {
-        protocol: 'https',
-        hostname: 'reukdkgdlvgdvyuwuaub.supabase.co',
-        pathname: '/storage/v1/object/public/**',
+        protocol: "https",
+        hostname: "reukdkgdlvgdvyuwuaub.supabase.co",
+        pathname: "/storage/v1/object/public/**",
       },
-      { protocol: 'https', hostname: 'img.clerk.com' },
-      { protocol: 'https', hostname: 'images.clerk.dev' },
-      { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
-      { protocol: 'https', hostname: '*.ggpht.com' },
+      { protocol: "https", hostname: "img.clerk.com" },
+      { protocol: "https", hostname: "images.clerk.dev" },
+      { protocol: "https", hostname: "lh3.googleusercontent.com" },
+      { protocol: "https", hostname: "*.ggpht.com" },
     ],
-    formats: ['image/avif', 'image/webp'],
+    formats: ["image/avif", "image/webp"],
     minimumCacheTTL: 60 * 60 * 24 * 365, // 1 an
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
@@ -27,20 +27,20 @@ const baseConfig = {
   // Expérimental -----------------------------------------------------------
   experimental: {
     optimizePackageImports: [
-      '@radix-ui/react-dropdown-menu',
-      '@radix-ui/react-alert-dialog',
-      '@radix-ui/react-checkbox',
-      '@radix-ui/react-label',
-      '@radix-ui/react-radio-group',
-      '@radix-ui/react-select',
-      '@radix-ui/react-slot',
-      '@radix-ui/react-toast',
-      'lucide-react',
-      'recharts',
-      'framer-motion',
+      "@radix-ui/react-dropdown-menu",
+      "@radix-ui/react-alert-dialog",
+      "@radix-ui/react-checkbox",
+      "@radix-ui/react-label",
+      "@radix-ui/react-radio-group",
+      "@radix-ui/react-select",
+      "@radix-ui/react-slot",
+      "@radix-ui/react-toast",
+      "lucide-react",
+      "recharts",
+      "framer-motion",
     ],
-    optimizeCss: true,
-    serverComponentsExternalPackages: ['@supabase/supabase-js'],
+    // ❌ Retiré optimizeCss: true, qui causait l'erreur critters
+    serverComponentsExternalPackages: ["@supabase/supabase-js"],
   },
 
   // Global -----------------------------------------------------------------
@@ -59,23 +59,39 @@ const baseConfig = {
   async headers() {
     return [
       {
-        source: '/(.*)',
+        source: "/(.*)",
         headers: [
-          { key: 'X-Content-Type-Options', value: 'nosniff' },
-          { key: 'X-Frame-Options', value: 'DENY' },
-          { key: 'X-XSS-Protection', value: '1; mode=block' },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "X-XSS-Protection", value: "1; mode=block" },
         ],
       },
       {
-        source: '/static/(.*)',
+        source: "/static/(.*)",
         headers: [
-          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
         ],
       },
       {
-        source: '/_next/static/(.*)',
+        source: "/_next/static/(.*)",
         headers: [
-          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      // ✅ Ajout d'optimisation CSS manuelle via headers
+      {
+        source: "/_next/static/css/(.*)",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
         ],
       },
     ];
@@ -100,52 +116,49 @@ module.exports = (phase) => {
           usedExports: true,
           sideEffects: false,
           splitChunks: {
-            chunks: 'all',
+            chunks: "all",
             cacheGroups: {
               vendor: {
                 test: /[\\/]node_modules[\\/]/,
-                name: 'vendors',
+                name: "vendors",
                 priority: 10,
                 reuseExistingChunk: true,
               },
               radixUI: {
                 test: /[\\/]node_modules[\\/]@radix-ui[\\/]/,
-                name: 'radix-ui',
+                name: "radix-ui",
                 priority: 20,
                 reuseExistingChunk: true,
               },
               googleMaps: {
                 test: /[\\/]node_modules[\\/](@react-google-maps|@googlemaps)[\\/]/,
-                name: 'google-maps',
+                name: "google-maps",
                 priority: 30,
                 reuseExistingChunk: true,
               },
               clerk: {
                 test: /[\\/]node_modules[\\/]@clerk[\\/]/,
-                name: 'clerk',
+                name: "clerk",
                 priority: 25,
                 reuseExistingChunk: true,
               },
               charts: {
                 test: /[\\/]node_modules[\\/](recharts|d3)[\\/]/,
-                name: 'charts',
+                name: "charts",
                 priority: 15,
                 reuseExistingChunk: true,
               },
             },
           },
         };
-
-        // Fusion agressive des chunks restants
-        config.plugins.push(new webpack.optimize.AggressiveMergingPlugin());
       }
 
       // Forcer une seule version de React (exactes uniquement)
       config.resolve.alias = {
         ...config.resolve.alias,
-        'react$': require.resolve('react'),
-        'react-dom$': require.resolve('react-dom'),
-        'react/jsx-runtime$': require.resolve('react/jsx-runtime'),
+        react$: require.resolve("react"),
+        "react-dom$": require.resolve("react-dom"),
+        "react/jsx-runtime$": require.resolve("react/jsx-runtime"),
       };
 
       // Supprimer les polyfills inutiles côté client
