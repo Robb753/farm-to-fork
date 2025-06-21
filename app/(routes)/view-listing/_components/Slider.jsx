@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image"; // ✅ AJOUTÉ ICI
 import {
   Carousel,
   CarouselContent,
@@ -46,13 +47,16 @@ function Slider({ imageList }) {
     );
   }
 
-  if (isModalOpen) {
+  // ✅ Ajout d'une sécurité si l’image est introuvable
+  const currentImage = imageList[currentImageIndex];
+
+  if (isModalOpen && currentImage) {
     return (
       <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
         <div className="relative w-full h-full flex items-center justify-center p-4">
           <div className="relative w-full max-w-4xl h-[80vh] max-h-[80vh]">
-            <Image
-              src={imageList[currentImageIndex]?.url || defaultImage}
+            <SafeImage // ✅ Remplacé <Image> par <SafeImage>
+              src={currentImage.url || defaultImage}
               fill
               sizes="90vw"
               alt={`Agrandissement image ${currentImageIndex + 1}`}
@@ -105,7 +109,7 @@ function Slider({ imageList }) {
                   sizes="100vw"
                   alt={`image ${index + 1}`}
                   priority={index === 0}
-                  className="object-contain bg-white" // ✅ Ne coupe plus le visuel
+                  className="object-contain bg-white"
                 />
                 <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   <ZoomIn className="text-white w-10 h-10 bg-black/50 p-2 rounded-full" />
@@ -136,7 +140,7 @@ function Slider({ imageList }) {
                 fill
                 sizes="64px"
                 alt={`thumbnail ${index + 1}`}
-                className="object-contain bg-white" // ✅ Pas coupé, propre
+                className="object-contain bg-white"
                 priority
               />
             </div>

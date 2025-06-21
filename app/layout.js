@@ -17,7 +17,7 @@ export default function RootLayout({ children }) {
   return (
     <ClerkProvider>
       <html lang="fr">
-        <body className={inter.className}>
+        <body className={`${inter.className} flex flex-col min-h-screen`}>
           {/* Script GTM dans body */}
           <Script
             id="gtm-script"

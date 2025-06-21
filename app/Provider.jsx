@@ -33,7 +33,7 @@ function Provider({ children }) {
         <Toaster />
         <ClientModalWrapper />
           <Header />
-          <main className="min-h-screen">{children}</main>
+          <main className="flex-1">{children}</main>
         <Footer />
       </UserRoleProvider>
     </LanguageProvider>

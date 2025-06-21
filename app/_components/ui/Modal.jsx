@@ -1,72 +1,111 @@
 "use client";
 
-import React, { useEffect, useRef, useImperativeHandle, forwardRef } from "react";
+import React, { useEffect, useRef } from "react";
 import { X } from "@/utils/icons";
+import { createPortal } from "react-dom";
 
-const Modal = forwardRef(({ children, onClose }, ref) => {
+const Modal = React.forwardRef(({ children, onClose, className = "" }, ref) => {
   const modalRef = useRef(null);
+  const backdropRef = useRef(null);
   const isClosingRef = useRef(false);
 
-  // Exposer une méthode forceClose via la référence
-  useImperativeHandle(ref, () => ({
-    forceClose: () => {
-      if (!isClosingRef.current) {
-        isClosingRef.current = true;
-        document.body.style.overflow = "auto";
-        if (onClose) onClose();
-      }
-    }
-  }));
+  // ✅ Fonction de fermeture sécurisée
+  const handleClose = () => {
+    if (isClosingRef.current) return;
+    isClosingRef.current = true;
+    onClose?.();
+  };
 
-  // Fermer le modal avec la touche Échap
+  // ✅ Fermeture avec ESC
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === "Escape" && !isClosingRef.current) onClose();
+      if (e.key === "Escape") {
+        handleClose();
+      }
     };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
 
-  // Fermer le modal en cliquant à l'extérieur
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // ✅ Clic sur le backdrop
   const handleBackdropClick = (e) => {
-    if (modalRef.current && !modalRef.current.contains(e.target) && !isClosingRef.current) {
-      onClose();
+    if (e.target === backdropRef.current) {
+      handleClose();
     }
   };
 
-  // Empêcher le défilement du body quand le modal est ouvert
+  // ✅ Prévenir le scroll du body
   useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+
     return () => {
-      document.body.style.overflow = "auto";
+      document.body.style.overflow = originalOverflow;
     };
   }, []);
 
-  return (
+  // ✅ Focus management pour l'accessibilité
+  useEffect(() => {
+    const modal = modalRef.current;
+    if (modal) {
+      modal.focus();
+    }
+  }, []);
+
+  const modalContent = (
     <div
-      className="fixed inset-0 z-1000 flex items-center justify-center bg-black/50 backdrop-blur-sm overflow-y-auto py-12"
+      ref={backdropRef}
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm overflow-y-auto py-4 px-4"
       aria-modal="true"
       role="dialog"
       onClick={handleBackdropClick}
     >
       <div
         ref={modalRef}
+        tabIndex={-1}
+        className={`
+          relative w-full max-w-4xl max-h-[90vh] 
+          bg-white rounded-xl shadow-2xl 
+          transform transition-all duration-300 ease-out
+          animate-in fade-in-0 zoom-in-95
+          overflow-hidden
+          ${className}
+        `}
         onClick={(e) => e.stopPropagation()}
-        className="relative w-[95%] sm:w-[90%] md:w-[80%] max-w-4xl bg-white rounded-xl shadow-xl animate-fadeIn my-auto"
       >
+        {/* ✅ Bouton de fermeture accessible */}
         <button
-          onClick={onClose}
-          className="absolute top-3 right-3 text-gray-500 hover:text-black focus:outline-none z-10 bg-white/80 rounded-full p-1"
+          onClick={handleClose}
+          className="
+            absolute top-4 right-4 z-50
+            w-8 h-8 
+            bg-white/90 hover:bg-white 
+            rounded-full 
+            flex items-center justify-center
+            text-gray-500 hover:text-gray-700
+            transition-all duration-200
+            shadow-sm hover:shadow-md
+            focus:outline-none focus:ring-2 focus:ring-green-500
+          "
           aria-label="Fermer la fenêtre"
-          title="Fermer"
+          title="Fermer (Échap)"
         >
-          <X className="w-5 h-5" />
+          <X className="w-4 h-4" />
         </button>
 
-        {children}
+        {/* ✅ Contenu du modal avec scroll */}
+        <div className="relative w-full h-full max-h-[90vh] overflow-auto">
+          {children}
+        </div>
       </div>
     </div>
   );
+
+  // ✅ Utilisation de createPortal pour une meilleure isolation
+  return typeof window !== "undefined"
+    ? createPortal(modalContent, document.body)
+    : null;
 });
 
 Modal.displayName = "Modal";

@@ -306,7 +306,7 @@ const DesktopListingMapView = () => {
         </div>
       </div>
 
-      <div className="relative flex flex-col md:flex-row transition-all duration-500 ease-in-out h-[calc(100vh-240px)]">
+      <div className="relative flex flex-col md:flex-row transition-all duration-500 ease-in-out h-[calc(100vh-200px)]">
         {/* Liste avec overlay de chargement style Airbnb */}
         <div
           className={`relative overflow-y-auto transition-all duration-500 ease-in-out ${
@@ -392,6 +392,7 @@ const DesktopListingMapView = () => {
               ) : (
                 <Maximize2 className="w-5 h-5" />
               )}
+
             </button>
           </div>
         </div>

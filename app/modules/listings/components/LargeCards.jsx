@@ -15,7 +15,7 @@ function LargeCards({
       {/* Image container with status indicator */}
       <div className="relative h-96 min-w-[300px] overflow-hidden rounded-lg shadow-md">
         <Image
-          src={img}
+          src={img || "/placeholder-farm.jpg"}
           alt={title}
           fill
           style={{ objectFit: "cover" }}
@@ -29,15 +29,15 @@ function LargeCards({
               status === "open"
                 ? "bg-green-100 text-green-800"
                 : status === "closed"
-                ? "bg-red-100 text-red-800"
-                : "bg-yellow-100 text-yellow-800"
+                  ? "bg-red-100 text-red-800"
+                  : "bg-yellow-100 text-yellow-800"
             }`}
           >
             {status === "open"
               ? "Ouvert"
               : status === "closed"
-              ? "Fermé"
-              : status}
+                ? "Fermé"
+                : status}
           </div>
         )}
       </div>
@@ -74,7 +74,7 @@ function LargeCardAlternate({
         {/* Image container */}
         <div className="relative h-64 w-full">
           <Image
-            src={img}
+            src={img || "/placeholder-farm.jpg"}
             alt={title}
             fill
             style={{ objectFit: "cover" }}
@@ -88,15 +88,15 @@ function LargeCardAlternate({
                 status === "open"
                   ? "bg-green-100 text-green-800"
                   : status === "closed"
-                  ? "bg-red-100 text-red-800"
-                  : "bg-yellow-100 text-yellow-800"
+                    ? "bg-red-100 text-red-800"
+                    : "bg-yellow-100 text-yellow-800"
               }`}
             >
               {status === "open"
                 ? "Ouvert"
                 : status === "closed"
-                ? "Fermé"
-                : status}
+                  ? "Fermé"
+                  : status}
             </div>
           )}
         </div>
