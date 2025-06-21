@@ -12,6 +12,8 @@ export {
   ChevronLeft,
   ArrowLeft,
   ArrowRight,
+  XCircle,
+  Inbox,
 
   // Maps & Location
   MapPin,

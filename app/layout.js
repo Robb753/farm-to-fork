@@ -2,6 +2,7 @@
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
+import { frFR } from "@clerk/localizations";
 import Script from "next/script";
 import Provider from "./Provider";
 import AppLoadingNotifier from "@/utils/AppLoadingNotifier";
@@ -15,7 +16,7 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <ClerkProvider>
+    <ClerkProvider localization={frFR}>
       <html lang="fr">
         <body className={`${inter.className} flex flex-col min-h-screen`}>
           {/* Script GTM dans body */}

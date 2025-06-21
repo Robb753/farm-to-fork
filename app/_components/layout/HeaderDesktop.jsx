@@ -11,7 +11,7 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { LogIn, PlusCircle, ListChecks, Heart, User, Menu } from "lucide-react";
-import { useUser, SignOutButton } from "@clerk/nextjs";
+import { useUser, useClerk } from "@clerk/nextjs";
 import SignInModal from "@/app/modules/auth/SignInModal";
 import SignupModalSimple from "@/app/modules/auth/SignupModalSimple";
 import useUserSync from "@/app/hooks/useUserSync";
@@ -19,15 +19,22 @@ import { AvatarImage } from "@/components/ui/OptimizedImage";
 import Image from "next/image";
 
 export default function HeaderDesktop() {
-  const { user, isSignedIn } = useUser();
+  const { user, isSignedIn, isLoaded } = useUser();
+  const { signOut } = useClerk();
   const { role, isReady } = useUserSync();
 
   const [userRole, setUserRole] = useState(null);
   const [activeModal, setActiveModal] = useState(null);
+  const [isClient, setIsClient] = useState(false);
+
+  // S'assurer que le composant est monté côté client
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // Gestion de rôle utilisateur
   useEffect(() => {
-    if (!isSignedIn) return;
+    if (!isClient || !isLoaded || !isSignedIn) return;
 
     if (isReady && role) {
       setUserRole(role);
@@ -39,26 +46,45 @@ export default function HeaderDesktop() {
       return setUserRole(clerkRole);
     }
 
-    const localRole = localStorage.getItem("userRole");
-    if (localRole === "farmer" || localRole === "user") {
-      return setUserRole(localRole);
+    try {
+      const localRole = localStorage.getItem("userRole");
+      if (localRole === "farmer" || localRole === "user") {
+        return setUserRole(localRole);
+      }
+    } catch (error) {
+      console.warn("Erreur d'accès au localStorage:", error);
     }
 
     setUserRole("user");
-  }, [isSignedIn, user, role, isReady]);
+  }, [isClient, isLoaded, isSignedIn, user, role, isReady]);
+
+  // Gestion de la déconnexion
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error("Erreur lors de la déconnexion:", error);
+    }
+  };
 
   // Gestion modales
   const openModal = (type) => {
     setActiveModal(type);
-    window.dispatchEvent(new CustomEvent("modalOpen", { detail: true }));
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("modalOpen", { detail: true }));
+    }
   };
 
   const closeModal = () => {
     setActiveModal(null);
-    window.dispatchEvent(new CustomEvent("modalOpen", { detail: false }));
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("modalOpen", { detail: false }));
+    }
   };
 
   useEffect(() => {
+    if (!isClient) return;
+
     const handleEscape = (e) => {
       if (e.key === "Escape" && activeModal) closeModal();
     };
@@ -70,12 +96,16 @@ export default function HeaderDesktop() {
       document.removeEventListener("keydown", handleEscape);
       document.body.style.overflow = "auto";
     };
-  }, [activeModal]);
+  }, [activeModal, isClient]);
 
-  const getUserAvatarUrl = () =>
-    user?.imageUrl ||
-    user?.publicMetadata?.profileImage ||
-    "/default-avatar.png";
+  const getUserAvatarUrl = () => {
+    if (!user) return "/default-avatar.png";
+    return (
+      user.imageUrl ||
+      user.publicMetadata?.profileImage ||
+      "/default-avatar.png"
+    );
+  };
 
   const getUserDisplayName = () => {
     if (!user) return "Utilisateur";
@@ -85,17 +115,40 @@ export default function HeaderDesktop() {
     return email ? email.split("@")[0] : "Utilisateur";
   };
 
-  return (
-    <>
+  // Afficher un état de chargement pendant l'hydratation
+  if (!isClient || !isLoaded) {
+    return (
       <header className="flex items-center justify-between px-6 py-3 bg-white shadow-sm border-b z-40">
-        {/* Logo */}
         <Image
           src="/logof2f.svg"
           alt="Logo Farm to Fork"
           width={60}
           height={60}
           priority
+          style={{ width: "auto", height: "60px" }}
         />
+        <div className="flex items-center gap-6">
+          <div className="w-32 h-4 bg-gray-200 rounded animate-pulse" />
+          <div className="w-20 h-8 bg-gray-200 rounded animate-pulse" />
+        </div>
+      </header>
+    );
+  }
+
+  return (
+    <>
+      <header className="flex items-center justify-between px-6 py-3 bg-white shadow-sm border-b z-40">
+        {/* Logo */}
+        <Link href="/">
+          <Image
+            src="/logof2f.svg"
+            alt="Logo Farm to Fork"
+            width={60}
+            height={60}
+            priority
+            style={{ width: "auto", height: "60px" }}
+          />
+        </Link>
 
         <div className="flex items-center gap-6">
           <Link
@@ -158,6 +211,7 @@ export default function HeaderDesktop() {
                         alt={`Photo de ${getUserDisplayName()}`}
                         size={32}
                         className="ring-2 ring-green-100"
+                        fallbackSrc="/default-avatar.png"
                       />
                       <div className="flex flex-col">
                         <span className="text-sm font-medium text-gray-900">
@@ -228,11 +282,14 @@ export default function HeaderDesktop() {
                     </Link>
                   </DropdownMenuItem>
 
-                  <DropdownMenuItem className="py-3 hover:bg-gray-50">
-                    <SignOutButton className="w-full flex items-center gap-3 px-4">
+                  <DropdownMenuItem
+                    onClick={handleSignOut}
+                    className="py-3 hover:bg-gray-50 cursor-pointer"
+                  >
+                    <div className="w-full flex items-center gap-3 px-4">
                       <LogIn className="w-5 h-5 text-green-600 rotate-180" />
                       <span>Se déconnecter</span>
-                    </SignOutButton>
+                    </div>
                   </DropdownMenuItem>
                 </>
               )}

@@ -37,7 +37,9 @@ export class GoogleMapsLoader {
 
       const script = document.createElement("script");
       script.type = "text/javascript";
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${GoogleMapsLoader.apiKey}&libraries=places&callback=initGoogleMaps`;
+      script.async = true; // ✅ Ajout de async
+      script.defer = true; // ✅ Ajout de defer
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${GoogleMapsLoader.apiKey}&libraries=places&loading=async&callback=initGoogleMaps`;
 
       window.initGoogleMaps = () => {
         GoogleMapsLoader.isLoaded = true;

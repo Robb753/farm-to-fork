@@ -19,8 +19,8 @@ import {
   ListChecks,
   X,
   ChevronDown,
-} from "lucide-react";
-import { useUser, SignOutButton } from "@clerk/nextjs";
+} from "@/utils/icons";
+import { useUser, useClerk } from "@clerk/nextjs";
 import SignInModal from "@/app/modules/auth/SignInModal";
 import SignupModalSimple from "@/app/modules/auth/SignupModalSimple";
 import useUserSync from "@/app/hooks/useUserSync";
@@ -29,10 +29,12 @@ import Image from "next/image";
 
 const MobileModal = ({ isOpen, onClose, children }) => {
   useEffect(() => {
-    document.body.style.overflow = isOpen ? "hidden" : "unset";
-    return () => {
-      document.body.style.overflow = "unset";
-    };
+    if (typeof document !== "undefined") {
+      document.body.style.overflow = isOpen ? "hidden" : "unset";
+      return () => {
+        document.body.style.overflow = "unset";
+      };
+    }
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -56,16 +58,23 @@ const MobileModal = ({ isOpen, onClose, children }) => {
 };
 
 export default function HeaderMobile() {
-  const { user, isSignedIn } = useUser();
+  const { user, isSignedIn, isLoaded } = useUser();
+  const { signOut } = useClerk();
   const { role, isReady } = useUserSync();
 
   const [userRole, setUserRole] = useState(null);
   const [modalType, setModalType] = useState(null);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+
+  // S'assurer que le composant est monté côté client
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // Synchronisation rôle utilisateur
   useEffect(() => {
-    if (!isSignedIn) return;
+    if (!isClient || !isLoaded || !isSignedIn) return;
 
     if (isReady && role) return setUserRole(role);
 
@@ -74,18 +83,36 @@ export default function HeaderMobile() {
       return setUserRole(clerkRole);
     }
 
-    const localRole = localStorage.getItem("userRole");
-    if (localRole === "farmer" || localRole === "user") {
-      return setUserRole(localRole);
+    // Vérifier localStorage seulement côté client
+    try {
+      const localRole = localStorage.getItem("userRole");
+      if (localRole === "farmer" || localRole === "user") {
+        return setUserRole(localRole);
+      }
+    } catch (error) {
+      console.warn("Erreur d'accès au localStorage:", error);
     }
 
     setUserRole("user");
-  }, [isSignedIn, user, role, isReady]);
+  }, [isClient, isLoaded, isSignedIn, user, role, isReady]);
 
-  const getUserAvatarUrl = () =>
-    user?.imageUrl ||
-    user?.publicMetadata?.profileImage ||
-    "/default-avatar.png";
+  // Gestion de la déconnexion
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error("Erreur lors de la déconnexion:", error);
+    }
+  };
+
+  const getUserAvatarUrl = () => {
+    if (!user) return "/default-avatar.png";
+    return (
+      user.imageUrl ||
+      user.publicMetadata?.profileImage ||
+      "/default-avatar.png"
+    );
+  };
 
   const getUserDisplayName = () => {
     if (!user) return "Utilisateur";
@@ -100,9 +127,38 @@ export default function HeaderMobile() {
 
   // Ouverture modale = déclencheur global (pour le backdrop notamment)
   useEffect(() => {
+    if (!isClient) return;
+
     const isOpen = modalType === "signin" || modalType === "signup-role";
-    window.dispatchEvent(new CustomEvent("modalOpen", { detail: isOpen }));
-  }, [modalType]);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("modalOpen", { detail: isOpen }));
+    }
+  }, [modalType, isClient]);
+
+  // Afficher un état de chargement pendant l'hydratation
+  if (!isClient || !isLoaded) {
+    return (
+      <header className="fixed top-0 left-0 right-0 z-40 bg-white shadow-sm border-b">
+        <div className="flex items-center justify-between px-4 py-3">
+          <Link href="/" className="flex items-center">
+            <Image
+              src="/logof2f.svg"
+              alt="Logo Farm to Fork"
+              width={40}
+              height={40}
+              priority
+              className="mr-2"
+              style={{ width: "auto", height: "60px" }}
+            />
+            <span className="text-2xl font-medium text-green-600 tracking-tight">
+              Farm To Fork
+            </span>
+          </Link>
+          <div className="w-10 h-8 bg-gray-200 rounded-lg animate-pulse" />
+        </div>
+      </header>
+    );
+  }
 
   return (
     <>
@@ -117,6 +173,7 @@ export default function HeaderMobile() {
               height={40}
               priority
               className="mr-2"
+              style={{ width: "auto", height: "60px" }}
             />
             <span className="text-2xl font-medium text-green-600 tracking-tight">
               Farm To Fork
@@ -141,6 +198,7 @@ export default function HeaderMobile() {
                     alt={`Photo de ${getUserDisplayName()}`}
                     size={24}
                     className="ring-1 ring-green-100"
+                    fallbackSrc="/default-avatar.png"
                   />
                   <span className="text-sm font-medium text-gray-700 max-w-20 truncate">
                     {getUserDisplayName().split(" ")[0]}
@@ -213,11 +271,14 @@ export default function HeaderMobile() {
                   </Link>
                 </DropdownMenuItem>
 
-                <DropdownMenuItem className="py-3">
-                  <SignOutButton className="w-full flex gap-3 px-4 py-2">
+                <DropdownMenuItem
+                  onClick={handleSignOut}
+                  className="py-3 hover:bg-gray-50 cursor-pointer"
+                >
+                  <div className="w-full flex gap-3 px-4 py-2">
                     <LogIn className="w-5 h-5 text-green-600 transform rotate-180" />
                     <span>Se déconnecter</span>
-                  </SignOutButton>
+                  </div>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
