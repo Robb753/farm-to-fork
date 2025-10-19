@@ -10,11 +10,22 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { LogIn, PlusCircle, ListChecks, Heart, User, Menu } from "lucide-react";
+import {
+  LogIn,
+  PlusCircle,
+  ListChecks,
+  Heart,
+  User,
+  Menu,
+  Search,
+  MapPin,
+  Bell,
+  Settings,
+} from "lucide-react";
 import { useUser, useClerk } from "@clerk/nextjs";
 import { AvatarImage } from "@/components/ui/OptimizedImage";
-// ✅ Utiliser le bon store Zustand au lieu du contexte
 import {
   useUserRole,
   useUserSyncState,
@@ -24,30 +35,24 @@ import {
 export default function HeaderDesktop() {
   const { user, isSignedIn, isLoaded } = useUser();
   const { signOut } = useClerk();
-
-  // ✅ Utiliser les hooks Zustand au lieu du contexte
   const role = useUserRole();
   const { isReady } = useUserSyncState();
   const { reset } = useUserActions();
-
   const [isClient, setIsClient] = useState(false);
 
-  // S'assurer que le composant est monté côté client
   useEffect(() => {
     setIsClient(true);
   }, []);
 
-  // ✅ Gestion simplifiée de la déconnexion avec reset du store
   const handleSignOut = async () => {
     try {
-      reset(); // Réinitialiser le store Zustand
+      reset();
       await signOut();
     } catch (error) {
       console.error("Erreur lors de la déconnexion:", error);
     }
   };
 
-  // ✅ Fonctions d'ouverture de modales simplifiées
   const openSignIn = () => {
     window.dispatchEvent(new CustomEvent("openSigninModal"));
   };
@@ -56,7 +61,6 @@ export default function HeaderDesktop() {
     window.dispatchEvent(new CustomEvent("openSignupModal"));
   };
 
-  // ✅ Utilitaires pour l'avatar et le nom
   const getUserAvatarUrl = () => {
     if (!user) return "/default-avatar.png";
     return user.imageUrl || "/default-avatar.png";
@@ -81,20 +85,11 @@ export default function HeaderDesktop() {
     }
   };
 
-  // ✅ État de chargement simplifié
-  if (!isClient || !isLoaded || !isReady) {
+  if (!isClient || !isLoaded) {
     return (
-      <header className="flex items-center justify-between px-6 py-3 bg-white shadow-sm border-b z-40">
-        <Image
-          src="/logof2f.svg"
-          alt="Logo Farm to Fork"
-          width={60}
-          height={60}
-          priority
-          style={{ width: "auto", height: "60px" }}
-        />
-        <div className="flex items-center gap-6">
-          <div className="w-32 h-4 bg-gray-200 rounded animate-pulse" />
+      <header className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
+        <div className="container flex h-16 items-center justify-between px-6">
+          <div className="w-32 h-8 bg-gray-200 rounded animate-pulse" />
           <div className="w-20 h-8 bg-gray-200 rounded animate-pulse" />
         </div>
       </header>
@@ -102,160 +97,233 @@ export default function HeaderDesktop() {
   }
 
   return (
-    <header className="flex items-center justify-between px-6 py-3 bg-white shadow-sm border-b z-40">
-      {/* Logo */}
-      <Link href="/">
-        <Image
-          src="/logof2f.svg"
-          alt="Logo Farm to Fork"
-          width={60}
-          height={60}
-          priority
-          style={{ width: "auto", height: "60px" }}
-        />
-      </Link>
+    <header className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
+      <div className="container flex h-16 items-center justify-between px-6">
+        {/* Logo et Navigation */}
+        <div className="flex items-center gap-8">
+          <Link href="/" className="flex items-center space-x-2">
+            <Image
+              src="/logof2f.svg"
+              alt="Farm to Fork"
+              width={40}
+              height={40}
+              priority
+              className="w-auto h-10"
+            />
+            <span className="text-xl font-bold text-green-700 hidden sm:block">
+              Farm To Fork
+            </span>
+          </Link>
 
-      <div className="flex items-center gap-6">
-        <Link
-          href="/become-farmer"
-          className="text-sm text-green-600 font-medium hover:underline"
-        >
-          Devenir producteur
-        </Link>
+          {/* Navigation principale */}
+          <nav className="hidden md:flex items-center space-x-6">
+            <Link
+              href="/explore"
+              className="text-sm font-medium text-gray-700 hover:text-green-600 transition-colors flex items-center gap-1"
+            >
+              <MapPin className="w-4 h-4" />
+              Explorer
+            </Link>
+            <Link
+              href="/discover/producteurs"
+              className="text-sm font-medium text-gray-700 hover:text-green-600 transition-colors"
+            >
+              Producteurs
+            </Link>
+            <Link
+              href="/discover/produits"
+              className="text-sm font-medium text-gray-700 hover:text-green-600 transition-colors"
+            >
+              Produits
+            </Link>
+          </nav>
+        </div>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="flex items-center gap-2 px-3 py-2 border rounded-md shadow-sm hover:bg-gray-50 transition">
-              <Menu className="w-5 h-5" />
-              {!isSignedIn ? (
-                <LogIn className="w-5 h-5" />
-              ) : (
-                <AvatarImage
-                  src={getUserAvatarUrl()}
-                  alt={`Photo de ${getUserDisplayName()}`}
-                  size={28}
-                  className="ring-2 ring-green-100"
-                  fallbackSrc="/default-avatar.png"
-                />
-              )}
-            </button>
-          </DropdownMenuTrigger>
+        {/* Actions droite */}
+        <div className="flex items-center gap-4">
+          {/* Barre de recherche compacte */}
+          <div className="hidden lg:flex items-center">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Rechercher..."
+                className="pl-10 pr-4 py-2 w-64 text-sm border border-gray-200 rounded-full bg-gray-50 focus:bg-white focus:border-green-300 focus:outline-none focus:ring-2 focus:ring-green-100 transition-all"
+              />
+            </div>
+          </div>
 
-          <DropdownMenuContent
-            align="end"
-            className="w-72 p-2 bg-white border shadow-md"
+          {/* Devenir producteur */}
+          <Link
+            href="/become-farmer"
+            className="hidden md:flex items-center gap-1 text-sm font-medium text-green-600 hover:text-green-700 px-3 py-2 rounded-lg hover:bg-green-50 transition-all"
           >
-            {!isSignedIn ? (
-              <>
-                <DropdownMenuItem
-                  onClick={openSignUp}
-                  className="cursor-pointer py-3 hover:bg-gray-50"
-                >
-                  <div className="flex items-center gap-3 px-4">
-                    <PlusCircle className="w-5 h-5 text-green-600" />
-                    <span>S'inscrire</span>
-                  </div>
-                </DropdownMenuItem>
+            <PlusCircle className="w-4 h-4" />
+            Devenir producteur
+          </Link>
 
-                <DropdownMenuItem
-                  onClick={openSignIn}
-                  className="cursor-pointer py-3 hover:bg-gray-50"
-                >
-                  <div className="flex items-center gap-3 px-4">
-                    <LogIn className="w-5 h-5 text-green-600" />
-                    <span>Se connecter</span>
-                  </div>
-                </DropdownMenuItem>
-              </>
-            ) : (
-              <>
-                <DropdownMenuLabel className="text-lg font-medium px-4 py-3">
-                  <div className="flex items-center gap-3">
+          {/* Menu utilisateur */}
+          {!isSignedIn ? (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={openSignIn}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
+              >
+                Se connecter
+              </button>
+              <button
+                onClick={openSignUp}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                <PlusCircle className="w-4 h-4" />
+                S'inscrire
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              {/* Favoris */}
+              <Link
+                href="/user#favorites"
+                className="p-2 text-gray-600 hover:text-red-500 hover:bg-gray-50 rounded-lg transition-all relative"
+                title="Mes favoris"
+              >
+                <Heart className="w-5 h-5" />
+              </Link>
+
+              {/* Notifications */}
+              <button className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all relative">
+                <Bell className="w-5 h-5" />
+                <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>
+              </button>
+
+              {/* Dropdown utilisateur */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center gap-2 p-1 hover:bg-gray-50 rounded-lg transition-colors">
                     <AvatarImage
                       src={getUserAvatarUrl()}
                       alt={`Photo de ${getUserDisplayName()}`}
-                      size={32}
-                      className="ring-2 ring-green-100"
+                      size={36}
+                      className="ring-2 ring-gray-100 hover:ring-green-200 transition-all"
                       fallbackSrc="/default-avatar.png"
                     />
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium text-gray-900">
+                    <div className="hidden lg:block text-left">
+                      <div className="text-sm font-medium text-gray-900">
                         {getUserDisplayName()}
-                      </span>
-                      <span className="text-xs text-gray-500">
+                      </div>
+                      <div className="text-xs text-gray-500">
                         {getRoleLabel()}
-                      </span>
+                      </div>
                     </div>
-                  </div>
-                </DropdownMenuLabel>
+                  </button>
+                </DropdownMenuTrigger>
 
-                <DropdownMenuItem asChild className="py-3 hover:bg-gray-50">
-                  <Link href="/user" className="flex items-center gap-3 px-4">
-                    <User className="w-5 h-5 text-green-600" />
-                    <span>Profil</span>
-                  </Link>
-                </DropdownMenuItem>
+                <DropdownMenuContent align="end" className="w-64 p-2">
+                  <DropdownMenuLabel className="p-3">
+                    <div className="flex items-center gap-3">
+                      <AvatarImage
+                        src={getUserAvatarUrl()}
+                        alt={`Photo de ${getUserDisplayName()}`}
+                        size={40}
+                        className="ring-2 ring-green-100"
+                        fallbackSrc="/default-avatar.png"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-gray-900 truncate">
+                          {getUserDisplayName()}
+                        </div>
+                        <div className="text-sm text-gray-500 truncate">
+                          {user?.primaryEmailAddress?.emailAddress}
+                        </div>
+                        <div className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 mt-1">
+                          {getRoleLabel()}
+                        </div>
+                      </div>
+                    </div>
+                  </DropdownMenuLabel>
 
-                {role === "admin" && (
-                  <DropdownMenuItem asChild className="py-3 hover:bg-gray-50">
+                  <DropdownMenuSeparator />
+
+                  <DropdownMenuItem asChild>
                     <Link
-                      href="/admin"
-                      className="flex items-center gap-3 px-4"
+                      href="/user"
+                      className="flex items-center gap-3 p-3 cursor-pointer"
                     >
-                      <ListChecks className="w-5 h-5 text-green-600" />
-                      <span>Admin Dashboard</span>
+                      <User className="w-4 h-4 text-gray-600" />
+                      <span>Mon profil</span>
                     </Link>
                   </DropdownMenuItem>
-                )}
 
-                {role === "farmer" && (
-                  <DropdownMenuItem asChild className="py-3 hover:bg-gray-50">
-                    <Link
-                      href="/dashboard/farms"
-                      className="flex items-center gap-3 px-4"
-                    >
-                      <svg
-                        className="w-5 h-5 text-green-600"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
+                  {role === "admin" && (
+                    <DropdownMenuItem asChild>
+                      <Link
+                        href="/admin"
+                        className="flex items-center gap-3 p-3 cursor-pointer"
                       >
-                        <path
-                          d="M3 9L12 2L21 9V20C21 20.5304 20.7893 21.0391 20.4142 21.4142C20.0391 21.7893 19.5304 22 19 22H5C4.46957 22 3.96086 21.7893 3.58579 21.4142C3.21071 21.0391 3 20.5304 3 20V9Z"
+                        <ListChecks className="w-4 h-4 text-gray-600" />
+                        <span>Administration</span>
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+
+                  {role === "farmer" && (
+                    <DropdownMenuItem asChild>
+                      <Link
+                        href="/dashboard/farms"
+                        className="flex items-center gap-3 p-3 cursor-pointer"
+                      >
+                        <svg
+                          className="w-4 h-4 text-gray-600"
+                          viewBox="0 0 24 24"
+                          fill="none"
                           stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                      <span>Dashboard</span>
+                        >
+                          <path
+                            d="M3 9L12 2L21 9V20C21 20.5304 20.7893 21.0391 20.4142 21.4142C20.0391 21.7893 19.5304 22 19 22H5C4.46957 22 3.96086 21.7893 3.58579 21.4142C3.21071 21.0391 3 20.5304 3 20V9Z"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                        <span>Ma ferme</span>
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+
+                  <DropdownMenuItem asChild>
+                    <Link
+                      href="/user#favorites"
+                      className="flex items-center gap-3 p-3 cursor-pointer"
+                    >
+                      <Heart className="w-4 h-4 text-red-500" />
+                      <span>Mes favoris</span>
                     </Link>
                   </DropdownMenuItem>
-                )}
 
-                <DropdownMenuItem asChild className="py-3 hover:bg-gray-50">
-                  <Link
-                    href="/user#favorites"
-                    className="flex items-center gap-3 px-4"
+                  <DropdownMenuItem asChild>
+                    <Link
+                      href="/user#settings"
+                      className="flex items-center gap-3 p-3 cursor-pointer"
+                    >
+                      <Settings className="w-4 h-4 text-gray-600" />
+                      <span>Paramètres</span>
+                    </Link>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuSeparator />
+
+                  <DropdownMenuItem
+                    onClick={handleSignOut}
+                    className="flex items-center gap-3 p-3 cursor-pointer text-red-600 focus:text-red-600"
                   >
-                    <Heart className="w-5 h-5 text-red-500" />
-                    <span>Mes favoris</span>
-                  </Link>
-                </DropdownMenuItem>
-
-                <DropdownMenuItem
-                  onClick={handleSignOut}
-                  className="py-3 hover:bg-gray-50 cursor-pointer"
-                >
-                  <div className="w-full flex items-center gap-3 px-4">
-                    <LogIn className="w-5 h-5 text-green-600 rotate-180" />
+                    <LogIn className="w-4 h-4 rotate-180" />
                     <span>Se déconnecter</span>
-                  </div>
-                </DropdownMenuItem>
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );

@@ -225,7 +225,9 @@ export const useUserFavorites = () =>
 export const useUserActions = () =>
   useUserStore((state) => ({
     setProfile: state.setProfile,
-    setRole: state.setRole,
+    setRole: state.setRole, // ✅ Ajouté
+    setReady: state.setReady, // ✅ Ajouté
+    setSyncing: state.setSyncing, // ✅ Ajouté (optionnel)
     syncUser: state.syncUser,
     resyncRole: state.resyncRole,
     addFavorite: state.addFavorite,

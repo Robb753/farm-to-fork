@@ -25,14 +25,22 @@ export function UserRoleTransitionProvider({
   const role = useUserRole();
   const { isSyncing, isReady, isWaitingForProfile, syncError } =
     useUserSyncState();
-  const { syncUser, resyncRole } = useUserActions();
+  const { syncUser, resyncRole, setReady, setRole } = useUserActions();
 
-  // Synchronisation automatique quand l'utilisateur Clerk change
+  // 🔥 FIX PRINCIPAL : Gestion des utilisateurs non connectés
   useEffect(() => {
-    if (!isLoaded || !isSignedIn || !user) return;
+    if (!isLoaded) return;
 
+    if (!isSignedIn || !user) {
+      // ✅ Utilisateur non connecté : on met directement isReady = true
+      setRole(null);
+      setReady(true);
+      return;
+    }
+
+    // ✅ Utilisateur connecté : synchronisation normale
     syncUser(user);
-  }, [isLoaded, isSignedIn, user?.id, syncUser]);
+  }, [isLoaded, isSignedIn, user?.id, syncUser, setReady, setRole]);
 
   // Fonction de re-sync compatible avec l'ancienne API
   const resyncRoleCompat = async () => {

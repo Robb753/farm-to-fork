@@ -10,35 +10,44 @@ import {
   MapPin,
 } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
-// ✅ Intégration avec le store Zustand
 import { useUserActions } from "@/lib/store/userStore";
 
 // Hook pour gérer l'état global de l'auth
 const useAuthModal = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [mode, setMode] = useState("welcome"); // welcome, signin, signup, farmer-request
+  const [mode, setMode] = useState("welcome");
   const [selectedRole, setSelectedRole] = useState("user");
 
   useEffect(() => {
-    // Écouter les événements globaux pour ouvrir les modales
     const handleOpenSignin = () => {
       setMode("signin");
       setIsOpen(true);
     };
 
     const handleOpenSignup = () => {
-      setMode("welcome"); // ✅ Ouvrir d'abord le choix de rôle
+      setMode("welcome");
       setIsOpen(true);
+    };
+
+    // 🔥 FIX: Gestion de l'échappement
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape" && isOpen) {
+        setIsOpen(false);
+        setMode("welcome");
+        setSelectedRole("user");
+      }
     };
 
     window.addEventListener("openSigninModal", handleOpenSignin);
     window.addEventListener("openSignupModal", handleOpenSignup);
+    document.addEventListener("keydown", handleKeyDown);
 
     return () => {
       window.removeEventListener("openSigninModal", handleOpenSignin);
       window.removeEventListener("openSignupModal", handleOpenSignup);
+      document.removeEventListener("keydown", handleKeyDown);
     };
-  }, []);
+  }, [isOpen]);
 
   return {
     isOpen,
@@ -56,7 +65,6 @@ export default function ModernAuthSystem() {
     useAuthModal();
 
   const { user } = useUser();
-  // ✅ Utiliser les actions du store Zustand
   const { setRole } = useUserActions();
 
   const [farmerRequestData, setFarmerRequestData] = useState({
@@ -66,10 +74,9 @@ export default function ModernAuthSystem() {
     description: "",
   });
 
-  // ✅ Gérer la fermeture automatique après connexion/inscription
+  // Gérer la fermeture automatique après connexion/inscription
   useEffect(() => {
     if (user && isOpen) {
-      // L'utilisateur s'est connecté avec succès, fermer la modale
       closeModal();
     }
   }, [user, isOpen]);
@@ -80,7 +87,6 @@ export default function ModernAuthSystem() {
     setIsOpen(false);
     setMode("welcome");
     setSelectedRole("user");
-    // ✅ Réinitialiser les données farmer
     setFarmerRequestData({
       farmName: "",
       location: "",
@@ -89,10 +95,16 @@ export default function ModernAuthSystem() {
     });
   };
 
-  // ✅ Fonction pour sélectionner un rôle et mettre à jour le store
+  // 🔥 FIX: Gestion du clic sur le backdrop
+  const handleBackdropClick = (e) => {
+    if (e.target === e.currentTarget) {
+      closeModal();
+    }
+  };
+
   const selectRole = (role) => {
     setSelectedRole(role);
-    setRole(role); // ✅ Mettre à jour le store Zustand
+    setRole(role);
   };
 
   // Étape 1: Écran d'accueil avec choix du profil
@@ -100,12 +112,12 @@ export default function ModernAuthSystem() {
     <div className="p-8 text-center">
       <div className="mb-8">
         <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <span className="text-2xl">🌱</span>
+          <span className="text-xl">🌱</span>
         </div>
         <h2 className="text-2xl font-bold text-gray-900 mb-2">
           Rejoignez Farm To Fork
         </h2>
-        <p className="text-gray-600">
+        <p className="text-xs text-gray-600">
           Comment souhaitez-vous utiliser notre plateforme ?
         </p>
       </div>
@@ -285,7 +297,7 @@ export default function ModernAuthSystem() {
 
   // Étape 3: Inscription Clerk
   const SignupStep = () => (
-    <div className="p-6">
+    <div className="p-8">
       <div className="mb-6 text-center">
         <h2 className="text-xl font-bold text-gray-900 mb-2">
           {selectedRole === "farmer"
@@ -300,16 +312,18 @@ export default function ModernAuthSystem() {
       </div>
 
       <SignUp
+        routing="hash"
+        signInUrl="#/sign-in"
         appearance={{
           elements: {
             formButtonPrimary: "bg-green-600 hover:bg-green-700",
             card: "shadow-none border-0",
             headerTitle: "hidden",
             headerSubtitle: "hidden",
+            footerAction: "hidden",
           },
         }}
         afterSignUpUrl="/"
-        // ✅ Passer le rôle sélectionné dans les métadonnées
         additionalOAuthScopes={{
           google: ["profile", "email"],
         }}
@@ -345,12 +359,16 @@ export default function ModernAuthSystem() {
       </div>
 
       <SignIn
+        routing="hash"
+        signUpUrl="#/sign-up"
         appearance={{
           elements: {
             formButtonPrimary: "bg-green-600 hover:bg-green-700",
             card: "shadow-none border-0",
             headerTitle: "hidden",
             headerSubtitle: "hidden",
+            footerActionLink: "text-green-600 hover:text-green-700",
+            footerAction: "hidden", // ✅ Cache le texte dupliqué en bas
           },
         }}
         afterSignInUrl="/"
@@ -369,28 +387,24 @@ export default function ModernAuthSystem() {
   );
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      onClick={handleBackdropClick}
+    >
       <div className="bg-white rounded-2xl max-w-md w-full relative overflow-hidden shadow-2xl max-h-[90vh] overflow-y-auto">
-        {/* Header avec fermeture */}
-        <div className="absolute top-4 right-4 z-10">
+        {/* 🔥 FIX: Header avec fermeture plus petit et mieux positionné */}
+        <div className="absolute top-3 right-3 z-10">
           <button
             onClick={closeModal}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors bg-white/90 backdrop-blur-sm"
+            aria-label="Fermer"
           >
-            <X className="w-5 h-5 text-gray-500" />
+            <X className="w-4 h-4 text-gray-500" />
           </button>
         </div>
 
-        {/* Image de fond avec overlay */}
-        <div className="h-32 bg-gradient-to-r from-green-400 to-blue-500 relative">
-          <div className="absolute inset-0 bg-black/20"></div>
-          <div className="absolute bottom-4 left-6 text-white">
-            <h1 className="text-lg font-bold">Farm To Fork</h1>
-            <p className="text-sm opacity-90">
-              Connectez-vous aux producteurs locaux
-            </p>
-          </div>
-        </div>
+        {/* 🔥 FIX: Image de fond avec overlay plus petit */}
+
 
         {/* Contenu dynamique */}
         <div className="relative bg-white">
