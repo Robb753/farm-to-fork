@@ -1,13 +1,16 @@
 "use client";
 
-import { ChevronDown, Check, Globe } from "@/utils/icons"; // Assurez-vous que le chemin est correct
+import { ChevronDown, Check, Globe } from "@/utils/icons";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useLanguage } from "../contexts/Language-context"; // ✅ Vérifie que le nom du fichier est correct
+import {
+  useCurrentLanguage,
+  useLanguageActions,
+} from "@/lib/store/settingsStore";
 
 const languages = [
   { code: "fr", name: "Français", flag: "🇫🇷" },
@@ -15,17 +18,15 @@ const languages = [
 ];
 
 export function LanguageSelector() {
-  const { currentLanguage, setLanguage } = useLanguage();
+  const currentLanguage = useCurrentLanguage();
+  const { setLanguage } = useLanguageActions();
 
-  // ✅ Vérification : Si `currentLanguage` est `null`, on affiche une valeur par défaut
-  const selectedLanguage = currentLanguage || languages[0];
+  // Trouve la langue sélectionnée ou utilise français par défaut
+  const selectedLanguage =
+    languages.find((lang) => lang.code === currentLanguage) || languages[0];
 
   const handleLanguageChange = (language) => {
-    if (setLanguage) {
-      setLanguage(language);
-    } else {
-      console.error("Erreur: `setLanguage` n'est pas défini.");
-    }
+    setLanguage(language.code);
   };
 
   return (

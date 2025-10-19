@@ -19,13 +19,16 @@ import {
   ListChecks,
   X,
   ChevronDown,
-} from "@/utils/icons";
+} from "lucide-react";
 import { useUser, useClerk } from "@clerk/nextjs";
-import SignInModal from "@/app/modules/auth/SignInModal";
-import SignupModalSimple from "@/app/modules/auth/SignupModalSimple";
-import useUserSync from "@/app/hooks/useUserSync";
 import { AvatarImage } from "@/components/ui/OptimizedImage";
 import Image from "next/image";
+// ✅ Utiliser le store Zustand au lieu de useUserSync
+import {
+  useUserRole,
+  useUserSyncState,
+  useUserActions,
+} from "@/lib/store/userStore";
 
 const MobileModal = ({ isOpen, onClose, children }) => {
   useEffect(() => {
@@ -60,10 +63,12 @@ const MobileModal = ({ isOpen, onClose, children }) => {
 export default function HeaderMobile() {
   const { user, isSignedIn, isLoaded } = useUser();
   const { signOut } = useClerk();
-  const { role, isReady } = useUserSync();
 
-  const [userRole, setUserRole] = useState(null);
-  const [modalType, setModalType] = useState(null);
+  // ✅ Utiliser les hooks Zustand au lieu de useUserSync
+  const role = useUserRole();
+  const { isReady } = useUserSyncState();
+  const { reset } = useUserActions();
+
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [isClient, setIsClient] = useState(false);
 
@@ -72,46 +77,30 @@ export default function HeaderMobile() {
     setIsClient(true);
   }, []);
 
-  // Synchronisation rôle utilisateur
-  useEffect(() => {
-    if (!isClient || !isLoaded || !isSignedIn) return;
-
-    if (isReady && role) return setUserRole(role);
-
-    const clerkRole = user?.publicMetadata?.role;
-    if (clerkRole === "farmer" || clerkRole === "user") {
-      return setUserRole(clerkRole);
-    }
-
-    // Vérifier localStorage seulement côté client
-    try {
-      const localRole = localStorage.getItem("userRole");
-      if (localRole === "farmer" || localRole === "user") {
-        return setUserRole(localRole);
-      }
-    } catch (error) {
-      console.warn("Erreur d'accès au localStorage:", error);
-    }
-
-    setUserRole("user");
-  }, [isClient, isLoaded, isSignedIn, user, role, isReady]);
-
-  // Gestion de la déconnexion
+  // ✅ Gestion de la déconnexion avec reset du store
   const handleSignOut = async () => {
     try {
+      reset(); // Réinitialiser le store Zustand
       await signOut();
     } catch (error) {
       console.error("Erreur lors de la déconnexion:", error);
     }
   };
 
+  // ✅ Fonctions d'ouverture de modales (utilisation des événements globaux)
+  const openSignIn = () => {
+    window.dispatchEvent(new CustomEvent("openSigninModal"));
+    setShowMobileMenu(false);
+  };
+
+  const openSignUp = () => {
+    window.dispatchEvent(new CustomEvent("openSignupModal"));
+    setShowMobileMenu(false);
+  };
+
   const getUserAvatarUrl = () => {
     if (!user) return "/default-avatar.png";
-    return (
-      user.imageUrl ||
-      user.publicMetadata?.profileImage ||
-      "/default-avatar.png"
-    );
+    return user.imageUrl || "/default-avatar.png";
   };
 
   const getUserDisplayName = () => {
@@ -122,21 +111,19 @@ export default function HeaderMobile() {
     return email ? email.split("@")[0] : "Utilisateur";
   };
 
-  const handleCloseModal = () => setModalType(null);
-  const isFarmerUser = userRole === "farmer";
-
-  // Ouverture modale = déclencheur global (pour le backdrop notamment)
-  useEffect(() => {
-    if (!isClient) return;
-
-    const isOpen = modalType === "signin" || modalType === "signup-role";
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("modalOpen", { detail: isOpen }));
+  const getRoleLabel = () => {
+    switch (role) {
+      case "admin":
+        return "Administrateur";
+      case "farmer":
+        return "Agriculteur";
+      default:
+        return "Utilisateur";
     }
-  }, [modalType, isClient]);
+  };
 
   // Afficher un état de chargement pendant l'hydratation
-  if (!isClient || !isLoaded) {
+  if (!isClient || !isLoaded || !isReady) {
     return (
       <header className="fixed top-0 left-0 right-0 z-40 bg-white shadow-sm border-b">
         <div className="flex items-center justify-between px-4 py-3">
@@ -148,9 +135,9 @@ export default function HeaderMobile() {
               height={40}
               priority
               className="mr-2"
-              style={{ width: "auto", height: "60px" }}
+              style={{ width: "auto", height: "40px" }}
             />
-            <span className="text-2xl font-medium text-green-600 tracking-tight">
+            <span className="text-lg font-medium text-green-600 tracking-tight">
               Farm To Fork
             </span>
           </Link>
@@ -173,9 +160,9 @@ export default function HeaderMobile() {
               height={40}
               priority
               className="mr-2"
-              style={{ width: "auto", height: "60px" }}
+              style={{ width: "auto", height: "40px" }}
             />
-            <span className="text-2xl font-medium text-green-600 tracking-tight">
+            <span className="text-lg font-medium text-green-600 tracking-tight">
               Farm To Fork
             </span>
           </Link>
@@ -212,24 +199,37 @@ export default function HeaderMobile() {
                 className="w-64 p-2 bg-white border rounded-lg"
               >
                 <DropdownMenuLabel className="text-lg font-medium py-3 text-gray-800 px-4">
-                  {getUserDisplayName()}
+                  <div className="flex items-center gap-3">
+                    <AvatarImage
+                      src={getUserAvatarUrl()}
+                      alt={`Photo de ${getUserDisplayName()}`}
+                      size={32}
+                      className="ring-2 ring-green-100"
+                      fallbackSrc="/default-avatar.png"
+                    />
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium text-gray-900">
+                        {getUserDisplayName()}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {getRoleLabel()}
+                      </span>
+                    </div>
+                  </div>
                 </DropdownMenuLabel>
 
-                <DropdownMenuItem asChild>
-                  <Link
-                    href="/user"
-                    className="flex items-center gap-3 px-4 py-2"
-                  >
+                <DropdownMenuItem asChild className="py-3 hover:bg-gray-50">
+                  <Link href="/user" className="flex items-center gap-3 px-4">
                     <User className="w-5 h-5 text-green-600" />
                     <span>Profil</span>
                   </Link>
                 </DropdownMenuItem>
 
-                {userRole === "admin" && (
-                  <DropdownMenuItem asChild>
+                {role === "admin" && (
+                  <DropdownMenuItem asChild className="py-3 hover:bg-gray-50">
                     <Link
                       href="/admin"
-                      className="flex items-center gap-3 px-4 py-2"
+                      className="flex items-center gap-3 px-4"
                     >
                       <ListChecks className="w-5 h-5 text-green-600" />
                       <span>Admin Dashboard</span>
@@ -237,16 +237,17 @@ export default function HeaderMobile() {
                   </DropdownMenuItem>
                 )}
 
-                {isFarmerUser && (
-                  <DropdownMenuItem asChild>
+                {role === "farmer" && (
+                  <DropdownMenuItem asChild className="py-3 hover:bg-gray-50">
                     <Link
                       href="/dashboard/farms"
-                      className="flex items-center gap-3 px-4 py-2"
+                      className="flex items-center gap-3 px-4"
                     >
                       <svg
                         className="w-5 h-5 text-green-600"
                         viewBox="0 0 24 24"
                         fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
                       >
                         <path
                           d="M3 9L12 2L21 9V20C21 20.5304 20.7893 21.0391 20.4142 21.4142C20.0391 21.7893 19.5304 22 19 22H5C4.46957 22 3.96086 21.7893 3.58579 21.4142C3.21071 21.0391 3 20.5304 3 20V9Z"
@@ -261,10 +262,10 @@ export default function HeaderMobile() {
                   </DropdownMenuItem>
                 )}
 
-                <DropdownMenuItem asChild>
+                <DropdownMenuItem asChild className="py-3 hover:bg-gray-50">
                   <Link
                     href="/user#favorites"
-                    className="flex items-center gap-3 px-4 py-2"
+                    className="flex items-center gap-3 px-4"
                   >
                     <Heart className="w-5 h-5 text-red-500" />
                     <span>Mes favoris</span>
@@ -275,8 +276,8 @@ export default function HeaderMobile() {
                   onClick={handleSignOut}
                   className="py-3 hover:bg-gray-50 cursor-pointer"
                 >
-                  <div className="w-full flex gap-3 px-4 py-2">
-                    <LogIn className="w-5 h-5 text-green-600 transform rotate-180" />
+                  <div className="w-full flex items-center gap-3 px-4">
+                    <LogIn className="w-5 h-5 text-green-600 rotate-180" />
                     <span>Se déconnecter</span>
                   </div>
                 </DropdownMenuItem>
@@ -300,10 +301,7 @@ export default function HeaderMobile() {
           </Link>
           <div className="space-y-3">
             <button
-              onClick={() => {
-                setModalType("signup-role");
-                setShowMobileMenu(false);
-              }}
+              onClick={openSignUp}
               className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700"
             >
               <PlusCircle className="w-5 h-5" />
@@ -311,10 +309,7 @@ export default function HeaderMobile() {
             </button>
 
             <button
-              onClick={() => {
-                setModalType("signin");
-                setShowMobileMenu(false);
-              }}
+              onClick={openSignIn}
               className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-green-600 text-green-600 rounded-lg font-medium hover:bg-green-50"
             >
               <LogIn className="w-5 h-5" />
@@ -324,12 +319,8 @@ export default function HeaderMobile() {
         </div>
       </MobileModal>
 
+      {/* Spacer pour compenser le header fixe */}
       <div className="h-16" />
-
-      {modalType === "signin" && <SignInModal onClose={handleCloseModal} />}
-      {modalType === "signup-role" && (
-        <SignupModalSimple onClose={handleCloseModal} />
-      )}
     </>
   );
 }

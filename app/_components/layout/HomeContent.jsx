@@ -5,13 +5,13 @@ import { useRouter } from "next/navigation";
 import { Toaster } from "sonner";
 import ExploreNearby from "./ExploreNearby";
 import EuropeanFeatures from "./EuropeanFeatures";
-import { useLanguage } from "@/app/contexts/Language-context";
 import { useMapState } from "@/app/contexts/MapDataContext/MapStateContext";
 import CitySearch from "@/app/modules/maps/components/shared/CitySearch";
+import { useTranslation } from "@/lib/store/settingsStore";
 
 function HomeContent() {
   const { setCoordinates } = useMapState();
-  const { t } = useLanguage();
+  const t = useTranslation();
   const router = useRouter();
 
   const handleCitySelect = (cityData) => {

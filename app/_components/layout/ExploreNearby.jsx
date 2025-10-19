@@ -1,11 +1,10 @@
 "use client";
-
-import { useLanguage } from "@/app/contexts/Language-context";
+import { useTranslation } from "@/lib/store/settingsStore";
 import Link from "next/link"; // <-- Pour mettre des liens
 import React from "react";
 
 function ExploreNearby() {
-  const { t } = useLanguage();
+  const t = useTranslation();
 
   const cards = [
     {

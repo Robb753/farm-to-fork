@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useUserRole } from "@/app/contexts/UserRoleContext";
+import { useUserRoleDirect as useUserRole } from "@/app/contexts/UserRoleTransitionProvider";
 
 export default function SignupSyncingPage() {
   const router = useRouter();

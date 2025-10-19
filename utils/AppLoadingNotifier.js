@@ -1,7 +1,7 @@
 "use client";
 
 
-import { useUserRole } from "@/app/contexts/UserRoleContext";
+import { useUserRoleDirect as useUserRole } from "@/app/contexts/UserRoleTransitionProvider";
 import { useEffect } from "react";
 import { toast } from "sonner";
 

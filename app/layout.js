@@ -6,6 +6,7 @@ import { frFR } from "@clerk/localizations";
 import Script from "next/script";
 import Provider from "./Provider";
 import AppLoadingNotifier from "@/utils/AppLoadingNotifier";
+import { UserRoleTransitionProvider } from "@/app/contexts/UserRoleTransitionProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -42,10 +43,13 @@ export default function RootLayout({ children }) {
             ></iframe>
           </noscript>
 
-          <Provider>
-            <AppLoadingNotifier />
-            {children}
-          </Provider>
+          {/* Wrapping avec le UserRoleTransitionProvider */}
+          <UserRoleTransitionProvider>
+            <Provider>
+              <AppLoadingNotifier />
+              {children}
+            </Provider>
+          </UserRoleTransitionProvider>
         </body>
       </html>
     </ClerkProvider>

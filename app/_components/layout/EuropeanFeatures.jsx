@@ -1,11 +1,10 @@
 "use client";
-
-import { useLanguage } from "@/app/contexts/Language-context";
+import { useTranslation } from "@/lib/store/settingsStore";
 import React from "react";
 
 
 function EuropeanFeatures() {
-  const { t } = useLanguage(); // ✅ Utilisation de `t`
+  const t = useTranslation();
 
   return (
     <section className="px-4 py-12 md:px-6 bg-gray-50 border-t border-gray-200">
