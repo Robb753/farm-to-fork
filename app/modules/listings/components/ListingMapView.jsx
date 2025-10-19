@@ -13,7 +13,6 @@ import {
 import { toast } from "sonner";
 import { useSearchParams } from "next/navigation";
 import FilterSection from "@/app/_components/layout/FilterSection";
-import GoogleMapSection from "../../maps/components/GoogleMapSection";
 import Listing from "./Listing";
 import { useMapData } from "@/app/contexts/MapDataContext/useMapData";
 import { useMapState } from "@/app/contexts/MapDataContext/MapStateContext";
@@ -29,6 +28,18 @@ const MobileListingMapView = dynamic(() => import("./MobileListingMapView"), {
   ),
   ssr: false,
 });
+
+const GoogleMapSection = dynamic(
+  () => import("../../maps/components/GoogleMapSection"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center h-full bg-gray-100">
+        <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    ),
+  }
+);
 
 // Hook pour détecter si on est sur mobile
 const useIsMobile = () => {

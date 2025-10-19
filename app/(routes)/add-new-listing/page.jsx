@@ -140,7 +140,7 @@ export default function AddNewListing() {
 
         if (data?.id) {
           toast.success("Nouvelle adresse ajoutée !");
-          router.push(`/edit-listing/${data.id}`);
+          router.push(`/EditListing/${data.id}`);
         } else {
           toast.error("Erreur inattendue : aucun ID retourné.");
         }
