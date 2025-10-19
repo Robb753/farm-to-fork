@@ -312,8 +312,8 @@ export default function ModernAuthSystem() {
       </div>
 
       <SignUp
-        routing="hash"
-        signInUrl="#/sign-in"
+        routing="hash" // ← Garder "hash"
+        signInUrl="#/sign-in" // ← Garder le #
         appearance={{
           elements: {
             formButtonPrimary: "bg-green-600 hover:bg-green-700",
@@ -359,8 +359,8 @@ export default function ModernAuthSystem() {
       </div>
 
       <SignIn
-        routing="hash"
-        signUpUrl="#/sign-up"
+        routing="hash" // ← Garder "hash"
+        signUpUrl="#/sign-up" // ← Garder le #
         appearance={{
           elements: {
             formButtonPrimary: "bg-green-600 hover:bg-green-700",

@@ -2,28 +2,36 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useUserRoleDirect as useUserRole } from "@/app/contexts/UserRoleTransitionProvider";
+// ⬇️ Adapte le chemin si besoin
+import { useUserStore } from "@/lib/store/userStore";
 
 export default function SignupSyncingPage() {
   const router = useRouter();
-  const { role, isReady, isFarmer, isUser } = useUserRole();
+
+  // Lis juste ce dont tu as besoin depuis le store
+  const { role, isReady } = useUserStore((s) => ({
+    role: s.role,
+    isReady: s.isReady,
+  }));
+
+  // On dérive les helpers localement
+  const isFarmer = role === "farmer";
+  const isUser = role === "user";
+
   const [tries, setTries] = useState(1);
 
+  // Redirections quand la sync est prête
   useEffect(() => {
     if (!isReady) return;
-
-    if (isFarmer) {
-      router.replace("/dashboard/farms");
-    } else if (isUser) {
-      router.replace("/");
-    }
+    if (isFarmer) router.replace("/dashboard/farms");
+    else if (isUser) router.replace("/");
   }, [isReady, isFarmer, isUser, router]);
 
+  // Petit compteur visuel ; on le cappe à 10
   useEffect(() => {
     const interval = setInterval(() => {
-      setTries((prev) => prev + 1);
+      setTries((prev) => (prev < 10 ? prev + 1 : prev));
     }, 1000);
-
     return () => clearInterval(interval);
   }, []);
 

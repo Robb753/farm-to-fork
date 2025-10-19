@@ -16,7 +16,9 @@ export default function SignupFarmerTunnel() {
     // Si l'utilisateur n'est pas connecté
     if (!isSignedIn) {
       const redirectAfterSignup = encodeURIComponent(requestAccessUrl);
-      router.push(`/sign-up?redirect_url=${redirectAfterSignup}`);
+      router.push(
+        `/sign-up?redirectUrl=${encodeURIComponent(requestAccessUrl)}`
+      );
       return;
     }
 

@@ -7,6 +7,8 @@ import {
   syncProfileToSupabase,
 } from "@/lib/syncUserUtils";
 import { toast } from "sonner";
+// (optionnel) importer le type Clerk si tu veux typer `user`
+import type { User as ClerkUser } from "@clerk/nextjs/server"; // ou "@clerk/nextjs"
 
 interface UserProfile {
   id: string;
@@ -15,10 +17,12 @@ interface UserProfile {
   favorites: number[];
 }
 
+type Role = "user" | "farmer" | "admin" | null;
+
 interface UserState {
   // État utilisateur
   profile: UserProfile | null;
-  role: "user" | "farmer" | "admin" | null;
+  role: Role;
 
   // États de synchronisation
   isSyncing: boolean;
@@ -28,27 +32,38 @@ interface UserState {
 
   // Actions
   setProfile: (profile: UserProfile | null) => void;
-  setRole: (role: "user" | "farmer" | "admin" | null) => void;
+  setRole: (role: Role) => void;
   setSyncing: (syncing: boolean) => void;
   setReady: (ready: boolean) => void;
   setWaitingForProfile: (waiting: boolean) => void;
   setSyncError: (error: string | null) => void;
 
   // Actions métier
-  syncUser: (user: any) => Promise<void>;
-  resyncRole: (user: any) => Promise<void>;
+  syncUser: (user: ClerkUser | null) => Promise<void>;
+  resyncRole: (user: ClerkUser | null) => Promise<void>;
   addFavorite: (listingId: number) => void;
   removeFavorite: (listingId: number) => void;
 
-  // Getters computed
-  isFarmer: boolean;
-  isUser: boolean;
-
   // Utils
   reset: () => void;
+  logoutReset: () => Promise<void>;
 }
 
-const INITIAL_STATE = {
+const INITIAL_STATE: Omit<
+  UserState,
+  | "setProfile"
+  | "setRole"
+  | "setSyncing"
+  | "setReady"
+  | "setWaitingForProfile"
+  | "setSyncError"
+  | "syncUser"
+  | "resyncRole"
+  | "addFavorite"
+  | "removeFavorite"
+  | "reset"
+  | "logoutReset"
+> = {
   profile: null,
   role: null,
   isSyncing: false,
@@ -61,16 +76,7 @@ export const useUserStore = create<UserState>()(
   subscribeWithSelector(
     persist(
       (set, get) => ({
-        // État initial
         ...INITIAL_STATE,
-
-        // Getters computed
-        get isFarmer() {
-          return get().role === "farmer";
-        },
-        get isUser() {
-          return get().role === "user";
-        },
 
         // ==================== ACTIONS BASIQUES ====================
         setProfile: (profile) => set({ profile }),
@@ -85,6 +91,8 @@ export const useUserStore = create<UserState>()(
         addFavorite: (listingId) =>
           set((state) => {
             if (!state.profile) return state;
+            const exists = state.profile.favorites.includes(listingId);
+            if (exists) return state;
             return {
               profile: {
                 ...state.profile,
@@ -108,11 +116,6 @@ export const useUserStore = create<UserState>()(
 
         // ==================== ACTIONS MÉTIER ====================
         syncUser: async (user) => {
-          if (!user) {
-            console.warn("[UserStore] Aucun utilisateur fourni pour la sync");
-            return;
-          }
-
           const {
             setSyncing,
             setWaitingForProfile,
@@ -121,33 +124,43 @@ export const useUserStore = create<UserState>()(
             setReady,
           } = get();
 
+          // cas déconnecté : on réinitialise proprement l'app
+          if (!user) {
+            setSyncing(false);
+            setWaitingForProfile(false);
+            setRole(null);
+            setReady(true);
+            return;
+          }
+
           setSyncing(true);
           setWaitingForProfile(true);
+          setReady(false);
           setSyncError(null);
 
           try {
-            // 1. Déterminer le rôle (Clerk → Supabase)
+            // 1) Résoudre le rôle (Clerk+Supabase)
             const resolvedRole = await determineUserRole(user);
             setRole(resolvedRole);
 
-            // 2. Mettre à jour Clerk si nécessaire
-            if (user.publicMetadata?.role !== resolvedRole) {
+            // 2) Répercuter côté Clerk si besoin
+            if ((user.publicMetadata as any)?.role !== resolvedRole) {
               await updateClerkRole(user.id, resolvedRole);
             }
 
-            // 3. Synchroniser Supabase
+            // 3) Synchroniser/mettre à jour le profil Supabase
             await syncProfileToSupabase(user, resolvedRole);
 
             setReady(true);
-          } catch (error) {
-            console.error("[UserStore] Erreur de synchronisation:", error);
-            setSyncError(error.message || "Erreur de synchronisation");
-
+          } catch (e: unknown) {
+            const errMsg =
+              e instanceof Error ? e.message : "Erreur de synchronisation";
+            console.error("[UserStore] Erreur de synchronisation:", e);
+            setSyncError(errMsg);
             toast.error(
               "Erreur de synchronisation du profil. Certaines fonctionnalités peuvent être limitées."
             );
-
-            // En cas d'erreur, on fallback sur "user"
+            // Fallback raisonnable
             setRole("user");
             setReady(true);
           } finally {
@@ -157,16 +170,12 @@ export const useUserStore = create<UserState>()(
         },
 
         resyncRole: async (user) => {
-          if (!user) {
-            console.warn(
-              "[UserStore] Aucun utilisateur fourni pour la re-sync"
-            );
-            return;
-          }
-
           const { isSyncing, setSyncing, setSyncError, setRole, setReady } =
             get();
-
+          if (!user) {
+            console.warn("[UserStore] Aucun utilisateur pour la re-sync");
+            return;
+          }
           if (isSyncing) return;
 
           setSyncing(true);
@@ -175,15 +184,15 @@ export const useUserStore = create<UserState>()(
           try {
             const resolvedRole = await determineUserRole(user);
             setRole(resolvedRole);
-
             await updateClerkRole(user.id, resolvedRole);
             await syncProfileToSupabase(user, resolvedRole);
-
             toast.success("Profil synchronisé avec succès");
             setReady(true);
-          } catch (error) {
-            console.error("[UserStore] Échec re-sync:", error);
-            setSyncError(error.message || "Échec de la re-synchronisation");
+          } catch (e: unknown) {
+            const errMsg =
+              e instanceof Error ? e.message : "Échec de la re-synchronisation";
+            console.error("[UserStore] Échec re-sync:", e);
+            setSyncError(errMsg);
             toast.error("Erreur pendant la re-synchronisation du rôle.");
           } finally {
             setSyncing(false);
@@ -191,14 +200,22 @@ export const useUserStore = create<UserState>()(
         },
 
         // ==================== UTILS ====================
-        reset: () => set(INITIAL_STATE),
+        reset: () => set({ ...INITIAL_STATE }),
+        logoutReset: async () => {
+          set({ ...INITIAL_STATE });
+          // Efface aussi le storage persisté
+          const persist = (useUserStore as any).persist;
+          if (persist?.clearStorage) {
+            await persist.clearStorage();
+          }
+        },
       }),
       {
         name: "farm2fork-user",
+        // On ne persiste que ce qui est utile à la reprise
         partialize: (state) => ({
           profile: state.profile,
           role: state.role,
-          // Ne pas persister les états temporaires de sync
         }),
       }
     )
@@ -206,31 +223,31 @@ export const useUserStore = create<UserState>()(
 );
 
 // ==================== SELECTORS ====================
-export const useUserProfile = () => useUserStore((state) => state.profile);
-export const useUserRole = () => useUserStore((state) => state.role);
-export const useIsFarmer = () =>
-  useUserStore((state) => state.role === "farmer");
-export const useIsUser = () => useUserStore((state) => state.role === "user");
+// (préférables aux champs "computed" dans le store)
+export const useUserProfile = () => useUserStore((s) => s.profile);
+export const useUserRole = () => useUserStore((s) => s.role);
+export const useIsFarmer = () => useUserStore((s) => s.role === "farmer");
+export const useIsUser = () => useUserStore((s) => s.role === "user");
 export const useUserSyncState = () =>
-  useUserStore((state) => ({
-    isSyncing: state.isSyncing,
-    isReady: state.isReady,
-    isWaitingForProfile: state.isWaitingForProfile,
-    syncError: state.syncError,
+  useUserStore((s) => ({
+    isSyncing: s.isSyncing,
+    isReady: s.isReady,
+    isWaitingForProfile: s.isWaitingForProfile,
+    syncError: s.syncError,
   }));
 export const useUserFavorites = () =>
-  useUserStore((state) => state.profile?.favorites ?? []);
+  useUserStore((s) => s.profile?.favorites ?? []);
 
-// Actions selectors
 export const useUserActions = () =>
-  useUserStore((state) => ({
-    setProfile: state.setProfile,
-    setRole: state.setRole, // ✅ Ajouté
-    setReady: state.setReady, // ✅ Ajouté
-    setSyncing: state.setSyncing, // ✅ Ajouté (optionnel)
-    syncUser: state.syncUser,
-    resyncRole: state.resyncRole,
-    addFavorite: state.addFavorite,
-    removeFavorite: state.removeFavorite,
-    reset: state.reset,
+  useUserStore((s) => ({
+    setProfile: s.setProfile,
+    setRole: s.setRole,
+    setReady: s.setReady,
+    setSyncing: s.setSyncing,
+    syncUser: s.syncUser,
+    resyncRole: s.resyncRole,
+    addFavorite: s.addFavorite,
+    removeFavorite: s.removeFavorite,
+    reset: s.reset,
+    logoutReset: s.logoutReset,
   }));

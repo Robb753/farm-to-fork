@@ -145,8 +145,8 @@ export default function SignupRoleModal({ onClose }) {
           <div className="flex-1 flex items-center justify-center p-6 bg-gray-50">
             <div className="w-full max-w-sm">
               <SignUp
-                routing="hash"
-                signInUrl="/sign-in"
+                routing="hash" // ← Remettre "hash"
+                signInUrl="#/sign-in" // ← Remettre le #
                 fallbackRedirectUrl="/"
                 appearance={{
                   elements: {
@@ -207,8 +207,8 @@ export default function SignupRoleModal({ onClose }) {
           <div className="flex-1 flex items-center justify-center p-6">
             <div className="w-full max-w-md mx-auto">
               <SignUp
-                routing="hash"
-                signInUrl="/sign-in"
+                routing="hash" // ← Remettre "hash"
+                signInUrl="#/sign-in" // ← Remettre le #
                 fallbackRedirectUrl="/"
                 appearance={{
                   elements: {

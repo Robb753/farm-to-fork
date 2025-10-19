@@ -1,8 +1,12 @@
 "use client";
 
 import React, { useEffect, useRef, useCallback } from "react";
-import { useListingState } from "@/app/contexts/MapDataContext/ListingStateContext";
-import { useFilterState } from "@/app/contexts/MapDataContext/FilterStateContext";
+// ✅ Nouveaux imports Zustand
+import {
+  useInteractionsState,
+  useInteractionsActions,
+  useFiltersState,
+} from "@/lib/store/mapListingsStore";
 
 const GoogleMarkerItem = ({ map, item }) => {
   const markerRef = useRef(null);
@@ -12,18 +16,15 @@ const GoogleMarkerItem = ({ map, item }) => {
   const markerLibraryPromise = useRef(null);
   const hoverTimeoutRef = useRef(null);
 
-  const {
-    hoveredListingId,
-    setHoveredListingId,
-    selectedListingId,
-    setSelectedListingId,
-    openInfoWindowId,
-    setOpenInfoWindowId,
-    filteredListings,
-  } = useListingState();
+  // ✅ Hooks Zustand remplacent les anciens contextes
+  const { hoveredListingId, selectedListingId, openInfoWindowId } =
+    useInteractionsState();
+
+  const { setHoveredListingId, setSelectedListingId, setOpenInfoWindowId } =
+    useInteractionsActions();
 
   // Récupérer les filtres du contexte
-  const { filters } = useFilterState();
+  const filters = useFiltersState();
 
   const loadMarkerLibrary = useCallback(async () => {
     if (!window.google?.maps) return null;
@@ -197,7 +198,19 @@ const GoogleMarkerItem = ({ map, item }) => {
       markerElementRef.current = null;
       mountedRef.current = false;
     };
-  }, [map, item, selectedListingId, openInfoWindowId, shouldShowMarker]);
+  }, [
+    map,
+    item,
+    selectedListingId,
+    openInfoWindowId,
+    shouldShowMarker,
+    createNativeInfoWindow,
+    loadMarkerLibrary,
+    createPinSVG,
+    setSelectedListingId,
+    setOpenInfoWindowId,
+    setHoveredListingId,
+  ]);
 
   // Effet pour mettre à jour la visibilité du marqueur quand les filtres changent
   useEffect(() => {

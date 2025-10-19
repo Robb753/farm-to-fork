@@ -24,6 +24,41 @@ const baseConfig = {
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
   },
 
+  // ✅ NOUVEAU : Rewrites pour gérer les routes Clerk
+  async rewrites() {
+    return [
+      {
+        source: "/sign-in/:path*",
+        destination: "/",
+      },
+      {
+        source: "/sign-up/:path*",
+        destination: "/",
+      },
+      // Gestion des routes d'authentification Clerk
+      {
+        source: "/sso-callback",
+        destination: "/",
+      },
+      {
+        source: "/verify",
+        destination: "/",
+      },
+    ];
+  },
+
+  // ✅ NOUVEAU : Redirections pour nettoyer les URLs
+  async redirects() {
+    return [
+      // Redirection des anciennes routes avec hash vers les nouvelles
+      {
+        source: "/factor-one",
+        destination: "/sign-in",
+        permanent: false,
+      },
+    ];
+  },
+
   // Expérimental -----------------------------------------------------------
   experimental: {
     optimizePackageImports: [
@@ -39,7 +74,6 @@ const baseConfig = {
       "recharts",
       "framer-motion",
     ],
-    // ❌ Retiré optimizeCss: true, qui causait l'erreur critters
     serverComponentsExternalPackages: ["@supabase/supabase-js"],
   },
 
@@ -84,7 +118,6 @@ const baseConfig = {
           },
         ],
       },
-      // ✅ Ajout d'optimisation CSS manuelle via headers
       {
         source: "/_next/static/css/(.*)",
         headers: [

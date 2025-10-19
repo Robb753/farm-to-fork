@@ -11,8 +11,14 @@ import React, {
 import { useUser, useClerk } from "@clerk/nextjs";
 import { supabase } from "@/utils/supabase/client";
 import { toast } from "sonner";
-import { useListingState } from "@/app/contexts/MapDataContext/ListingStateContext";
-import { useMapState } from "@/app/contexts/MapDataContext/MapStateContext";
+// ✅ Nouveaux imports Zustand
+import {
+  useListingsState,
+  useListingsActions,
+  useMapState,
+  useInteractionsState,
+  useInteractionsActions,
+} from "@/lib/store/mapListingsStore";
 import { useListingsWithImages } from "@/app/hooks/useListingsWithImages";
 import Link from "next/link";
 import OptimizedImage, { ListingImage } from "@/components/ui/OptimizedImage";
@@ -141,7 +147,6 @@ const ListItem = React.memo(
     const [imageError, setImageError] = useState(false);
 
     const getImageUrl = useCallback(() => {
-
       if (!item.listingImages) {
         return "/default-farm-image.jpg";
       }
@@ -433,13 +438,13 @@ const useFavorites = (user, openSignUp) => {
 
 // Composant principal
 export default function Listing() {
-  const {
-    visibleListings = [],
-    hoveredListingId,
-    setHoveredListingId,
-    setListings,
-  } = useListingState() || {};
-  const { mapBounds } = useMapState() || {};
+  // ✅ Nouveaux hooks Zustand
+  const { visible: visibleListings = [] } = useListingsState();
+  const { hoveredListingId } = useInteractionsState();
+  const { setHoveredListingId } = useInteractionsActions();
+  const { setAllListings } = useListingsActions();
+  const { mapBounds } = useMapState();
+
   const { user } = useUser();
   const { openSignUp } = useClerk();
 
@@ -472,10 +477,10 @@ export default function Listing() {
 
   // Mise à jour des listings
   useEffect(() => {
-    if (listings.length > 0 && setListings) {
-      setListings(listings);
+    if (listings.length > 0 && setAllListings) {
+      setAllListings(listings);
     }
-  }, [listings, setListings]);
+  }, [listings, setAllListings]);
 
   // Handlers optimisés
   const handleMouseEnter = useCallback(

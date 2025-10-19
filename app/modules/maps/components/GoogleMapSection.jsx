@@ -8,9 +8,14 @@ import React, {
   useMemo,
 } from "react";
 import { GoogleMap } from "@react-google-maps/api";
-import { useMapState } from "@/app/contexts/MapDataContext/MapStateContext";
-import { useListingState } from "@/app/contexts/MapDataContext/ListingStateContext";
-import { useFilterState } from "@/app/contexts/MapDataContext/FilterStateContext";
+// ✅ Nouveaux imports Zustand
+import {
+  useMapState,
+  useMapActions,
+  useListingsState,
+  useInteractionsActions,
+  useFiltersState,
+} from "@/lib/store/mapListingsStore";
 import { useSearchParams } from "next/navigation";
 import { useUpdateExploreUrl } from "@/utils/updateExploreUrl";
 import GoogleMarkerItem from "@/app/modules/maps/components/GoogleMarkerItem";
@@ -48,13 +53,13 @@ const getDesktopMapOptions = () => ({
 // Options de carte pour mobile
 const getMobileMapOptions = () => ({
   disableDefaultUI: true,
-  zoomControl: false, // ✅ Supprime les boutons zoom/dezoom
+  zoomControl: false, // Supprime les boutons zoom/dezoom
   mapTypeControl: false,
   scaleControl: false,
   streetViewControl: false,
   rotateControl: false,
   fullscreenControl: false,
-  gestureHandling: "greedy", // ✅ Supprime "utiliser deux doigts"
+  gestureHandling: "greedy", // Supprime "utiliser deux doigts"
   mapId: process.env.NEXT_PUBLIC_MAP_ID,
 });
 
@@ -69,22 +74,29 @@ function filtersToUrlParams(filters) {
 }
 
 function GoogleMapSection({ isMapExpanded, isMobile: forceMobile = null }) {
+  // ✅ Hooks Zustand remplacent les anciens contextes
+  const { isApiLoaded, coordinates, mapZoom } = useMapState();
+
   const {
-    isApiLoaded,
-    coordinates,
     setCoordinates,
-    handleMapLoad: contextHandleMapLoad,
-  } = useMapState();
+    setMapBounds,
+    setMapZoom,
+    setMapInstance,
+    setApiLoaded,
+  } = useMapActions();
 
-  const { visibleListings, setOpenInfoWindowId, clearSelection } =
-    useListingState();
+  const { visible: visibleListings } = useListingsState();
 
-  const { filters, filtersHydrated } = useFilterState();
+  const { setOpenInfoWindowId, clearSelection } = useInteractionsActions();
+
+  const filters = useFiltersState();
+
   const updateExploreUrl = useUpdateExploreUrl();
 
   const mapInstanceRef = useRef(null);
   const searchParams = useSearchParams();
   const initialUrlParsed = useRef(false);
+  const [filtersHydrated, setFiltersHydrated] = useState(true); // Simplifié pour la migration
 
   // Détection mobile avec possibilité de forcer via prop
   const detectedMobile = useIsMobile();
@@ -92,7 +104,7 @@ function GoogleMapSection({ isMapExpanded, isMobile: forceMobile = null }) {
 
   const [initialZoom, setInitialZoom] = useState(12);
 
-  // ✅ Options de carte conditionnelles selon la plateforme
+  // Options de carte conditionnelles selon la plateforme
   const mapOptions = useMemo(() => {
     return isMobile ? getMobileMapOptions() : getDesktopMapOptions();
   }, [isMobile]);
@@ -146,25 +158,67 @@ function GoogleMapSection({ isMapExpanded, isMobile: forceMobile = null }) {
     (map) => {
       mapInstanceRef.current = map;
 
-      // ✅ Sur mobile, on évite de mettre à jour l'URL à chaque mouvement
+      // ✅ Mise à jour du store Zustand
+      setMapInstance(map);
+
+      // Sur mobile, on évite de mettre à jour l'URL à chaque mouvement
       if (!isMobile) {
-        map.addListener("idle", updateUrlWithCenter);
+        map.addListener("idle", () => {
+          // Mettre à jour les bounds dans le store
+          const bounds = map.getBounds();
+          if (bounds) {
+            const boundsObj = {
+              ne: {
+                lat: bounds.getNorthEast().lat(),
+                lng: bounds.getNorthEast().lng(),
+              },
+              sw: {
+                lat: bounds.getSouthWest().lat(),
+                lng: bounds.getSouthWest().lng(),
+              },
+            };
+            setMapBounds(boundsObj);
+          }
+
+          // Mettre à jour le zoom
+          setMapZoom(map.getZoom());
+
+          // Mettre à jour l'URL
+          updateUrlWithCenter();
+        });
+      } else {
+        // Sur mobile, mettre à jour les bounds quand même mais sans URL
+        map.addListener("idle", () => {
+          const bounds = map.getBounds();
+          if (bounds) {
+            const boundsObj = {
+              ne: {
+                lat: bounds.getNorthEast().lat(),
+                lng: bounds.getNorthEast().lng(),
+              },
+              sw: {
+                lat: bounds.getSouthWest().lat(),
+                lng: bounds.getSouthWest().lng(),
+              },
+            };
+            setMapBounds(boundsObj);
+          }
+          setMapZoom(map.getZoom());
+        });
       }
 
       map.addListener("click", () => {
         setOpenInfoWindowId(null);
         clearSelection();
       });
-
-      if (contextHandleMapLoad) {
-        contextHandleMapLoad(map);
-      }
     },
     [
       updateUrlWithCenter,
       setOpenInfoWindowId,
       clearSelection,
-      contextHandleMapLoad,
+      setMapInstance,
+      setMapBounds,
+      setMapZoom,
       isMobile,
     ]
   );
@@ -191,10 +245,10 @@ function GoogleMapSection({ isMapExpanded, isMobile: forceMobile = null }) {
         mapContainerStyle={mapContainerStyle}
         center={coordinates || { lat: 46.6, lng: 1.88 }}
         zoom={initialZoom}
-        options={mapOptions} // ✅ Options conditionnelles mobile/desktop
+        options={mapOptions} // Options conditionnelles mobile/desktop
         onLoad={handleMapLoad}
       >
-        {/* ✅ Boucle sur les listings visibles */}
+        {/* Boucle sur les listings visibles */}
         {visibleListings.map((item) => (
           <GoogleMarkerItem
             key={item.id}

@@ -103,8 +103,8 @@ export default function SignInModal({ onClose }) {
                 )}
 
                 <SignIn
-                  routing="hash"
-                  signUpUrl="#/sign-up"
+                  routing="hash" // ← Remettre "hash"
+                  signUpUrl="#/sign-up" // ← Remettre le #
                   appearance={{
                     elements: {
                       formButtonPrimary:
@@ -208,8 +208,8 @@ export default function SignInModal({ onClose }) {
                 )}
 
                 <SignIn
-                  routing="hash"
-                  signUpUrl="#/sign-up"
+                  routing="hash" // ← Remettre "hash"
+                  signUpUrl="#/sign-up" // ← Remettre le #
                   appearance={{
                     elements: {
                       formButtonPrimary:

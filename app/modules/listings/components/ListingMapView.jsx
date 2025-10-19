@@ -14,9 +14,13 @@ import { toast } from "sonner";
 import { useSearchParams } from "next/navigation";
 import FilterSection from "@/app/_components/layout/FilterSection";
 import Listing from "./Listing";
-import { useMapData } from "@/app/contexts/MapDataContext/useMapData";
-import { useMapState } from "@/app/contexts/MapDataContext/MapStateContext";
-import { useListingState } from "@/app/contexts/MapDataContext/ListingStateContext";
+// ✅ Nouveaux imports Zustand
+import {
+  useMapState,
+  useListingsState,
+  useListingsActions,
+  useFiltersState,
+} from "@/lib/store/mapListingsStore";
 import ExploreMapSearch from "../../maps/components/shared/ExploreMapSearch";
 
 // Import dynamique du composant mobile pour éviter les problèmes SSR
@@ -63,10 +67,12 @@ const useIsMobile = () => {
 
 // Composant desktop existant
 const DesktopListingMapView = () => {
-  const { filters, coordinates, isLoading, fetchListings, hasMore } =
-    useMapData();
-  const { mapBounds, map } = useMapState();
-  const { visibleListings } = useListingState();
+  // ✅ Hooks Zustand remplacent les anciens contextes
+  const { coordinates, mapBounds, mapInstance } = useMapState();
+  const { visible: visibleListings, isLoading, hasMore } = useListingsState();
+  const { fetchListings, loadMoreListings, refreshListings, searchInArea } =
+    useListingsActions();
+  const filters = useFiltersState();
 
   const searchParams = useSearchParams();
   const [isMapExpanded, setIsMapExpanded] = useState(false);
@@ -112,7 +118,7 @@ const DesktopListingMapView = () => {
 
   // Écouteurs d'événements pour la carte (style Airbnb)
   useEffect(() => {
-    if (!map) return;
+    if (!mapInstance) return;
 
     const handleDragStart = () => {
       setIsMapMoving(true);
@@ -147,7 +153,7 @@ const DesktopListingMapView = () => {
     };
 
     const handleBoundsChanged = () => {
-      const currentBounds = map.getBounds();
+      const currentBounds = mapInstance.getBounds();
       if (currentBounds && lastBoundsRef.current) {
         const hasSignificantChange = !currentBounds.equals(
           lastBoundsRef.current
@@ -160,17 +166,17 @@ const DesktopListingMapView = () => {
     };
 
     // Ajouter les écouteurs
-    map.addListener("dragstart", handleDragStart);
-    map.addListener("dragend", handleDragEnd);
-    map.addListener("zoom_changed", handleZoomChanged);
-    map.addListener("bounds_changed", handleBoundsChanged);
+    mapInstance.addListener("dragstart", handleDragStart);
+    mapInstance.addListener("dragend", handleDragEnd);
+    mapInstance.addListener("zoom_changed", handleZoomChanged);
+    mapInstance.addListener("bounds_changed", handleBoundsChanged);
 
     return () => {
-      if (map) {
-        google.maps.event.clearListeners(map, "dragstart");
-        google.maps.event.clearListeners(map, "dragend");
-        google.maps.event.clearListeners(map, "zoom_changed");
-        google.maps.event.clearListeners(map, "bounds_changed");
+      if (mapInstance) {
+        google.maps.event.clearListeners(mapInstance, "dragstart");
+        google.maps.event.clearListeners(mapInstance, "dragend");
+        google.maps.event.clearListeners(mapInstance, "zoom_changed");
+        google.maps.event.clearListeners(mapInstance, "bounds_changed");
       }
       if (mapMoveTimeoutRef.current) {
         clearTimeout(mapMoveTimeoutRef.current);
@@ -179,19 +185,15 @@ const DesktopListingMapView = () => {
         clearTimeout(searchButtonTimeoutRef.current);
       }
     };
-  }, [map]);
+  }, [mapInstance]);
 
-  // Fonction de recherche dans la zone actuelle (style Airbnb)
-  const searchInCurrentArea = useCallback(() => {
+  // ✅ Fonction de recherche dans la zone actuelle mise à jour
+  const handleSearchInCurrentArea = useCallback(() => {
     setShowSearchButton(false);
     setMapUpdatePending(false);
     setPage(1);
 
-    fetchListings({
-      page: 1,
-      forceRefresh: true,
-      bounds: map?.getBounds(),
-    })
+    searchInArea(mapInstance)
       .then((data) => {
         if (data && data.length > 0) {
           toast.success(`${data.length} fermes trouvées dans cette zone`);
@@ -203,28 +205,30 @@ const DesktopListingMapView = () => {
         toast.error("Erreur lors de la recherche");
         console.error("Search error:", error);
       });
-  }, [fetchListings, map]);
+  }, [searchInArea, mapInstance]);
 
-  const loadMoreListings = useCallback(() => {
+  // ✅ Fonction pour charger plus de listings mise à jour
+  const handleLoadMoreListings = useCallback(() => {
     if (isLoading || !hasMore) return;
     const newPage = page + 1;
     setPage(newPage);
-    fetchListings({ page: newPage, append: true });
-  }, [page, hasMore, isLoading, fetchListings]);
+    loadMoreListings();
+  }, [page, hasMore, isLoading, loadMoreListings]);
 
-  const refreshListings = useCallback(() => {
+  // ✅ Fonction pour rafraîchir les listings mise à jour
+  const handleRefreshListings = useCallback(() => {
     setPage(1);
     setShowSearchButton(false);
     setMapUpdatePending(false);
 
-    fetchListings({ page: 1, forceRefresh: true }).then((data) => {
+    refreshListings().then((data) => {
       if (data && data.length > 0) {
         toast.success(`${data.length} fermes trouvées`);
       } else {
         toast.info("Aucune ferme trouvée dans cette zone");
       }
     });
-  }, [fetchListings]);
+  }, [refreshListings]);
 
   const toggleMapSize = useCallback(() => {
     setIsMapExpanded((prev) => !prev);
@@ -277,7 +281,7 @@ const DesktopListingMapView = () => {
           </div>
 
           <button
-            onClick={refreshListings}
+            onClick={handleRefreshListings}
             disabled={isLoading}
             className="text-green-600 hover:text-green-800 text-sm flex items-center gap-1 disabled:opacity-50 transition-colors"
           >
@@ -346,7 +350,7 @@ const DesktopListingMapView = () => {
             }`}
           >
             <Listing
-              onLoadMore={loadMoreListings}
+              onLoadMore={handleLoadMoreListings}
               hasMore={hasMore}
               isLoading={isLoading}
             />
@@ -380,7 +384,7 @@ const DesktopListingMapView = () => {
           {showSearchButton && !isLoading && !isMapMoving && (
             <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 z-30 animate-slide-up">
               <button
-                onClick={searchInCurrentArea}
+                onClick={handleSearchInCurrentArea}
                 className="bg-gray-900 hover:bg-gray-800 text-white px-6 py-3 rounded-full shadow-lg flex items-center gap-2 transition-all duration-200 hover:scale-105"
               >
                 <Search className="w-4 h-4" />
@@ -403,7 +407,6 @@ const DesktopListingMapView = () => {
               ) : (
                 <Maximize2 className="w-5 h-5" />
               )}
-
             </button>
           </div>
         </div>
