@@ -5,12 +5,14 @@ import { useRouter } from "next/navigation";
 import { Toaster } from "sonner";
 import ExploreNearby from "./ExploreNearby";
 import EuropeanFeatures from "./EuropeanFeatures";
-import { useMapState } from "@/app/contexts/MapDataContext/MapStateContext";
+// ✅ Nouvel import Zustand
+import { useMapActions } from "@/lib/store/mapListingsStore";
 import CitySearch from "@/app/modules/maps/components/shared/CitySearch";
 import { useTranslation } from "@/lib/store/settingsStore";
 
 function HomeContent() {
-  const { setCoordinates } = useMapState();
+  // ✅ Hook Zustand remplace l'ancien contexte
+  const { setCoordinates } = useMapActions();
   const t = useTranslation();
   const router = useRouter();
 

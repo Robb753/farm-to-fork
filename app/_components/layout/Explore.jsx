@@ -3,7 +3,8 @@
 import React, { useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useAllListingsWithImages } from "@/app/hooks/useAllListingsWithImages";
-import { useListingState } from "@/app/contexts/MapDataContext/ListingStateContext";
+// ✅ Nouveaux imports Zustand
+import { useListingsActions } from "@/lib/store/mapListingsStore";
 
 const ListingMapView = dynamic(
   () => import("../../modules/listings/components/ListingMapView"),
@@ -19,7 +20,8 @@ const ListingMapView = dynamic(
 
 export default function Explore() {
   const { listingsWithImages } = useAllListingsWithImages();
-  const { setAllListings } = useListingState();
+  // ✅ Hook Zustand remplace l'ancien contexte
+  const { setAllListings } = useListingsActions();
 
   useEffect(() => {
     if (Array.isArray(listingsWithImages) && listingsWithImages.length > 0) {

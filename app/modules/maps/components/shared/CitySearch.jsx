@@ -4,14 +4,18 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import { Search, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { useMapState } from "@/app/contexts/MapDataContext/MapStateContext";
+// ✅ Nouvel import Zustand
+import { useMapState, useMapActions } from "@/lib/store/mapListingsStore";
 
 /**
  * Composant de recherche spécialisé pour les villes
  * Utilisé pour l'exploration de la carte (homepage, explore, etc.)
  */
 function CitySearch({ onCitySelect, placeholder = "Rechercher une ville..." }) {
-  const { isApiLoaded, setCoordinates } = useMapState();
+  // ✅ Hooks Zustand remplacent l'ancien contexte
+  const { isApiLoaded } = useMapState();
+  const { setCoordinates } = useMapActions();
+
   const inputRef = useRef(null);
   const autocompleteRef = useRef(null);
   const selectedPlaceRef = useRef(null);

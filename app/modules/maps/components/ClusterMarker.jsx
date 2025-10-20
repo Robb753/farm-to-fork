@@ -1,4 +1,3 @@
-// components/maps/ClusterMarker.jsx - Version optimisée
 import React, { useRef, useEffect, useCallback } from "react";
 import { useMapData } from "@/app/contexts/MapDataContext";
 import { sortListingsByDistance } from "@/utils/markerClusterUtility";
