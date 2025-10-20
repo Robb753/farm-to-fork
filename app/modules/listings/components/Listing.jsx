@@ -11,7 +11,7 @@ import React, {
 import { useUser, useClerk } from "@clerk/nextjs";
 import { supabase } from "@/utils/supabase/client";
 import { toast } from "sonner";
-// ✅ Nouveaux imports Zustand
+// ✅ Imports Zustand
 import {
   useListingsState,
   useListingsActions,
@@ -19,6 +19,10 @@ import {
   useInteractionsState,
   useInteractionsActions,
 } from "@/lib/store/mapListingsStore";
+import {
+  useUserFavorites,
+  useUserActions,
+} from "@/lib/store/userStore";
 import { useListingsWithImages } from "@/app/hooks/useListingsWithImages";
 import Link from "next/link";
 import OptimizedImage, { ListingImage } from "@/components/ui/OptimizedImage";
@@ -356,42 +360,39 @@ const ListItem = React.memo(
 
 ListItem.displayName = "ListItem";
 
-// Hook personnalisé pour la gestion optimisée des favoris
-const useFavorites = (user, openSignUp) => {
-  const [favorites, setFavorites] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
+// Composant principal
+export default function Listing() {
+  // ✅ Hooks Zustand
+  const { visible: visibleListings = [] } = useListingsState();
+  const { hoveredListingId } = useInteractionsState();
+  const { setHoveredListingId } = useInteractionsActions();
+  const { setAllListings } = useListingsActions();
+  const { mapBounds } = useMapState();
 
+  // ✅ Hooks favoris depuis userStore
+  const favorites = useUserFavorites();
+  const { loadFavorites, toggleFavorite: toggleFavoriteStore } = useUserActions();
+
+  const { user } = useUser();
+  const { openSignUp } = useClerk();
+
+  // Charger les favoris au montage si l'utilisateur est connecté
   useEffect(() => {
-    const fetchFavorites = async () => {
-      setIsLoading(true);
-      try {
-        if (user) {
-          const { data, error } = await supabase
-            .from("profiles")
-            .select("favorites")
-            .eq("user_id", user.id)
-            .single();
+    if (user?.id) {
+      loadFavorites(user.id);
+    }
+  }, [user?.id, loadFavorites]);
 
-          if (error) throw error;
-          setFavorites(data?.favorites || []);
-        } else {
-          const stored = localStorage.getItem("farmToForkFavorites");
-          if (stored) {
-            setFavorites(JSON.parse(stored));
-          }
-        }
-      } catch (error) {
-        toast.error("Erreur lors du chargement des favoris");
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const visibleIds = useMemo(
+    () => visibleListings?.map((item) => item.id) || [],
+    [visibleListings]
+  );
 
-    fetchFavorites();
-  }, [user]);
+  const { listings, isLoading } = useListingsWithImages(visibleIds);
 
-  const toggleFavorite = useCallback(
-    async (id) => {
+  // Wrapper pour toggleFavorite qui gère le cas non-connecté
+  const handleToggleFavorite = useCallback(
+    (id) => {
       if (!user) {
         toast("Connectez-vous pour gérer vos favoris", {
           action: {
@@ -401,60 +402,10 @@ const useFavorites = (user, openSignUp) => {
         });
         return;
       }
-
-      const isCurrentlyFavorite = favorites.includes(id);
-      const updatedFavorites = isCurrentlyFavorite
-        ? favorites.filter((fid) => fid !== id)
-        : [...favorites, id];
-
-      // Mise à jour optimiste
-      setFavorites(updatedFavorites);
-
-      try {
-        const { error } = await supabase
-          .from("profiles")
-          .update({ favorites: updatedFavorites })
-          .eq("user_id", user.id);
-
-        if (error) throw error;
-
-        toast.success(
-          isCurrentlyFavorite ? "Retiré des favoris" : "Ajouté aux favoris",
-          {
-            icon: isCurrentlyFavorite ? "💔" : "❤️",
-          }
-        );
-      } catch (error) {
-        // Rollback en cas d'erreur
-        setFavorites(favorites);
-        toast.error("Erreur lors de la mise à jour des favoris");
-      }
+      toggleFavoriteStore(id, user.id);
     },
-    [favorites, user, openSignUp]
+    [user, toggleFavoriteStore, openSignUp]
   );
-
-  return { favorites, toggleFavorite, isLoading };
-};
-
-// Composant principal
-export default function Listing() {
-  // ✅ Nouveaux hooks Zustand
-  const { visible: visibleListings = [] } = useListingsState();
-  const { hoveredListingId } = useInteractionsState();
-  const { setHoveredListingId } = useInteractionsActions();
-  const { setAllListings } = useListingsActions();
-  const { mapBounds } = useMapState();
-
-  const { user } = useUser();
-  const { openSignUp } = useClerk();
-
-  const visibleIds = useMemo(
-    () => visibleListings?.map((item) => item.id) || [],
-    [visibleListings]
-  );
-
-  const { listings, isLoading } = useListingsWithImages(visibleIds);
-  const { favorites, toggleFavorite } = useFavorites(user, openSignUp);
 
   const [delayedLoading, setDelayedLoading] = useState(true);
   const loadingTimerRef = useRef(null);
@@ -525,7 +476,7 @@ export default function Listing() {
                 isFavorite={favorites.includes(item.id)}
                 onMouseEnter={() => handleMouseEnter(item.id)}
                 onMouseLeave={handleMouseLeave}
-                onToggleFavorite={() => toggleFavorite(item.id)}
+                onToggleFavorite={() => handleToggleFavorite(item.id)}
               />
             ))
           : !delayedLoading && <EmptyState onRetry={handleRetry} />}

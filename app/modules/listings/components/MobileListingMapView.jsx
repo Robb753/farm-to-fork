@@ -35,6 +35,10 @@ import {
   useInteractionsState,
   useInteractionsActions,
 } from "@/lib/store/mapListingsStore";
+import {
+  useUserFavorites,
+  useUserActions,
+} from "@/lib/store/userStore";
 import { useRouter } from "next/navigation";
 import { ListingImage } from "@/components/ui/OptimizedImage";
 import GoogleMapSection from "../../maps/components/GoogleMapSection";
@@ -354,6 +358,10 @@ const MobileListingMapView = () => {
   const { hoveredListingId } = useInteractionsState();
   const { setHoveredListingId } = useInteractionsActions();
 
+  // ✅ Hooks favoris depuis userStore
+  const favorites = useUserFavorites();
+  const { loadFavorites, toggleFavorite: toggleFavoriteStore } = useUserActions();
+
   const { user } = useUser();
   const { openSignUp } = useClerk();
 
@@ -361,7 +369,6 @@ const MobileListingMapView = () => {
   const [showSearchButton, setShowSearchButton] = useState(false);
   const [totalResults, setTotalResults] = useState(0);
   const [page, setPage] = useState(1);
-  const [favorites, setFavorites] = useState([]);
   const [showLoader, setShowLoader] = useState(false);
   const [quickSearch, setQuickSearch] = useState("");
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -427,20 +434,12 @@ const MobileListingMapView = () => {
     }
   }, [filteredListings]);
 
-  // Chargement des favoris
+  // ✅ Chargement des favoris depuis le store
   useEffect(() => {
-    const fetchFavorites = async () => {
-      if (user) {
-        const { data } = await supabase
-          .from("profiles")
-          .select("favorites")
-          .eq("user_id", user.id)
-          .single();
-        if (data) setFavorites(data.favorites || []);
-      }
-    };
-    fetchFavorites();
-  }, [user]);
+    if (user?.id) {
+      loadFavorites(user.id);
+    }
+  }, [user?.id, loadFavorites]);
 
   // Loader state
   useEffect(() => {
@@ -518,34 +517,18 @@ const MobileListingMapView = () => {
     }
   }, [page, hasMore, isLoading, isLoadingMore, fetchListings]);
 
-  const toggleFavorite = async (id) => {
-    if (!user) {
-      toast("Connectez-vous pour gérer vos favoris");
-      openSignUp({ redirectUrl: "/signup" });
-      return;
-    }
-
-    const updatedFavorites = favorites.includes(id)
-      ? favorites.filter((fid) => fid !== id)
-      : [...favorites, id];
-
-    setFavorites(updatedFavorites);
-
-    const { error } = await supabase
-      .from("profiles")
-      .update({ favorites: updatedFavorites })
-      .eq("user_id", user.id);
-
-    if (error) {
-      toast.error("Erreur favoris");
-    } else {
-      toast.success(
-        updatedFavorites.includes(id)
-          ? "Ajouté aux favoris"
-          : "Retiré des favoris"
-      );
-    }
-  };
+  // ✅ Wrapper pour toggleFavorite qui gère le cas non-connecté
+  const handleToggleFavorite = useCallback(
+    (id) => {
+      if (!user) {
+        toast("Connectez-vous pour gérer vos favoris");
+        openSignUp({ redirectUrl: "/signup" });
+        return;
+      }
+      toggleFavoriteStore(id, user.id);
+    },
+    [user, toggleFavoriteStore, openSignUp]
+  );
 
   const handleHover = (id) => {
     setHoveredListingId?.(id);
@@ -710,7 +693,7 @@ const MobileListingMapView = () => {
                   onHover={() => handleHover(item.id)}
                   onLeave={handleLeave}
                   isFavorite={favorites.includes(item.id)}
-                  onToggleFavorite={() => toggleFavorite(item.id)}
+                  onToggleFavorite={() => handleToggleFavorite(item.id)}
                   isCompact={!isExpanded}
                 />
               ))}
