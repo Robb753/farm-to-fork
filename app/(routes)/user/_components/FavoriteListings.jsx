@@ -7,26 +7,34 @@ import { useUser } from "@clerk/nextjs";
 import { supabase } from "@/utils/supabase/client";
 import Link from "next/link";
 import Image from "next/image";
+// ✅ Import userStore
+import { useUserFavorites, useUserActions } from "@/lib/store/userStore";
 
 export default function FavoriteListings() {
   const { user } = useUser();
-  const [favorites, setFavorites] = useState([]);
+
+  // ✅ Utiliser le store pour les IDs des favoris
+  const favoriteIds = useUserFavorites();
+  const { loadFavorites } = useUserActions();
+
+  // State local pour les listings complets (avec images, etc.)
+  const [favoriteListings, setFavoriteListings] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Charger les IDs des favoris depuis le store
   useEffect(() => {
-    const fetchFavorites = async () => {
-      if (!user) return;
+    if (user?.id) {
+      loadFavorites(user.id);
+    }
+  }, [user?.id, loadFavorites]);
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("favorites")
-        .eq("user_id", user.id)
-        .single();
-
-      const favoriteIds = profile?.favorites || [];
+  // Charger les listings complets depuis Supabase quand les IDs changent
+  useEffect(() => {
+    const fetchListings = async () => {
+      setLoading(true);
 
       if (favoriteIds.length === 0) {
-        setFavorites([]);
+        setFavoriteListings([]);
         setLoading(false);
         return;
       }
@@ -36,23 +44,23 @@ export default function FavoriteListings() {
         .select("*, listingImages(url)")
         .in("id", favoriteIds);
 
-      setFavorites(listings || []);
+      setFavoriteListings(listings || []);
       setLoading(false);
     };
 
-    fetchFavorites();
-  }, [user]);
+    fetchListings();
+  }, [favoriteIds]);
 
   if (loading) return <p>Chargement des favoris...</p>;
 
   return (
     <div>
       <h2 className="font-bold text-2xl mb-4">Mes favoris</h2>
-      {favorites.length === 0 ? (
+      {favoriteListings.length === 0 ? (
         <p className="text-gray-500">Aucune ferme enregistrée en favori.</p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {favorites.map((farm) => (
+          {favoriteListings.map((farm) => (
             <div
               key={farm.id}
               className="bg-white p-4 rounded-lg shadow-md hover:shadow-lg transition"

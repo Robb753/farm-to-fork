@@ -7,6 +7,7 @@ import {
   syncProfileToSupabase,
 } from "@/lib/syncUserUtils";
 import { toast } from "sonner";
+import { supabase } from "@/utils/supabase/client";
 // (optionnel) importer le type Clerk si tu veux typer `user`
 import type { User as ClerkUser } from "@clerk/nextjs/server"; // ou "@clerk/nextjs"
 
@@ -41,8 +42,13 @@ interface UserState {
   // Actions métier
   syncUser: (user: ClerkUser | null) => Promise<void>;
   resyncRole: (user: ClerkUser | null) => Promise<void>;
+
+  // Actions favorites (optimisées avec Supabase sync)
+  loadFavorites: (userId: string) => Promise<void>;
+  toggleFavorite: (listingId: number, userId: string) => Promise<void>;
   addFavorite: (listingId: number) => void;
   removeFavorite: (listingId: number) => void;
+  isFavorite: (listingId: number) => boolean;
 
   // Utils
   reset: () => void;
@@ -59,8 +65,11 @@ const INITIAL_STATE: Omit<
   | "setSyncError"
   | "syncUser"
   | "resyncRole"
+  | "loadFavorites"
+  | "toggleFavorite"
   | "addFavorite"
   | "removeFavorite"
+  | "isFavorite"
   | "reset"
   | "logoutReset"
 > = {
@@ -88,6 +97,88 @@ export const useUserStore = create<UserState>()(
         setSyncError: (syncError) => set({ syncError }),
 
         // ==================== ACTIONS FAVORITES ====================
+        // Charger les favoris depuis Supabase
+        loadFavorites: async (userId) => {
+          try {
+            const { data, error } = await supabase
+              .from("profiles")
+              .select("favorites")
+              .eq("user_id", userId)
+              .single();
+
+            if (error) throw error;
+
+            set((state) => {
+              if (!state.profile) return state;
+              return {
+                profile: {
+                  ...state.profile,
+                  favorites: data?.favorites || [],
+                },
+              };
+            });
+          } catch (error) {
+            console.error("[UserStore] Error loading favorites:", error);
+            toast.error("Erreur lors du chargement des favoris");
+          }
+        },
+
+        // Toggle favorite avec optimistic update et sync Supabase
+        toggleFavorite: async (listingId, userId) => {
+          const state = get();
+          if (!state.profile) {
+            toast.error("Vous devez être connecté pour gérer vos favoris");
+            return;
+          }
+
+          const isCurrentlyFavorite = state.profile.favorites.includes(listingId);
+          const updatedFavorites = isCurrentlyFavorite
+            ? state.profile.favorites.filter((id) => id !== listingId)
+            : [...state.profile.favorites, listingId];
+
+          // Optimistic update (mise à jour immédiate de l'UI)
+          const previousFavorites = state.profile.favorites;
+          set((s) => {
+            if (!s.profile) return s;
+            return {
+              profile: {
+                ...s.profile,
+                favorites: updatedFavorites,
+              },
+            };
+          });
+
+          try {
+            // Synchronisation avec Supabase
+            const { error } = await supabase
+              .from("profiles")
+              .update({ favorites: updatedFavorites })
+              .eq("user_id", userId);
+
+            if (error) throw error;
+
+            toast.success(
+              isCurrentlyFavorite
+                ? "Retiré des favoris"
+                : "Ajouté aux favoris"
+            );
+          } catch (error) {
+            console.error("[UserStore] Error toggling favorite:", error);
+            // Rollback en cas d'erreur
+            set((s) => {
+              if (!s.profile) return s;
+              return {
+                profile: {
+                  ...s.profile,
+                  favorites: previousFavorites,
+                },
+              };
+            });
+            toast.error("Erreur lors de la mise à jour des favoris");
+          }
+        },
+
+        // Actions simples pour l'état local (utilisées par loadFavorites)
         addFavorite: (listingId) =>
           set((state) => {
             if (!state.profile) return state;
@@ -113,6 +204,12 @@ export const useUserStore = create<UserState>()(
               },
             };
           }),
+
+        // Helper pour vérifier si un listing est favori
+        isFavorite: (listingId) => {
+          const state = get();
+          return state.profile?.favorites.includes(listingId) ?? false;
+        },
 
         // ==================== ACTIONS MÉTIER ====================
         syncUser: async (user) => {
@@ -246,8 +343,15 @@ export const useUserActions = () =>
     setSyncing: s.setSyncing,
     syncUser: s.syncUser,
     resyncRole: s.resyncRole,
+    loadFavorites: s.loadFavorites,
+    toggleFavorite: s.toggleFavorite,
     addFavorite: s.addFavorite,
     removeFavorite: s.removeFavorite,
+    isFavorite: s.isFavorite,
     reset: s.reset,
     logoutReset: s.logoutReset,
   }));
+
+// Helper selector pour vérifier si un listing est favori
+export const useIsFavorite = (listingId: number) =>
+  useUserStore((s) => s.profile?.favorites.includes(listingId) ?? false);
