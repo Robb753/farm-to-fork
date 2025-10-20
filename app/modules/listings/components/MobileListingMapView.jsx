@@ -26,9 +26,15 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { useUser, useClerk } from "@clerk/nextjs";
 import { supabase } from "@/utils/supabase/client";
-import { useMapData } from "@/app/contexts/MapDataContext/useMapData";
-import { useMapState } from "@/app/contexts/MapDataContext/MapStateContext";
-import { useListingState } from "@/app/contexts/MapDataContext/ListingStateContext";
+// ✅ Imports Zustand
+import {
+  useMapState,
+  useListingsState,
+  useListingsActions,
+  useFiltersState,
+  useInteractionsState,
+  useInteractionsActions,
+} from "@/lib/store/mapListingsStore";
 import { useRouter } from "next/navigation";
 import { ListingImage } from "@/components/ui/OptimizedImage";
 import GoogleMapSection from "../../maps/components/GoogleMapSection";
@@ -340,11 +346,14 @@ const MobileListingCard = ({
 
 // Composant principal avec bottom sheet optimisé
 const MobileListingMapView = () => {
-  const { filters, coordinates, isLoading, fetchListings, hasMore } =
-    useMapData();
-  const { map } = useMapState();
-  const { visibleListings, hoveredListingId, setHoveredListingId } =
-    useListingState();
+  // ✅ Hooks Zustand
+  const filters = useFiltersState();
+  const { coordinates, mapInstance } = useMapState();
+  const { visible: visibleListings, isLoading, hasMore } = useListingsState();
+  const { fetchListings } = useListingsActions();
+  const { hoveredListingId } = useInteractionsState();
+  const { setHoveredListingId } = useInteractionsActions();
+
   const { user } = useUser();
   const { openSignUp } = useClerk();
 
@@ -445,7 +454,7 @@ const MobileListingMapView = () => {
 
   // Écouteurs d'événements pour la carte
   useEffect(() => {
-    if (!map) return;
+    if (!mapInstance) return;
 
     const handleDragStart = () => {
       setIsMapMoving(true);
@@ -461,18 +470,18 @@ const MobileListingMapView = () => {
       setTimeout(() => setShowSearchButton(true), 500);
     };
 
-    map.addListener("dragstart", handleDragStart);
-    map.addListener("dragend", handleDragEnd);
-    map.addListener("zoom_changed", handleZoomChanged);
+    mapInstance.addListener("dragstart", handleDragStart);
+    mapInstance.addListener("dragend", handleDragEnd);
+    mapInstance.addListener("zoom_changed", handleZoomChanged);
 
     return () => {
-      if (map) {
-        google.maps.event.clearListeners(map, "dragstart");
-        google.maps.event.clearListeners(map, "dragend");
-        google.maps.event.clearListeners(map, "zoom_changed");
+      if (mapInstance) {
+        google.maps.event.clearListeners(mapInstance, "dragstart");
+        google.maps.event.clearListeners(mapInstance, "dragend");
+        google.maps.event.clearListeners(mapInstance, "zoom_changed");
       }
     };
-  }, [map]);
+  }, [mapInstance]);
 
   const handleFiltersClick = () => {
     openMobileFilters();
@@ -482,10 +491,10 @@ const MobileListingMapView = () => {
     setShowSearchButton(false);
     setPage(1);
 
+    // ✅ Le store Zustand utilise automatiquement mapBounds du state
     fetchListings({
       page: 1,
       forceRefresh: true,
-      bounds: map?.getBounds(),
     }).then((data) => {
       if (data && data.length > 0) {
         toast.success(`${data.length} fermes trouvées dans cette zone`);
@@ -493,7 +502,7 @@ const MobileListingMapView = () => {
         toast.info("Aucune ferme trouvée dans cette zone");
       }
     });
-  }, [fetchListings, map]);
+  }, [fetchListings]);
 
   const handleLoadMore = useCallback(async () => {
     if (isLoading || !hasMore || isLoadingMore) return;

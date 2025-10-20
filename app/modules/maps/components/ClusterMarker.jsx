@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useCallback } from "react";
-import { useMapData } from "@/app/contexts/MapDataContext";
+// ✅ Import Zustand
+import { useInteractionsActions } from "@/lib/store/mapListingsStore";
 import { sortListingsByDistance } from "@/utils/markerClusterUtility";
 import { CustomInfoWindow } from "./CustomInfoWindow";
 
@@ -11,7 +12,8 @@ const ClusterMarker = ({ map, cluster, onClusterClick }) => {
   const markerElementRef = useRef(null);
   const spiderfyStateRef = useRef({ isSpiderfied: false, markers: [] });
   const infoWindowRef = useRef(null);
-  const { setSelectedListingId } = useMapData();
+  // ✅ Hook Zustand
+  const { setSelectedListingId } = useInteractionsActions();
 
   // Création optimisée du contenu du marqueur de cluster avec memoization
   const createClusterElement = useCallback(() => {
