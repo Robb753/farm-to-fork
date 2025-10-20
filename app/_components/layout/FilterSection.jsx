@@ -14,7 +14,12 @@ import {
   Check,
   ArrowLeft,
 } from "@/utils/icons";
-import { useFilterState } from "@/app/contexts/MapDataContext/FilterStateContext";
+import {
+  useFiltersState,
+  useFiltersActions,
+} from "@/lib/store/mapListingsStore";
+import { useSearchParams } from "next/navigation";
+import { useUpdateExploreUrl } from "@/utils/updateExploreUrl";
 
 export const openMobileFilters = () => {
   window.dispatchEvent(new CustomEvent("openMobileFilters"));
@@ -114,8 +119,27 @@ const SimpleCheckbox = ({ checked, onChange, id, label }) => (
   </div>
 );
 
+// Helper pour convertir les filtres en params URL
+const filtersToUrlParams = (filters) => {
+  const params = {};
+  Object.entries(filters).forEach(([key, values]) => {
+    if (values && values.length > 0) {
+      params[key] = values.join(",");
+    }
+  });
+  return params;
+};
+
 const FilterSection = () => {
-  const { filters, toggleFilter, resetFilters } = useFilterState();
+  // ✅ Hooks Zustand
+  const filters = useFiltersState();
+  const { toggleFilter, resetFilters, setFilters } = useFiltersActions();
+
+  // Hooks pour synchronisation URL
+  const searchParams = useSearchParams();
+  const updateExploreUrl = useUpdateExploreUrl();
+  const [filtersHydrated, setFiltersHydrated] = useState(false);
+
   const [isOpen, setIsOpen] = useState(null);
   const [isMapFilterOpen, setIsMapFilterOpen] = useState(false);
   const containerRef = useRef(null);
@@ -123,6 +147,42 @@ const FilterSection = () => {
 
   const [isMobileModalOpen, setIsMobileModalOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+
+  // ✅ Hydrater les filtres depuis l'URL au chargement
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlFilters = {};
+
+    filterSections.forEach(({ key }) => {
+      const val = params.get(key);
+      if (val) urlFilters[key] = val.split(",");
+    });
+
+    // Gérer également mapType
+    const mapTypeVal = params.get("mapType");
+    if (mapTypeVal) urlFilters.mapType = mapTypeVal.split(",");
+
+    if (Object.keys(urlFilters).length > 0) {
+      setFilters(urlFilters);
+    }
+
+    setFiltersHydrated(true);
+  }, [setFilters]);
+
+  // ✅ Synchroniser l'URL avec les filtres (sans écraser lat/lng)
+  useEffect(() => {
+    if (!filtersHydrated) return;
+
+    const lat = searchParams.get("lat");
+    const lng = searchParams.get("lng");
+    if (!lat || !lng) return;
+
+    updateExploreUrl({
+      lat,
+      lng,
+      ...filtersToUrlParams(filters),
+    });
+  }, [filters, filtersHydrated, searchParams, updateExploreUrl]);
 
   useEffect(() => {
     const checkMobile = () => {
