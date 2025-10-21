@@ -24,6 +24,7 @@ const MapboxSection = ({ isMapExpanded, isMobile = false }) => {
   const mapRef = useRef(null);
   const markersRef = useRef(new Map());
   const popupRef = useRef(null);
+  const isInitializedRef = useRef(false); // Utiliser useRef au lieu de useState
 
   // État Zustand - Carte
   const { isLoaded, coordinates, zoom, style, bounds } = useMapboxState();
@@ -42,11 +43,9 @@ const MapboxSection = ({ isMapExpanded, isMobile = false }) => {
     useInteractionsActions();
   const filters = useFiltersState();
 
-  const [isInitialized, setIsInitialized] = useState(false);
-
   // Initialisation de la carte
   useEffect(() => {
-    if (!mapContainer.current || isInitialized) return;
+    if (!mapContainer.current || isInitializedRef.current) return;
 
     try {
       const map = new mapboxgl.Map({
@@ -82,7 +81,7 @@ const MapboxSection = ({ isMapExpanded, isMobile = false }) => {
       map.on("load", () => {
         console.log("🗺️ Mapbox chargé avec succès");
         setMapLoaded(true);
-        setIsInitialized(true);
+        isInitializedRef.current = true;
 
         // Ajouter les sources et layers pour les marqueurs
         addMarkersLayer(map);
@@ -126,10 +125,10 @@ const MapboxSection = ({ isMapExpanded, isMobile = false }) => {
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
-        setIsInitialized(false);
+        isInitializedRef.current = false;
       }
     };
-  }, [isInitialized, coordinates, zoom, style, isMobile]);
+  }, []); // Pas de dépendances - la carte ne doit être initialisée qu'une seule fois
 
   // Fonction pour ajouter la layer des marqueurs
   const addMarkersLayer = useCallback((map) => {
