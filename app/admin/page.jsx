@@ -1,6 +1,7 @@
   "use client";
 
   import { useEffect, useState } from "react";
+  import { useUser } from "@clerk/nextjs";
   import { toast } from "sonner";
   import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
   import {
@@ -31,12 +32,13 @@
     Search
   } from "@/utils/icons";
   import { Input } from "@/components/ui/input";
-  import useUserSync from "../hooks/useUserSync";
+  import { useUserRole } from "@/lib/store/userStore";
   import AppPieChart from "@/components/ui/AppPieChart";
   import AppBarChart from "@/components/ui/AppBarChart";
 
   export default function AdminDashboard() {
-    const { user, isLoaded, isSignedIn, role } = useUserSync();
+    const { user, isLoaded, isSignedIn } = useUser();
+    const role = useUserRole();
     const [users, setUsers] = useState([]);
     const [requests, setRequests] = useState([]);
     const [stats, setStats] = useState({
