@@ -2,6 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
+@import 'mapbox-gl/dist/mapbox-gl.css';
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -88,4 +90,14 @@
     margin-bottom: 0 !important;
     padding-bottom: 0 !important;
   }
+}
+
+/* Styles personnalisés pour les popups Mapbox */
+.mapboxgl-popup-content {
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.mapboxgl-popup-tip {
+  border-top-color: white;
 }
