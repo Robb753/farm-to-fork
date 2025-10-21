@@ -148,6 +148,8 @@ export interface Farm2ForkState {
 
   filterListings: () => void;
 
+  filterListingsInner: (listings: Listing[], filters: FilterState) => Listing[];
+
   // Utils
   reset: () => void;
 }
