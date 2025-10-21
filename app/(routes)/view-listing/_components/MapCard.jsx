@@ -1,10 +1,10 @@
 "use client";
 
-import SingleFarmMap from "@/app/modules/maps/components/SingleFarmMap";
+import SingleFarmMapbox from "@/app/modules/maps/components/SingleFarmMapbox";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
 export default function MapCard({ listing }) {
-  const { lat, lng } = listing || {};
+  const { lat, lng, name } = listing || {};
 
   if (!lat || !lng) {
     return null;
@@ -17,7 +17,7 @@ export default function MapCard({ listing }) {
       </CardHeader>
       <CardContent>
         <div className="aspect-square rounded-lg overflow-hidden border border-gray-200">
-          <SingleFarmMap lat={lat} lng={lng} />
+          <SingleFarmMapbox lat={lat} lng={lng} name={name} />
         </div>
       </CardContent>
     </Card>

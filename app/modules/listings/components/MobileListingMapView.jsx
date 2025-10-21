@@ -28,22 +28,22 @@ import { useUser, useClerk } from "@clerk/nextjs";
 import { supabase } from "@/utils/supabase/client";
 // ✅ Imports Zustand
 import {
-  useMapState,
   useListingsState,
   useListingsActions,
   useFiltersState,
   useInteractionsState,
   useInteractionsActions,
 } from "@/lib/store/mapListingsStore";
+import { useMapboxState } from "@/lib/store/mapboxListingsStore";
 import {
   useUserFavorites,
   useUserActions,
 } from "@/lib/store/userStore";
 import { useRouter } from "next/navigation";
 import { ListingImage } from "@/components/ui/OptimizedImage";
-import GoogleMapSection from "../../maps/components/GoogleMapSection";
+import MapboxSection from "../../maps/components/MapboxSection";
 import { openMobileFilters } from "@/app/_components/layout/FilterSection";
-import CitySearch from "../../maps/components/shared/CitySearch";
+import MapboxCitySearch from "../../maps/components/shared/MapboxCitySearch";
 
 // Hook pour gérer le bottom sheet
 const useBottomSheet = (initialHeight = 400) => {
@@ -352,7 +352,7 @@ const MobileListingCard = ({
 const MobileListingMapView = () => {
   // ✅ Hooks Zustand
   const filters = useFiltersState();
-  const { coordinates, mapInstance } = useMapState();
+  const { mapInstance } = useMapboxState();
   const { visible: visibleListings, isLoading, hasMore } = useListingsState();
   const { fetchListings } = useListingsActions();
   const { hoveredListingId } = useInteractionsState();
@@ -451,7 +451,7 @@ const MobileListingMapView = () => {
     }
   }, [isLoading]);
 
-  // Écouteurs d'événements pour la carte
+  // Écouteurs d'événements pour la carte Mapbox
   useEffect(() => {
     if (!mapInstance) return;
 
@@ -465,19 +465,20 @@ const MobileListingMapView = () => {
       setTimeout(() => setShowSearchButton(true), 300);
     };
 
-    const handleZoomChanged = () => {
+    const handleZoomEnd = () => {
       setTimeout(() => setShowSearchButton(true), 500);
     };
 
-    mapInstance.addListener("dragstart", handleDragStart);
-    mapInstance.addListener("dragend", handleDragEnd);
-    mapInstance.addListener("zoom_changed", handleZoomChanged);
+    // Mapbox événements
+    mapInstance.on("dragstart", handleDragStart);
+    mapInstance.on("dragend", handleDragEnd);
+    mapInstance.on("zoomend", handleZoomEnd);
 
     return () => {
       if (mapInstance) {
-        google.maps.event.clearListeners(mapInstance, "dragstart");
-        google.maps.event.clearListeners(mapInstance, "dragend");
-        google.maps.event.clearListeners(mapInstance, "zoom_changed");
+        mapInstance.off("dragstart", handleDragStart);
+        mapInstance.off("dragend", handleDragEnd);
+        mapInstance.off("zoomend", handleZoomEnd);
       }
     };
   }, [mapInstance]);
@@ -551,7 +552,7 @@ const MobileListingMapView = () => {
       <div className="top-24 left-0 right-0 z-30 bg-white border-b border-gray-200 p-4">
         <div className="flex items-center gap-3">
           <div className="flex-1">
-            <CitySearch
+            <MapboxCitySearch
               placeholder="Rechercher une ville..."
               onCitySelect={(cityData) => {
                 console.log("Ville sélectionnée:", cityData);
@@ -569,7 +570,7 @@ const MobileListingMapView = () => {
 
       {/* Carte en arrière-plan avec marge pour le header */}
       <div className="absolute top-20 left-0 right-0 bottom-0">
-        <GoogleMapSection isMapExpanded={true} isMobile={true} />
+        <MapboxSection isMapExpanded={true} isMobile={true} />
 
         {/* Indicateur de mouvement */}
         {isMapMoving && (
