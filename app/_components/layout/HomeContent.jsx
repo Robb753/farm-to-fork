@@ -3,12 +3,26 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { Toaster } from "sonner";
+import dynamic from "next/dynamic";
 import ExploreNearby from "./ExploreNearby";
 import EuropeanFeatures from "./EuropeanFeatures";
 // ✅ Nouvel import Zustand
 import { useMapActions } from "@/lib/store/mapListingsStore";
-import MapboxCitySearch from "@/app/modules/maps/components/shared/MapboxCitySearch";
 import { useTranslation } from "@/lib/store/settingsStore";
+
+// Chargement dynamique pour éviter les erreurs d'hydratation
+const MapboxCitySearch = dynamic(
+  () => import("@/app/modules/maps/components/shared/MapboxCitySearch"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center border-2 rounded-full py-2 px-4 shadow-lg bg-white max-w-lg w-full">
+        <div className="w-5 h-5 bg-gray-200 rounded mr-3 animate-pulse"></div>
+        <div className="flex-grow h-4 bg-gray-200 rounded animate-pulse"></div>
+      </div>
+    ),
+  }
+);
 
 function HomeContent() {
   // ✅ Hook Zustand remplace l'ancien contexte
