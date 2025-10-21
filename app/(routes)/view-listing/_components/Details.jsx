@@ -14,7 +14,7 @@ import {
   Home,
 } from "@/utils/icons";
 import AgentDetail from "./AgentDetail";
-import GoogleMapSection from "@/app/modules/maps/components/GoogleMapSection";
+import SingleFarmMapbox from "@/app/modules/maps/components/SingleFarmMapbox";
 
 function Details({ listingDetail }) {
   if (!listingDetail) {
@@ -155,10 +155,20 @@ function Details({ listingDetail }) {
       <div className="bg-white rounded-lg shadow-sm p-6">
         <h2 className="font-bold text-2xl text-gray-800 mb-4">Localisation</h2>
         <div className="rounded-lg overflow-hidden border border-gray-200 h-[400px]">
-          {listingDetail.coordinates ? (
-            <GoogleMapSection
-              coordinates={listingDetail.coordinates}
-              listing={[listingDetail]}
+          {(listingDetail.lat && listingDetail.lng) ||
+          listingDetail.coordinates ? (
+            <SingleFarmMapbox
+              lat={
+                listingDetail.lat ||
+                listingDetail.coordinates?.lat ||
+                listingDetail.coordinates?.[0]
+              }
+              lng={
+                listingDetail.lng ||
+                listingDetail.coordinates?.lng ||
+                listingDetail.coordinates?.[1]
+              }
+              name={listingDetail.name}
             />
           ) : (
             <div className="flex items-center justify-center h-full bg-gray-100">

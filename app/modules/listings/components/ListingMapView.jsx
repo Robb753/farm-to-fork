@@ -33,8 +33,8 @@ const MobileListingMapView = dynamic(() => import("./MobileListingMapView"), {
   ssr: false,
 });
 
-const GoogleMapSection = dynamic(
-  () => import("../../maps/components/GoogleMapSection"),
+const MapboxSection = dynamic(
+  () => import("../../maps/components/MapboxSection"),
   {
     ssr: false,
     loading: () => (
@@ -393,7 +393,7 @@ const DesktopListingMapView = () => {
             </div>
           )}
 
-          <GoogleMapSection isMapExpanded={isMapExpanded} />
+          <MapboxSection isMapExpanded={isMapExpanded} />
 
           {/* Contrôles de carte */}
           <div className="absolute top-4 right-4 z-20 flex flex-col gap-2">

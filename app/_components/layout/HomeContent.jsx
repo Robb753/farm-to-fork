@@ -7,7 +7,7 @@ import ExploreNearby from "./ExploreNearby";
 import EuropeanFeatures from "./EuropeanFeatures";
 // ✅ Nouvel import Zustand
 import { useMapActions } from "@/lib/store/mapListingsStore";
-import CitySearch from "@/app/modules/maps/components/shared/CitySearch";
+import MapboxCitySearch from "@/app/modules/maps/components/shared/MapboxCitySearch";
 import { useTranslation } from "@/lib/store/settingsStore";
 
 function HomeContent() {
@@ -17,11 +17,10 @@ function HomeContent() {
   const router = useRouter();
 
   const handleCitySelect = (cityData) => {
-    if (!cityData?.value?.geometry) return;
+    // MapboxCitySearch retourne { coordinates: [lng, lat], ... }
+    if (!cityData?.coordinates) return;
 
-    const lat = cityData.value.geometry.location.lat();
-    const lng = cityData.value.geometry.location.lng();
-
+    const [lng, lat] = cityData.coordinates;
     setCoordinates({ lat, lng });
   };
 
@@ -47,7 +46,7 @@ function HomeContent() {
             {t("connect")}
           </p>
           <div className="w-full max-w-lg">
-            <CitySearch
+            <MapboxCitySearch
               onCitySelect={handleCitySelect}
               placeholder="Entrez une ville pour explorer..."
             />

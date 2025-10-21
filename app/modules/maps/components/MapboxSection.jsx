@@ -9,6 +9,12 @@ import {
   useMapboxActions,
   MAPBOX_CONFIG,
 } from "@/lib/store/mapboxListingsStore";
+import {
+  useListingsState,
+  useInteractionsState,
+  useInteractionsActions,
+  useFiltersState,
+} from "@/lib/store/mapListingsStore";
 
 // Configuration du token Mapbox
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
@@ -17,8 +23,9 @@ const MapboxSection = ({ isMapExpanded, isMobile = false }) => {
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef(new Map());
+  const popupRef = useRef(null);
 
-  // État Zustand
+  // État Zustand - Carte
   const { isLoaded, coordinates, zoom, style, bounds } = useMapboxState();
   const {
     setMapLoaded,
@@ -27,6 +34,13 @@ const MapboxSection = ({ isMapExpanded, isMobile = false }) => {
     setMapZoom,
     setCoordinates,
   } = useMapboxActions();
+
+  // État Zustand - Listings et interactions
+  const { visible: visibleListings } = useListingsState();
+  const { hoveredListingId, selectedListingId } = useInteractionsState();
+  const { setHoveredListingId, setSelectedListingId, setOpenInfoWindowId } =
+    useInteractionsActions();
+  const filters = useFiltersState();
 
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -175,7 +189,7 @@ const MapboxSection = ({ isMapExpanded, isMobile = false }) => {
       },
     });
 
-    // Layer pour les marqueurs individuels
+    // Layer pour les marqueurs individuels avec état hover/select
     map.addLayer({
       id: "unclustered-point",
       type: "circle",
@@ -188,9 +202,31 @@ const MapboxSection = ({ isMapExpanded, isMobile = false }) => {
           "#22c55e", // Vert pour ouvert
           "#ef4444", // Rouge pour fermé
         ],
-        "circle-radius": 8,
-        "circle-stroke-width": 2,
+        "circle-radius": [
+          "case",
+          ["boolean", ["feature-state", "selected"], false],
+          12, // Radius pour sélection
+          ["boolean", ["feature-state", "hover"], false],
+          10, // Radius pour hover
+          8, // Radius normal
+        ],
+        "circle-stroke-width": [
+          "case",
+          ["boolean", ["feature-state", "selected"], false],
+          3,
+          ["boolean", ["feature-state", "hover"], false],
+          2.5,
+          2,
+        ],
         "circle-stroke-color": "#ffffff",
+        "circle-opacity": [
+          "case",
+          ["boolean", ["feature-state", "selected"], false],
+          1,
+          ["boolean", ["feature-state", "hover"], false],
+          0.9,
+          0.85,
+        ],
       },
     });
 
@@ -222,27 +258,69 @@ const MapboxSection = ({ isMapExpanded, isMobile = false }) => {
 
       if (features.length > 0) {
         const listing = features[0].properties;
-        console.log("Listing cliqué:", listing);
+        const listingId = listing.id;
 
-        // Créer une popup
-        new mapboxgl.Popup()
-          .setLngLat(e.lngLat)
-          .setHTML(
+        // Toggle selection
+        const alreadySelected = selectedListingId === listingId;
+        setSelectedListingId(alreadySelected ? null : listingId);
+        setOpenInfoWindowId(alreadySelected ? null : listingId);
+
+        // Créer ou fermer popup
+        if (popupRef.current) {
+          popupRef.current.remove();
+          popupRef.current = null;
+        }
+
+        if (!alreadySelected) {
+          const popup = new mapboxgl.Popup({
+            closeButton: true,
+            closeOnClick: false,
+            offset: 25,
+            maxWidth: "250px",
+          })
+            .setLngLat(e.lngLat)
+            .setHTML(
+              `
+              <div class="p-3" style="max-width: 220px;">
+                <h3 class="font-medium text-sm mb-1">${listing.name || "Ferme"}</h3>
+                <p class="text-xs text-gray-600 mb-2">${
+                  listing.address || "Adresse non disponible"
+                }</p>
+                <span class="inline-block px-2 py-1 rounded-full text-xs font-medium" style="
+                  background-color: ${
+                    listing.availability === "open" ? "#dcfce7" : "#fee2e2"
+                  };
+                  color: ${listing.availability === "open" ? "#166534" : "#991b1b"};
+                ">
+                  ${listing.availability === "open" ? "Ouvert" : "Fermé"}
+                </span>
+              </div>
             `
-            <div class="p-3">
-              <h3 class="font-bold">${listing.name}</h3>
-              <p class="text-sm text-gray-600">${listing.address}</p>
-              <span class="inline-block px-2 py-1 rounded-full text-xs font-medium ${
-                listing.availability === "open"
-                  ? "bg-green-100 text-green-800"
-                  : "bg-red-100 text-red-800"
-              }">
-                ${listing.availability === "open" ? "Ouvert" : "Fermé"}
-              </span>
-            </div>
-          `
-          )
-          .addTo(map);
+            )
+            .addTo(map);
+
+          popupRef.current = popup;
+
+          // Écouter la fermeture de la popup
+          popup.on("close", () => {
+            setSelectedListingId(null);
+            setOpenInfoWindowId(null);
+            popupRef.current = null;
+          });
+        }
+
+        // Scroll to listing dans la liste
+        requestAnimationFrame(() => {
+          const listEl = document.getElementById(`listing-${listingId}`);
+          if (listEl) {
+            listEl.scrollIntoView({ behavior: "smooth", block: "center" });
+            listEl.classList.add("selected-listing");
+            setTimeout(
+              () => listEl.classList.remove("selected-listing"),
+              1500
+            );
+          }
+        });
       }
     });
 
@@ -255,12 +333,62 @@ const MapboxSection = ({ isMapExpanded, isMobile = false }) => {
       map.getCanvas().style.cursor = "";
     });
 
-    map.on("mouseenter", "unclustered-point", () => {
+    map.on("mouseenter", "unclustered-point", (e) => {
       map.getCanvas().style.cursor = "pointer";
+
+      const features = map.queryRenderedFeatures(e.point, {
+        layers: ["unclustered-point"],
+      });
+
+      if (features.length > 0) {
+        const listing = features[0].properties;
+        setHoveredListingId(listing.id);
+
+        // Afficher popup au hover après un délai
+        setTimeout(() => {
+          if (
+            !popupRef.current &&
+            selectedListingId !== listing.id &&
+            hoveredListingId === listing.id
+          ) {
+            const popup = new mapboxgl.Popup({
+              closeButton: false,
+              closeOnClick: false,
+              offset: 25,
+              maxWidth: "220px",
+            })
+              .setLngLat([parseFloat(listing.lng), parseFloat(listing.lat)])
+              .setHTML(
+                `
+                <div class="p-2" style="max-width: 200px;">
+                  <h3 class="font-medium text-xs mb-1">${listing.name || "Ferme"}</h3>
+                  <p class="text-xs text-gray-600">${
+                    listing.address || "Adresse non disponible"
+                  }</p>
+                </div>
+              `
+              )
+              .addTo(map);
+
+            popupRef.current = popup;
+          }
+        }, 300);
+      }
     });
 
     map.on("mouseleave", "unclustered-point", () => {
       map.getCanvas().style.cursor = "";
+      setHoveredListingId(null);
+
+      // Fermer la popup de hover si ce n'est pas une sélection
+      if (popupRef.current && !selectedListingId) {
+        setTimeout(() => {
+          if (popupRef.current && !selectedListingId) {
+            popupRef.current.remove();
+            popupRef.current = null;
+          }
+        }, 100);
+      }
     });
   }, []);
 
@@ -269,15 +397,39 @@ const MapboxSection = ({ isMapExpanded, isMobile = false }) => {
     (listings) => {
       if (!mapRef.current || !isLoaded) return;
 
+      // Filtrer les listings selon les filtres actifs
+      const filteredListings = listings.filter((listing) => {
+        const hasActiveFilters = Object.values(filters).some(
+          (arr) => arr && arr.length > 0
+        );
+        if (!hasActiveFilters) return true;
+
+        return Object.entries(filters).every(([key, values]) => {
+          if (!values || values.length === 0) return true;
+
+          let listingValues = [];
+          if (listing[key]) {
+            listingValues = Array.isArray(listing[key])
+              ? listing[key]
+              : [listing[key]];
+          }
+
+          if (listingValues.length === 0) return false;
+          return values.some((value) => listingValues.includes(value));
+        });
+      });
+
       const geojsonData = {
         type: "FeatureCollection",
-        features: listings.map((listing) => ({
+        features: filteredListings.map((listing) => ({
           type: "Feature",
           properties: {
             id: listing.id,
             name: listing.name,
             address: listing.address,
             availability: listing.availability,
+            lng: listing.lng,
+            lat: listing.lat,
           },
           geometry: {
             type: "Point",
@@ -291,8 +443,61 @@ const MapboxSection = ({ isMapExpanded, isMobile = false }) => {
         source.setData(geojsonData);
       }
     },
-    [isLoaded]
+    [isLoaded, filters]
   );
+
+  // Mettre à jour les marqueurs quand les listings ou filtres changent
+  useEffect(() => {
+    if (visibleListings && visibleListings.length > 0) {
+      updateMarkersData(visibleListings);
+    }
+  }, [visibleListings, filters, updateMarkersData]);
+
+  // Mettre à jour le feature-state pour le hover
+  useEffect(() => {
+    if (!mapRef.current || !isLoaded) return;
+
+    const map = mapRef.current;
+
+    // Réinitialiser tous les états hover
+    visibleListings?.forEach((listing) => {
+      map.setFeatureState(
+        { source: "listings", id: listing.id },
+        { hover: false }
+      );
+    });
+
+    // Activer le hover pour le listing survolé
+    if (hoveredListingId) {
+      map.setFeatureState(
+        { source: "listings", id: hoveredListingId },
+        { hover: true }
+      );
+    }
+  }, [hoveredListingId, isLoaded, visibleListings]);
+
+  // Mettre à jour le feature-state pour la sélection
+  useEffect(() => {
+    if (!mapRef.current || !isLoaded) return;
+
+    const map = mapRef.current;
+
+    // Réinitialiser tous les états selected
+    visibleListings?.forEach((listing) => {
+      map.setFeatureState(
+        { source: "listings", id: listing.id },
+        { selected: false }
+      );
+    });
+
+    // Activer le selected pour le listing sélectionné
+    if (selectedListingId) {
+      map.setFeatureState(
+        { source: "listings", id: selectedListingId },
+        { selected: true }
+      );
+    }
+  }, [selectedListingId, isLoaded, visibleListings]);
 
   // Fonction pour voler vers des coordonnées
   const flyTo = useCallback((coordinates, zoomLevel = 14) => {
