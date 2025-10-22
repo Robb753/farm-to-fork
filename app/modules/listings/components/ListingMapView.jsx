@@ -197,35 +197,53 @@ const DesktopListingMapView = () => {
         <FilterSection />
       </div>
 
-      {/* Barre de résultats améliorée avec feedback temps réel */}
+      {/* Barre de résultats moderne style Properstar */}
       <div
-        className={`bg-gray-50 py-3 px-4 border-b border-gray-200 flex items-center justify-between transition-all duration-300 ${
+        className={`bg-white py-4 px-6 border-b border-gray-200 flex items-center justify-between shadow-sm transition-all duration-300 ${
           isModalOpen ? "pointer-events-none opacity-50" : ""
         }`}
       >
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3">
             {isLoading ? (
               <>
-                <RefreshCw className="h-4 w-4 animate-spin text-green-600" />
-                <span className="text-gray-600 text-sm font-medium">
-                  {isMapMoving ? "Recherche en cours..." : "Chargement..."}
-                </span>
+                <div className="relative w-5 h-5">
+                  <RefreshCw className="h-5 w-5 animate-spin text-green-600" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-gray-900 text-sm font-semibold">
+                    {isMapMoving ? "Recherche..." : "Chargement..."}
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    Actualisation des résultats
+                  </span>
+                </div>
               </>
             ) : (
               <>
-                <span className="text-gray-600 text-sm font-medium">
-                  {totalResults} résultat{totalResults !== 1 ? "s" : ""} dans
-                  cette zone
-                </span>
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-900 text-base font-bold">
+                      {totalResults.toLocaleString()}
+                    </span>
+                    <span className="text-gray-600 text-sm">
+                      {totalResults !== 1 ? "fermes trouvées" : "ferme trouvée"}
+                    </span>
 
-                {/* Indicateur de mise à jour récente */}
-                {Date.now() - lastSearchTime < 3000 && !isLoading && (
-                  <div className="flex items-center gap-1 text-xs text-green-600 animate-fade-in">
-                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                    <span>Mis à jour</span>
+                    {/* Badge de mise à jour récente */}
+                    {Date.now() - lastSearchTime < 3000 && !isLoading && (
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200 animate-fade-in">
+                        <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+                        Actualisé
+                      </span>
+                    )}
                   </div>
-                )}
+                  {totalResults > 0 && (
+                    <span className="text-xs text-gray-500">
+                      dans la zone visible
+                    </span>
+                  )}
+                </div>
               </>
             )}
           </div>
@@ -233,23 +251,23 @@ const DesktopListingMapView = () => {
           <button
             onClick={handleRefreshListings}
             disabled={isLoading}
-            className="text-green-600 hover:text-green-800 text-sm flex items-center gap-1 disabled:opacity-50 transition-colors"
+            className="group flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 hover:border-green-500 hover:bg-green-50 text-sm font-medium text-gray-700 hover:text-green-700 disabled:opacity-50 disabled:hover:bg-white disabled:hover:border-gray-200 transition-all duration-200"
           >
             <RefreshCw
-              className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`}
+              className={`h-4 w-4 ${isLoading ? "animate-spin" : "group-hover:rotate-180 transition-transform duration-300"}`}
             />
-            <span>Actualiser</span>
+            <span className="hidden sm:inline">Actualiser</span>
           </button>
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="hidden md:flex items-center gap-1 text-sm">
-            <span className="text-gray-600 mr-1">Affichage :</span>
+        {/* Contrôles d'affichage améliorés */}
+        <div className="flex items-center gap-3">
+          <div className="hidden md:flex items-center bg-gray-100 rounded-lg p-1">
             <button
-              className={`px-3 py-1.5 rounded-md flex items-center gap-1 transition-all duration-200 ${
+              className={`px-4 py-2 rounded-md flex items-center gap-2 text-sm font-medium transition-all duration-200 ${
                 !isMapExpanded
-                  ? "bg-gray-900 text-white"
-                  : "text-gray-600 hover:bg-gray-100"
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-600 hover:text-gray-900"
               }`}
               onClick={() => setIsMapExpanded(false)}
             >
@@ -257,10 +275,10 @@ const DesktopListingMapView = () => {
               <span>Liste</span>
             </button>
             <button
-              className={`px-3 py-1.5 rounded-md flex items-center gap-1 transition-all duration-200 ${
+              className={`px-4 py-2 rounded-md flex items-center gap-2 text-sm font-medium transition-all duration-200 ${
                 isMapExpanded
-                  ? "bg-gray-900 text-white"
-                  : "text-gray-600 hover:bg-gray-100"
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-600 hover:text-gray-900"
               }`}
               onClick={() => setIsMapExpanded(true)}
             >
@@ -330,48 +348,64 @@ const DesktopListingMapView = () => {
             </div>
           )}
 
-          {/* Bouton "Rechercher dans cette zone" style Airbnb */}
+          {/* Bouton "Rechercher dans cette zone" style moderne */}
           {showSearchButton && !isLoading && !isMapMoving && (
-            <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 z-30 animate-slide-up">
+            <div className="absolute bottom-24 left-1/2 transform -translate-x-1/2 z-30 animate-slide-up">
               <button
                 onClick={handleSearchInCurrentArea}
-                className="bg-gray-900 hover:bg-gray-800 text-white px-6 py-3 rounded-full shadow-lg flex items-center gap-2 transition-all duration-200 hover:scale-105"
+                className="group bg-gray-900 hover:bg-gray-800 text-white px-5 py-3 rounded-full shadow-xl hover:shadow-2xl flex items-center gap-3 transition-all duration-300 hover:scale-105 border border-gray-700"
               >
-                <Search className="w-4 h-4" />
-                <span className="font-medium">Rechercher dans cette zone</span>
+                <div className="relative">
+                  <Search className="w-4 h-4 transition-transform group-hover:scale-110" />
+                  <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 rounded-full transition-opacity duration-300"></div>
+                </div>
+                <span className="font-semibold text-sm">
+                  Rechercher dans cette zone
+                </span>
               </button>
             </div>
           )}
 
           <MapboxSection isMapExpanded={isMapExpanded} />
 
-          {/* Contrôles de carte */}
+          {/* Contrôles de carte améliorés */}
           <div className="absolute top-4 right-4 z-20 flex flex-col gap-2">
             <button
               onClick={toggleMapSize}
-              className="bg-white text-gray-700 hover:bg-gray-50 p-3 rounded-lg shadow-lg flex items-center gap-2 transition-all border border-gray-200 hover:shadow-xl"
+              className="group bg-white text-gray-700 hover:text-gray-900 hover:bg-gray-50 p-3 rounded-xl shadow-lg hover:shadow-xl flex items-center gap-2 transition-all duration-200 border border-gray-200 hover:border-gray-300"
               title={isMapExpanded ? "Réduire la carte" : "Agrandir la carte"}
             >
-              {isMapExpanded ? (
-                <Minimize2 className="w-5 h-5" />
-              ) : (
-                <Maximize2 className="w-5 h-5" />
-              )}
+              <div className="relative">
+                {isMapExpanded ? (
+                  <Minimize2 className="w-5 h-5 transition-transform group-hover:scale-90" />
+                ) : (
+                  <Maximize2 className="w-5 h-5 transition-transform group-hover:scale-110" />
+                )}
+              </div>
             </button>
           </div>
         </div>
       </div>
 
-      {/* Bouton mobile amélioré */}
+      {/* Bouton mobile moderne avec indicateur */}
       <div className="md:hidden fixed bottom-6 right-6 z-50">
         <button
           onClick={toggleMapSize}
-          className="bg-gray-900 hover:bg-gray-800 text-white rounded-full p-4 shadow-xl flex items-center justify-center transition-all duration-200 hover:scale-110"
+          className="group relative bg-gray-900 hover:bg-gray-800 text-white rounded-full p-4 shadow-2xl hover:shadow-3xl flex items-center justify-center transition-all duration-300 hover:scale-110 border-2 border-gray-700"
         >
+          {/* Indicateur de mode */}
+          <div className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center border-2 border-white shadow-md">
+            {isMapExpanded ? (
+              <MapPin className="w-3 h-3 text-white" />
+            ) : (
+              <List className="w-3 h-3 text-white" />
+            )}
+          </div>
+
           {isMapExpanded ? (
-            <List className="w-6 h-6" />
+            <List className="w-6 h-6 transition-transform group-hover:scale-110" />
           ) : (
-            <MapPin className="w-6 h-6" />
+            <MapPin className="w-6 h-6 transition-transform group-hover:scale-110" />
           )}
         </button>
       </div>

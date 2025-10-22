@@ -149,7 +149,7 @@ const MapboxSection = ({ isMapExpanded, isMobile = false }) => {
       clusterRadius: 50,
     });
 
-    // Layer pour les clusters
+    // Layer pour les clusters - Style moderne
     map.addLayer({
       id: "clusters",
       type: "circle",
@@ -159,25 +159,29 @@ const MapboxSection = ({ isMapExpanded, isMobile = false }) => {
         "circle-color": [
           "step",
           ["get", "point_count"],
-          "#51bbd6", // Couleur pour < 10
+          "#22c55e", // Vert pour < 10
           10,
-          "#f1f075", // Couleur pour 10-30
+          "#3b82f6", // Bleu pour 10-30
           30,
-          "#f28cb1", // Couleur pour > 30
+          "#8b5cf6", // Violet pour > 30
         ],
         "circle-radius": [
           "step",
           ["get", "point_count"],
-          20, // Rayon pour < 10
+          22, // Rayon pour < 10
           10,
-          30, // Rayon pour 10-30
+          32, // Rayon pour 10-30
           30,
-          40, // Rayon pour > 30
+          42, // Rayon pour > 30
         ],
+        "circle-opacity": 0.9,
+        "circle-stroke-width": 3,
+        "circle-stroke-color": "#ffffff",
+        "circle-stroke-opacity": 1,
       },
     });
 
-    // Layer pour le texte des clusters
+    // Layer pour le texte des clusters - Style amélioré
     map.addLayer({
       id: "cluster-count",
       type: "symbol",
@@ -186,14 +190,17 @@ const MapboxSection = ({ isMapExpanded, isMobile = false }) => {
       layout: {
         "text-field": "{point_count_abbreviated}",
         "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"],
-        "text-size": 12,
+        "text-size": 14,
+        "text-allow-overlap": true,
       },
       paint: {
         "text-color": "#ffffff",
+        "text-halo-color": "rgba(0, 0, 0, 0.2)",
+        "text-halo-width": 1,
       },
     });
 
-    // Layer pour les marqueurs individuels avec état hover/select
+    // Layer pour les marqueurs individuels - Style moderne avec animations
     map.addLayer({
       id: "unclustered-point",
       type: "circle",
@@ -204,23 +211,47 @@ const MapboxSection = ({ isMapExpanded, isMobile = false }) => {
           "case",
           ["==", ["get", "availability"], "open"],
           "#22c55e", // Vert pour ouvert
-          "#ef4444", // Rouge pour fermé
+          "#f59e0b", // Orange pour fermé
         ],
         "circle-radius": [
-          "case",
-          ["boolean", ["feature-state", "selected"], false],
-          12, // Radius pour sélection
-          ["boolean", ["feature-state", "hover"], false],
-          10, // Radius pour hover
-          8, // Radius normal
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          8,
+          [
+            "case",
+            ["boolean", ["feature-state", "selected"], false],
+            8,
+            ["boolean", ["feature-state", "hover"], false],
+            7,
+            5,
+          ],
+          12,
+          [
+            "case",
+            ["boolean", ["feature-state", "selected"], false],
+            12,
+            ["boolean", ["feature-state", "hover"], false],
+            10,
+            8,
+          ],
+          16,
+          [
+            "case",
+            ["boolean", ["feature-state", "selected"], false],
+            16,
+            ["boolean", ["feature-state", "hover"], false],
+            14,
+            12,
+          ],
         ],
         "circle-stroke-width": [
           "case",
           ["boolean", ["feature-state", "selected"], false],
-          3,
+          4,
           ["boolean", ["feature-state", "hover"], false],
+          3,
           2.5,
-          2,
         ],
         "circle-stroke-color": "#ffffff",
         "circle-opacity": [
@@ -228,8 +259,8 @@ const MapboxSection = ({ isMapExpanded, isMobile = false }) => {
           ["boolean", ["feature-state", "selected"], false],
           1,
           ["boolean", ["feature-state", "hover"], false],
+          0.95,
           0.9,
-          0.85,
         ],
       },
     });
