@@ -3,8 +3,8 @@
 import React, { useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useAllListingsWithImages } from "@/app/hooks/useAllListingsWithImages";
-// ✅ Nouveaux imports Zustand
-import { useListingsActions } from "@/lib/store/mapListingsStore";
+// ✅ Nouveaux imports Zustand depuis mapboxListingsStore
+import { useListingsActions } from "@/lib/store/mapboxListingsStore";
 
 const ListingMapView = dynamic(
   () => import("../../modules/listings/components/ListingMapView"),

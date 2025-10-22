@@ -11,14 +11,14 @@ import React, {
 import { useUser, useClerk } from "@clerk/nextjs";
 import { supabase } from "@/utils/supabase/client";
 import { toast } from "sonner";
-// ✅ Imports Zustand
+// ✅ Imports Zustand depuis mapboxListingsStore
 import {
   useListingsState,
   useListingsActions,
-  useMapState,
+  useMapboxState,
   useInteractionsState,
   useInteractionsActions,
-} from "@/lib/store/mapListingsStore";
+} from "@/lib/store/mapboxListingsStore";
 import {
   useUserFavorites,
   useUserActions,
@@ -367,7 +367,7 @@ export default function Listing() {
   const { hoveredListingId } = useInteractionsState();
   const { setHoveredListingId } = useInteractionsActions();
   const { setAllListings } = useListingsActions();
-  const { mapBounds } = useMapState();
+  const { bounds: mapBounds } = useMapboxState();
 
   // ✅ Hooks favoris depuis userStore
   const favorites = useUserFavorites();

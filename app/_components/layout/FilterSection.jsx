@@ -17,7 +17,7 @@ import {
 import {
   useFiltersState,
   useFiltersActions,
-} from "@/lib/store/mapListingsStore";
+} from "@/lib/store/mapboxListingsStore";
 import { useSearchParams } from "next/navigation";
 import { useUpdateExploreUrl } from "@/utils/updateExploreUrl";
 
