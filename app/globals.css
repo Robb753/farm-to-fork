@@ -101,3 +101,8 @@
 .mapboxgl-popup-tip {
   border-top-color: white;
 }
+:where(.mapbox-wrapper, .relative).mapbox-wrapper:fullscreen,
+.mapbox-wrapper:-webkit-full-screen {
+  width: 100vw !important;
+  height: 100vh !important;
+}
