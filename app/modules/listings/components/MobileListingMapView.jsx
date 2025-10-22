@@ -27,15 +27,15 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { useUser, useClerk } from "@clerk/nextjs";
 import { supabase } from "@/utils/supabase/client";
-// ✅ Imports Zustand
+// ✅ Imports Zustand depuis mapboxListingsStore
 import {
   useListingsState,
   useListingsActions,
   useFiltersState,
   useInteractionsState,
   useInteractionsActions,
-} from "@/lib/store/mapListingsStore";
-import { useMapboxState } from "@/lib/store/mapboxListingsStore";
+  useMapboxState,
+} from "@/lib/store/mapboxListingsStore";
 import {
   useUserFavorites,
   useUserActions,

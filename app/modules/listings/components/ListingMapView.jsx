@@ -14,13 +14,13 @@ import { toast } from "sonner";
 import { useSearchParams } from "next/navigation";
 import FilterSection from "@/app/_components/layout/FilterSection";
 import Listing from "./Listing";
-// ✅ Nouveaux imports Zustand
+// ✅ Nouveaux imports Zustand depuis mapboxListingsStore
 import {
-  useMapState,
+  useMapboxState,
   useListingsState,
   useListingsActions,
   useFiltersState,
-} from "@/lib/store/mapListingsStore";
+} from "@/lib/store/mapboxListingsStore";
 import ExploreMapSearch from "../../maps/components/shared/ExploreMapSearch";
 
 // Import dynamique du composant mobile pour éviter les problèmes SSR
@@ -68,11 +68,10 @@ const useIsMobile = () => {
 // Composant desktop existant
 const DesktopListingMapView = () => {
   // ✅ Hooks Zustand remplacent les anciens contextes
-  const { coordinates, mapBounds, mapInstance } = useMapState();
+  const { coordinates, bounds: mapBounds, mapInstance } = useMapboxState();
   const { visible: visibleListings, isLoading, hasMore } = useListingsState();
-  const { fetchListings, loadMoreListings, refreshListings, searchInArea } =
-    useListingsActions();
-  const filters = useFiltersState();
+  const { fetchListings, searchInArea } = useListingsActions();
+  const { filters } = useFiltersState();
 
   const searchParams = useSearchParams();
   const [isMapExpanded, setIsMapExpanded] = useState(false);
@@ -116,76 +115,27 @@ const DesktopListingMapView = () => {
     }
   }, [visibleListings, totalResults, isLoading]);
 
-  // Écouteurs d'événements pour la carte (style Airbnb)
+  // Écouter les changements de bounds pour afficher le bouton de recherche
   useEffect(() => {
-    if (!mapInstance) return;
+    if (!mapBounds) return;
 
-    const handleDragStart = () => {
-      setIsMapMoving(true);
-      setShowSearchButton(false);
-      if (mapMoveTimeoutRef.current) {
-        clearTimeout(mapMoveTimeoutRef.current);
-      }
-    };
+    // Quand les bounds changent, afficher le bouton après un délai
+    if (searchButtonTimeoutRef.current) {
+      clearTimeout(searchButtonTimeoutRef.current);
+    }
 
-    const handleDragEnd = () => {
+    setMapUpdatePending(true);
+    searchButtonTimeoutRef.current = setTimeout(() => {
+      setShowSearchButton(true);
       setIsMapMoving(false);
-      setMapUpdatePending(true);
-
-      if (searchButtonTimeoutRef.current) {
-        clearTimeout(searchButtonTimeoutRef.current);
-      }
-
-      searchButtonTimeoutRef.current = setTimeout(() => {
-        setShowSearchButton(true);
-      }, 300);
-    };
-
-    const handleZoomChanged = () => {
-      setMapUpdatePending(true);
-      if (searchButtonTimeoutRef.current) {
-        clearTimeout(searchButtonTimeoutRef.current);
-      }
-
-      searchButtonTimeoutRef.current = setTimeout(() => {
-        setShowSearchButton(true);
-      }, 500);
-    };
-
-    const handleBoundsChanged = () => {
-      const currentBounds = mapInstance.getBounds();
-      if (currentBounds && lastBoundsRef.current) {
-        const hasSignificantChange = !currentBounds.equals(
-          lastBoundsRef.current
-        );
-        if (hasSignificantChange) {
-          setMapUpdatePending(true);
-        }
-      }
-      lastBoundsRef.current = currentBounds;
-    };
-
-    // Ajouter les écouteurs
-    mapInstance.addListener("dragstart", handleDragStart);
-    mapInstance.addListener("dragend", handleDragEnd);
-    mapInstance.addListener("zoom_changed", handleZoomChanged);
-    mapInstance.addListener("bounds_changed", handleBoundsChanged);
+    }, 500);
 
     return () => {
-      if (mapInstance) {
-        google.maps.event.clearListeners(mapInstance, "dragstart");
-        google.maps.event.clearListeners(mapInstance, "dragend");
-        google.maps.event.clearListeners(mapInstance, "zoom_changed");
-        google.maps.event.clearListeners(mapInstance, "bounds_changed");
-      }
-      if (mapMoveTimeoutRef.current) {
-        clearTimeout(mapMoveTimeoutRef.current);
-      }
       if (searchButtonTimeoutRef.current) {
         clearTimeout(searchButtonTimeoutRef.current);
       }
     };
-  }, [mapInstance]);
+  }, [mapBounds]);
 
   // ✅ Fonction de recherche dans la zone actuelle mise à jour
   const handleSearchInCurrentArea = useCallback(() => {
@@ -212,8 +162,8 @@ const DesktopListingMapView = () => {
     if (isLoading || !hasMore) return;
     const newPage = page + 1;
     setPage(newPage);
-    loadMoreListings();
-  }, [page, hasMore, isLoading, loadMoreListings]);
+    fetchListings({ page: newPage, append: true });
+  }, [page, hasMore, isLoading, fetchListings]);
 
   // ✅ Fonction pour rafraîchir les listings mise à jour
   const handleRefreshListings = useCallback(() => {
@@ -221,14 +171,14 @@ const DesktopListingMapView = () => {
     setShowSearchButton(false);
     setMapUpdatePending(false);
 
-    refreshListings().then((data) => {
+    fetchListings({ page: 1, forceRefresh: true }).then((data) => {
       if (data && data.length > 0) {
         toast.success(`${data.length} fermes trouvées`);
       } else {
         toast.info("Aucune ferme trouvée dans cette zone");
       }
     });
-  }, [refreshListings]);
+  }, [fetchListings]);
 
   const toggleMapSize = useCallback(() => {
     setIsMapExpanded((prev) => !prev);

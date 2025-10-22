@@ -6,8 +6,8 @@ import { Toaster } from "sonner";
 import dynamic from "next/dynamic";
 import ExploreNearby from "./ExploreNearby";
 import EuropeanFeatures from "./EuropeanFeatures";
-// ✅ Nouvel import Zustand
-import { useMapActions } from "@/lib/store/mapListingsStore";
+// ✅ Nouvel import Zustand depuis mapboxListingsStore
+import { useMapboxActions } from "@/lib/store/mapboxListingsStore";
 import { useTranslation } from "@/lib/store/settingsStore";
 
 // Chargement dynamique pour éviter les erreurs d'hydratation
@@ -26,7 +26,7 @@ const MapboxCitySearch = dynamic(
 
 function HomeContent() {
   // ✅ Hook Zustand remplace l'ancien contexte
-  const { setCoordinates } = useMapActions();
+  const { setCoordinates } = useMapboxActions();
   const t = useTranslation();
   const router = useRouter();
 

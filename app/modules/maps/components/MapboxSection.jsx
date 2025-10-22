@@ -7,14 +7,13 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import {
   useMapboxState,
   useMapboxActions,
-  MAPBOX_CONFIG,
-} from "@/lib/store/mapboxListingsStore";
-import {
   useListingsState,
+  useListingsActions,
   useInteractionsState,
   useInteractionsActions,
   useFiltersState,
-} from "@/lib/store/mapListingsStore";
+  MAPBOX_CONFIG,
+} from "@/lib/store/mapboxListingsStore";
 
 // Configuration du token Mapbox
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
@@ -35,6 +34,9 @@ const MapboxSection = ({ isMapExpanded, isMobile = false }) => {
     setMapZoom,
     setCoordinates,
   } = useMapboxActions();
+
+  // Actions Listings pour le fetch automatique
+  const { searchInArea } = useListingsActions();
 
   // État Zustand - Listings et interactions
   const { visible: visibleListings } = useListingsState();
@@ -98,6 +100,9 @@ const MapboxSection = ({ isMapExpanded, isMobile = false }) => {
           [currentBounds.getWest(), currentBounds.getSouth()],
           [currentBounds.getEast(), currentBounds.getNorth()],
         ]);
+
+        // Déclencher automatiquement la recherche dans la zone visible (avec debounce)
+        searchInArea(map);
       });
 
       map.on("error", (e) => {
