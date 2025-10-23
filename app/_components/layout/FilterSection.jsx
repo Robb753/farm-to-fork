@@ -18,6 +18,7 @@ import {
 import {
   useFiltersState,
   useFiltersActions,
+  filterSections,
 } from "@/lib/store/mapboxListingsStore";
 import { useSearchParams } from "next/navigation";
 import { useUpdateExploreUrl } from "@/utils/updateExploreUrl";
@@ -28,69 +29,6 @@ export const openMobileFilters = () => {
     window.dispatchEvent(new CustomEvent("openMobileFilters"));
   }
 };
-
-/* -------- filter sections -------- */
-export const filterSections = [
-  {
-    title: "Produits",
-    key: "product_type",
-    items: [
-      "Fruits",
-      "Légumes",
-      "Produits laitiers",
-      "Viande",
-      "Œufs",
-      "Produits transformés",
-    ],
-  },
-  {
-    title: "Certifications",
-    key: "certifications",
-    items: ["Label AB", "Label Rouge", "AOP/AOC", "HVE", "Demeter"],
-  },
-  {
-    title: "Distribution",
-    key: "purchase_mode",
-    items: [
-      "Vente directe à la ferme",
-      "Marché local",
-      "Livraison à domicile",
-      "Drive fermier",
-    ],
-  },
-  {
-    title: "Production",
-    key: "production_method",
-    items: [
-      "Agriculture conventionnelle",
-      "Agriculture biologique",
-      "Agriculture durable",
-      "Agriculture raisonnée",
-    ],
-  },
-  {
-    title: "Services",
-    key: "additional_services",
-    items: [
-      "Visite de la ferme",
-      "Ateliers de cuisine",
-      "Hébergement",
-      "Activités pour enfants",
-      "Réservation pour événements",
-    ],
-  },
-  {
-    title: "Disponibilité",
-    key: "availability",
-    items: [
-      "Saisonnière",
-      "Toute l'année",
-      "Pré-commande",
-      "Sur abonnement",
-      "Événements spéciaux",
-    ],
-  },
-];
 
 const mapFilterTypes = [
   { id: "conventional", label: "Agriculture conventionnelle" },
