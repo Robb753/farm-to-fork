@@ -1,4 +1,5 @@
 "use client";
+
 import React, {
   useState,
   useEffect,
@@ -21,10 +22,14 @@ import {
 import { useSearchParams } from "next/navigation";
 import { useUpdateExploreUrl } from "@/utils/updateExploreUrl";
 
+/* -------- open on mobile from elsewhere -------- */
 export const openMobileFilters = () => {
-  window.dispatchEvent(new CustomEvent("openMobileFilters"));
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("openMobileFilters"));
+  }
 };
 
+/* -------- filter sections -------- */
 export const filterSections = [
   {
     title: "Produits",
@@ -94,8 +99,9 @@ const mapFilterTypes = [
   { id: "reasoned", label: "Agriculture raisonnée" },
 ];
 
+/* -------- small UI bits -------- */
 const SimpleCheckbox = ({ checked, onChange, id, label }) => (
-  <div className="flex items-center space-x-3">
+  <label htmlFor={id} className="flex cursor-pointer items-center gap-3">
     <input
       id={id}
       type="checkbox"
@@ -103,212 +109,256 @@ const SimpleCheckbox = ({ checked, onChange, id, label }) => (
       onChange={onChange}
       className="sr-only"
     />
-    <div
+    <span
       onClick={onChange}
-      className={`w-4 h-4 flex items-center justify-center border rounded cursor-pointer ${
+      className={`flex h-4 w-4 items-center justify-center rounded border text-white transition ${
         checked
-          ? "bg-green-600 border-green-600 text-white"
+          ? "border-emerald-600 bg-emerald-600"
           : "border-gray-300 bg-white"
       }`}
+      aria-checked={checked}
+      role="checkbox"
     >
       {checked && <Check className="h-3 w-3" />}
-    </div>
-    <label htmlFor={id} className="text-gray-700 text-sm cursor-pointer">
-      {label}
-    </label>
-  </div>
+    </span>
+    <span className="text-sm text-gray-700">{label}</span>
+  </label>
 );
 
-// Helper pour convertir les filtres en params URL
+/* filters -> query params */
 const filtersToUrlParams = (filters) => {
   const params = {};
   Object.entries(filters).forEach(([key, values]) => {
-    if (values && values.length > 0) {
+    if (Array.isArray(values) && values.length > 0)
       params[key] = values.join(",");
-    }
   });
   return params;
 };
 
+/* debounce helper */
+const useDebouncedCallback = (fn, delay = 300) => {
+  const tRef = useRef(null);
+  return useCallback(
+    (...args) => {
+      if (tRef.current) clearTimeout(tRef.current);
+      tRef.current = setTimeout(() => fn(...args), delay);
+    },
+    [fn, delay]
+  );
+};
+
+/* ===== helpers ===== */
+function useOnClickOutside(ref, onClose) {
+  useEffect(() => {
+    const handler = (e) => {
+      if (!ref.current) return;
+      if (!ref.current.contains(e.target)) onClose();
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [ref, onClose]);
+}
+
+const PillButton = ({ active, label, onClick, count, onClear, rightIcon }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`inline-flex h-10 items-center gap-2 rounded-full border px-4 text-sm transition ${
+      active
+        ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+        : "border-gray-200 bg-white text-gray-800 hover:bg-gray-50"
+    }`}
+  >
+    <span>{label}</span>
+    {count ? (
+      <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-white/80 px-1.5 text-xs">
+        {count}
+      </span>
+    ) : null}
+    {active && onClear ? (
+      <span
+        onClick={(e) => {
+          e.stopPropagation();
+          onClear();
+        }}
+        className="-mr-1 inline-flex h-5 w-5 items-center justify-center rounded-full hover:bg-white/60"
+        aria-label={`Effacer ${label}`}
+      >
+        <X className="h-4 w-4" />
+      </span>
+    ) : (
+      (rightIcon ?? <ChevronDown className="h-4 w-4" />)
+    )}
+  </button>
+);
+
+const DropdownPill = ({ label, values, children, onClear }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useOnClickOutside(ref, () => setOpen(false));
+
+  const count = Array.isArray(values) ? values.length : 0;
+  const active = count > 0;
+
+  return (
+    <div className="relative" ref={ref}>
+      <PillButton
+        label={label}
+        active={active}
+        count={count || undefined}
+        onClick={() => setOpen((o) => !o)}
+        onClear={active ? onClear : undefined}
+      />
+      {open && (
+        <div className="absolute left-0 z-30 mt-2 w-[320px] rounded-xl border border-gray-200 bg-white p-4 shadow-xl">
+          {children}
+          <div className="mt-3 flex justify-end">
+            <button
+              onClick={() => setOpen(false)}
+              className="rounded-md border border-gray-200 px-3 py-1.5 text-sm hover:bg-gray-50"
+            >
+              Fermer
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ---------- Component ---------- */
 const FilterSection = () => {
-  // ✅ Hooks Zustand
+  // IMPORTANT : useFiltersState() renvoie l’objet "filters" (après correction du store)
   const filters = useFiltersState();
   const { toggleFilter, resetFilters, setFilters } = useFiltersActions();
 
-  // Hooks pour synchronisation URL
   const searchParams = useSearchParams();
   const updateExploreUrl = useUpdateExploreUrl();
-  const [filtersHydrated, setFiltersHydrated] = useState(false);
 
-  const [isOpen, setIsOpen] = useState(null);
-  const [isMapFilterOpen, setIsMapFilterOpen] = useState(false);
-  const containerRef = useRef(null);
-  const mapFilterRef = useRef(null);
-
+  const [hydratedFromUrl, setHydratedFromUrl] = useState(false);
   const [isMobileModalOpen, setIsMobileModalOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
-  // ✅ Hydrater les filtres depuis l'URL au chargement
+  /* 1) hydrate from URL once */
   useEffect(() => {
+    if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     const urlFilters = {};
 
     filterSections.forEach(({ key }) => {
-      const val = params.get(key);
-      if (val) urlFilters[key] = val.split(",");
+      const raw = params.get(key);
+      if (raw) urlFilters[key] = raw.split(",").filter(Boolean);
     });
 
-    // Gérer également mapType
     const mapTypeVal = params.get("mapType");
-    if (mapTypeVal) urlFilters.mapType = mapTypeVal.split(",");
+    if (mapTypeVal) urlFilters.mapType = mapTypeVal.split(",").filter(Boolean);
 
-    if (Object.keys(urlFilters).length > 0) {
-      setFilters(urlFilters);
-    }
-
-    setFiltersHydrated(true);
+    if (Object.keys(urlFilters).length > 0) setFilters(urlFilters);
+    setHydratedFromUrl(true);
   }, [setFilters]);
 
-  // ✅ Synchroniser l'URL avec les filtres (sans écraser lat/lng)
-  useEffect(() => {
-    if (!filtersHydrated) return;
-
+  /* 2) sync URL (debounced), keep lat/lng */
+  const pushUrl = useDebouncedCallback((f) => {
     const lat = searchParams.get("lat");
     const lng = searchParams.get("lng");
     if (!lat || !lng) return;
-
-    updateExploreUrl({
-      lat,
-      lng,
-      ...filtersToUrlParams(filters),
-    });
-  }, [filters, filtersHydrated, searchParams, updateExploreUrl]);
+    updateExploreUrl({ lat, lng, ...filtersToUrlParams(f) });
+  }, 300);
 
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
+    if (!hydratedFromUrl) return;
+    pushUrl(filters);
+  }, [filters, hydratedFromUrl, pushUrl]);
 
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-
-    const handleOpenMobileFilters = () => {
-      setIsMobileModalOpen(true);
-      // Émettre l'événement modal pour le backdrop
-      window.dispatchEvent(new CustomEvent("modalOpen", { detail: true }));
-    };
-
-    window.addEventListener("openMobileFilters", handleOpenMobileFilters);
-
+  /* 3) responsive + openMobileFilters event */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 767px)");
+    const onChange = (e) => setIsMobile(e.matches ?? e.target.matches);
+    onChange(mq);
+    mq.addEventListener?.("change", onChange);
+    const open = () => setIsMobileModalOpen(true);
+    window.addEventListener("openMobileFilters", open);
     return () => {
-      window.removeEventListener("resize", checkMobile);
-      window.removeEventListener("openMobileFilters", handleOpenMobileFilters);
+      mq.removeEventListener?.("change", onChange);
+      window.removeEventListener("openMobileFilters", open);
     };
   }, []);
 
-  const closeMobileModal = () => {
-    setIsMobileModalOpen(false);
-    // Émettre l'événement pour fermer le backdrop
-    window.dispatchEvent(new CustomEvent("modalOpen", { detail: false }));
-  };
+  /* 4) lock scroll when mobile modal open */
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (isMobileModalOpen) document.body.style.overflow = "hidden";
+    else document.body.style.removeProperty("overflow");
+  }, [isMobileModalOpen]);
 
-  const toggleSection = useCallback((section) => {
-    setIsOpen((prev) => (prev === section ? null : section));
-  }, []);
-
-  const toggleMapFilter = useCallback(() => {
-    setIsMapFilterOpen((prev) => !prev);
-  }, []);
-
+  /* helpers */
   const handleFilterChange = useCallback(
-    (key, value) => {
-      toggleFilter(key, value);
-    },
+    (key, value) => toggleFilter(key, value),
     [toggleFilter]
   );
 
-  const handleClickOutside = useCallback((event) => {
-    if (containerRef.current && !containerRef.current.contains(event.target)) {
-      setIsOpen(null);
-    }
+  const clearSection = useCallback(
+    (key) => {
+      const current = filters[key];
+      if (Array.isArray(current)) current.forEach((v) => toggleFilter(key, v));
+    },
+    [filters, toggleFilter]
+  );
 
-    if (mapFilterRef.current && !mapFilterRef.current.contains(event.target)) {
-      setIsMapFilterOpen(false);
-    }
-  }, []);
+  const activeFilterCount = useMemo(
+    () =>
+      Object.values(filters).reduce(
+        (acc, arr) => acc + (Array.isArray(arr) ? arr.length : 0),
+        0
+      ),
+    [filters]
+  );
 
-  useEffect(() => {
-    document.addEventListener("click", handleClickOutside);
-    return () => {
-      document.removeEventListener("click", handleClickOutside);
-    };
-  }, [handleClickOutside]);
-
-  const activeFilterCount = useMemo(() => {
-    return Object.values(filters).reduce(
-      (count, values) => count + (values?.length || 0),
-      0
-    );
-  }, [filters]);
-
-  const resetAllFilters = useCallback(() => {
-    resetFilters();
-  }, [resetFilters]);
+  const resetAllFilters = useCallback(() => resetFilters(), [resetFilters]);
 
   const resetMapFilters = useCallback(() => {
-    if (!filters.mapType || filters.mapType.length === 0) return;
+    (filters.mapType || []).forEach((id) => handleFilterChange("mapType", id));
+  }, [filters, handleFilterChange]);
 
-    mapFilterTypes.forEach((type) => {
-      if (filters.mapType.includes(type.id)) {
-        handleFilterChange("mapType", type.id);
-      }
-    });
-  }, [filters.mapType, handleFilterChange]);
-
+  /* ---------- Mobile modal ---------- */
   if (isMobile && isMobileModalOpen) {
     return (
-      <div className="fixed inset-0 bg-white z-50 overflow-y-auto">
-        {/* Header mobile */}
-        <div className="sticky top-0 bg-white border-b border-gray-200 p-4">
+      <div className="fixed inset-0 z-50 overflow-y-auto bg-white">
+        <div className="sticky top-0 border-b bg-white p-4">
           <div className="flex items-center justify-between">
             <button
-              onClick={closeMobileModal}
+              onClick={() => setIsMobileModalOpen(false)}
               className="flex items-center gap-2 text-gray-600"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <ArrowLeft className="h-5 w-5" />
               <span>Retour</span>
             </button>
             <h1 className="text-lg font-semibold">Filtres</h1>
             <button
               onClick={() => {
                 resetFilters();
-                closeMobileModal();
+                setIsMobileModalOpen(false);
               }}
-              className="text-green-600 font-medium"
+              className="font-medium text-emerald-600"
             >
               Effacer
             </button>
           </div>
         </div>
 
-        {/* Filtres en version mobile - layout vertical */}
-        <div className="p-4 space-y-6">
+        <div className="space-y-6 p-4">
           {filterSections.map(({ title, key, items }) => (
-            <div
-              key={key}
-              className="border-b border-gray-200 pb-6 last:border-b-0"
-            >
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                {title}
-              </h3>
+            <div key={key} className="border-b pb-6 last:border-0">
+              <h3 className="mb-4 text-lg font-semibold">{title}</h3>
               <div className="space-y-3">
                 {items.map((item) => {
-                  const isChecked = filters[key]?.includes(item) || false;
+                  const checked = (filters[key] || []).includes(item);
                   return (
                     <SimpleCheckbox
-                      key={`mobile-${key}-${item}`}
-                      id={`mobile-${key}-${item}`}
-                      checked={isChecked}
+                      key={`m-${key}-${item}`}
+                      id={`m-${key}-${item}`}
+                      checked={checked}
                       onChange={() => handleFilterChange(key, item)}
                       label={item}
                     />
@@ -318,21 +368,18 @@ const FilterSection = () => {
             </div>
           ))}
 
-          {/* Section Type d'agriculture en mobile */}
-          <div className="border-b border-gray-200 pb-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Type d'agriculture
-            </h3>
+          <div className="border-b pb-6">
+            <h3 className="mb-4 text-lg font-semibold">Type d’agriculture</h3>
             <div className="space-y-3">
-              {mapFilterTypes.map((type) => {
-                const isChecked = filters.mapType?.includes(type.id) || false;
+              {mapFilterTypes.map((t) => {
+                const checked = (filters.mapType || []).includes(t.id);
                 return (
                   <SimpleCheckbox
-                    key={`mobile-map-filter-${type.id}`}
-                    id={`mobile-map-filter-${type.id}`}
-                    checked={isChecked}
-                    onChange={() => handleFilterChange("mapType", type.id)}
-                    label={type.label}
+                    key={`m-map-${t.id}`}
+                    id={`m-map-${t.id}`}
+                    checked={checked}
+                    onChange={() => handleFilterChange("mapType", t.id)}
+                    label={t.label}
                   />
                 );
               })}
@@ -340,11 +387,10 @@ const FilterSection = () => {
           </div>
         </div>
 
-        {/* Footer mobile avec bouton de validation */}
-        <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4">
+        <div className="sticky bottom-0 border-t bg-white p-4">
           <button
-            onClick={closeMobileModal}
-            className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-medium text-base"
+            onClick={() => setIsMobileModalOpen(false)}
+            className="w-full rounded-lg bg-emerald-600 py-3 font-medium text-white hover:bg-emerald-700"
           >
             Appliquer les filtres ({activeFilterCount})
           </button>
@@ -353,148 +399,125 @@ const FilterSection = () => {
     );
   }
 
+  /* ---------- Desktop pills bar ---------- */
   return (
-    <div className="flex flex-col gap-4 w-full">
-      <div
-        ref={containerRef}
-        className="relative z-20 flex flex-wrap justify-between items-center gap-4 p-4 bg-white shadow-sm rounded-lg w-full text-sm lg:flex-nowrap border border-gray-200"
-      >
-        {filterSections.map(({ title, key, items }) => (
-          <section
-            key={key}
-            className="relative w-full lg:w-auto flex-1 cursor-pointer"
-            onClick={() => toggleSection(key)}
-          >
-            <div
-              className={`flex justify-between items-center p-3 rounded-md border border-gray-200 transition-all duration-200 ${
-                isOpen === key
-                  ? "bg-gray-50 border-gray-300"
-                  : "bg-white hover:bg-gray-50"
-              }`}
-            >
-              <h3 className="text-gray-700 font-medium flex-1 text-center">
-                {title}
-              </h3>
-              <div
-                className="flex items-center cursor-pointer"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleSection(key);
-                }}
+    <div className="flex w-full flex-col gap-2">
+      <div className="w-full border-b border-gray-100 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60">
+        <div className="mx-auto max-w-6xl px-3">
+          <div className="no-scrollbar flex h-14 items-center gap-2 overflow-x-auto py-2 [scrollbar-width:none] [-ms-overflow-style:none]">
+            {filterSections.map(({ title, key, items }) => (
+              <DropdownPill
+                key={key}
+                label={title}
+                values={filters[key]}
+                onClear={() => clearSection(key)}
               >
-                {isOpen === key ? (
-                  <ChevronUp className="text-gray-500 h-5 w-5" />
-                ) : (
-                  <ChevronDown className="text-gray-500 h-5 w-5" />
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-gray-700">{title}</p>
+                  <div className="grid grid-cols-1 gap-2">
+                    {items.map((item) => {
+                      const checked = (filters[key] || []).includes(item);
+                      return (
+                        <SimpleCheckbox
+                          key={`${key}-${item}`}
+                          id={`${key}-${item}`}
+                          checked={checked}
+                          onChange={() => handleFilterChange(key, item)}
+                          label={item}
+                        />
+                      );
+                    })}
+                  </div>
+                  {filters[key]?.length > 0 && (
+                    <div className="pt-1">
+                      <button
+                        onClick={() => clearSection(key)}
+                        className="text-xs text-gray-500 hover:text-gray-700"
+                      >
+                        Réinitialiser
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </DropdownPill>
+            ))}
+
+            <DropdownPill
+              label="Type d’agriculture"
+              values={filters.mapType}
+              onClear={() => resetMapFilters()}
+            >
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-gray-700">
+                  Type d’agriculture
+                </p>
+                <div className="grid grid-cols-1 gap-2">
+                  {mapFilterTypes.map((t) => {
+                    const checked = (filters.mapType || []).includes(t.id);
+                    return (
+                      <SimpleCheckbox
+                        key={`map-${t.id}`}
+                        id={`map-${t.id}`}
+                        checked={checked}
+                        onChange={() => handleFilterChange("mapType", t.id)}
+                        label={t.label}
+                      />
+                    );
+                  })}
+                </div>
+                {filters.mapType?.length > 0 && (
+                  <div className="pt-1">
+                    <button
+                      onClick={resetMapFilters}
+                      className="text-xs text-gray-500 hover:text-gray-700"
+                    >
+                      Réinitialiser
+                    </button>
+                  </div>
                 )}
               </div>
-            </div>
-            <div
-              className={`absolute top-full left-0 mt-1 w-full bg-white shadow-md rounded-md overflow-hidden transition-all duration-200 ${
-                isOpen === key
-                  ? "opacity-100 max-h-96"
-                  : "opacity-0 max-h-0 pointer-events-none"
-              } z-50`}
+            </DropdownPill>
+
+            <button
+              type="button"
+              className="inline-flex h-10 items-center gap-2 rounded-full border border-gray-200 bg-white px-4 text-sm hover:bg-gray-50"
+              onClick={() => openMobileFilters()}
             >
-              <div className="p-3 space-y-2">
-                {items.map((item) => {
-                  const isChecked = filters[key]?.includes(item) || false;
-                  return (
-                    <SimpleCheckbox
-                      key={`${key}-${item}`}
-                      id={`${key}-${item}`}
-                      checked={isChecked}
-                      onChange={() => handleFilterChange(key, item)}
-                      label={item}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-          </section>
-        ))}
-
-        <div ref={mapFilterRef} className="relative">
-          <button
-            onClick={toggleMapFilter}
-            className={`flex items-center gap-2 px-4 py-3 rounded-md border ${
-              isMapFilterOpen || filters.mapType?.length
-                ? "bg-green-50 border-green-200 text-green-700"
-                : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
-            }`}
-          >
-            <Filter className="h-4 w-4" />
-            <span className="font-medium">Type d'agriculture</span>
-            {filters.mapType?.length > 0 && (
-              <span className="inline-flex items-center justify-center bg-green-100 text-green-800 text-xs font-medium rounded-full h-5 min-w-5 px-1.5">
-                {filters.mapType.length}
-              </span>
-            )}
-            {isMapFilterOpen ? (
-              <ChevronUp className="h-4 w-4" />
-            ) : (
-              <ChevronDown className="h-4 w-4" />
-            )}
-          </button>
-
-          <div
-            className={`absolute right-0 top-full mt-1 bg-white rounded-md shadow-md p-3 border border-gray-200 w-64 z-50 transition-all duration-200 ${
-              isMapFilterOpen
-                ? "opacity-100 transform translate-y-0"
-                : "opacity-0 transform -translate-y-2 pointer-events-none"
-            }`}
-          >
-            <div className="flex justify-between items-center mb-2 pb-2 border-b border-gray-100">
-              <h4 className="font-medium text-gray-800">Type d'agriculture</h4>
-              {filters.mapType?.length > 0 && (
-                <button
-                  onClick={resetMapFilters}
-                  className="text-xs text-gray-500 hover:text-gray-700"
-                >
-                  Réinitialiser
-                </button>
+              <Filter className="h-4 w-4" />
+              Filtres
+              {activeFilterCount > 0 && (
+                <span className="ml-1 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-emerald-600 px-1.5 text-xs font-medium text-white">
+                  {activeFilterCount}
+                </span>
               )}
-            </div>
-            <div className="space-y-2">
-              {mapFilterTypes.map((type) => {
-                const isChecked = filters.mapType?.includes(type.id) || false;
-                return (
-                  <SimpleCheckbox
-                    key={`map-filter-${type.id}`}
-                    id={`map-filter-${type.id}`}
-                    checked={isChecked}
-                    onChange={() => handleFilterChange("mapType", type.id)}
-                    label={type.label}
-                  />
-                );
-              })}
-            </div>
+            </button>
           </div>
         </div>
       </div>
 
       {activeFilterCount > 0 && (
-        <div className="flex flex-wrap items-center gap-2 px-4 py-2">
-          <span className="text-sm text-gray-500">Filtres actifs:</span>
+        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-2 px-3 py-2">
+          <span className="text-sm text-gray-500">Filtres actifs :</span>
           {Object.entries(filters).flatMap(([key, values]) =>
-            values.map((value) => (
-              <div
+            (values || []).map((value) => (
+              <span
                 key={`${key}-${value}`}
-                className="flex items-center gap-1 bg-green-50 text-green-700 px-2 py-1 rounded-full text-xs"
+                className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-xs text-emerald-700"
               >
-                <span>{value}</span>
+                {value}
                 <button
                   onClick={() => handleFilterChange(key, value)}
-                  className="text-green-600 hover:text-green-800"
+                  aria-label={`Retirer ${value}`}
+                  className="text-emerald-700 hover:text-emerald-900"
                 >
                   <X className="h-3 w-3" />
                 </button>
-              </div>
+              </span>
             ))
           )}
           <button
             onClick={resetAllFilters}
-            className="text-xs text-gray-500 hover:text-gray-700 ml-2"
+            className="ml-2 text-xs text-gray-500 hover:text-gray-700"
           >
             Effacer tous les filtres
           </button>

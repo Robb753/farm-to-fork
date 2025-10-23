@@ -28,6 +28,6 @@
     "**/*.ts",
     "**/*.tsx",
     "app/legal/page.jsx"
-, "components/ui/input.tsx"  ],
+, "components/ui/input.tsx", "app/_components/layout/FilterSection.jsx"  ],
   "exclude": ["node_modules"]
 }
