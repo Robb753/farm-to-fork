@@ -71,7 +71,7 @@ const DesktopListingMapView = () => {
   const { coordinates, bounds: mapBounds, mapInstance } = useMapboxState();
   const { visible: visibleListings, isLoading, hasMore } = useListingsState();
   const { fetchListings, searchInArea } = useListingsActions();
-  const { filters } = useFiltersState();
+  const filters = useFiltersState();
 
   const searchParams = useSearchParams();
   const [isMapExpanded, setIsMapExpanded] = useState(false);
