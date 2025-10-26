@@ -12,8 +12,7 @@ import {
 import MarkerListingItem from "../../listings/components/MarkerListingItem";
 
 /**
- * Composant qui gère l'affichage des markers et popups sur la carte Mapbox
- * pour tous les listings visibles
+ * Gère les markers + popups React sur la carte Mapbox
  */
 export default function MapboxMarkers() {
   const { mapInstance } = useMapboxState();
@@ -21,55 +20,126 @@ export default function MapboxMarkers() {
   const { openInfoWindowId, hoveredListingId } = useInteractionsState();
   const { setOpenInfoWindowId, setHoveredListingId } = useInteractionsActions();
 
-  // Refs pour stocker les markers et popups
-  const markersRef = useRef(new Map()); // Map<listingId, { marker, popup, root }>
+  // Map<listingId, { marker, popup, root, element, popupContainer, listing }>
+  const markersRef = useRef(new Map());
 
-  // Nettoyage de tous les markers
+  /** Nettoyage de tous les marqueurs et popups */
   const cleanupMarkers = () => {
-    markersRef.current.forEach(({ marker, root }) => {
+    markersRef.current.forEach(({ marker, root, popup }) => {
       try {
+        if (popup) popup.remove();
         if (root) root.unmount();
         if (marker) marker.remove();
       } catch (e) {
-        console.warn("Erreur lors du nettoyage d'un marker:", e);
+        console.warn("Cleanup marker error:", e);
       }
     });
     markersRef.current.clear();
   };
 
-  // Mise à jour des markers quand les listings changent
+  /** Crée (ou recrée) le contenu React d'un popup pour un listing donné */
+  const mountPopupContent = (listingId) => {
+    const entry = markersRef.current.get(listingId);
+    if (!entry) return;
+
+    // (Re)crée un container vierge si nécessaire
+    if (!entry.popupContainer || !entry.popupContainer.isConnected) {
+      entry.popupContainer = document.createElement("div");
+    }
+
+    // (Re)monte le contenu React
+    if (entry.root) {
+      try {
+        entry.root.unmount();
+      } catch {}
+    }
+    entry.root = createRoot(entry.popupContainer);
+    entry.root.render(<MarkerListingItem item={entry.listing} />);
+    entry.popup.setDOMContent(entry.popupContainer);
+  };
+
+  /** Ouvre le popup d'un marker et centre/zoome la carte dessus */
+  const openPopupFor = (listingId, { animate = true } = {}) => {
+    const entry = markersRef.current.get(listingId);
+    if (!entry || !mapInstance) return;
+
+    // Monte (ou remonte) le contenu du popup avant l'ouverture
+    mountPopupContent(listingId);
+
+    // Ouvrir le popup (attaché au marker via setPopup)
+    if (!entry.popup.isOpen()) {
+      // addTo n'est pas nécessaire si le popup est attaché au marker,
+      // on utilise le mécanisme natif de Mapbox:
+      entry.marker.togglePopup(); // ouvre si fermé
+    }
+
+    // Centre + zoom doux sur le marker
+    const { listing } = entry;
+    if (listing?.lng != null && listing?.lat != null) {
+      const target = [listing.lng, listing.lat];
+      const curZoom = mapInstance.getZoom();
+      const nextZoom = curZoom < 13 ? 13.5 : curZoom;
+
+      if (animate) {
+        mapInstance.easeTo({
+          center: target,
+          zoom: nextZoom,
+          duration: 700,
+          essential: true,
+        });
+      } else {
+        mapInstance.jumpTo({ center: target, zoom: nextZoom });
+      }
+    }
+  };
+
+  /** Ferme tous les popups sauf celui d'un éventuel ID à garder ouvert */
+  const closeAllPopupsExcept = (keepId = null) => {
+    markersRef.current.forEach(({ marker, popup }, id) => {
+      if (id !== keepId && popup?.isOpen()) {
+        // togglePopup ferme si déjà ouvert
+        try {
+          marker.togglePopup();
+        } catch {
+          popup.remove();
+        }
+      }
+    });
+  };
+
+  // (1) Création / mise à jour des markers quand les listings visibles évoluent
   useEffect(() => {
     if (!mapInstance || !Array.isArray(visibleListings)) return;
 
-    // Liste des IDs actuels
+    // Supprime les markers qui ne sont plus visibles
     const currentIds = new Set(visibleListings.map((l) => l.id));
-    const existingIds = new Set(markersRef.current.keys());
-
-    // 1. Supprimer les markers qui ne sont plus visibles
-    existingIds.forEach((id) => {
+    for (const [id, entry] of markersRef.current.entries()) {
       if (!currentIds.has(id)) {
-        const { marker, root } = markersRef.current.get(id) || {};
         try {
-          if (root) root.unmount();
-          if (marker) marker.remove();
+          entry.popup?.remove();
+          entry.root?.unmount();
+          entry.marker?.remove();
         } catch (e) {
-          console.warn("Erreur lors de la suppression d'un marker:", e);
+          console.warn("Remove marker error:", e);
         }
         markersRef.current.delete(id);
       }
-    });
+    }
 
-    // 2. Ajouter ou mettre à jour les markers pour les nouveaux listings
+    // Ajoute les nouveaux markers
     visibleListings.forEach((listing) => {
-      if (!listing.lat || !listing.lng) return;
+      if (!listing?.lat || !listing?.lng || !listing?.id) return;
 
-      const { id, lat, lng } = listing;
-
-      // Si le marker existe déjà, on le garde (évite les re-renders inutiles)
-      if (markersRef.current.has(id)) return;
+      const id = listing.id;
+      if (markersRef.current.has(id)) {
+        // Met à jour la data (utile si listing a changé)
+        const existing = markersRef.current.get(id);
+        existing.listing = listing;
+        return;
+      }
 
       try {
-        // Créer l'élément du marker personnalisé
+        // Élément du marker (pin custom)
         const markerEl = document.createElement("div");
         markerEl.className = "custom-farm-marker";
         markerEl.innerHTML = `
@@ -87,116 +157,127 @@ export default function MapboxMarkers() {
             cursor: pointer;
             transition: all 0.2s ease;
           ">
-            <svg
-              style="transform: rotate(45deg); width: 18px; height: 18px;"
-              fill="white"
-              viewBox="0 0 20 20"
-            >
+            <svg style="transform: rotate(45deg); width: 18px; height: 18px;" fill="white" viewBox="0 0 20 20">
               <path d="M10 2a6 6 0 00-6 6c0 4.314 6 10 6 10s6-5.686 6-10a6 6 0 00-6-6zm0 8a2 2 0 110-4 2 2 0 010 4z"/>
             </svg>
           </div>
         `;
 
-        // Effet de hover sur le marker
+        // Hover (carte -> store)
         markerEl.addEventListener("mouseenter", () => {
-          markerEl.firstElementChild.style.transform = "rotate(-45deg) scale(1.15)";
-          markerEl.firstElementChild.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.35)";
+          const pin = markerEl.firstElementChild;
+          if (pin) {
+            pin.style.transform = "rotate(-45deg) scale(1.15)";
+            pin.style.boxShadow = "0 4px 12px rgba(0,0,0,0.35)";
+          }
           setHoveredListingId(id);
         });
         markerEl.addEventListener("mouseleave", () => {
-          markerEl.firstElementChild.style.transform = "rotate(-45deg) scale(1)";
-          markerEl.firstElementChild.style.boxShadow = "0 3px 8px rgba(0, 0, 0, 0.25)";
+          const pin = markerEl.firstElementChild;
+          if (pin) {
+            pin.style.transform = "rotate(-45deg) scale(1)";
+            pin.style.boxShadow = "0 3px 8px rgba(0,0,0,0.25)";
+          }
           setHoveredListingId(null);
         });
 
-        // Créer le conteneur pour le popup React
-        const popupContainer = document.createElement("div");
-        const root = createRoot(popupContainer);
-
-        // Rendre le composant MarkerListingItem dans le popup
-        root.render(<MarkerListingItem item={listing} />);
-
-        // Créer le popup Mapbox
+        // Popup attaché au marker
         const popup = new mapboxgl.Popup({
           offset: 35,
           closeButton: true,
           closeOnClick: false,
           maxWidth: "300px",
           className: "farm-marker-popup",
-        }).setDOMContent(popupContainer);
-
-        // Gérer la fermeture du popup
-        popup.on("close", () => {
-          setOpenInfoWindowId(null);
         });
 
-        // Créer et configurer le marker
+        // Marker + popup
         const marker = new mapboxgl.Marker({
           element: markerEl,
           anchor: "bottom",
         })
-          .setLngLat([lng, lat])
+          .setLngLat([listing.lng, listing.lat])
           .setPopup(popup)
           .addTo(mapInstance);
 
-        // Gérer le click sur le marker
-        markerEl.addEventListener("click", () => {
+        // Ouvrir le popup via clic sur le pin
+        markerEl.addEventListener("click", (e) => {
+          e.stopPropagation();
+          // Met à jour le store (déclenchera l'effet d'ouverture/fermeture)
           setOpenInfoWindowId(id);
         });
 
-        // Stocker le marker, popup, root et element pour nettoyage ultérieur
-        markersRef.current.set(id, { marker, popup, root, element: markerEl });
-      } catch (error) {
-        console.error(`Erreur lors de la création du marker pour listing ${id}:`, error);
+        // Crée l’entrée dans notre registry
+        markersRef.current.set(id, {
+          marker,
+          popup,
+          root: null,
+          element: markerEl,
+          popupContainer: null,
+          listing,
+        });
+
+        // Nettoyage React quand le popup se ferme manuellement
+        popup.on("close", () => {
+          const entry = markersRef.current.get(id);
+          if (!entry) return;
+          try {
+            entry.root?.unmount();
+          } catch {}
+          entry.root = null;
+          // On remet à jour le store si c'était le popup ouvert
+          if (openInfoWindowId === id) setOpenInfoWindowId(null);
+        });
+      } catch (err) {
+        console.error(`Erreur création marker ${id}:`, err);
       }
     });
-  }, [mapInstance, visibleListings, setOpenInfoWindowId]);
 
-  // Gérer l'ouverture/fermeture des popups via le store
+    return () => {
+      // pas de cleanup global ici (on garde les markers tant que la carte vit)
+    };
+  }, [
+    mapInstance,
+    visibleListings,
+    setOpenInfoWindowId,
+    setHoveredListingId,
+    openInfoWindowId,
+  ]);
+
+  // (2) Ouvrir/fermer les popups selon le store + centrer la carte
   useEffect(() => {
     if (!mapInstance) return;
 
-    markersRef.current.forEach(({ marker, popup }, listingId) => {
-      if (listingId === openInfoWindowId) {
-        // Ouvrir ce popup
-        if (!popup.isOpen()) {
-          popup.addTo(mapInstance);
-        }
-      } else {
-        // Fermer les autres popups
-        if (popup.isOpen()) {
-          popup.remove();
-        }
-      }
-    });
-  }, [mapInstance, openInfoWindowId]);
+    if (!openInfoWindowId) {
+      // Ferme tout si aucun sélectionné
+      closeAllPopupsExcept(null);
+      return;
+    }
 
-  // Gérer l'effet visuel de hover depuis la liste vers les markers
+    // Ferme les autres, ouvre celui demandé + centre
+    closeAllPopupsExcept(openInfoWindowId);
+    openPopupFor(openInfoWindowId, { animate: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openInfoWindowId, mapInstance]);
+
+  // (3) Effet de hover depuis la liste → marker
   useEffect(() => {
-    markersRef.current.forEach(({ element }, listingId) => {
-      if (!element?.firstElementChild) return;
-
-      if (listingId === hoveredListingId) {
-        // Appliquer l'effet hover
-        element.firstElementChild.style.transform = "rotate(-45deg) scale(1.15)";
-        element.firstElementChild.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.35)";
-        element.firstElementChild.style.zIndex = "1000";
+    markersRef.current.forEach(({ element }, id) => {
+      const pin = element?.firstElementChild;
+      if (!pin) return;
+      if (id === hoveredListingId) {
+        pin.style.transform = "rotate(-45deg) scale(1.15)";
+        pin.style.boxShadow = "0 4px 12px rgba(0,0,0,0.35)";
+        pin.style.zIndex = "1000";
       } else {
-        // Retirer l'effet hover
-        element.firstElementChild.style.transform = "rotate(-45deg) scale(1)";
-        element.firstElementChild.style.boxShadow = "0 3px 8px rgba(0, 0, 0, 0.25)";
-        element.firstElementChild.style.zIndex = "auto";
+        pin.style.transform = "rotate(-45deg) scale(1)";
+        pin.style.boxShadow = "0 3px 8px rgba(0,0,0,0.25)";
+        pin.style.zIndex = "auto";
       }
     });
   }, [hoveredListingId]);
 
-  // Nettoyage lors du démontage
-  useEffect(() => {
-    return () => {
-      cleanupMarkers();
-    };
-  }, []);
+  // (4) Nettoyage intégral au démontage
+  useEffect(() => cleanupMarkers, []);
 
-  // Ce composant ne rend rien (il manipule directement la carte)
-  return null;
+  return null; // tout est géré côté Mapbox
 }

@@ -21,6 +21,9 @@ const MapboxCitySearch = ({
   const suggestionsRef = useRef(null);
   const abortControllerRef = useRef(null);
 
+  // empêche la relance d'une recherche immédiate après sélection
+  const suppressNextSearchRef = useRef(false);
+
   const [searchText, setSearchText] = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -34,6 +37,8 @@ const MapboxCitySearch = ({
   // --- Search ---
   const searchPlaces = useCallback(
     async (query) => {
+      if (suppressNextSearchRef.current) return; // ⛔️ skip si on vient de sélectionner
+
       if (!query.trim() || query.length < 3) {
         setSuggestions([]);
         setShowSuggestions(false);
@@ -44,7 +49,9 @@ const MapboxCitySearch = ({
       setIsLoading(true);
       try {
         const response = await fetch(
-          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?` +
+          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
+            query
+          )}.json?` +
             new URLSearchParams({
               access_token: process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN,
               country,
@@ -80,7 +87,11 @@ const MapboxCitySearch = ({
   );
 
   useEffect(() => {
-    const t = setTimeout(() => searchPlaces(searchText), 300);
+    const t = setTimeout(() => {
+      if (!suppressNextSearchRef.current) {
+        searchPlaces(searchText);
+      }
+    }, 300);
     return () => clearTimeout(t);
   }, [searchText, searchPlaces]);
 
@@ -102,11 +113,9 @@ const MapboxCitySearch = ({
       }
 
       const target = `/explore?${params.toString()}`;
-      // On the landing or when variant explicitly says "hero" → push
       if (variant === "hero" || pathname === "/") {
         router.push(target);
       } else {
-        // In header on /explore → replace (no scroll jump)
         router.replace(target, { scroll: false });
       }
     },
@@ -116,9 +125,15 @@ const MapboxCitySearch = ({
   // --- Select handler ---
   const selectSuggestion = useCallback(
     (s) => {
+      // empêche le useEffect(search) de ré-ouvrir la liste
+      suppressNextSearchRef.current = true;
+
       setSearchText(s.place_name);
       setShowSuggestions(false);
       setSuggestions([]);
+
+      // blur immédiatement (ferme la liste dans la plupart des UIs)
+      inputRef.current?.blur();
 
       onCitySelect?.({
         center: s.center,
@@ -177,20 +192,31 @@ const MapboxCitySearch = ({
   );
 
   // --- Misc ---
+  // fermeture au clic hors composant
   useEffect(() => {
     const clickOutside = (e) => {
-      if (
+      const clickedOutside =
         suggestionsRef.current &&
         !suggestionsRef.current.contains(e.target) &&
         inputRef.current &&
-        !inputRef.current.contains(e.target)
-      )
-        setShowSuggestions(false);
+        !inputRef.current.contains(e.target);
+      if (clickedOutside) setShowSuggestions(false);
     };
-    document.addEventListener("mousedown", clickOutside);
-    return () => document.removeEventListener("mousedown", clickOutside);
+    document.addEventListener("pointerdown", clickOutside);
+    return () => document.removeEventListener("pointerdown", clickOutside);
   }, []);
+
+  // annuler fetchs pendants
   useEffect(() => () => abortControllerRef.current?.abort(), []);
+
+  // quand l’URL change (après navigation / recentrage carte), on ferme + on réactive la recherche
+  const paramsString = urlParams?.toString() || "";
+  useEffect(() => {
+    setShowSuggestions(false);
+    setSuggestions([]);
+    // relâche la suppression pour les recherches ultérieures
+    suppressNextSearchRef.current = false;
+  }, [pathname, paramsString]);
 
   const clearSearch = () => {
     setSearchText("");
@@ -221,6 +247,9 @@ const MapboxCitySearch = ({
             if (!e.target.value.trim()) {
               setSuggestions([]);
               setShowSuggestions(false);
+            } else {
+              // si l'utilisateur retape après une sélection, on rouvre
+              setShowSuggestions(true);
             }
           }}
           onKeyDown={handleKeyDown}
@@ -273,6 +302,7 @@ const MapboxCitySearch = ({
           {suggestions.map((s, i) => (
             <button
               key={s.id}
+              // ⚠️ pas de preventDefault: on veut laisser blur se produire
               onClick={() => selectSuggestion(s)}
               className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0 first:rounded-t-xl last:rounded-b-xl ${
                 i === selectedIndex ? "bg-green-50 border-green-200" : ""
@@ -310,7 +340,7 @@ const MapboxCitySearch = ({
         suggestions.length === 0 &&
         searchText.length >= 3 &&
         !isLoading && (
-          <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl z-50 p-4 text-center">
+          <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl z-[400] p-4 text-center">
             <div className="text-gray-500">
               <Search className="w-8 h-8 mx-auto mb-2 text-gray-400" />
               <p className="text-sm">Aucune ville trouvée</p>

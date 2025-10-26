@@ -11,12 +11,20 @@ import MapboxMarkers from "./MapboxMarkers";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || "";
 
+// Helpers de validation
+const isFiniteNumber = (n) => Number.isFinite(n);
+const isValidLngLat = (v) =>
+  Array.isArray(v) &&
+  v.length === 2 &&
+  isFiniteNumber(v[0]) &&
+  isFiniteNumber(v[1]) &&
+  !(v[0] === 0 && v[1] === 0); // évite le (0,0) Afrique
+
 export default function MapboxSection({ isMapExpanded = false }) {
-  // Wrapper (peut accueillir d'autres éléments) et conteneur map STRICTEMENT vide
   const wrapperRef = useRef(null);
   const containerRef = useRef(null);
   const mapRef = useRef(null);
-  const userInteractingRef = useRef(false); // Track user interactions
+  const userInteractingRef = useRef(false);
 
   const { coordinates, zoom, style } = useMapboxState();
   const {
@@ -27,6 +35,7 @@ export default function MapboxSection({ isMapExpanded = false }) {
     setMapZoom,
     setMapPitch,
     setMapBearing,
+    setCoordinates, // ⚠️ on l’utilise pour pousser le fallback France si nécessaire
   } = useMapboxActions();
 
   // ---- 1️⃣ Initialisation (une seule fois) ----
@@ -35,9 +44,9 @@ export default function MapboxSection({ isMapExpanded = false }) {
 
     setMapLoading(true);
 
-    // 🧹 IMPORTANT: purger tout contenu éventuel du conteneur
+    // Purge défensive
     try {
-      containerRef.current.replaceChildren(); // supprime tous les enfants sans recréer le nœud
+      containerRef.current.replaceChildren();
     } catch {
       containerRef.current.innerHTML = "";
       while (containerRef.current.firstChild) {
@@ -45,15 +54,20 @@ export default function MapboxSection({ isMapExpanded = false }) {
       }
     }
 
-    const [lng, lat] = Array.isArray(coordinates)
+    // Centre/zoom init avec Fallback France si coords invalides
+    const initCenter = isValidLngLat(coordinates)
       ? coordinates
-      : MAPBOX_CONFIG.center;
+      : MAPBOX_CONFIG.center; // [2.2137, 46.2276]
+    const initZoom =
+      typeof zoom === "number" && zoom >= MAPBOX_CONFIG.minZoom
+        ? zoom
+        : MAPBOX_CONFIG.zoom; // 5.6
 
     const map = new mapboxgl.Map({
-      container: containerRef.current, // NE PAS passer le wrapper ici
+      container: containerRef.current,
       style: style || MAPBOX_CONFIG.style,
-      center: [lng, lat],
-      zoom: typeof zoom === "number" ? zoom : MAPBOX_CONFIG.zoom,
+      center: initCenter,
+      zoom: initZoom,
       minZoom: MAPBOX_CONFIG.minZoom,
       maxZoom: MAPBOX_CONFIG.maxZoom,
       cooperativeGestures: true,
@@ -94,6 +108,13 @@ export default function MapboxSection({ isMapExpanded = false }) {
       setMapLoading(false);
       enforceFlatView();
 
+      // Si le store était invalide (ex: [0,0] ou undefined), on pousse le fallback France
+      if (!isValidLngLat(coordinates)) {
+        setCoordinates(MAPBOX_CONFIG.center);
+        setMapZoom(MAPBOX_CONFIG.zoom);
+      }
+
+      // Bounds init → store
       const b = map.getBounds();
       setMapBounds([
         [b.getWest(), b.getSouth()],
@@ -102,10 +123,7 @@ export default function MapboxSection({ isMapExpanded = false }) {
     });
 
     const onMoveStart = (e) => {
-      // Si l'événement provient d'une interaction utilisateur, on le marque
-      if (e && e.originalEvent) {
-        userInteractingRef.current = true;
-      }
+      if (e && e.originalEvent) userInteractingRef.current = true;
     };
 
     const onMoveEnd = () => {
@@ -115,8 +133,7 @@ export default function MapboxSection({ isMapExpanded = false }) {
         [b.getEast(), b.getNorth()],
       ]);
       setMapZoom(map.getZoom());
-
-      // Réinitialiser le flag après un court délai
+      // reset flag après un tick
       setTimeout(() => {
         userInteractingRef.current = false;
       }, 100);
@@ -134,16 +151,13 @@ export default function MapboxSection({ isMapExpanded = false }) {
         map.off("zoomstart", onMoveStart);
         map.off("moveend", onMoveEnd);
         map.off("zoomend", onMoveEnd);
-        map.remove(); // retire canvas + contrôles du container
+        map.remove();
         mapRef.current = null;
       }
-      // 🧹 Purge finale du container pour éviter tout résidu au prochain mount
-      if (containerRef.current) {
-        try {
-          containerRef.current.replaceChildren();
-        } catch {
-          containerRef.current.innerHTML = "";
-        }
+      try {
+        containerRef.current?.replaceChildren();
+      } catch {
+        if (containerRef.current) containerRef.current.innerHTML = "";
       }
       setMapLoaded(false);
       setMapLoading(false);
@@ -156,18 +170,22 @@ export default function MapboxSection({ isMapExpanded = false }) {
     const map = mapRef.current;
     if (!map) return;
 
-    // Ne pas appliquer de easeTo si l'utilisateur est en train d'interagir
+    // Ne pas bouger si l'utilisateur manipule
     if (userInteractingRef.current) return;
 
-    const [lng, lat] = Array.isArray(coordinates)
-      ? coordinates
-      : MAPBOX_CONFIG.center;
+    // Ignore toute coordonnée invalide (évite le saut vers Afrique)
+    if (!isValidLngLat(coordinates)) return;
 
-    const newZoom = typeof zoom === "number" ? zoom : MAPBOX_CONFIG.zoom;
+    const [lng, lat] = coordinates;
+    const newZoom =
+      typeof zoom === "number" && zoom >= MAPBOX_CONFIG.minZoom
+        ? zoom
+        : MAPBOX_CONFIG.zoom;
+
     const curCenter = map.getCenter();
     const curZoom = map.getZoom();
 
-    // Tolérance plus large pour éviter les micro-ajustements
+    // évite micro-ajustements
     if (
       Math.abs(curCenter.lat - lat) < 1e-4 &&
       Math.abs(curCenter.lng - lng) < 1e-4 &&
@@ -208,11 +226,8 @@ export default function MapboxSection({ isMapExpanded = false }) {
         style={{ contain: "layout paint size" }}
       />
 
-      {/* Composant qui gère les markers et popups */}
+      {/* Markers + popups contrôlés */}
       <MapboxMarkers />
-
-      {/* Place ici d'éventuels overlays, pas dans containerRef */}
-      {/* <div className="pointer-events-none absolute inset-0">…</div> */}
     </div>
   );
 }

@@ -169,3 +169,13 @@
   width: 100vw !important;
   height: 100vh !important;
 }
+
+.mapboxgl-popup-content {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+.mapboxgl-popup-tip {
+  display: none !important;
+}

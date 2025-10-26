@@ -11,7 +11,8 @@ import React, {
 import { useUser, useClerk } from "@clerk/nextjs";
 import { supabase } from "@/utils/supabase/client";
 import { toast } from "sonner";
-// ✅ Imports Zustand depuis mapboxListingsStore
+
+// Zustand stores
 import {
   useListingsState,
   useListingsActions,
@@ -20,22 +21,22 @@ import {
   useInteractionsState,
   useInteractionsActions,
 } from "@/lib/store/mapboxListingsStore";
-import {
-  useUserFavorites,
-  useUserActions,
-} from "@/lib/store/userStore";
+import { useUserFavorites, useUserActions } from "@/lib/store/userStore";
+
 import { useListingsWithImages } from "@/app/hooks/useListingsWithImages";
 import Link from "next/link";
-import OptimizedImage, { ListingImage } from "@/components/ui/OptimizedImage";
+import OptimizedImage from "@/components/ui/OptimizedImage";
 
-// Composant de loader avec animation plus fluide
+/* ------------------------------
+   UI: Loader & Empty state
+------------------------------ */
 const BookingStyleLoader = () => (
   <div className="absolute inset-0 flex items-center justify-center z-30 bg-white/80 backdrop-blur-sm">
     <div className="bg-white rounded-xl shadow-xl p-6 flex flex-col items-center w-72 max-w-[90%] border border-gray-100">
       <div className="w-10 h-10 mb-4">
         <div className="relative">
-          <div className="w-10 h-10 border-4 border-green-200 rounded-full animate-pulse"></div>
-          <div className="absolute inset-0 w-10 h-10 border-4 border-green-500 rounded-full animate-spin border-t-transparent"></div>
+          <div className="w-10 h-10 border-4 border-green-200 rounded-full animate-pulse" />
+          <div className="absolute inset-0 w-10 h-10 border-4 border-green-500 rounded-full animate-spin border-t-transparent" />
         </div>
       </div>
       <div className="text-center">
@@ -50,7 +51,6 @@ const BookingStyleLoader = () => (
   </div>
 );
 
-// État vide amélioré avec plus d'interactions
 const EmptyState = ({ onRetry }) => (
   <div className="flex flex-col items-center justify-center py-16 px-6 bg-gradient-to-br from-green-50 to-blue-50 rounded-2xl border border-gray-200 shadow-sm">
     <div className="relative mb-8">
@@ -96,9 +96,9 @@ const EmptyState = ({ onRetry }) => (
               stroke="currentColor"
               viewBox="0 0 24 24"
             >
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="12" y1="8" x2="12" y2="16"></line>
-              <line x1="8" y1="12" x2="16" y2="12"></line>
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="16" />
+              <line x1="8" y1="12" x2="16" y2="12" />
             </svg>
           </div>
           <span className="font-medium text-gray-800">Zoom arrière</span>
@@ -109,7 +109,6 @@ const EmptyState = ({ onRetry }) => (
   </div>
 );
 
-// Badge de statut amélioré
 const StatusBadge = ({ availability, className = "" }) => {
   const isOpen = availability === "open";
   return (
@@ -124,13 +123,12 @@ const StatusBadge = ({ availability, className = "" }) => {
         className={`w-2 h-2 rounded-full ${
           isOpen ? "bg-green-500" : "bg-orange-500"
         }`}
-      ></div>
+      />
       {isOpen ? "Ouvert maintenant" : "Fermé"}
     </div>
   );
 };
 
-// Badge de certification avec icône
 const CertificationBadge = ({ certification }) => (
   <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-full text-xs font-medium">
     <Award className="w-3 h-3" />
@@ -138,7 +136,9 @@ const CertificationBadge = ({ certification }) => (
   </div>
 );
 
-// Composant ListItem en format liste horizontale
+/* ------------------------------
+   List item
+------------------------------ */
 const ListItem = React.memo(
   ({
     item,
@@ -153,30 +153,16 @@ const ListItem = React.memo(
     const [imageError, setImageError] = useState(false);
 
     const getImageUrl = useCallback(() => {
-      if (!item.listingImages) {
-        return "/default-farm-image.jpg";
-      }
-
+      // priorité: relations Supabase listingImages
       if (Array.isArray(item.listingImages) && item.listingImages.length > 0) {
-        const imageUrl =
-          item.listingImages[0].url ||
-          item.listingImages[0].image_url ||
-          "/default-farm-image.jpg";
-        return imageUrl;
+        return item.listingImages[0]?.url || "/default-farm-image.jpg";
       }
+      if (item.listingImages?.url) return item.listingImages.url;
 
-      if (typeof item.listingImages === "object" && item.listingImages.url) {
-        return item.listingImages.url;
-      }
-
-      // Fallback vers d'autres propriétés possibles
-      if (item.image_url) {
-        return item.image_url;
-      }
-
-      if (item.images && item.images.length > 0) {
+      // fallback éventuels
+      if (item.image_url) return item.image_url;
+      if (Array.isArray(item.images) && item.images.length > 0)
         return item.images[0];
-      }
 
       return "/default-farm-image.jpg";
     }, [item]);
@@ -194,16 +180,10 @@ const ListItem = React.memo(
       (e) => {
         e.preventDefault();
         e.stopPropagation();
-        if (onShowOnMap) {
-          onShowOnMap(item);
-        }
+        onShowOnMap?.(item);
       },
       [onShowOnMap, item]
     );
-
-    const handleImageError = () => {
-      setImageError(true);
-    };
 
     const imageUrl = getImageUrl();
 
@@ -217,7 +197,7 @@ const ListItem = React.memo(
         onMouseLeave={onMouseLeave}
       >
         <Link href={`/view-listing/${item.id}`} className="flex w-full">
-          {/* Image container - Format liste */}
+          {/* Image */}
           <div className="relative w-32 sm:w-40 md:w-48 h-32 sm:h-36 flex-shrink-0">
             {!imageError ? (
               <img
@@ -227,7 +207,7 @@ const ListItem = React.memo(
                   imageLoaded ? "opacity-100" : "opacity-0"
                 }`}
                 onLoad={() => setImageLoaded(true)}
-                onError={handleImageError}
+                onError={() => setImageError(true)}
                 loading="lazy"
               />
             ) : (
@@ -251,14 +231,12 @@ const ListItem = React.memo(
               </div>
             )}
 
-            {/* Badge de statut */}
             {item.availability && (
               <div className="absolute top-2 left-2">
                 <StatusBadge availability={item.availability} />
               </div>
             )}
 
-            {/* Nombre d'images si multiple */}
             {Array.isArray(item.listingImages) &&
               item.listingImages.length > 1 && (
                 <div className="absolute bottom-2 right-2 bg-black/70 text-white px-2 py-1 rounded-full text-xs flex items-center gap-1">
@@ -278,18 +256,15 @@ const ListItem = React.memo(
               )}
           </div>
 
-          {/* Contenu de la carte */}
+          {/* Contenu */}
           <div className="flex-1 p-4 flex flex-col justify-between min-w-0">
             <div>
-              {/* En-tête avec nom */}
               <div className="flex items-start justify-between mb-2">
                 <h2 className="text-lg font-semibold text-gray-900 line-clamp-1 group-hover:text-green-700 transition-colors pr-2">
                   {item.name}
                 </h2>
 
-                {/* Boutons d'action */}
                 <div className="flex items-center gap-1.5 flex-shrink-0">
-                  {/* Bouton voir sur la carte */}
                   {item.lat && item.lng && onShowOnMap && (
                     <button
                       onClick={handleShowOnMapClick}
@@ -301,7 +276,6 @@ const ListItem = React.memo(
                     </button>
                   )}
 
-                  {/* Bouton favoris */}
                   <button
                     onClick={handleFavoriteClick}
                     className="bg-gray-50 hover:bg-white p-1.5 rounded-full shadow-sm hover:shadow-md transition-all duration-200 border border-gray-200"
@@ -320,7 +294,6 @@ const ListItem = React.memo(
                 </div>
               </div>
 
-              {/* Adresse */}
               <div className="flex items-start gap-2 text-sm text-gray-600 mb-3">
                 <MapPin className="h-4 w-4 mt-0.5 text-green-600 flex-shrink-0" />
                 <span className="line-clamp-1" title={item.address}>
@@ -328,7 +301,6 @@ const ListItem = React.memo(
                 </span>
               </div>
 
-              {/* Types de produits */}
               {item.product_type?.length > 0 && (
                 <div className="mb-3">
                   <div className="flex flex-wrap gap-1.5">
@@ -350,7 +322,6 @@ const ListItem = React.memo(
                 </div>
               )}
 
-              {/* Description courte si disponible */}
               {item.description && (
                 <p className="text-sm text-gray-600 line-clamp-2 mb-3 leading-relaxed">
                   {item.description}
@@ -358,7 +329,6 @@ const ListItem = React.memo(
               )}
             </div>
 
-            {/* Footer avec certifications */}
             <div className="flex items-center justify-between mt-auto pt-2">
               <div className="flex items-center gap-2">
                 {item.certifications?.[0] && (
@@ -366,7 +336,6 @@ const ListItem = React.memo(
                 )}
               </div>
 
-              {/* Note et avis si disponibles */}
               {item.rating && (
                 <div className="flex items-center gap-1 text-sm">
                   <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
@@ -388,38 +357,159 @@ const ListItem = React.memo(
 
 ListItem.displayName = "ListItem";
 
-// Composant principal
+/* ------------------------------
+   Main component
+------------------------------ */
 export default function Listing() {
-  // ✅ Hooks Zustand
+  // Zustand state
   const { visible: visibleListings = [] } = useListingsState();
-  const { hoveredListingId } = useInteractionsState();
-  const { setHoveredListingId, setOpenInfoWindowId } = useInteractionsActions();
   const { setAllListings } = useListingsActions();
   const { bounds: mapBounds } = useMapboxState();
   const { setCoordinates, setMapZoom } = useMapboxActions();
 
-  // ✅ Hooks favoris depuis userStore
+  const { hoveredListingId } = useInteractionsState();
+  const { setHoveredListingId, setOpenInfoWindowId } = useInteractionsActions();
+
+  // Favoris
   const favorites = useUserFavorites();
-  const { loadFavorites, toggleFavorite: toggleFavoriteStore } = useUserActions();
+  const { loadFavorites, toggleFavorite: toggleFavoriteStore } =
+    useUserActions();
 
   const { user } = useUser();
   const { openSignUp } = useClerk();
 
-  // Charger les favoris au montage si l'utilisateur est connecté
+  // Charger les favoris au montage si connecté
   useEffect(() => {
-    if (user?.id) {
-      loadFavorites(user.id);
-    }
+    if (user?.id) loadFavorites(user.id);
   }, [user?.id, loadFavorites]);
 
+  // IDs visibles (pilotés par la carte + filtres via store)
   const visibleIds = useMemo(
     () => visibleListings?.map((item) => item.id) || [],
     [visibleListings]
   );
 
-  const { listings, isLoading } = useListingsWithImages(visibleIds);
+  // Enrichissement images des listings visibles
+  const { listings, isLoading: isLoadingImages } =
+    useListingsWithImages(visibleIds);
 
-  // Wrapper pour toggleFavorite qui gère le cas non-connecté
+  // ---------------------------
+  // FETCH SUPABASE PAR BOUNDS
+  // ---------------------------
+  const [isFetching, setIsFetching] = useState(false);
+
+  // Requête initiale (France) si aucun bounds encore émis
+  useEffect(() => {
+    if (mapBounds) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        setIsFetching(true);
+        // France approximative
+        const south = 41.0,
+          north = 51.5,
+          west = -5.5,
+          east = 9.8;
+
+        const { data, error } = await supabase
+          .from("listing")
+          .select(
+            `
+    id, name, address, lat, lng,
+    description, product_type, certifications,
+    availability, created_at, updated_at
+  `
+          )
+          .gte("lat", south)
+          .lte("lat", north)
+          .gte("lng", west)
+          .lte("lng", east)
+          .limit(500);
+
+        if (error) throw error;
+        if (!cancelled) setAllListings(data ?? []);
+      } catch (e) {
+        console.error(e);
+        toast.error("Impossible de charger les fermes (zone France).");
+      } finally {
+        if (!cancelled) setIsFetching(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mapBounds, setAllListings]);
+
+  // Requête à chaque changement de bounds de la carte
+  useEffect(() => {
+    if (!mapBounds || !Array.isArray(mapBounds) || mapBounds.length !== 2)
+      return;
+
+    const [[west, south], [east, north]] = mapBounds;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        setIsFetching(true);
+
+        const { data, error } = await supabase
+          .from("listing")
+          .select(
+            `
+    id, name, address, lat, lng,
+    description, product_type, certifications,
+    availability, created_at, updated_at
+  `
+          )
+          .gte("lat", south)
+          .lte("lat", north)
+          .gte("lng", west)
+          .lte("lng", east)
+          .limit(500);
+
+        if (error) throw error;
+        if (!cancelled) setAllListings(data ?? []);
+      } catch (e) {
+        console.error(e);
+        toast.error("Erreur lors du chargement des fermes.");
+      } finally {
+        if (!cancelled) setIsFetching(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mapBounds, setAllListings]);
+
+  // ⚠️ Supprime la boucle précédente: on ne pousse plus "listings" (images) dans allListings
+  // useEffect(() => {
+  //   if (listings.length > 0 && setAllListings) {
+  //     setAllListings(listings);
+  //   }
+  // }, [listings, setAllListings]);
+
+  // Loader combiné (fetch + images) avec petit délai pour éviter le clignotement
+  const [delayedLoading, setDelayedLoading] = useState(true);
+  const loadingTimerRef = useRef(null);
+
+  const effectiveLoading = isFetching || isLoadingImages;
+
+  useEffect(() => {
+    if (effectiveLoading) {
+      setDelayedLoading(true);
+      if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
+    } else {
+      loadingTimerRef.current = setTimeout(() => setDelayedLoading(false), 600);
+    }
+    return () => {
+      if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
+    };
+  }, [effectiveLoading]);
+
+  // Handlers
   const handleToggleFavorite = useCallback(
     (id) => {
       if (!user) {
@@ -436,70 +526,46 @@ export default function Listing() {
     [user, toggleFavoriteStore, openSignUp]
   );
 
-  const [delayedLoading, setDelayedLoading] = useState(true);
-  const loadingTimerRef = useRef(null);
-
-  // Gestion du loading avec délai
-  useEffect(() => {
-    if (isLoading) {
-      setDelayedLoading(true);
-      if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
-    } else {
-      loadingTimerRef.current = setTimeout(() => {
-        setDelayedLoading(false);
-      }, 800); // Réduit le délai
-    }
-
-    return () => {
-      if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
-    };
-  }, [isLoading]);
-
-  // Mise à jour des listings
-  useEffect(() => {
-    if (listings.length > 0 && setAllListings) {
-      setAllListings(listings);
-    }
-  }, [listings, setAllListings]);
-
-  // Handlers optimisés
   const handleMouseEnter = useCallback(
-    (id) => {
-      setHoveredListingId?.(id);
-    },
+    (id) => setHoveredListingId?.(id),
     [setHoveredListingId]
   );
 
-  const handleMouseLeave = useCallback(() => {
-    setHoveredListingId?.(null);
-  }, [setHoveredListingId]);
+  const handleMouseLeave = useCallback(
+    () => setHoveredListingId?.(null),
+    [setHoveredListingId]
+  );
 
   const handleShowOnMap = useCallback(
     (listing) => {
       if (!listing?.lat || !listing?.lng) return;
-
-      // Ouvrir le popup sur la carte
       setOpenInfoWindowId?.(listing.id);
-
-      // Centrer la carte sur le listing avec un bon niveau de zoom
       setCoordinates?.([listing.lng, listing.lat]);
       setMapZoom?.(14);
-
-      // Scroll vers le haut pour voir la carte (optionnel)
       window.scrollTo({ top: 0, behavior: "smooth" });
-
-      // Toast pour feedback utilisateur
       toast.success(`Centrage sur ${listing.name}`);
     },
     [setOpenInfoWindowId, setCoordinates, setMapZoom]
   );
 
   const handleRetry = useCallback(() => {
-    window.location.reload();
-  }, []);
+    // simple retry: on relance la requête en redemandant la même zone
+    if (!mapBounds) {
+      // forcera l'effet "France"
+      window.location.reload();
+    } else {
+      const [[west, south], [east, north]] = mapBounds;
+      toast.info(
+        `Nouvel essai (${south.toFixed(2)}–${north.toFixed(2)} ; ${west.toFixed(
+          2
+        )}–${east.toFixed(2)})`
+      );
+      // L'effet bounds se relancera dès que la carte bouge ; ici on peut faire un léger pan/zoom si besoin.
+    }
+  }, [mapBounds]);
 
-  // Rendu conditionnel pour état vide
-  if (visibleIds.length === 0 && !isLoading) {
+  // Etat vide (pas d’IDs visibles ET pas en cours de chargement)
+  if (visibleIds.length === 0 && !effectiveLoading) {
     return (
       <div className="p-6 min-h-screen bg-gray-50">
         <EmptyState onRetry={handleRetry} />

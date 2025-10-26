@@ -1,23 +1,26 @@
-// modules/listings/components/MarkerListingItem.jsx
+"use client";
+
 import React from "react";
-import { useRouter } from "next/navigation";
 import { Heart } from "@/utils/icons";
 import Image from "next/image";
 
-function MarkerListingItem({ item }) {
-  const router = useRouter();
-
+function MarkerListingItem({ item, onNavigate }) {
+  // ✅ Navigation compatible App Router + hors App Router
   const handleClick = () => {
-    router.push(`/view-listing/${item.id}`);
+    if (onNavigate) {
+      onNavigate(item.id);
+    } else if (typeof window !== "undefined") {
+      window.location.href = `/view-listing/${item.id}`;
+    }
   };
 
-  // Récupérer l'image principale de la ferme ou une image par défaut
+  // ✅ Récupérer l'image principale ou une image par défaut
   const imageUrl = item?.listingImages?.[0]?.url || "/default-farm-image.jpg";
 
-  // Formater le prix si disponible
+  // ✅ Formater le prix si disponible
   const formattedPrice = item?.price ? `${item.price} €` : null;
 
-  // Déterminer le statut d'ouverture
+  // ✅ Déterminer le statut d'ouverture
   const isOpen = item?.availability === "open";
 
   return (
@@ -41,7 +44,7 @@ function MarkerListingItem({ item }) {
           aria-label="Ajouter aux favoris"
           onClick={(e) => {
             e.stopPropagation();
-            // Logique d'ajout aux favoris à implémenter
+            // TODO: Logique d’ajout aux favoris
           }}
         >
           <Heart className="h-5 w-5 text-gray-400" />
@@ -101,7 +104,7 @@ function MarkerListingItem({ item }) {
           </div>
         )}
 
-        {/* Badges pour les certifications/types de produits */}
+        {/* Badges pour les certifications */}
         {item?.certifications?.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-2">
             {item.certifications.slice(0, 2).map((cert, index) => (
