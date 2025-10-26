@@ -1,809 +1,682 @@
 "use client";
 
 import React, {
-  useState,
   useEffect,
-  useRef,
-  useCallback,
   useMemo,
+  useRef,
+  useState,
+  useCallback,
+  memo,
+  Suspense,
 } from "react";
 import dynamic from "next/dynamic";
-import {
-  Search,
-  MapPin,
-  List,
-  ArrowLeft,
-  SlidersHorizontal,
-  Heart,
-  Star,
-  RefreshCw,
-  Award,
-  Clock,
-  ChevronUp,
-  ChevronDown,
-  Filter,
-} from "@/utils/icons";
-import { toast } from "sonner";
 import Link from "next/link";
-import { useUser, useClerk } from "@clerk/nextjs";
-import { supabase } from "@/utils/supabase/client";
-// ✅ Imports Zustand depuis mapboxListingsStore
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 import {
+  MapPin,
+  Heart as LucideHeart,
+  Star,
+  ChevronLeft,
+  RefreshCw,
+  Filter as LucideFilter,
+  Map as LucideMap,
+  Clock,
+  Share2,
+  Navigation,
+  Phone,
+  ChevronRight,
+} from "lucide-react";
+
+// shadcn/ui
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+
+// Project stores
+import {
+  useMapboxState,
+  useMapboxActions,
   useListingsState,
   useListingsActions,
-  useFiltersState,
-  useInteractionsState,
   useInteractionsActions,
-  useMapboxState,
+  useFiltersState,
 } from "@/lib/store/mapboxListingsStore";
-import {
-  useUserFavorites,
-  useUserActions,
-} from "@/lib/store/userStore";
-import { useRouter } from "next/navigation";
+
+import { useUser } from "@clerk/nextjs";
+import { useUserFavorites, useUserActions } from "@/lib/store/userStore";
 import { ListingImage } from "@/components/ui/OptimizedImage";
-import MapboxSection from "../../maps/components/MapboxSection";
 import { openMobileFilters } from "@/app/_components/layout/FilterSection";
 
-// Chargement dynamique pour éviter les erreurs d'hydratation
+// --- Config ---
+const PAGE_SIZE = 20; // garder en phase avec l'API
+
+// lazy (évite SSR/hydration issues)
 const MapboxCitySearch = dynamic(
   () => import("../../maps/components/shared/MapboxCitySearch"),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex items-center border-2 rounded-full py-2 px-4 bg-white">
-        <div className="w-5 h-5 bg-gray-200 rounded mr-3 animate-pulse"></div>
-        <div className="flex-grow h-4 bg-gray-200 rounded animate-pulse"></div>
-      </div>
-    ),
-  }
+  { ssr: false }
+);
+const MapboxSection = dynamic(
+  () => import("../../maps/components/MapboxSection"),
+  { ssr: false }
 );
 
-// Hook pour gérer le bottom sheet
-const useBottomSheet = (initialHeight = 400) => {
-  const [height, setHeight] = useState(initialHeight);
-  const [isDragging, setIsDragging] = useState(false);
-  const [startY, setStartY] = useState(0);
-  const [startHeight, setStartHeight] = useState(0);
-  const containerRef = useRef(null);
+/* ----------------------- Helpers ----------------------- */
 
-  const minHeight = 190;
-  const maxHeight =
-    typeof window !== "undefined" ? window.innerHeight * 0.85 : 600; // 85% de l'écran
-
-  const handleTouchStart = (e) => {
-    setIsDragging(true);
-    setStartY(e.touches[0].clientY);
-    setStartHeight(height);
-  };
-
-  const handleTouchMove = (e) => {
-    if (!isDragging) return;
-
-    const currentY = e.touches[0].clientY;
-    const deltaY = startY - currentY;
-    const newHeight = Math.max(
-      minHeight,
-      Math.min(maxHeight, startHeight + deltaY)
-    );
-    setHeight(newHeight);
-  };
-
-  const handleTouchEnd = () => {
-    if (!isDragging) return;
-    setIsDragging(false);
-
-    // Snap à des positions fixes
-    if (height < 250) {
-      setHeight(minHeight); // Position fermée
-    } else if (height < maxHeight * 0.6) {
-      setHeight(maxHeight * 0.55); // Position demi-ouverte
-    } else {
-      setHeight(maxHeight); // Position pleine
-    }
-  };
-
-  return {
-    height,
-    setHeight,
-    isDragging,
-    containerRef,
-    handleTouchStart,
-    handleTouchMove,
-    handleTouchEnd,
-    minHeight,
-    maxHeight,
-  };
+const formatDistance = (item) => {
+  if (typeof item?.distance_km === "number")
+    return `${item.distance_km.toFixed(1)} km`;
+  if (typeof item?.distance === "string") return item.distance;
+  return null;
 };
 
-// Hook pour la virtualisation du scroll
-const useVirtualizedList = (items, itemHeight, containerHeight) => {
-  const [scrollTop, setScrollTop] = useState(0);
-
-  const visibleCount = Math.ceil(containerHeight / itemHeight) + 2; // Buffer
-  const startIndex = Math.max(0, Math.floor(scrollTop / itemHeight) - 1);
-  const endIndex = Math.min(items.length - 1, startIndex + visibleCount);
-
-  const visibleItems = items.slice(startIndex, endIndex + 1);
-  const totalHeight = items.length * itemHeight;
-  const offsetY = startIndex * itemHeight;
-
-  return {
-    visibleItems,
-    totalHeight,
-    offsetY,
-    setScrollTop,
-    startIndex,
-    endIndex,
-  };
+const pickAddress = (item) => {
+  if (typeof item?.address === "string") return item.address;
+  if (item?.address?.label) return item.address.label;
+  if (item?.address?.street || item?.city)
+    return [item?.address?.street, item?.city].filter(Boolean).join(", ");
+  return null;
 };
 
-// Skeleton loader pour les cards
-const SkeletonCard = ({ isCompact }) => {
-  if (isCompact) {
-    return (
-      <div className="bg-white rounded-xl overflow-hidden shadow-sm mb-3 flex animate-pulse">
-        <div className="w-20 h-20 bg-gray-200 flex-shrink-0"></div>
-        <div className="flex-1 p-3">
-          <div className="h-4 bg-gray-200 rounded mb-2 w-3/4"></div>
-          <div className="h-3 bg-gray-200 rounded mb-2 w-1/2"></div>
-          <div className="h-3 bg-gray-200 rounded w-1/4"></div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-white rounded-2xl overflow-hidden shadow-sm mb-6 animate-pulse">
-      <div className="w-full h-64 bg-gray-200"></div>
-      <div className="p-5">
-        <div className="h-6 bg-gray-200 rounded mb-3 w-3/4"></div>
-        <div className="h-4 bg-gray-200 rounded mb-2 w-1/2"></div>
-        <div className="flex gap-2 mb-3">
-          <div className="h-6 bg-gray-200 rounded-full w-16"></div>
-          <div className="h-6 bg-gray-200 rounded-full w-20"></div>
-        </div>
-        <div className="h-4 bg-gray-200 rounded w-1/3"></div>
-      </div>
-    </div>
-  );
+const computeBadges = (item) => {
+  const out = [];
+  const certs = Array.isArray(item?.certifications) ? item.certifications : [];
+  if (certs.some((c) => /bio|ab|organic/i.test(String(c)))) out.push("Bio");
+  if (
+    Array.isArray(item?.purchase_mode) &&
+    item.purchase_mode.includes("vente_directe")
+  )
+    out.push("Vente directe");
+  if (Array.isArray(item?.delivery_options) && item.delivery_options.length)
+    out.push("Livraison");
+  if (item?.is_new) out.push("Nouveau");
+  return out.slice(0, 3);
 };
 
-// Composant de listing mobile avec vue compacte/étendue optimisée
-const MobileListingCard = ({
+const computeOpenState = (item) => {
+  if (typeof item?.is_open === "boolean")
+    return { isOpen: item.is_open, label: item.is_open ? "Ouvert" : "Fermé" };
+  return null;
+};
+
+/* ----------------------- Card (design) ----------------------- */
+
+const FarmCard = memo(function FarmCard({
   item,
-  onHover,
-  onLeave,
   isFavorite,
   onToggleFavorite,
-  isCompact = false,
-  style = {},
-}) => {
-  const getImageUrl = () => {
-    if (!item.listingImages) return "/default-farm-image.jpg";
-    if (Array.isArray(item.listingImages) && item.listingImages.length > 0) {
-      return item.listingImages[0].url || "/default-farm-image.jpg";
-    }
-    if (typeof item.listingImages === "object" && item.listingImages.url) {
-      return item.listingImages.url;
-    }
-    return "/default-farm-image.jpg";
-  };
+}) {
+  const cover =
+    (Array.isArray(item.listingImages) && item.listingImages[0]?.url) ||
+    item.listingImages?.url ||
+    "/default-farm-image.jpg";
 
-  if (isCompact) {
-    return (
-      <div style={style}>
-        <Link href={`/view-listing/${item.id}`}>
-          <div
-            className="bg-white rounded-xl overflow-hidden shadow-sm mb-3 flex transition-transform duration-200 active:scale-95"
-            onMouseEnter={onHover}
-            onMouseLeave={onLeave}
-          >
-            <div className="w-20 h-20 flex-shrink-0 relative">
-              <ListingImage
-                src={getImageUrl()}
-                alt={`Image de ${item.name}`}
-                fallbackSrc="/default-farm-image.jpg"
-                priority={false}
-                className="w-full h-full object-cover"
-              />
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onToggleFavorite();
-                }}
-                className="absolute top-1 right-1 w-5 h-5 bg-black/20 backdrop-blur-sm rounded-full flex items-center justify-center"
-              >
-                <Heart
-                  className={`w-3 h-3 ${isFavorite ? "text-red-500 fill-red-500" : "text-white"}`}
-                />
-              </button>
-            </div>
-            <div className="flex-1 p-3 min-w-0">
-              <h3 className="font-semibold text-sm text-gray-900 mb-1 line-clamp-1">
-                {item.name}
-              </h3>
-              <div className="flex items-center text-gray-600 mb-1">
-                <MapPin className="h-3 w-3 text-green-600 mr-1 flex-shrink-0" />
-                <span className="text-xs truncate">{item.address}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1">
-                  {item.product_type?.length > 0 && (
-                    <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
-                      {item.product_type[0]}
-                    </span>
-                  )}
-                  {item.product_type?.length > 1 && (
-                    <span className="text-xs text-gray-500">
-                      +{item.product_type.length - 1}
-                    </span>
-                  )}
-                </div>
-                {item.rating && (
-                  <div className="flex items-center">
-                    <Star className="w-3 h-3 text-yellow-400 fill-yellow-400 mr-1" />
-                    <span className="text-xs text-gray-600">{item.rating}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </Link>
-      </div>
-    );
-  }
+  const address = pickAddress(item);
+  const distance = formatDistance(item);
+  const badges = computeBadges(item);
+  const openState = computeOpenState(item);
+  const rating = typeof item?.rating === "number" ? item.rating : null;
+  const reviewCount =
+    typeof item?.reviewCount === "number" ? item.reviewCount : null;
+  const products = Array.isArray(item?.product_type)
+    ? item.product_type.slice(0, 6)
+    : [];
 
   return (
-    <div style={style}>
-      <Link href={`/view-listing/${item.id}`}>
-        <div
-          className="bg-white rounded-2xl overflow-hidden shadow-sm mb-6 transition-transform duration-200 active:scale-95"
-          onMouseEnter={onHover}
-          onMouseLeave={onLeave}
-        >
-          <div className="relative">
-            <div className="w-full h-64 relative">
-              <ListingImage
-                src={getImageUrl()}
-                alt={`Image de ${item.name}`}
-                fallbackSrc="/default-farm-image.jpg"
-                priority={false}
-              />
+    <Card className="overflow-hidden border-emerald-100 hover:shadow-lg transition-all duration-300 hover:border-emerald-300">
+      <Link
+        href={`/view-listing/${item.id}`}
+        prefetch={false}
+        className="block"
+      >
+        <div className="relative h-40 bg-emerald-50">
+          <ListingImage
+            src={cover}
+            alt={item.name || "Ferme"}
+            fallbackSrc="/default-farm-image.jpg"
+            className="h-full w-full object-cover"
+          />
 
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onToggleFavorite();
-                }}
-                className="absolute top-3 right-3 w-10 h-10 bg-black/20 backdrop-blur-sm rounded-full flex items-center justify-center"
+          {/* Favorite */}
+          <Button
+            size="icon"
+            variant="secondary"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onToggleFavorite?.();
+            }}
+            className="absolute top-3 right-3 h-9 w-9 rounded-full bg-white/90 hover:bg-white shadow-md"
+            aria-label={
+              isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"
+            }
+          >
+            <LucideHeart
+              className={`h-4 w-4 ${isFavorite ? "fill-red-500 text-red-500" : "text-gray-700"}`}
+            />
+          </Button>
+
+          {/* Badges */}
+          <div className="absolute top-3 left-3 flex flex-wrap gap-2">
+            {badges.map((b) => (
+              <Badge
+                key={b}
+                className="bg-emerald-600 text-white shadow-md hover:bg-emerald-700"
               >
-                <Heart
-                  className={`w-5 h-5 ${isFavorite ? "text-red-500 fill-red-500" : "text-white"}`}
-                />
-              </button>
-
-              {item.certifications?.length > 0 && (
-                <div className="absolute top-3 left-3 bg-white px-3 py-1 rounded-lg shadow-sm">
-                  <span className="text-xs font-semibold text-green-700">
-                    {item.certifications[0]}
-                  </span>
-                </div>
-              )}
-            </div>
+                {b}
+              </Badge>
+            ))}
           </div>
 
-          <div className="p-5">
-            <div className="flex items-start justify-between mb-3">
-              <h3 className="font-semibold text-lg text-gray-900 flex-1 leading-tight pr-2">
-                {item.name}
-              </h3>
-              {item.rating && (
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-                  <span className="text-sm font-semibold text-gray-900">
-                    {item.rating}
-                  </span>
-                </div>
-              )}
+          {/* Distance */}
+          {distance && (
+            <div className="absolute bottom-3 left-3">
+              <Badge className="bg-white/90 text-emerald-700 hover:bg-white shadow-md">
+                <MapPin className="mr-1 h-3 w-3" /> {distance}
+              </Badge>
             </div>
+          )}
+        </div>
 
-            <div className="flex items-center text-gray-600 mb-2">
-              <MapPin className="h-4 w-4 text-green-600 mr-2 flex-shrink-0" />
-              <span className="text-sm truncate">{item.address}</span>
-            </div>
-
-            {item.product_type?.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-3">
-                {item.product_type.slice(0, 3).map((type, i) => (
-                  <span
-                    key={i}
-                    className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium"
-                  >
-                    {type}
-                  </span>
-                ))}
-                {item.product_type.length > 3 && (
-                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full font-medium">
-                    +{item.product_type.length - 3}
-                  </span>
-                )}
+        <div className="p-4 space-y-2.5">
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-lg text-gray-900 leading-tight line-clamp-1">
+              {item.name || "Ferme"}
+            </h3>
+            {openState && (
+              <div className="flex items-center gap-1.5 text-xs">
+                <span
+                  className={`w-2 h-2 rounded-full ${openState.isOpen ? "bg-green-500" : "bg-red-500"}`}
+                />
+                <span
+                  className={
+                    openState.isOpen
+                      ? "text-green-700 font-medium"
+                      : "text-red-700 font-medium"
+                  }
+                >
+                  {openState.label}
+                </span>
               </div>
             )}
+          </div>
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                {item.openingHours && (
-                  <div className="flex items-center text-gray-500">
-                    <Clock className="h-4 w-4 mr-1" />
-                    <span className="text-xs">{item.openingHours}</span>
-                  </div>
+          {/* Rating + Hours */}
+          <div className="flex items-center justify-between text-sm">
+            {rating !== null ? (
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
+                  <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                  <span className="font-semibold text-gray-900">
+                    {rating.toFixed(1)}
+                  </span>
+                </div>
+                {typeof reviewCount === "number" && (
+                  <span className="text-gray-500">({reviewCount} avis)</span>
                 )}
               </div>
+            ) : (
+              <div />
+            )}
 
-              {item.availability && (
-                <span
-                  className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                    item.availability === "open"
-                      ? "bg-green-100 text-green-800"
-                      : "bg-red-100 text-red-800"
-                  }`}
-                >
-                  {item.availability === "open" ? "Ouvert" : "Fermé"}
-                </span>
-              )}
-            </div>
+            {item.hours && (
+              <div className="flex items-center gap-1 text-gray-600">
+                <Clock className="h-3.5 w-3.5" />
+                <span className="text-xs">{item.hours}</span>
+              </div>
+            )}
           </div>
+
+          {/* Address */}
+          {address && (
+            <div className="flex items-start gap-2 text-sm text-gray-600">
+              <MapPin className="h-4 w-4 text-emerald-600 mt-0.5 flex-shrink-0" />
+              <span className="leading-relaxed line-clamp-2">{address}</span>
+            </div>
+          )}
+
+          {/* Products */}
+          {products.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {products.map((p) => (
+                <Badge
+                  key={p}
+                  variant="secondary"
+                  className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200"
+                >
+                  {p}
+                </Badge>
+              ))}
+              {Array.isArray(item?.product_type) &&
+                item.product_type.length > products.length && (
+                  <Badge
+                    variant="outline"
+                    className="border-emerald-200 text-emerald-700"
+                  >
+                    +{item.product_type.length - products.length}
+                  </Badge>
+                )}
+            </div>
+          )}
+
+          {/* Quick actions */}
+          <div className="flex gap-2 pt-1">
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50 bg-transparent"
+            >
+              <Phone className="h-4 w-4" /> Appeler
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50 bg-transparent"
+            >
+              <Navigation className="h-4 w-4" /> Itinéraire
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 bg-transparent"
+            >
+              <Share2 className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium h-10">
+            Voir la ferme
+          </Button>
         </div>
       </Link>
-    </div>
+    </Card>
   );
-};
+});
 
-// Composant principal avec bottom sheet optimisé
-const MobileListingMapView = () => {
-  // ✅ Hooks Zustand
-  const filters = useFiltersState();
+/* ----------------------- Main component ----------------------- */
+
+export default function MobileListingMapView() {
+  // stores
   const { mapInstance } = useMapboxState();
-  const { visible: visibleListings, isLoading, hasMore } = useListingsState();
-  const { fetchListings } = useListingsActions();
-  const { hoveredListingId } = useInteractionsState();
+  const { setCenter: setMapCenter, setZoom: setMapZoom } =
+    (useMapboxActions && useMapboxActions()) || {};
+  const filters = useFiltersState();
+  const { visible, isLoading, hasMore, page } = useListingsState();
+  const { fetchListings, resetListings } = useListingsActions();
   const { setHoveredListingId } = useInteractionsActions();
 
-  // ✅ Hooks favoris depuis userStore
-  const favorites = useUserFavorites();
-  const { loadFavorites, toggleFavorite: toggleFavoriteStore } = useUserActions();
-
+  // user + favoris
   const { user } = useUser();
-  const { openSignUp } = useClerk();
+  const favs = useUserFavorites() || [];
+  const { loadFavorites, toggleFavorite } = useUserActions();
 
-  const [isMapMoving, setIsMapMoving] = useState(false);
-  const [showSearchButton, setShowSearchButton] = useState(false);
-  const [totalResults, setTotalResults] = useState(0);
-  const [page, setPage] = useState(1);
-  const [showLoader, setShowLoader] = useState(false);
+  // router (pour mise à jour d'URL sans clignotement)
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // local UI state
+  const [showMap, setShowMap] = useState(false);
   const [quickSearch, setQuickSearch] = useState("");
+  const [searchCity, setSearchCity] = useState("");
+  const [sortBy, setSortBy] = useState("distance"); // "distance" | "rating" | "name"
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-
-  // Hook du bottom sheet
-  const {
-    height,
-    setHeight,
-    isDragging,
-    containerRef,
-    handleTouchStart,
-    handleTouchMove,
-    handleTouchEnd,
-    minHeight,
-    maxHeight,
-  } = useBottomSheet(200);
-
-  // Calculer l'état d'expansion
-  const isExpanded = height > maxHeight * 0.3;
-  const isFullyExpanded = height > maxHeight * 0.7;
-
-  // Filtrage rapide des résultats
-  const filteredListings = useMemo(() => {
-    if (!visibleListings) return [];
-    if (!quickSearch.trim()) return visibleListings;
-
-    return visibleListings.filter(
-      (item) =>
-        item.name.toLowerCase().includes(quickSearch.toLowerCase()) ||
-        item.address.toLowerCase().includes(quickSearch.toLowerCase()) ||
-        item.product_type?.some((type) =>
-          type.toLowerCase().includes(quickSearch.toLowerCase())
-        )
-    );
-  }, [visibleListings, quickSearch]);
-
-  // Ref pour le scroll
+  const loadMoreRef = useRef(null);
   const scrollContainerRef = useRef(null);
 
-  // Intersection Observer pour le scroll infini
-  const loadMoreRef = useRef(null);
+  // Charger favoris à la connexion
+  useEffect(() => {
+    if (user?.id) loadFavorites(user.id);
+  }, [user?.id, loadFavorites]);
 
+  // Reset pagination quand les filtres changent fortement
+  useEffect(() => {
+    resetListings?.();
+    fetchListings({ page: 1, forceRefresh: true });
+  }, [filters, resetListings, fetchListings]);
+
+  // filtre rapide (client-side)
+  const filtered = useMemo(() => {
+    if (!visible) return [];
+    let arr = [...visible];
+
+    // quick search (nom/adresse/produit)
+    const q = quickSearch.trim().toLowerCase();
+    if (q)
+      arr = arr.filter(
+        (l) =>
+          l.name?.toLowerCase().includes(q) ||
+          pickAddress(l)?.toLowerCase().includes(q) ||
+          (Array.isArray(l.product_type) &&
+            l.product_type.some((t) => t.toLowerCase().includes(q)))
+      );
+
+    // tri local
+    if (sortBy === "distance") {
+      arr.sort((a, b) => (a.distance_km ?? 1e9) - (b.distance_km ?? 1e9));
+    } else if (sortBy === "rating") {
+      arr.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+    } else if (sortBy === "name") {
+      arr.sort((a, b) =>
+        String(a.name || "").localeCompare(String(b.name || ""))
+      );
+    }
+
+    return arr;
+  }, [visible, quickSearch, sortBy]);
+
+  // infinite scroll (list mode)
   useEffect(() => {
     if (!loadMoreRef.current || !hasMore || isLoading) return;
 
-    const observer = new IntersectionObserver(
+    const el = loadMoreRef.current;
+    let ticking = false; // micro-throttle
+
+    const io = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && !isLoadingMore) {
-          handleLoadMore();
+        const isVisible = entries[0]?.isIntersecting;
+        if (isVisible && !isLoadingMore && !ticking) {
+          ticking = true;
+          setIsLoadingMore(true);
+          const nextPage =
+            (page || Math.floor((visible?.length || 0) / PAGE_SIZE)) + 1;
+          fetchListings({ page: nextPage, append: true })
+            .catch(() => {})
+            .finally(() => {
+              setIsLoadingMore(false);
+              ticking = false;
+            });
         }
       },
-      { threshold: 0.1 }
+      {
+        root: scrollContainerRef.current ?? null,
+        rootMargin: "200px 0px 0px 0px",
+      }
     );
 
-    observer.observe(loadMoreRef.current);
-    return () => observer.disconnect();
-  }, [hasMore, isLoading, isLoadingMore]);
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasMore, isLoading, isLoadingMore, visible?.length, fetchListings, page]);
 
-  // Mise à jour du total des résultats
-  useEffect(() => {
-    if (filteredListings) {
-      setTotalResults(filteredListings.length);
-    }
-  }, [filteredListings]);
+  /* ----------------------- HANDLERS ----------------------- */
 
-  // ✅ Chargement des favoris depuis le store
-  useEffect(() => {
-    if (user?.id) {
-      loadFavorites(user.id);
-    }
-  }, [user?.id, loadFavorites]);
-
-  // Loader state
-  useEffect(() => {
-    if (isLoading) {
-      const timer = setTimeout(() => setShowLoader(true), 200);
-      return () => clearTimeout(timer);
-    } else {
-      setShowLoader(false);
-    }
-  }, [isLoading]);
-
-  // Écouteurs d'événements pour la carte Mapbox
-  useEffect(() => {
-    if (!mapInstance) return;
-
-    const handleDragStart = () => {
-      setIsMapMoving(true);
-      setShowSearchButton(false);
-    };
-
-    const handleDragEnd = () => {
-      setIsMapMoving(false);
-      setTimeout(() => setShowSearchButton(true), 300);
-    };
-
-    const handleZoomEnd = () => {
-      setTimeout(() => setShowSearchButton(true), 500);
-    };
-
-    // Mapbox événements
-    mapInstance.on("dragstart", handleDragStart);
-    mapInstance.on("dragend", handleDragEnd);
-    mapInstance.on("zoomend", handleZoomEnd);
-
-    return () => {
-      if (mapInstance) {
-        mapInstance.off("dragstart", handleDragStart);
-        mapInstance.off("dragend", handleDragEnd);
-        mapInstance.off("zoomend", handleZoomEnd);
-      }
-    };
-  }, [mapInstance]);
-
-  const handleFiltersClick = () => {
-    openMobileFilters();
-  };
-
-  const handleSearchInArea = useCallback(() => {
-    setShowSearchButton(false);
-    setPage(1);
-
-    // ✅ Le store Zustand utilise automatiquement mapBounds du state
-    fetchListings({
-      page: 1,
-      forceRefresh: true,
-    }).then((data) => {
-      if (data && data.length > 0) {
-        toast.success(`${data.length} fermes trouvées dans cette zone`);
-      } else {
-        toast.info("Aucune ferme trouvée dans cette zone");
-      }
-    });
-  }, [fetchListings]);
-
-  const handleLoadMore = useCallback(async () => {
-    if (isLoading || !hasMore || isLoadingMore) return;
-
-    setIsLoadingMore(true);
-    const newPage = page + 1;
-    setPage(newPage);
-
-    try {
-      await fetchListings({ page: newPage, append: true });
-    } finally {
-      setIsLoadingMore(false);
-    }
-  }, [page, hasMore, isLoading, isLoadingMore, fetchListings]);
-
-  // ✅ Wrapper pour toggleFavorite qui gère le cas non-connecté
   const handleToggleFavorite = useCallback(
     (id) => {
       if (!user) {
         toast("Connectez-vous pour gérer vos favoris");
-        openSignUp({ redirectUrl: "/signup" });
         return;
       }
-      toggleFavoriteStore(id, user.id);
+      toggleFavorite(id, user.id);
     },
-    [user, toggleFavoriteStore, openSignUp]
+    [user, toggleFavorite]
   );
 
-  const handleHover = (id) => {
-    setHoveredListingId?.(id);
-  };
+  const handleSearchInArea = useCallback(() => {
+    fetchListings({ page: 1, forceRefresh: true }).then((data) => {
+      if (Array.isArray(data) && data.length)
+        toast.success(`${data.length} fermes trouvées dans cette zone`);
+      else toast.info("Aucune ferme trouvée dans cette zone");
+    });
+  }, [fetchListings]);
 
-  const handleLeave = () => {
-    setHoveredListingId?.(null);
-  };
+  const handleShowMap = useCallback(() => {
+    setShowMap(true);
+    if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0;
+  }, []);
 
-  // Générer des skeletons pour le loading
-  const renderSkeletons = (count = 6) => {
-    return Array.from({ length: count }, (_, i) => (
-      <SkeletonCard key={`skeleton-${i}`} isCompact={!isExpanded} />
-    ));
-  };
+  /* ----------------------- Utilitaires Map + onCitySelect ----------------------- */
 
-  return (
-    <div className="h-screen bg-white overflow-hidden relative">
-      {/* Barre de recherche et filtres entre header et carte */}
-      <div className="top-24 left-0 right-0 z-30 bg-white border-b border-gray-200 p-4">
-        <div className="flex items-center gap-3">
-          <div className="flex-1">
-            <MapboxCitySearch
-              placeholder="Rechercher une ville..."
-              onCitySelect={(cityData) => {
-                console.log("Ville sélectionnée:", cityData);
-              }}
-            />
-          </div>
-          <button
-            onClick={handleFiltersClick}
-            className="w-10 h-10 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center transition-colors"
-          >
-            <SlidersHorizontal className="w-5 h-5 text-gray-700" />
-          </button>
-        </div>
-      </div>
+  const easeToCenter = useCallback(
+    (map, center, zoom = 12) =>
+      new Promise((resolve) => {
+        if (!map) return resolve(false);
+        const done = () => {
+          map.off("moveend", done);
+          resolve(true);
+        };
+        map.on("moveend", done);
+        map.easeTo({ center, zoom, duration: 600, essential: true });
+      }),
+    []
+  );
 
-      {/* Carte en arrière-plan avec marge pour le header */}
-      <div className="absolute top-20 left-0 right-0 bottom-0">
-        <MapboxSection isMapExpanded={true} isMobile={true} />
+  const getCurrentBBox = useCallback((map) => {
+    if (!map) return null;
+    const b = map.getBounds();
+    return [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()];
+  }, []);
 
-        {/* Indicateur de mouvement */}
-        {isMapMoving && (
-          <div className="absolute top-8 left-1/2 transform -translate-x-1/2 z-20 bg-white/95 backdrop-blur-sm px-4 py-3 rounded-full shadow-lg border border-gray-200">
-            <div className="flex items-center gap-3">
-              <RefreshCw className="w-4 h-4 animate-spin text-green-600" />
-              <span className="text-sm font-medium text-gray-700">
-                Recherche en cours...
-              </span>
-            </div>
-          </div>
-        )}
+  const updateUrl = useCallback(
+    ({ lat, lng, zoom }) => {
+      try {
+        const params = new URLSearchParams(searchParams?.toString() || "");
+        if (typeof lat === "number") params.set("lat", lat.toFixed(6));
+        if (typeof lng === "number") params.set("lng", lng.toFixed(6));
+        if (typeof zoom === "number") params.set("zoom", String(zoom));
+        router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+      } catch (_) {}
+    },
+    [router, pathname, searchParams]
+  );
 
-        {/* Bouton rechercher dans cette zone */}
-        {showSearchButton && (
-          <div
-            className="absolute left-1/2 transform -translate-x-1/2 z-20 animate-slide-up"
-            style={{ bottom: `${height + 20}px` }}
-          >
-            <button
-              onClick={handleSearchInArea}
-              className="bg-gray-900 hover:bg-gray-800 text-white px-8 py-4 rounded-full shadow-xl flex items-center gap-3 text-base font-medium"
-            >
-              <Search className="w-5 h-5" />
-              Rechercher dans cette zone
-            </button>
-          </div>
-        )}
-      </div>
+  const handleCitySelect = useCallback(
+    async (city) => {
+      let lng, lat;
+      let zoom = 12;
+      let bbox = null;
+      if (city?.center && Array.isArray(city.center)) {
+        [lng, lat] = city.center;
+      } else if (Array.isArray(city)) {
+        [lng, lat] = city;
+      } else if (city?.location) {
+        lng = Number(city.location.lng);
+        lat = Number(city.location.lat);
+      }
+      if (Array.isArray(city?.bbox) && city.bbox.length === 4) bbox = city.bbox;
+      if (typeof city?.zoom === "number") zoom = city.zoom;
 
-      {/* Bottom Sheet collé au bas */}
-      <div
-        ref={containerRef}
-        className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl z-40 transition-all duration-300 ease-out"
-        style={{
-          height: `${height}px`,
-          marginBottom: "0px",
-        }}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-      >
-        {/* Handle pour le drag */}
-        <div className="w-full flex justify-center pt-3 pb-2 cursor-pointer">
-          <div className="w-12 h-1 bg-gray-300 rounded-full"></div>
-        </div>
+      setSearchCity(String(city?.place_name || city?.text || ""));
+      if (typeof lat === "number" && typeof lng === "number")
+        updateUrl({ lat, lng, zoom });
 
-        {/* Header du bottom sheet */}
-        <div className="px-6 py-3 border-b border-gray-100">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h2 className="font-bold text-lg text-gray-900">
-                {totalResults > 0
-                  ? `${totalResults.toLocaleString()} ferme${totalResults > 1 ? "s" : ""}`
-                  : "Aucune ferme"}
-              </h2>
-              <p className="text-sm text-gray-600">
-                {quickSearch
-                  ? "correspondant à votre recherche"
-                  : "dans la zone de la carte"}
-              </p>
-            </div>
-            <button
-              onClick={() => setHeight(isFullyExpanded ? 200 : maxHeight)}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-            >
-              {isFullyExpanded ? (
-                <ChevronDown className="w-5 h-5 text-gray-600" />
-              ) : (
-                <ChevronUp className="w-5 h-5 text-gray-600" />
-              )}
-            </button>
-          </div>
+      try {
+        if (setMapCenter && typeof lat === "number" && typeof lng === "number")
+          setMapCenter({ lat, lng });
+      } catch {}
+      try {
+        if (setMapZoom && typeof zoom === "number") setMapZoom(zoom);
+      } catch {}
 
-          {/* Recherche rapide quand étendu */}
-          {isExpanded && (
+      if (mapInstance && typeof lat === "number" && typeof lng === "number") {
+        await easeToCenter(mapInstance, [lng, lat], zoom);
+        const current = getCurrentBBox(mapInstance);
+        await fetchListings({
+          page: 1,
+          forceRefresh: true,
+          bbox: current || bbox || undefined,
+        });
+      } else {
+        await fetchListings({
+          page: 1,
+          forceRefresh: true,
+          bbox: bbox || undefined,
+        });
+      }
+    },
+    [
+      mapInstance,
+      easeToCenter,
+      getCurrentBBox,
+      fetchListings,
+      setMapCenter,
+      setMapZoom,
+      updateUrl,
+    ]
+  );
+
+  /* ----------------------- LIST VIEW ----------------------- */
+
+  const ListView = (
+    <div className="relative min-h-[100dvh] w-full bg-gradient-to-b from-emerald-50 to-white pb-32">
+      {/* Header (recherche affichée uniquement en desktop) */}
+      <header className="sticky top-0 z-50 bg-white border-b border-emerald-100 shadow-sm">
+        <div className="px-4 py-2">
+          <div className="hidden md:block">
             <div className="relative">
-              <input
-                type="text"
-                placeholder="Rechercher dans les résultats..."
-                value={quickSearch}
-                onChange={(e) => setQuickSearch(e.target.value)}
-                className="w-full pl-4 pr-10 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              />
-              <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-            </div>
-          )}
-        </div>
-
-        {/* Contenu scrollable avec optimisations */}
-        <div
-          ref={scrollContainerRef}
-          className="flex-1 overflow-y-auto px-6 py-4"
-          style={{
-            height: `${height - (isExpanded ? 160 : 120)}px`, // Ajustement dynamique
-          }}
-        >
-          {showLoader &&
-          (!filteredListings || filteredListings.length === 0) ? (
-            <div className="space-y-4">{renderSkeletons()}</div>
-          ) : filteredListings.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                <Search className="w-8 h-8 text-gray-400" />
-              </div>
-              <h3 className="font-semibold text-gray-900 mb-2">
-                Aucune ferme trouvée
-              </h3>
-              <p className="text-gray-600 text-center text-sm">
-                {quickSearch
-                  ? "Essayez avec d'autres mots-clés"
-                  : "Essayez de déplacer la carte ou d'ajuster vos filtres"}
-              </p>
-            </div>
-          ) : (
-            <>
-              {filteredListings.map((item) => (
-                <MobileListingCard
-                  key={item.id}
-                  item={item}
-                  onHover={() => handleHover(item.id)}
-                  onLeave={handleLeave}
-                  isFavorite={favorites.includes(item.id)}
-                  onToggleFavorite={() => handleToggleFavorite(item.id)}
-                  isCompact={!isExpanded}
+              <Suspense
+                fallback={
+                  <div className="h-10 w-full rounded-full bg-emerald-50" />
+                }
+              >
+                <MapboxCitySearch
+                  placeholder="Rechercher une ville..."
+                  onCitySelect={handleCitySelect}
+                  className="h-10 w-full rounded-full border border-gray-200 bg-gray-50 px-4 focus:border-emerald-300 focus:bg-white focus:ring-2 focus:ring-emerald-100"
                 />
-              ))}
+              </Suspense>
+            </div>
+          </div>
+        </div>
+      </header>
 
-              {/* Zone de chargement infini */}
-              {hasMore && (
-                <div ref={loadMoreRef} className="flex justify-center py-8">
-                  {isLoadingMore ? (
-                    <div className="flex flex-col items-center">
-                      <RefreshCw className="w-6 h-6 animate-spin text-green-600 mb-2" />
-                      <span className="text-sm text-gray-600">
-                        Chargement...
-                      </span>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={handleLoadMore}
-                      className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-full font-medium transition-colors"
-                    >
-                      Charger plus
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {/* Indicateur fin de liste */}
-              {!hasMore && filteredListings.length > 10 && (
-                <div className="text-center py-8 text-gray-500 text-sm">
-                  Vous avez vu toutes les fermes disponibles
-                </div>
-              )}
-            </>
-          )}
+      {/* Fil d'Ariane simple */}
+      <div className="bg-white border-b border-emerald-100">
+        <div className="px-4 py-2">
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-emerald-700 font-medium">France</span>
+            <ChevronRight className="h-4 w-4 text-gray-400" />
+            <span className="text-gray-900 font-semibold">
+              {searchCity || "Sélectionnez une ville"}
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Styles CSS */}
-      <style jsx>{`
-        @keyframes slide-up {
-          from {
-            opacity: 0;
-            transform: translate(-50%, 20px);
-          }
-          to {
-            opacity: 1;
-            transform: translate(-50%, 0);
-          }
-        }
+      {/* Résultats */}
+      <div
+        ref={scrollContainerRef}
+        className="no-scrollbar h-[calc(100dvh-190px)] overflow-y-auto px-4 py-4 pb-[120px]"
+      >
+        {isLoading && (!filtered || filtered.length === 0) ? (
+          <div className="space-y-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div
+                key={i}
+                className="flex gap-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm"
+              >
+                <div className="h-20 w-20 animate-pulse rounded-xl bg-gray-200" />
+                <div className="flex-1">
+                  <div className="mb-2 h-4 w-2/3 animate-pulse rounded bg-gray-200" />
+                  <div className="mb-2 h-3 w-5/6 animate-pulse rounded bg-gray-200" />
+                  <div className="flex gap-2">
+                    <div className="h-5 w-16 animate-pulse rounded-full bg-gray-200" />
+                    <div className="h-5 w-20 animate-pulse rounded-full bg-gray-200" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
+              {/* icône de recherche */}
+              <svg
+                className="h-8 w-8 text-gray-400"
+                viewBox="0 0 24 24"
+                fill="none"
+              >
+                <path
+                  d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </div>
+            <h3 className="mb-1 text-base font-semibold text-gray-900">
+              Aucune ferme
+            </h3>
+            <p className="max-w-xs text-sm text-gray-600">
+              Essayez d’élargir la zone ou d’ajuster vos filtres.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {filtered.map((item) => (
+              <FarmCard
+                key={item.id}
+                item={item}
+                isFavorite={Array.isArray(favs) && favs.includes(item.id)}
+                onToggleFavorite={() => handleToggleFavorite(item.id)}
+              />
+            ))}
 
-        .animate-slide-up {
-          animation: slide-up 0.3s ease-out forwards;
-        }
+            {hasMore && (
+              <div ref={loadMoreRef} className="py-6 text-center">
+                {isLoadingMore ? (
+                  <div className="inline-flex items-center gap-2 rounded-full bg-gray-50 px-4 py-2 text-sm text-gray-600">
+                    <RefreshCw className="h-4 w-4 animate-spin text-emerald-600" />{" "}
+                    Chargement…
+                  </div>
+                ) : (
+                  <span className="text-xs text-gray-400">
+                    Faites défiler pour charger plus
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
-        .line-clamp-1 {
-          display: -webkit-box;
-          -webkit-line-clamp: 1;
-          -webkit-box-orient: vertical;
-          overflow: hidden;
-        }
-
-        /* Suppression des marges et espacements indésirables */
-        * {
-          box-sizing: border-box;
-        }
-
-        body {
-          margin: 0;
-          padding: 0;
-          overflow: hidden;
-        }
-
-        /* Container principal sans espacement */
-        .h-screen {
-          height: 100vh;
-          height: 100dvh; /* Dynamic viewport height pour mobile */
-        }
-        .overflow-y-auto::-webkit-scrollbar {
-          width: 4px;
-        }
-
-        .overflow-y-auto::-webkit-scrollbar-track {
-          background: transparent;
-        }
-
-        .overflow-y-auto::-webkit-scrollbar-thumb {
-          background: rgba(0, 0, 0, 0.1);
-          border-radius: 2px;
-        }
-
-        .overflow-y-auto::-webkit-scrollbar-thumb:hover {
-          background: rgba(0, 0, 0, 0.2);
-        }
-      `}</style>
+      {/* CTA bas "Voir sur la carte" */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-emerald-100 shadow-lg z-40">
+        <div className="px-4 py-4">
+          <Button
+            size="lg"
+            onClick={handleShowMap}
+            className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium h-12 rounded-full"
+          >
+            <LucideMap className="h-5 w-5" /> Voir sur la carte
+          </Button>
+        </div>
+        <div className="h-[env(safe-area-inset-bottom)]" />
+      </div>
     </div>
   );
-};
 
-export default MobileListingMapView;
+  /* ----------------------- MAP VIEW ----------------------- */
+
+  const MapView = (
+    <div className="relative h-[70dvh] w-full overflow-hidden rounded-t-2xl border-t border-gray-200 shadow-inner">
+      {/* top bar */}
+      <div className="pointer-events-none absolute left-0 right-0 top-0 z-30 flex items-start justify-between p-3">
+        <Button
+          onClick={() => setShowMap(false)}
+          variant="outline"
+          className="pointer-events-auto inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white/95 px-3 py-2 text-sm font-medium text-gray-800 shadow-sm backdrop-blur hover:bg-white"
+          aria-label="Revenir à la liste"
+        >
+          <ChevronLeft className="h-4 w-4" /> Liste
+        </Button>
+
+        <Button
+          onClick={openMobileFilters}
+          variant="outline"
+          size="icon"
+          className="pointer-events-auto inline-flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-700 shadow-sm hover:bg-gray-50"
+          aria-label="Ouvrir les filtres"
+        >
+          <LucideFilter className="h-5 w-5" />
+        </Button>
+      </div>
+
+      <Suspense fallback={<div className="h-full w-full bg-gray-100" />}>
+        <MapboxSection isMapExpanded={true} isMobile />
+      </Suspense>
+      <div className="h-[env(safe-area-inset-bottom)]" />
+    </div>
+  );
+
+  return showMap ? MapView : ListView;
+}

@@ -1,68 +1,65 @@
+// app/HomeContent.jsx
 "use client";
 
 import React from "react";
-import { useRouter } from "next/navigation";
-import { Toaster } from "sonner";
 import dynamic from "next/dynamic";
+import { Toaster } from "sonner";
 import ExploreNearby from "./ExploreNearby";
 import EuropeanFeatures from "./EuropeanFeatures";
-// ✅ Nouvel import Zustand depuis mapboxListingsStore
-import { useMapboxActions } from "@/lib/store/mapboxListingsStore";
 import { useTranslation } from "@/lib/store/settingsStore";
 
-// Chargement dynamique pour éviter les erreurs d'hydratation
 const MapboxCitySearch = dynamic(
   () => import("@/app/modules/maps/components/shared/MapboxCitySearch"),
   {
     ssr: false,
     loading: () => (
       <div className="flex items-center border-2 rounded-full py-2 px-4 shadow-lg bg-white max-w-lg w-full">
-        <div className="w-5 h-5 bg-gray-200 rounded mr-3 animate-pulse"></div>
-        <div className="flex-grow h-4 bg-gray-200 rounded animate-pulse"></div>
+        <div className="w-5 h-5 bg-gray-200 rounded mr-3 animate-pulse" />
+        <div className="flex-grow h-4 bg-gray-200 rounded animate-pulse" />
       </div>
     ),
   }
 );
 
 function HomeContent() {
-  // ✅ Hook Zustand remplace l'ancien contexte
-  const { setCoordinates } = useMapboxActions();
   const t = useTranslation();
-  const router = useRouter();
-
-  const handleCitySelect = (cityData) => {
-    // MapboxCitySearch retourne { coordinates: [lng, lat], ... }
-    if (!cityData?.coordinates) return;
-
-    const [lng, lat] = cityData.coordinates;
-    setCoordinates({ lat, lng });
-  };
 
   return (
     <div>
       {/* Hero Section avec barre de recherche */}
-      <div className="relative h-[450px] md:h-[550px]">
+      <div className="relative h-[420px] md:h-[540px] rounded-xl">
+        {/* Si tu as déjà un <Toaster /> global, supprime cette ligne */}
         <Toaster richColors />
+
+        {/* Vidéo en fond */}
         <video
-          src={"/856065-hd_1920_1080_30fps.mp4"}
+          src="/856065-hd_1920_1080_30fps.mp4"
+          poster="/hero-poster.jpg" // optionnel mais conseillé
+          preload="metadata"
           autoPlay
           loop
-          playsInline
           muted
-          className="absolute top-0 left-0 w-full h-full object-cover"
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover z-0 rounded-xl"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/30 to-black/50"></div>
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-white p-4">
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif font-bold mb-6 tracking-wide drop-shadow-lg">
+
+        {/* Overlay au-dessus de la vidéo */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/30 to-black/50 z-10 rounded-xl" />
+
+        {/* Contenu au-dessus de l’overlay */}
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center text-center text-white p-4">
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif font-bold mb-5 tracking-wide drop-shadow-lg">
             {t("welcome")}
           </h1>
-          <p className="text-xl md:text-2xl max-w-3xl font-light leading-relaxed drop-shadow-md mb-6">
+          <p className="text-lg md:text-2xl max-w-3xl font-light leading-relaxed drop-shadow-md mb-5">
             {t("connect")}
           </p>
-          <div className="w-full max-w-lg">
+
+          {/* Champ + suggestions au-dessus de tout (header inclus) */}
+          <div className="w-full max-w-lg relative z-[400]">
             <MapboxCitySearch
-              onCitySelect={handleCitySelect}
-              placeholder="Entrez une ville pour explorer..."
+              variant="hero"
+              placeholder="Entrez une ville pour explorer…"
             />
           </div>
         </div>

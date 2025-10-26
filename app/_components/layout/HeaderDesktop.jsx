@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -18,8 +19,6 @@ import {
   ListChecks,
   Heart,
   User,
-  Menu,
-  Search,
   MapPin,
   Bell,
   Settings,
@@ -32,40 +31,59 @@ import {
   useUserActions,
 } from "@/lib/store/userStore";
 
-export default function HeaderDesktop() {
+const MapboxCitySearch = dynamic(
+  () => import("@/app/modules/maps/components/shared/MapboxCitySearch"),
+  { ssr: false }
+);
+
+export default function HeaderDesktop({ showSearchInHeader = true }) {
   const { user, isSignedIn, isLoaded } = useUser();
   const { signOut } = useClerk();
   const role = useUserRole();
-  const { isReady } = useUserSyncState();
+  const {
+    /* isReady */
+  } = useUserSyncState();
   const { reset } = useUserActions();
+
   const [isClient, setIsClient] = useState(false);
+  const [canRender, setCanRender] = useState(true); // garde-fou anti-doublon
 
   useEffect(() => {
     setIsClient(true);
+
+    // 🔒 empêche un second montage accidentel (layout doublé, hot reload, etc.)
+    if (typeof window !== "undefined") {
+      if (window.__F2F_HEADER_DESKTOP_MOUNTED__) {
+        setCanRender(false);
+      } else {
+        window.__F2F_HEADER_DESKTOP_MOUNTED__ = true;
+      }
+    }
+    return () => {
+      if (
+        typeof window !== "undefined" &&
+        window.__F2F_HEADER_DESKTOP_MOUNTED__
+      ) {
+        delete window.__F2F_HEADER_DESKTOP_MOUNTED__;
+      }
+    };
   }, []);
 
   const handleSignOut = async () => {
     try {
       reset();
       await signOut();
-    } catch (error) {
-      console.error("Erreur lors de la déconnexion:", error);
+    } catch (e) {
+      console.error("Erreur lors de la déconnexion:", e);
     }
   };
 
-  const openSignIn = () => {
+  const openSignIn = () =>
     window.dispatchEvent(new CustomEvent("openSigninModal"));
-  };
-
-  const openSignUp = () => {
+  const openSignUp = () =>
     window.dispatchEvent(new CustomEvent("openSignupModal"));
-  };
 
-  const getUserAvatarUrl = () => {
-    if (!user) return "/default-avatar.png";
-    return user.imageUrl || "/default-avatar.png";
-  };
-
+  const getUserAvatarUrl = () => user?.imageUrl || "/default-avatar.png";
   const getUserDisplayName = () => {
     if (!user) return "Utilisateur";
     if (user.fullName) return user.fullName;
@@ -73,17 +91,12 @@ export default function HeaderDesktop() {
     const email = user.primaryEmailAddress?.emailAddress;
     return email ? email.split("@")[0] : "Utilisateur";
   };
-
-  const getRoleLabel = () => {
-    switch (role) {
-      case "admin":
-        return "Administrateur";
-      case "farmer":
-        return "Agriculteur";
-      default:
-        return "Utilisateur";
-    }
-  };
+  const getRoleLabel = () =>
+    role === "admin"
+      ? "Administrateur"
+      : role === "farmer"
+        ? "Agriculteur"
+        : "Utilisateur";
 
   if (!isClient || !isLoaded) {
     return (
@@ -95,11 +108,15 @@ export default function HeaderDesktop() {
       </header>
     );
   }
+  if (!canRender) {
+    // ⬅️ si un second header tente de se monter, on ne rend rien
+    return null;
+  }
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
+    <header className="sticky top-0 z-[200] w-full border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
       <div className="container flex h-16 items-center justify-between px-6">
-        {/* Logo et Navigation */}
+        {/* Logo + nav */}
         <div className="flex items-center gap-8">
           <Link href="/" className="flex items-center space-x-2">
             <Image
@@ -115,7 +132,6 @@ export default function HeaderDesktop() {
             </span>
           </Link>
 
-          {/* Navigation principale */}
           <nav className="hidden md:flex items-center space-x-6">
             <Link
               href="/explore"
@@ -141,19 +157,16 @@ export default function HeaderDesktop() {
 
         {/* Actions droite */}
         <div className="flex items-center gap-4">
-          {/* Barre de recherche compacte */}
-          <div className="hidden lg:flex items-center">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Rechercher..."
-                className="pl-10 pr-4 py-2 w-64 text-sm border border-gray-200 rounded-full bg-gray-50 focus:bg-white focus:border-green-300 focus:outline-none focus:ring-2 focus:ring-green-100 transition-all"
+          {/* Recherche ville (Mapbox) */}
+          {showSearchInHeader && (
+            <div className="hidden lg:flex items-center w-[380px] max-w-[40vw]">
+              <MapboxCitySearch
+                variant="header"
+                placeholder="Rechercher une ville…"
               />
             </div>
-          </div>
+          )}
 
-          {/* Devenir producteur */}
           <Link
             href="/become-farmer"
             className="hidden md:flex items-center gap-1 text-sm font-medium text-green-600 hover:text-green-700 px-3 py-2 rounded-lg hover:bg-green-50 transition-all"
@@ -162,7 +175,6 @@ export default function HeaderDesktop() {
             Devenir producteur
           </Link>
 
-          {/* Menu utilisateur */}
           {!isSignedIn ? (
             <div className="flex items-center gap-2">
               <button
@@ -181,7 +193,6 @@ export default function HeaderDesktop() {
             </div>
           ) : (
             <div className="flex items-center gap-3">
-              {/* Favoris */}
               <Link
                 href="/user#favorites"
                 className="p-2 text-gray-600 hover:text-red-500 hover:bg-gray-50 rounded-lg transition-all relative"
@@ -189,14 +200,11 @@ export default function HeaderDesktop() {
               >
                 <Heart className="w-5 h-5" />
               </Link>
-
-              {/* Notifications */}
               <button className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all relative">
                 <Bell className="w-5 h-5" />
-                <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>
+                <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full" />
               </button>
 
-              {/* Dropdown utilisateur */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button className="flex items-center gap-2 p-1 hover:bg-gray-50 rounded-lg transition-colors">
@@ -311,7 +319,6 @@ export default function HeaderDesktop() {
                   </DropdownMenuItem>
 
                   <DropdownMenuSeparator />
-
                   <DropdownMenuItem
                     onClick={handleSignOut}
                     className="flex items-center gap-3 p-3 cursor-pointer text-red-600 focus:text-red-600"

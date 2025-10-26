@@ -1,589 +1,192 @@
-// app/modules/maps/components/MapboxSection.jsx
 "use client";
 
-import React, { useEffect, useRef, useCallback, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import mapboxgl from "mapbox-gl";
-import "mapbox-gl/dist/mapbox-gl.css";
 import {
   useMapboxState,
   useMapboxActions,
-  useListingsState,
-  useListingsActions,
-  useInteractionsState,
-  useInteractionsActions,
-  useFiltersState,
   MAPBOX_CONFIG,
 } from "@/lib/store/mapboxListingsStore";
 
-// Configuration du token Mapbox
-mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
+mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || "";
 
-const MapboxSection = ({ isMapExpanded, isMobile = false }) => {
-  const mapContainer = useRef(null);
+export default function MapboxSection({ isMapExpanded = false }) {
+  // Wrapper (peut accueillir d'autres éléments) et conteneur map STRICTEMENT vide
+  const wrapperRef = useRef(null);
+  const containerRef = useRef(null);
   const mapRef = useRef(null);
-  const markersRef = useRef(new Map());
-  const popupRef = useRef(null);
-  const isInitializedRef = useRef(false); // Utiliser useRef au lieu de useState
 
-  // État Zustand - Carte
-  const { isLoaded, coordinates, zoom, style, bounds } = useMapboxState();
+  const { coordinates, zoom, style } = useMapboxState();
   const {
-    setMapLoaded,
     setMapInstance,
     setMapBounds,
+    setMapLoaded,
+    setMapLoading,
     setMapZoom,
-    setCoordinates,
+    setMapPitch,
+    setMapBearing,
   } = useMapboxActions();
 
-  // Actions Listings pour le fetch automatique
-  const { searchInArea } = useListingsActions();
-
-  // État Zustand - Listings et interactions
-  const { visible: visibleListings } = useListingsState();
-  const { hoveredListingId, selectedListingId } = useInteractionsState();
-  const { setHoveredListingId, setSelectedListingId, setOpenInfoWindowId } =
-    useInteractionsActions();
-  const filters = useFiltersState();
-
-  // Initialisation de la carte
+  // ---- 1️⃣ Initialisation (une seule fois) ----
   useEffect(() => {
-    if (!mapContainer.current || isInitializedRef.current) return;
+    if (!containerRef.current || mapRef.current) return;
 
+    setMapLoading(true);
+
+    // 🧹 IMPORTANT: purger tout contenu éventuel du conteneur
     try {
-      const map = new mapboxgl.Map({
-        container: mapContainer.current,
-        style: style || MAPBOX_CONFIG.style,
-        center: coordinates || MAPBOX_CONFIG.center,
-        zoom: zoom || MAPBOX_CONFIG.zoom,
-        minZoom: MAPBOX_CONFIG.minZoom,
-        maxZoom: MAPBOX_CONFIG.maxZoom,
-        // Options spécifiques mobile
-        ...(isMobile && {
-          dragPan: true,
-          touchZoomRotate: true,
-          doubleClickZoom: true,
-          scrollZoom: true,
-        }),
-        // Options desktop
-        ...(!isMobile && {
-          dragPan: true,
-          scrollZoom: true,
-          boxZoom: true,
-          dragRotate: true,
-          keyboard: true,
-          doubleClickZoom: true,
-          touchZoomRotate: true,
-        }),
-      });
-
-      mapRef.current = map;
-      setMapInstance(map);
-
-      // Event listeners
-      map.on("load", () => {
-        console.log("🗺️ Mapbox chargé avec succès");
-        setMapLoaded(true);
-        isInitializedRef.current = true;
-
-        // Ajouter les sources et layers pour les marqueurs
-        addMarkersLayer(map);
-      });
-
-      map.on("moveend", () => {
-        const center = map.getCenter();
-        const currentZoom = map.getZoom();
-        const currentBounds = map.getBounds();
-
-        setCoordinates([center.lng, center.lat]);
-        setMapZoom(currentZoom);
-        setMapBounds([
-          [currentBounds.getWest(), currentBounds.getSouth()],
-          [currentBounds.getEast(), currentBounds.getNorth()],
-        ]);
-
-        // Déclencher automatiquement la recherche dans la zone visible (avec debounce)
-        searchInArea(map);
-      });
-
-      map.on("error", (e) => {
-        console.error("❌ Erreur Mapbox:", e.error);
-      });
-
-      // Navigation controls (sauf sur mobile)
-      if (!isMobile) {
-        map.addControl(new mapboxgl.NavigationControl(), "top-right");
+      containerRef.current.replaceChildren(); // supprime tous les enfants sans recréer le nœud
+    } catch {
+      containerRef.current.innerHTML = "";
+      while (containerRef.current.firstChild) {
+        containerRef.current.removeChild(containerRef.current.firstChild);
       }
-
-      // Scale control
-      map.addControl(
-        new mapboxgl.ScaleControl({
-          maxWidth: 80,
-          unit: "metric",
-        }),
-        "bottom-left"
-      );
-    } catch (error) {
-      console.error("❌ Erreur initialisation Mapbox:", error);
     }
+
+    const [lng, lat] = Array.isArray(coordinates)
+      ? coordinates
+      : MAPBOX_CONFIG.center;
+
+    const map = new mapboxgl.Map({
+      container: containerRef.current, // NE PAS passer le wrapper ici
+      style: style || MAPBOX_CONFIG.style,
+      center: [lng, lat],
+      zoom: typeof zoom === "number" ? zoom : MAPBOX_CONFIG.zoom,
+      minZoom: MAPBOX_CONFIG.minZoom,
+      maxZoom: MAPBOX_CONFIG.maxZoom,
+      cooperativeGestures: true,
+      attributionControl: false,
+      pitch: 0,
+      bearing: 0,
+      projection: "mercator",
+    });
+
+    mapRef.current = map;
+
+    // Contrôles
+    map.addControl(
+      new mapboxgl.NavigationControl({ visualizePitch: true }),
+      "bottom-right"
+    );
+    map.addControl(
+      new mapboxgl.ScaleControl({ maxWidth: 80, unit: "metric" }),
+      "bottom-left"
+    );
+
+    const enforceFlatView = () => {
+      try {
+        if (map.getProjection?.().name !== "mercator")
+          map.setProjection("mercator");
+        map.setPitch(0);
+        map.setBearing(0);
+        setMapPitch(0);
+        setMapBearing(0);
+      } catch {}
+    };
+
+    map.on("style.load", enforceFlatView);
+
+    map.on("load", () => {
+      setMapInstance(map);
+      setMapLoaded(true);
+      setMapLoading(false);
+      enforceFlatView();
+
+      const b = map.getBounds();
+      setMapBounds([
+        [b.getWest(), b.getSouth()],
+        [b.getEast(), b.getNorth()],
+      ]);
+    });
+
+    const onMoveEnd = () => {
+      const b = map.getBounds();
+      setMapBounds([
+        [b.getWest(), b.getSouth()],
+        [b.getEast(), b.getNorth()],
+      ]);
+      setMapZoom(map.getZoom());
+    };
+
+    map.on("moveend", onMoveEnd);
+    map.on("zoomend", onMoveEnd);
 
     return () => {
       if (mapRef.current) {
-        mapRef.current.remove();
+        map.off("style.load", enforceFlatView);
+        map.off("moveend", onMoveEnd);
+        map.off("zoomend", onMoveEnd);
+        map.remove(); // retire canvas + contrôles du container
         mapRef.current = null;
-        isInitializedRef.current = false;
       }
+      // 🧹 Purge finale du container pour éviter tout résidu au prochain mount
+      if (containerRef.current) {
+        try {
+          containerRef.current.replaceChildren();
+        } catch {
+          containerRef.current.innerHTML = "";
+        }
+      }
+      setMapLoaded(false);
+      setMapLoading(false);
     };
-  }, []); // Pas de dépendances - la carte ne doit être initialisée qu'une seule fois
-
-  // Fonction pour ajouter la layer des marqueurs
-  const addMarkersLayer = useCallback((map) => {
-    // Source pour les listings
-    map.addSource("listings", {
-      type: "geojson",
-      data: {
-        type: "FeatureCollection",
-        features: [],
-      },
-      cluster: true,
-      clusterMaxZoom: 14,
-      clusterRadius: 50,
-    });
-
-    // Layer pour les clusters - Style moderne
-    map.addLayer({
-      id: "clusters",
-      type: "circle",
-      source: "listings",
-      filter: ["has", "point_count"],
-      paint: {
-        "circle-color": [
-          "step",
-          ["get", "point_count"],
-          "#22c55e", // Vert pour < 10
-          10,
-          "#3b82f6", // Bleu pour 10-30
-          30,
-          "#8b5cf6", // Violet pour > 30
-        ],
-        "circle-radius": [
-          "step",
-          ["get", "point_count"],
-          22, // Rayon pour < 10
-          10,
-          32, // Rayon pour 10-30
-          30,
-          42, // Rayon pour > 30
-        ],
-        "circle-opacity": 0.9,
-        "circle-stroke-width": 3,
-        "circle-stroke-color": "#ffffff",
-        "circle-stroke-opacity": 1,
-      },
-    });
-
-    // Layer pour le texte des clusters - Style amélioré
-    map.addLayer({
-      id: "cluster-count",
-      type: "symbol",
-      source: "listings",
-      filter: ["has", "point_count"],
-      layout: {
-        "text-field": "{point_count_abbreviated}",
-        "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"],
-        "text-size": 14,
-        "text-allow-overlap": true,
-      },
-      paint: {
-        "text-color": "#ffffff",
-        "text-halo-color": "rgba(0, 0, 0, 0.2)",
-        "text-halo-width": 1,
-      },
-    });
-
-    // Layer pour les marqueurs individuels - Style moderne avec animations
-    map.addLayer({
-      id: "unclustered-point",
-      type: "circle",
-      source: "listings",
-      filter: ["!", ["has", "point_count"]],
-      paint: {
-        "circle-color": [
-          "case",
-          ["==", ["get", "availability"], "open"],
-          "#22c55e", // Vert pour ouvert
-          "#f59e0b", // Orange pour fermé
-        ],
-        "circle-radius": [
-          "interpolate",
-          ["linear"],
-          ["zoom"],
-          8,
-          [
-            "case",
-            ["boolean", ["feature-state", "selected"], false],
-            8,
-            ["boolean", ["feature-state", "hover"], false],
-            7,
-            5,
-          ],
-          12,
-          [
-            "case",
-            ["boolean", ["feature-state", "selected"], false],
-            12,
-            ["boolean", ["feature-state", "hover"], false],
-            10,
-            8,
-          ],
-          16,
-          [
-            "case",
-            ["boolean", ["feature-state", "selected"], false],
-            16,
-            ["boolean", ["feature-state", "hover"], false],
-            14,
-            12,
-          ],
-        ],
-        "circle-stroke-width": [
-          "case",
-          ["boolean", ["feature-state", "selected"], false],
-          4,
-          ["boolean", ["feature-state", "hover"], false],
-          3,
-          2.5,
-        ],
-        "circle-stroke-color": "#ffffff",
-        "circle-opacity": [
-          "case",
-          ["boolean", ["feature-state", "selected"], false],
-          1,
-          ["boolean", ["feature-state", "hover"], false],
-          0.95,
-          0.9,
-        ],
-      },
-    });
-
-    // Event listeners pour les interactions
-    map.on("click", "clusters", (e) => {
-      const features = map.queryRenderedFeatures(e.point, {
-        layers: ["clusters"],
-      });
-
-      if (features.length > 0) {
-        const clusterId = features[0].properties.cluster_id;
-        map
-          .getSource("listings")
-          .getClusterExpansionZoom(clusterId, (err, zoom) => {
-            if (err) return;
-
-            map.easeTo({
-              center: features[0].geometry.coordinates,
-              zoom: zoom,
-            });
-          });
-      }
-    });
-
-    map.on("click", "unclustered-point", (e) => {
-      const features = map.queryRenderedFeatures(e.point, {
-        layers: ["unclustered-point"],
-      });
-
-      if (features.length > 0) {
-        const listing = features[0].properties;
-        const listingId = listing.id;
-
-        // Toggle selection
-        const alreadySelected = selectedListingId === listingId;
-        setSelectedListingId(alreadySelected ? null : listingId);
-        setOpenInfoWindowId(alreadySelected ? null : listingId);
-
-        // Créer ou fermer popup
-        if (popupRef.current) {
-          popupRef.current.remove();
-          popupRef.current = null;
-        }
-
-        if (!alreadySelected) {
-          const popup = new mapboxgl.Popup({
-            closeButton: true,
-            closeOnClick: false,
-            offset: 25,
-            maxWidth: "250px",
-          })
-            .setLngLat(e.lngLat)
-            .setHTML(
-              `
-              <div class="p-3" style="max-width: 220px;">
-                <h3 class="font-medium text-sm mb-1">${listing.name || "Ferme"}</h3>
-                <p class="text-xs text-gray-600 mb-2">${
-                  listing.address || "Adresse non disponible"
-                }</p>
-                <span class="inline-block px-2 py-1 rounded-full text-xs font-medium" style="
-                  background-color: ${
-                    listing.availability === "open" ? "#dcfce7" : "#fee2e2"
-                  };
-                  color: ${listing.availability === "open" ? "#166534" : "#991b1b"};
-                ">
-                  ${listing.availability === "open" ? "Ouvert" : "Fermé"}
-                </span>
-              </div>
-            `
-            )
-            .addTo(map);
-
-          popupRef.current = popup;
-
-          // Écouter la fermeture de la popup
-          popup.on("close", () => {
-            setSelectedListingId(null);
-            setOpenInfoWindowId(null);
-            popupRef.current = null;
-          });
-        }
-
-        // Scroll to listing dans la liste
-        requestAnimationFrame(() => {
-          const listEl = document.getElementById(`listing-${listingId}`);
-          if (listEl) {
-            listEl.scrollIntoView({ behavior: "smooth", block: "center" });
-            listEl.classList.add("selected-listing");
-            setTimeout(
-              () => listEl.classList.remove("selected-listing"),
-              1500
-            );
-          }
-        });
-      }
-    });
-
-    // Curseur pointer sur survol
-    map.on("mouseenter", "clusters", () => {
-      map.getCanvas().style.cursor = "pointer";
-    });
-
-    map.on("mouseleave", "clusters", () => {
-      map.getCanvas().style.cursor = "";
-    });
-
-    map.on("mouseenter", "unclustered-point", (e) => {
-      map.getCanvas().style.cursor = "pointer";
-
-      const features = map.queryRenderedFeatures(e.point, {
-        layers: ["unclustered-point"],
-      });
-
-      if (features.length > 0) {
-        const listing = features[0].properties;
-        setHoveredListingId(listing.id);
-
-        // Afficher popup au hover après un délai
-        setTimeout(() => {
-          if (
-            !popupRef.current &&
-            selectedListingId !== listing.id &&
-            hoveredListingId === listing.id
-          ) {
-            const popup = new mapboxgl.Popup({
-              closeButton: false,
-              closeOnClick: false,
-              offset: 25,
-              maxWidth: "220px",
-            })
-              .setLngLat([parseFloat(listing.lng), parseFloat(listing.lat)])
-              .setHTML(
-                `
-                <div class="p-2" style="max-width: 200px;">
-                  <h3 class="font-medium text-xs mb-1">${listing.name || "Ferme"}</h3>
-                  <p class="text-xs text-gray-600">${
-                    listing.address || "Adresse non disponible"
-                  }</p>
-                </div>
-              `
-              )
-              .addTo(map);
-
-            popupRef.current = popup;
-          }
-        }, 300);
-      }
-    });
-
-    map.on("mouseleave", "unclustered-point", () => {
-      map.getCanvas().style.cursor = "";
-      setHoveredListingId(null);
-
-      // Fermer la popup de hover si ce n'est pas une sélection
-      if (popupRef.current && !selectedListingId) {
-        setTimeout(() => {
-          if (popupRef.current && !selectedListingId) {
-            popupRef.current.remove();
-            popupRef.current = null;
-          }
-        }, 100);
-      }
-    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Fonction pour mettre à jour les données des marqueurs
-  const updateMarkersData = useCallback(
-    (listings) => {
-      if (!mapRef.current || !isLoaded) return;
-
-      // Filtrer les listings selon les filtres actifs
-      const filteredListings = listings.filter((listing) => {
-        const hasActiveFilters = Object.values(filters).some(
-          (arr) => arr && arr.length > 0
-        );
-        if (!hasActiveFilters) return true;
-
-        return Object.entries(filters).every(([key, values]) => {
-          if (!values || values.length === 0) return true;
-
-          let listingValues = [];
-          if (listing[key]) {
-            listingValues = Array.isArray(listing[key])
-              ? listing[key]
-              : [listing[key]];
-          }
-
-          if (listingValues.length === 0) return false;
-          return values.some((value) => listingValues.includes(value));
-        });
-      });
-
-      const geojsonData = {
-        type: "FeatureCollection",
-        features: filteredListings.map((listing) => ({
-          type: "Feature",
-          properties: {
-            id: listing.id,
-            name: listing.name,
-            address: listing.address,
-            availability: listing.availability,
-            lng: listing.lng,
-            lat: listing.lat,
-          },
-          geometry: {
-            type: "Point",
-            coordinates: [parseFloat(listing.lng), parseFloat(listing.lat)],
-          },
-        })),
-      };
-
-      const source = mapRef.current.getSource("listings");
-      if (source) {
-        source.setData(geojsonData);
-      }
-    },
-    [isLoaded, filters]
-  );
-
-  // Mettre à jour les marqueurs quand les listings ou filtres changent
+  // ---- 2️⃣ Mise à jour de la vue ----
   useEffect(() => {
-    if (visibleListings && visibleListings.length > 0) {
-      updateMarkersData(visibleListings);
-    }
-  }, [visibleListings, filters, updateMarkersData]);
-
-  // Mettre à jour le feature-state pour le hover
-  useEffect(() => {
-    if (!mapRef.current || !isLoaded) return;
-
     const map = mapRef.current;
+    if (!map) return;
 
-    // Réinitialiser tous les états hover
-    visibleListings?.forEach((listing) => {
-      map.setFeatureState(
-        { source: "listings", id: listing.id },
-        { hover: false }
-      );
+    const [lng, lat] = Array.isArray(coordinates)
+      ? coordinates
+      : MAPBOX_CONFIG.center;
+
+    const newZoom = typeof zoom === "number" ? zoom : MAPBOX_CONFIG.zoom;
+    const curCenter = map.getCenter();
+    const curZoom = map.getZoom();
+
+    if (
+      Math.abs(curCenter.lat - lat) < 1e-6 &&
+      Math.abs(curCenter.lng - lng) < 1e-6 &&
+      Math.abs(curZoom - newZoom) < 1e-3
+    )
+      return;
+
+    map.easeTo({
+      center: [lng, lat],
+      zoom: newZoom,
+      duration: 500,
+      essential: true,
     });
+  }, [coordinates, zoom]);
 
-    // Activer le hover pour le listing survolé
-    if (hoveredListingId) {
-      map.setFeatureState(
-        { source: "listings", id: hoveredListingId },
-        { hover: true }
-      );
-    }
-  }, [hoveredListingId, isLoaded, visibleListings]);
-
-  // Mettre à jour le feature-state pour la sélection
+  // ---- 3️⃣ Resize ----
   useEffect(() => {
-    if (!mapRef.current || !isLoaded) return;
-
     const map = mapRef.current;
+    if (!map) return;
+    const t = setTimeout(() => map.resize(), 350);
+    return () => clearTimeout(t);
+  }, [isMapExpanded]);
 
-    // Réinitialiser tous les états selected
-    visibleListings?.forEach((listing) => {
-      map.setFeatureState(
-        { source: "listings", id: listing.id },
-        { selected: false }
-      );
-    });
-
-    // Activer le selected pour le listing sélectionné
-    if (selectedListingId) {
-      map.setFeatureState(
-        { source: "listings", id: selectedListingId },
-        { selected: true }
-      );
-    }
-  }, [selectedListingId, isLoaded, visibleListings]);
-
-  // Fonction pour voler vers des coordonnées
-  const flyTo = useCallback((coordinates, zoomLevel = 14) => {
-    if (!mapRef.current) return;
-
-    mapRef.current.flyTo({
-      center: coordinates,
-      zoom: zoomLevel,
-      duration: 2000,
-    });
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const onResize = () => map.resize();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
   }, []);
-
-  // Exposer les méthodes utiles
-  useEffect(() => {
-    if (mapRef.current && isLoaded) {
-      mapRef.current.updateMarkersData = updateMarkersData;
-      mapRef.current.flyTo = flyTo;
-    }
-  }, [isLoaded, updateMarkersData, flyTo]);
-
-  if (!process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN) {
-    return (
-      <div className="flex items-center justify-center h-full bg-gray-100">
-        <div className="text-center">
-          <p className="text-red-600 font-medium">Token Mapbox manquant</p>
-          <p className="text-sm text-gray-600">
-            Ajoutez NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN à votre .env.local
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="w-full h-full relative">
+    <div ref={wrapperRef} className="h-full w-full relative">
+      {/* ⚠️ Cette DIV DOIT rester vide : Mapbox y injecte son canvas */}
       <div
-        ref={mapContainer}
-        className="w-full h-full"
-        style={{ minHeight: "300px" }}
+        ref={containerRef}
+        className="h-full w-full"
+        style={{ contain: "layout paint size" }}
       />
-
-      {!isLoaded && (
-        <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75">
-          <div className="text-center">
-            <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-            <p className="text-gray-600">Chargement de la carte...</p>
-          </div>
-        </div>
-      )}
+      {/* Place ici d'éventuels overlays, pas dans containerRef */}
+      {/* <div className="pointer-events-none absolute inset-0">…</div> */}
     </div>
   );
-};
-
-export default React.memo(MapboxSection);
+}

@@ -4,7 +4,7 @@ import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
 import { frFR } from "@clerk/localizations";
 import Script from "next/script";
-import Provider from "./Provider";
+import ClientLayout from "./ClientLayout"; // rend le header + Provider côté client
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -23,7 +23,6 @@ export default function RootLayout({ children }) {
     >
       <html lang="fr">
         <body className={`${inter.className} flex flex-col min-h-screen`}>
-          {/* GTM script */}
           <Script
             id="gtm-script"
             strategy="afterInteractive"
@@ -35,8 +34,6 @@ export default function RootLayout({ children }) {
               })(window,document,'script','dataLayer','GTM-NCRFL8R7');`,
             }}
           />
-
-          {/* GTM noscript fallback */}
           <noscript>
             <iframe
               src="https://www.googletagmanager.com/ns.html?id=GTM-NCRFL8R7"
@@ -46,7 +43,7 @@ export default function RootLayout({ children }) {
             />
           </noscript>
 
-          <Provider>{children}</Provider>
+          <ClientLayout>{children}</ClientLayout>
         </body>
       </html>
     </ClerkProvider>

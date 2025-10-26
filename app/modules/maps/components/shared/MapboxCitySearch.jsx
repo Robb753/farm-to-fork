@@ -4,16 +4,18 @@
 import React, { useRef, useState, useCallback, useEffect } from "react";
 import { Search, MapPin } from "lucide-react";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
-import { useMapboxActions } from "@/lib/store/mapboxListingsStore";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 
 /**
- * Composant de recherche de ville utilisant l'API Mapbox Geocoding
- * Alternative moderne à Google Places pour Farm2Fork
+ * Mapbox city search with built-in navigation.
+ * - variant="hero": used on landing (push to /explore)
+ * - variant="header": used in header on /explore (replace URL)
  */
 const MapboxCitySearch = ({
-  onCitySelect,
+  onCitySelect, // optional (analytics, etc.)
   placeholder = "Rechercher une ville...",
+  variant = "hero", // "hero" | "header"
+  country = "FR", // limit results (can be "FR,DE,BE" etc.)
 }) => {
   const inputRef = useRef(null);
   const suggestionsRef = useRef(null);
@@ -26,147 +28,141 @@ const MapboxCitySearch = ({
   const [selectedIndex, setSelectedIndex] = useState(-1);
 
   const router = useRouter();
-  const { setCoordinates } = useMapboxActions();
+  const pathname = usePathname();
+  const urlParams = useSearchParams();
 
-  // Fonction de recherche avec l'API Mapbox Geocoding
-  const searchPlaces = useCallback(async (query) => {
-    if (!query.trim() || query.length < 3) {
-      setSuggestions([]);
-      setShowSuggestions(false);
-      return;
-    }
-
-    // Annuler la requête précédente
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-
-    abortControllerRef.current = new AbortController();
-    setIsLoading(true);
-
-    try {
-      const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?` +
-          new URLSearchParams({
-            access_token: process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN,
-            country: "FR", // Limité à la France
-            types: "place,locality,neighborhood", // Villes et quartiers
-            language: "fr",
-            limit: "8",
-          }),
-        { signal: abortControllerRef.current.signal }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+  // --- Search ---
+  const searchPlaces = useCallback(
+    async (query) => {
+      if (!query.trim() || query.length < 3) {
+        setSuggestions([]);
+        setShowSuggestions(false);
+        return;
       }
-
-      const data = await response.json();
-
-      const formattedSuggestions = data.features.map((feature) => ({
-        id: feature.id,
-        text: feature.text,
-        place_name: feature.place_name,
-        center: feature.center, // [lng, lat]
-        context: feature.context || [],
-        bbox: feature.bbox,
-      }));
-
-      setSuggestions(formattedSuggestions);
-      setShowSuggestions(formattedSuggestions.length > 0);
-      setSelectedIndex(-1);
-    } catch (error) {
-      if (error.name !== "AbortError") {
-        console.error("Erreur de géocodage Mapbox:", error);
-        toast.error("Erreur lors de la recherche");
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+      abortControllerRef.current = new AbortController();
+      setIsLoading(true);
+      try {
+        const response = await fetch(
+          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?` +
+            new URLSearchParams({
+              access_token: process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN,
+              country,
+              types: "place,locality,neighborhood",
+              language: "fr",
+              limit: "8",
+            }),
+          { signal: abortControllerRef.current.signal }
+        );
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        const formatted = data.features.map((f) => ({
+          id: f.id,
+          text: f.text,
+          place_name: f.place_name,
+          center: f.center, // [lng, lat]
+          bbox: f.bbox, // [minX,minY,maxX,maxY]
+          context: f.context || [],
+        }));
+        setSuggestions(formatted);
+        setShowSuggestions(formatted.length > 0);
+        setSelectedIndex(-1);
+      } catch (e) {
+        if (e.name !== "AbortError") {
+          console.error("Mapbox geocoding error:", e);
+          toast.error("Erreur lors de la recherche");
+        }
+      } finally {
+        setIsLoading(false);
       }
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  // Debounce de la recherche
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      searchPlaces(searchText);
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [searchText, searchPlaces]);
-
-  // Sélectionner une suggestion
-  const selectSuggestion = useCallback(
-    (suggestion) => {
-      const [lng, lat] = suggestion.center;
-      const coordinates = [lng, lat];
-
-      setSearchText(suggestion.place_name);
-      setShowSuggestions(false);
-      setSuggestions([]);
-      setCoordinates(coordinates);
-
-      // Callback personnalisé
-      if (onCitySelect) {
-        onCitySelect({
-          coordinates,
-          name: suggestion.text,
-          place_name: suggestion.place_name,
-          bbox: suggestion.bbox,
-        });
-      }
-
-      // Navigation vers explore
-      router.push(`/explore?lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}`);
     },
-    [onCitySelect, setCoordinates, router]
+    [country]
   );
 
-  // Gestion du clavier - CORRIGÉ
+  useEffect(() => {
+    const t = setTimeout(() => searchPlaces(searchText), 300);
+    return () => clearTimeout(t);
+  }, [searchText, searchPlaces]);
+
+  // --- Navigation builder ---
+  const navigateWith = useCallback(
+    (payload) => {
+      const { center, bbox, place_name, text, zoom = 12 } = payload || {};
+      let lng, lat;
+      if (Array.isArray(center)) [lng, lat] = center;
+
+      const params = new URLSearchParams(urlParams?.toString() || "");
+      if (Number.isFinite(lat)) params.set("lat", lat.toFixed(6));
+      if (Number.isFinite(lng)) params.set("lng", lng.toFixed(6));
+      if (Number.isFinite(zoom)) params.set("zoom", String(zoom));
+      const label = String(place_name || text || "").trim();
+      if (label) params.set("city", label);
+      if (Array.isArray(bbox) && bbox.length === 4) {
+        params.set("bbox", bbox.map((n) => Number(n).toFixed(6)).join(","));
+      }
+
+      const target = `/explore?${params.toString()}`;
+      // On the landing or when variant explicitly says "hero" → push
+      if (variant === "hero" || pathname === "/") {
+        router.push(target);
+      } else {
+        // In header on /explore → replace (no scroll jump)
+        router.replace(target, { scroll: false });
+      }
+    },
+    [router, pathname, urlParams, variant]
+  );
+
+  // --- Select handler ---
+  const selectSuggestion = useCallback(
+    (s) => {
+      setSearchText(s.place_name);
+      setShowSuggestions(false);
+      setSuggestions([]);
+
+      onCitySelect?.({
+        center: s.center,
+        bbox: s.bbox,
+        place_name: s.place_name,
+        text: s.text,
+        zoom: 12,
+      });
+
+      navigateWith(s);
+    },
+    [navigateWith, onCitySelect]
+  );
+
+  // --- Keyboard ---
   const handleKeyDown = useCallback(
     (e) => {
       if (!showSuggestions || suggestions.length === 0) {
         if (e.key === "Enter") {
           e.preventDefault();
-          // Recherche manuelle si pas de suggestions
-          if (searchText.trim()) {
-            searchPlaces(searchText);
-          }
+          if (searchText.trim()) searchPlaces(searchText);
         }
         return;
       }
-
       switch (e.key) {
         case "ArrowDown":
           e.preventDefault();
-          setSelectedIndex((prev) =>
-            prev < suggestions.length - 1 ? prev + 1 : 0
-          );
+          setSelectedIndex((p) => (p < suggestions.length - 1 ? p + 1 : 0));
           break;
-
         case "ArrowUp":
           e.preventDefault();
-          setSelectedIndex((prev) =>
-            prev > 0 ? prev - 1 : suggestions.length - 1
-          );
+          setSelectedIndex((p) => (p > 0 ? p - 1 : suggestions.length - 1));
           break;
-
         case "Enter":
           e.preventDefault();
-          if (selectedIndex >= 0 && selectedIndex < suggestions.length) {
-            selectSuggestion(suggestions[selectedIndex]);
-          } else if (suggestions.length > 0) {
-            selectSuggestion(suggestions[0]);
-          }
+          if (selectedIndex >= 0) selectSuggestion(suggestions[selectedIndex]);
+          else selectSuggestion(suggestions[0]);
           break;
-
         case "Escape":
           setShowSuggestions(false);
           setSelectedIndex(-1);
           inputRef.current?.blur();
           break;
-
         default:
-          // Ne rien faire pour les autres touches
           break;
       }
     },
@@ -180,45 +176,21 @@ const MapboxCitySearch = ({
     ]
   );
 
-  // Fermer les suggestions au clic dehors
+  // --- Misc ---
   useEffect(() => {
-    const handleClickOutside = (event) => {
+    const clickOutside = (e) => {
       if (
         suggestionsRef.current &&
-        !suggestionsRef.current.contains(event.target) &&
+        !suggestionsRef.current.contains(e.target) &&
         inputRef.current &&
-        !inputRef.current.contains(event.target)
-      ) {
+        !inputRef.current.contains(e.target)
+      )
         setShowSuggestions(false);
-      }
     };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("mousedown", clickOutside);
+    return () => document.removeEventListener("mousedown", clickOutside);
   }, []);
-
-  // Nettoyage des requêtes en cours
-  useEffect(() => {
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-  }, []);
-
-  const handleInputChange = (e) => {
-    setSearchText(e.target.value);
-    if (!e.target.value.trim()) {
-      setSuggestions([]);
-      setShowSuggestions(false);
-    }
-  };
-
-  const handleInputFocus = () => {
-    if (suggestions.length > 0) {
-      setShowSuggestions(true);
-    }
-  };
+  useEffect(() => () => abortControllerRef.current?.abort(), []);
 
   const clearSearch = () => {
     setSearchText("");
@@ -227,7 +199,6 @@ const MapboxCitySearch = ({
     inputRef.current?.focus();
   };
 
-  // Vérification du token Mapbox
   if (!process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN) {
     return (
       <div className="flex items-center border-2 rounded-full py-2 px-4 bg-gray-100 max-w-lg w-full">
@@ -239,17 +210,21 @@ const MapboxCitySearch = ({
 
   return (
     <div className="relative w-full max-w-lg">
-      {/* Champ de recherche */}
       <div className="flex items-center border-2 rounded-full py-2 px-4 shadow-lg bg-white w-full">
         <Search className="h-5 w-5 text-gray-500 mr-3 flex-shrink-0" />
-
         <input
           ref={inputRef}
           type="text"
           value={searchText}
-          onChange={handleInputChange}
+          onChange={(e) => {
+            setSearchText(e.target.value);
+            if (!e.target.value.trim()) {
+              setSuggestions([]);
+              setShowSuggestions(false);
+            }
+          }}
           onKeyDown={handleKeyDown}
-          onFocus={handleInputFocus}
+          onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
           placeholder={placeholder}
           className="flex-grow bg-transparent outline-none text-sm text-black"
           aria-label="Recherche de ville"
@@ -257,8 +232,6 @@ const MapboxCitySearch = ({
           aria-autocomplete="list"
           autoComplete="off"
         />
-
-        {/* Indicateur de chargement ou bouton clear */}
         {isLoading ? (
           <div className="animate-spin h-4 w-4 border-2 border-green-500 border-t-transparent rounded-full ml-2 flex-shrink-0" />
         ) : searchText ? (
@@ -292,40 +265,37 @@ const MapboxCitySearch = ({
         )}
       </div>
 
-      {/* Liste des suggestions */}
       {showSuggestions && suggestions.length > 0 && (
         <div
           ref={suggestionsRef}
-          className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl z-50 max-h-80 overflow-y-auto"
+          className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl z-[400] max-h-80 overflow-y-auto"
         >
-          {suggestions.map((suggestion, index) => (
+          {suggestions.map((s, i) => (
             <button
-              key={suggestion.id}
-              onClick={() => selectSuggestion(suggestion)}
+              key={s.id}
+              onClick={() => selectSuggestion(s)}
               className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0 first:rounded-t-xl last:rounded-b-xl ${
-                index === selectedIndex ? "bg-green-50 border-green-200" : ""
+                i === selectedIndex ? "bg-green-50 border-green-200" : ""
               }`}
-              onMouseEnter={() => setSelectedIndex(index)}
+              onMouseEnter={() => setSelectedIndex(i)}
             >
               <div className="flex items-start gap-3">
                 <MapPin className="w-4 h-4 text-green-600 mt-1 flex-shrink-0" />
                 <div className="flex-grow min-w-0">
                   <div className="font-medium text-gray-900 truncate">
-                    {suggestion.text}
+                    {s.text}
                   </div>
                   <div className="text-sm text-gray-600 truncate">
-                    {suggestion.place_name}
+                    {s.place_name}
                   </div>
-                  {/* Afficher le contexte (département, région) */}
-                  {suggestion.context.length > 0 && (
+                  {Array.isArray(s.context) && s.context.length > 0 && (
                     <div className="text-xs text-gray-500 mt-1">
-                      {suggestion.context
+                      {s.context
                         .filter(
-                          (ctx) =>
-                            ctx.id.includes("region") ||
-                            ctx.id.includes("country")
+                          (c) =>
+                            c.id.includes("region") || c.id.includes("country")
                         )
-                        .map((ctx) => ctx.text)
+                        .map((c) => c.text)
                         .join(", ")}
                     </div>
                   )}
@@ -336,7 +306,6 @@ const MapboxCitySearch = ({
         </div>
       )}
 
-      {/* Message si aucun résultat */}
       {showSuggestions &&
         suggestions.length === 0 &&
         searchText.length >= 3 &&

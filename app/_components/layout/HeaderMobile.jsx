@@ -1,8 +1,8 @@
-// components/layout/HeaderMobile.jsx
 "use client";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,20 +20,22 @@ import {
   ListChecks,
   X,
   ChevronDown,
-  Search,
   MapPin,
   Bell,
   Settings,
 } from "lucide-react";
 import { useUser, useClerk } from "@clerk/nextjs";
 import { AvatarImage } from "@/components/ui/OptimizedImage";
-import Image from "next/image";
-import {
-  useUserRole,
-  useUserSyncState,
-  useUserActions,
-} from "@/lib/store/userStore";
+import { useUserRole, useUserActions } from "@/lib/store/userStore";
 
+import dynamic from "next/dynamic";
+const MapboxCitySearch = dynamic(
+  () => import("@/app/modules/maps/components/shared/MapboxCitySearch"),
+  { ssr: false }
+);
+import useCitySearchControl from "@/app/modules/maps/hooks/useCitySearchControl";
+
+/* ----------------------- Modal mobile ----------------------- */
 const MobileModal = ({ isOpen, onClose, children }) => {
   useEffect(() => {
     if (typeof document !== "undefined") {
@@ -48,14 +50,14 @@ const MobileModal = ({ isOpen, onClose, children }) => {
 
   return (
     <div className="fixed inset-0 z-50 bg-white">
-      <div className="flex flex-col h-full">
-        <div className="flex items-center justify-between p-4 border-b bg-white shadow-sm">
+      <div className="flex h-full flex-col">
+        <div className="flex items-center justify-between border-b bg-white p-4 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900">Menu</h2>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            className="rounded-full p-2 transition-colors hover:bg-gray-100"
           >
-            <X className="w-5 h-5" />
+            <X className="h-5 w-5" />
           </button>
         </div>
         <div className="flex-1 overflow-y-auto bg-gray-50">{children}</div>
@@ -64,14 +66,17 @@ const MobileModal = ({ isOpen, onClose, children }) => {
   );
 };
 
+/* ----------------------- Header ----------------------- */
 export default function HeaderMobile() {
   const { user, isSignedIn, isLoaded } = useUser();
   const { signOut } = useClerk();
   const role = useUserRole();
-  const { isReady } = useUserSyncState();
   const { reset } = useUserActions();
+
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [isClient, setIsClient] = useState(false);
+  const [searchCity, setSearchCity] = useState("");
+  const { handleCitySelect } = useCitySearchControl({ setSearchCity });
 
   useEffect(() => {
     setIsClient(true);
@@ -90,17 +95,12 @@ export default function HeaderMobile() {
     window.dispatchEvent(new CustomEvent("openSigninModal"));
     setShowMobileMenu(false);
   };
-
   const openSignUp = () => {
     window.dispatchEvent(new CustomEvent("openSignupModal"));
     setShowMobileMenu(false);
   };
 
-  const getUserAvatarUrl = () => {
-    if (!user) return "/default-avatar.png";
-    return user.imageUrl || "/default-avatar.png";
-  };
-
+  const getUserAvatarUrl = () => user?.imageUrl || "/default-avatar.png";
   const getUserDisplayName = () => {
     if (!user) return "Utilisateur";
     if (user.fullName) return user.fullName;
@@ -108,24 +108,19 @@ export default function HeaderMobile() {
     const email = user.primaryEmailAddress?.emailAddress;
     return email ? email.split("@")[0] : "Utilisateur";
   };
-
-  const getRoleLabel = () => {
-    switch (role) {
-      case "admin":
-        return "Administrateur";
-      case "farmer":
-        return "Agriculteur";
-      default:
-        return "Utilisateur";
-    }
-  };
+  const getRoleLabel = () =>
+    role === "admin"
+      ? "Administrateur"
+      : role === "farmer"
+        ? "Agriculteur"
+        : "Utilisateur";
 
   if (!isClient || !isLoaded) {
     return (
-      <header className="fixed top-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-b">
+      <header className="fixed left-0 right-0 top-0 z-40 border-b bg-white/95 backdrop-blur">
         <div className="flex items-center justify-between px-4 py-3">
-          <div className="w-32 h-8 bg-gray-200 rounded animate-pulse" />
-          <div className="w-10 h-8 bg-gray-200 rounded-lg animate-pulse" />
+          <div className="h-8 w-32 animate-pulse rounded bg-gray-200" />
+          <div className="h-8 w-10 animate-pulse rounded-lg bg-gray-200" />
         </div>
       </header>
     );
@@ -133,188 +128,203 @@ export default function HeaderMobile() {
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-b">
-        <div className="flex items-center justify-between px-4 py-3">
-          
+      {/* --- Header principal avec recherche intégrée --- */}
+      <header className="fixed left-0 right-0 top-0 z-40 border-b bg-white/95 backdrop-blur">
+        <div className="flex items-center gap-2 px-3 py-2 max-w-screen-sm mx-auto w-full">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-2 pl-1 shrink-0">
             <Image
               src="/logof2f.svg"
               alt="Farm to Fork"
-              width={32}
-              height={32}
+              width={28}
+              height={28}
               priority
-              className="w-auto h-8"
+              className="h-7 w-auto"
             />
-            <span className="text-lg font-bold text-green-700 hidden xs:block">
+            <span className="hidden xs:block text-base font-bold text-green-700">
               Farm To Fork
             </span>
           </Link>
 
-          {/* Actions droite */}
-          <div className="flex items-center gap-2">
-            
-            {/* Recherche mobile */}
-            <Link 
-              href="/explore"
-              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all"
+          {/* Barre de recherche ville */}
+          <div className="mx-2 flex-1 min-w-0">
+            <MapboxCitySearch
+              placeholder="Rechercher une ville…"
+              onCitySelect={handleCitySelect}
+              className="h-10 w-full rounded-full border border-gray-200 bg-gray-50 px-4
+                   focus:border-green-300 focus:bg-white focus:ring-2 focus:ring-green-100"
+            />
+          </div>
+
+          {/* Actions à droite */}
+          {!isSignedIn ? (
+            <button
+              onClick={() => setShowMobileMenu(true)}
+              className="flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-2 shadow-sm transition-colors hover:bg-gray-50"
+              aria-label="Menu & connexion"
             >
-              <Search className="w-5 h-5" />
-            </Link>
-
-            {/* Menu utilisateur ou connexion */}
-            {!isSignedIn ? (
-              <button
-                onClick={() => setShowMobileMenu(true)}
-                className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 transition-colors"
+              <Menu className="h-4 w-4" />
+              <LogIn className="h-4 w-4" />
+            </button>
+          ) : (
+            <div className="flex items-center gap-1 shrink-0">
+              {/* Favoris */}
+              <Link
+                href="/user#favorites"
+                className="relative rounded-lg p-2 text-gray-600 transition-all hover:bg-gray-50 hover:text-red-500"
+                aria-label="Favoris"
               >
-                <Menu className="w-4 h-4" />
-                <LogIn className="w-4 h-4" />
+                <Heart className="h-5 w-5" />
+              </Link>
+
+              {/* Notifications */}
+              <button
+                className="relative rounded-lg p-2 text-gray-600 transition-all hover:bg-gray-50 hover:text-gray-900"
+                aria-label="Notifications"
+              >
+                <Bell className="h-5 w-5" />
+                <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-red-500" />
               </button>
-            ) : (
-              <div className="flex items-center gap-2">
-                
-                {/* Favoris */}
-                <Link
-                  href="/user#favorites"
-                  className="p-2 text-gray-600 hover:text-red-500 hover:bg-gray-50 rounded-lg transition-all relative"
-                >
-                  <Heart className="w-5 h-5" />
-                </Link>
 
-                {/* Notifications */}
-                <button className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all relative">
-                  <Bell className="w-5 h-5" />
-                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>
-                </button>
+              {/* Dropdown utilisateur */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center gap-2 rounded-lg border border-gray-200 px-2 py-2 shadow-sm transition-colors hover:bg-gray-50">
+                    <AvatarImage
+                      src={getUserAvatarUrl()}
+                      alt={`Photo de ${getUserDisplayName()}`}
+                      size={24}
+                      className="ring-1 ring-green-100"
+                      fallbackSrc="/default-avatar.png"
+                    />
+                    <span className="hidden max-w-20 truncate text-sm font-medium text-gray-700 xs:block">
+                      {getUserDisplayName().split(" ")[0]}
+                    </span>
+                    <ChevronDown className="hidden h-3 w-3 text-gray-500 xs:block" />
+                  </button>
+                </DropdownMenuTrigger>
 
-                {/* Dropdown utilisateur */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="flex items-center gap-2 px-2 py-2 border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 transition-colors">
+                <DropdownMenuContent align="end" className="w-72 p-2">
+                  <DropdownMenuLabel className="p-3">
+                    <div className="flex items-center gap-3">
                       <AvatarImage
                         src={getUserAvatarUrl()}
                         alt={`Photo de ${getUserDisplayName()}`}
-                        size={24}
-                        className="ring-1 ring-green-100"
+                        size={40}
+                        className="ring-2 ring-green-100"
                         fallbackSrc="/default-avatar.png"
                       />
-                      <span className="text-sm font-medium text-gray-700 max-w-20 truncate hidden xs:block">
-                        {getUserDisplayName().split(" ")[0]}
-                      </span>
-                      <ChevronDown className="w-3 h-3 text-gray-500 hidden xs:block" />
-                    </button>
-                  </DropdownMenuTrigger>
-
-                  <DropdownMenuContent align="end" className="w-72 p-2">
-                    <DropdownMenuLabel className="p-3">
-                      <div className="flex items-center gap-3">
-                        <AvatarImage
-                          src={getUserAvatarUrl()}
-                          alt={`Photo de ${getUserDisplayName()}`}
-                          size={40}
-                          className="ring-2 ring-green-100"
-                          fallbackSrc="/default-avatar.png"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-gray-900 truncate">
-                            {getUserDisplayName()}
-                          </div>
-                          <div className="text-sm text-gray-500 truncate">
-                            {user?.primaryEmailAddress?.emailAddress}
-                          </div>
-                          <div className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 mt-1">
-                            {getRoleLabel()}
-                          </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-medium text-gray-900">
+                          {getUserDisplayName()}
+                        </div>
+                        <div className="truncate text-sm text-gray-500">
+                          {user?.primaryEmailAddress?.emailAddress}
+                        </div>
+                        <div className="mt-1 inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+                          {getRoleLabel()}
                         </div>
                       </div>
-                    </DropdownMenuLabel>
+                    </div>
+                  </DropdownMenuLabel>
 
-                    <DropdownMenuSeparator />
+                  <DropdownMenuSeparator />
 
+                  <DropdownMenuItem asChild>
+                    <Link href="/user" className="flex items-center gap-3 p-3">
+                      <User className="h-5 w-5 text-gray-600" />
+                      <span>Mon profil</span>
+                    </Link>
+                  </DropdownMenuItem>
+
+                  {role === "admin" && (
                     <DropdownMenuItem asChild>
-                      <Link href="/user" className="flex items-center gap-3 p-3">
-                        <User className="w-5 h-5 text-gray-600" />
-                        <span>Mon profil</span>
+                      <Link
+                        href="/admin"
+                        className="flex items-center gap-3 p-3"
+                      >
+                        <ListChecks className="h-5 w-5 text-gray-600" />
+                        <span>Administration</span>
                       </Link>
                     </DropdownMenuItem>
+                  )}
 
-                    {role === "admin" && (
-                      <DropdownMenuItem asChild>
-                        <Link href="/admin" className="flex items-center gap-3 p-3">
-                          <ListChecks className="w-5 h-5 text-gray-600" />
-                          <span>Administration</span>
-                        </Link>
-                      </DropdownMenuItem>
-                    )}
-
-                    {role === "farmer" && (
-                      <DropdownMenuItem asChild>
-                        <Link href="/dashboard/farms" className="flex items-center gap-3 p-3">
-                          <svg className="w-5 h-5 text-gray-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                            <path d="M3 9L12 2L21 9V20C21 20.5304 20.7893 21.0391 20.4142 21.4142C20.0391 21.7893 19.5304 22 19 22H5C4.46957 22 3.96086 21.7893 3.58579 21.4142C3.21071 21.0391 3 20.5304 3 20V9Z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
-                          <span>Ma ferme</span>
-                        </Link>
-                      </DropdownMenuItem>
-                    )}
-
+                  {role === "farmer" && (
                     <DropdownMenuItem asChild>
-                      <Link href="/user#favorites" className="flex items-center gap-3 p-3">
-                        <Heart className="w-5 h-5 text-red-500" />
-                        <span>Mes favoris</span>
+                      <Link
+                        href="/dashboard/farms"
+                        className="flex items-center gap-3 p-3"
+                      >
+                        <svg
+                          className="h-5 w-5 text-gray-600"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                        >
+                          <path
+                            d="M3 9L12 2L21 9V20C21 20.5304 20.7893 21.0391 20.4142 21.4142C20.0391 21.7893 19.5304 22 19 22H5C4.46957 22 3.96086 21.7893 3.58579 21.4142C3.21071 21.0391 3 20.5304 3 20V9Z"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                        <span>Ma ferme</span>
                       </Link>
                     </DropdownMenuItem>
+                  )}
 
-                    <DropdownMenuItem asChild>
-                      <Link href="/become-farmer" className="flex items-center gap-3 p-3">
-                        <PlusCircle className="w-5 h-5 text-green-600" />
-                        <span>Devenir producteur</span>
-                      </Link>
-                    </DropdownMenuItem>
-
-                    <DropdownMenuSeparator />
-
-                    <DropdownMenuItem asChild>
-                      <Link href="/user#settings" className="flex items-center gap-3 p-3">
-                        <Settings className="w-5 h-5 text-gray-600" />
-                        <span>Paramètres</span>
-                      </Link>
-                    </DropdownMenuItem>
-
-                    <DropdownMenuSeparator />
-
-                    <DropdownMenuItem 
-                      onClick={handleSignOut}
-                      className="flex items-center gap-3 p-3 text-red-600 focus:text-red-600"
+                  <DropdownMenuItem asChild>
+                    <Link
+                      href="/user#favorites"
+                      className="flex items-center gap-3 p-3"
                     >
-                      <LogIn className="w-5 h-5 rotate-180" />
-                      <span>Se déconnecter</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            )}
-          </div>
+                      <Heart className="h-5 w-5 text-red-500" />
+                      <span>Mes favoris</span>
+                    </Link>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuItem asChild>
+                    <Link
+                      href="/user#settings"
+                      className="flex items-center gap-3 p-3"
+                    >
+                      <Settings className="h-5 w-5 text-gray-600" />
+                      <span>Paramètres</span>
+                    </Link>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={async () => {
+                      await handleSignOut();
+                    }}
+                    className="flex items-center gap-3 p-3 text-red-600 focus:text-red-600"
+                  >
+                    <LogIn className="h-5 w-5 -rotate-180" />
+                    <span>Se déconnecter</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )}
         </div>
       </header>
 
-      {/* Modal mobile pour utilisateurs non connectés */}
+      {/* --- Modal mobile pour utilisateurs non connectés --- */}
       <MobileModal
         isOpen={showMobileMenu}
         onClose={() => setShowMobileMenu(false)}
       >
-        <div className="p-6 space-y-6">
-          
+        <div className="space-y-6 p-6">
           {/* Section principale */}
           <div className="text-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
               <span className="text-2xl">🌱</span>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            <h3 className="mb-2 text-lg font-semibold text-gray-900">
               Rejoignez Farm To Fork
             </h3>
-            <p className="text-gray-600 text-sm">
+            <p className="text-sm text-gray-600">
               Découvrez les producteurs locaux près de chez vous
             </p>
           </div>
@@ -323,18 +333,22 @@ export default function HeaderMobile() {
           <div className="space-y-3">
             <button
               onClick={openSignUp}
-              className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors"
+              className="w-full rounded-lg bg-green-600 px-4 py-3 font-medium text-white transition-colors hover:bg-green-700"
             >
-              <PlusCircle className="w-5 h-5" />
-              Créer un compte
+              <span className="inline-flex items-center gap-3">
+                <PlusCircle className="h-5 w-5" />
+                Créer un compte
+              </span>
             </button>
 
             <button
               onClick={openSignIn}
-              className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-green-600 text-green-600 rounded-lg font-medium hover:bg-green-50 transition-colors"
+              className="w-full rounded-lg border border-green-600 px-4 py-3 font-medium text-green-600 transition-colors hover:bg-green-50"
             >
-              <LogIn className="w-5 h-5" />
-              Se connecter
+              <span className="inline-flex items-center gap-3">
+                <LogIn className="h-5 w-5" />
+                Se connecter
+              </span>
             </button>
           </div>
 
@@ -343,28 +357,28 @@ export default function HeaderMobile() {
             <div className="space-y-3">
               <Link
                 href="/explore"
-                className="flex items-center gap-3 p-3 text-gray-700 hover:bg-white rounded-lg transition-colors"
+                className="flex items-center gap-3 rounded-lg p-3 text-gray-700 transition-colors hover:bg-white"
                 onClick={() => setShowMobileMenu(false)}
               >
-                <MapPin className="w-5 h-5 text-green-600" />
+                <MapPin className="h-5 w-5 text-green-600" />
                 <span>Explorer la carte</span>
               </Link>
-              
+
               <Link
                 href="/discover/producteurs"
-                className="flex items-center gap-3 p-3 text-gray-700 hover:bg-white rounded-lg transition-colors"
+                className="flex items-center gap-3 rounded-lg p-3 text-gray-700 transition-colors hover:bg-white"
                 onClick={() => setShowMobileMenu(false)}
               >
-                <User className="w-5 h-5 text-green-600" />
+                <User className="h-5 w-5 text-green-600" />
                 <span>Producteurs</span>
               </Link>
 
               <Link
                 href="/become-farmer"
-                className="flex items-center gap-3 p-3 text-gray-700 hover:bg-white rounded-lg transition-colors"
+                className="flex items-center gap-3 rounded-lg p-3 text-gray-700 transition-colors hover:bg-white"
                 onClick={() => setShowMobileMenu(false)}
               >
-                <PlusCircle className="w-5 h-5 text-green-600" />
+                <PlusCircle className="h-5 w-5 text-green-600" />
                 <span>Devenir producteur</span>
               </Link>
             </div>
