@@ -39,7 +39,24 @@ export default function MapboxMarkers() {
 
   // Mise à jour des markers quand les listings changent
   useEffect(() => {
-    if (!mapInstance || !Array.isArray(visibleListings)) return;
+    if (!mapInstance || !Array.isArray(visibleListings)) {
+      console.log("⚠️ MapboxMarkers: Conditions non remplies", {
+        hasMapInstance: !!mapInstance,
+        isArray: Array.isArray(visibleListings),
+        listingsCount: visibleListings?.length,
+      });
+      return;
+    }
+
+    console.log("🗺️ MapboxMarkers: Mise à jour des markers", {
+      visibleListingsCount: visibleListings.length,
+      listings: visibleListings.map((l) => ({
+        id: l.id,
+        name: l.name,
+        lat: l.lat,
+        lng: l.lng,
+      })),
+    });
 
     // Liste des IDs actuels
     const currentIds = new Set(visibleListings.map((l) => l.id));
@@ -61,12 +78,28 @@ export default function MapboxMarkers() {
 
     // 2. Ajouter ou mettre à jour les markers pour les nouveaux listings
     visibleListings.forEach((listing) => {
-      if (!listing.lat || !listing.lng) return;
+      if (!listing.lat || !listing.lng) {
+        console.warn("⚠️ Listing sans coordonnées:", {
+          id: listing.id,
+          name: listing.name,
+          lat: listing.lat,
+          lng: listing.lng,
+        });
+        return;
+      }
 
       const { id, lat, lng } = listing;
 
       // Si le marker existe déjà, on le garde (évite les re-renders inutiles)
-      if (markersRef.current.has(id)) return;
+      if (markersRef.current.has(id)) {
+        console.log("✓ Marker déjà existant pour:", listing.name);
+        return;
+      }
+
+      console.log("➕ Création d'un nouveau marker pour:", listing.name, {
+        lat,
+        lng,
+      });
 
       try {
         // Créer l'élément du marker personnalisé
@@ -146,11 +179,17 @@ export default function MapboxMarkers() {
 
         // Stocker le marker, popup, root et element pour nettoyage ultérieur
         markersRef.current.set(id, { marker, popup, root, element: markerEl });
+        console.log("✅ Marker créé avec succès pour:", listing.name);
       } catch (error) {
-        console.error(`Erreur lors de la création du marker pour listing ${id}:`, error);
+        console.error(`❌ Erreur lors de la création du marker pour listing ${id}:`, error);
       }
     });
-  }, [mapInstance, visibleListings, setOpenInfoWindowId]);
+
+    console.log("📊 État final des markers:", {
+      totalMarkers: markersRef.current.size,
+      markerIds: Array.from(markersRef.current.keys()),
+    });
+  }, [mapInstance, visibleListings, setOpenInfoWindowId, setHoveredListingId]);
 
   // Gérer l'ouverture/fermeture des popups via le store
   useEffect(() => {

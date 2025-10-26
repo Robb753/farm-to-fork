@@ -25,8 +25,8 @@ export default function Explore() {
   const searchParams = useSearchParams();
   const paramsKey = searchParams.toString();
 
-  const { listingsWithImages } = useAllListingsWithImages();
-  const { setAllListings } = useListingsActions();
+  const { listings: listingsWithImages, isLoading: listingsLoading } = useAllListingsWithImages();
+  const { setAllListings, fetchListings } = useListingsActions();
 
   const {
     coordinates: curCoords,
@@ -84,9 +84,30 @@ export default function Explore() {
   // 2) Injecte les listings préchargés si dispo (ne déclenche pas de refetch)
   useEffect(() => {
     if (Array.isArray(listingsWithImages) && listingsWithImages.length > 0) {
+      console.log("📦 Explore: Chargement de", listingsWithImages.length, "listings", {
+        premiers: listingsWithImages.slice(0, 3).map((l) => ({
+          id: l.id,
+          name: l.name,
+          lat: l.lat,
+          lng: l.lng,
+        })),
+      });
       setAllListings(listingsWithImages);
     }
   }, [listingsWithImages, setAllListings]);
+
+  // 3) Déclencher un fetch basé sur les bounds de la carte quand elle est chargée
+  useEffect(() => {
+    if (mapInstance && !listingsLoading) {
+      // Attendre un peu que la carte soit vraiment prête
+      const timer = setTimeout(() => {
+        console.log("🗺️ Explore: Carte chargée, fetch des listings dans la zone visible");
+        fetchListings({ page: 1, forceRefresh: true });
+      }, 500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [mapInstance, fetchListings, listingsLoading]);
 
   return <ListingMapView />;
 }
