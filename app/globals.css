@@ -93,13 +93,76 @@
 }
 
 /* Styles personnalisés pour les popups Mapbox */
+.mapboxgl-popup {
+  z-index: 100;
+}
+
 .mapboxgl-popup-content {
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  padding: 0 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15), 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  background: white;
 }
 
 .mapboxgl-popup-tip {
-  border-top-color: white;
+  border-top-color: white !important;
+}
+
+.mapboxgl-popup-close-button {
+  right: 8px !important;
+  top: 8px !important;
+  font-size: 24px !important;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280 !important;
+  background: white;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+  z-index: 10;
+  padding: 0;
+  line-height: 1;
+}
+
+.mapboxgl-popup-close-button:hover {
+  background: #f3f4f6 !important;
+  color: #1f2937 !important;
+  transform: scale(1.1);
+}
+
+.mapboxgl-popup-close-button:focus {
+  outline: none;
+}
+
+/* Style pour les popups de fermes */
+.farm-marker-popup .mapboxgl-popup-content {
+  min-width: 280px;
+  max-width: 300px;
+}
+
+.farm-marker-popup .mapboxgl-popup-tip {
+  border-top-color: white !important;
+}
+
+/* Animation d'apparition des popups */
+.mapboxgl-popup {
+  animation: popup-appear 0.3s ease-out;
+}
+
+@keyframes popup-appear {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 :where(.mapbox-wrapper, .relative).mapbox-wrapper:fullscreen,
 .mapbox-wrapper:-webkit-full-screen {

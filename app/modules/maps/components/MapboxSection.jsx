@@ -7,6 +7,7 @@ import {
   useMapboxActions,
   MAPBOX_CONFIG,
 } from "@/lib/store/mapboxListingsStore";
+import MapboxMarkers from "./MapboxMarkers";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || "";
 
@@ -15,6 +16,7 @@ export default function MapboxSection({ isMapExpanded = false }) {
   const wrapperRef = useRef(null);
   const containerRef = useRef(null);
   const mapRef = useRef(null);
+  const userInteractingRef = useRef(false); // Track user interactions
 
   const { coordinates, zoom, style } = useMapboxState();
   const {
@@ -99,6 +101,13 @@ export default function MapboxSection({ isMapExpanded = false }) {
       ]);
     });
 
+    const onMoveStart = (e) => {
+      // Si l'événement provient d'une interaction utilisateur, on le marque
+      if (e && e.originalEvent) {
+        userInteractingRef.current = true;
+      }
+    };
+
     const onMoveEnd = () => {
       const b = map.getBounds();
       setMapBounds([
@@ -106,14 +115,23 @@ export default function MapboxSection({ isMapExpanded = false }) {
         [b.getEast(), b.getNorth()],
       ]);
       setMapZoom(map.getZoom());
+
+      // Réinitialiser le flag après un court délai
+      setTimeout(() => {
+        userInteractingRef.current = false;
+      }, 100);
     };
 
+    map.on("movestart", onMoveStart);
+    map.on("zoomstart", onMoveStart);
     map.on("moveend", onMoveEnd);
     map.on("zoomend", onMoveEnd);
 
     return () => {
       if (mapRef.current) {
         map.off("style.load", enforceFlatView);
+        map.off("movestart", onMoveStart);
+        map.off("zoomstart", onMoveStart);
         map.off("moveend", onMoveEnd);
         map.off("zoomend", onMoveEnd);
         map.remove(); // retire canvas + contrôles du container
@@ -138,6 +156,9 @@ export default function MapboxSection({ isMapExpanded = false }) {
     const map = mapRef.current;
     if (!map) return;
 
+    // Ne pas appliquer de easeTo si l'utilisateur est en train d'interagir
+    if (userInteractingRef.current) return;
+
     const [lng, lat] = Array.isArray(coordinates)
       ? coordinates
       : MAPBOX_CONFIG.center;
@@ -146,10 +167,11 @@ export default function MapboxSection({ isMapExpanded = false }) {
     const curCenter = map.getCenter();
     const curZoom = map.getZoom();
 
+    // Tolérance plus large pour éviter les micro-ajustements
     if (
-      Math.abs(curCenter.lat - lat) < 1e-6 &&
-      Math.abs(curCenter.lng - lng) < 1e-6 &&
-      Math.abs(curZoom - newZoom) < 1e-3
+      Math.abs(curCenter.lat - lat) < 1e-4 &&
+      Math.abs(curCenter.lng - lng) < 1e-4 &&
+      Math.abs(curZoom - newZoom) < 0.01
     )
       return;
 
@@ -185,6 +207,10 @@ export default function MapboxSection({ isMapExpanded = false }) {
         className="h-full w-full"
         style={{ contain: "layout paint size" }}
       />
+
+      {/* Composant qui gère les markers et popups */}
+      <MapboxMarkers />
+
       {/* Place ici d'éventuels overlays, pas dans containerRef */}
       {/* <div className="pointer-events-none absolute inset-0">…</div> */}
     </div>
