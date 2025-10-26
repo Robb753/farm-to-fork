@@ -16,6 +16,7 @@ import {
   useListingsState,
   useListingsActions,
   useMapboxState,
+  useMapboxActions,
   useInteractionsState,
   useInteractionsActions,
 } from "@/lib/store/mapboxListingsStore";
@@ -146,6 +147,7 @@ const ListItem = React.memo(
     onMouseEnter,
     onMouseLeave,
     onToggleFavorite,
+    onShowOnMap,
   }) => {
     const [imageLoaded, setImageLoaded] = useState(false);
     const [imageError, setImageError] = useState(false);
@@ -186,6 +188,17 @@ const ListItem = React.memo(
         onToggleFavorite();
       },
       [onToggleFavorite]
+    );
+
+    const handleShowOnMapClick = useCallback(
+      (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (onShowOnMap) {
+          onShowOnMap(item);
+        }
+      },
+      [onShowOnMap, item]
     );
 
     const handleImageError = () => {
@@ -274,22 +287,37 @@ const ListItem = React.memo(
                   {item.name}
                 </h2>
 
-                {/* Bouton favoris */}
-                <button
-                  onClick={handleFavoriteClick}
-                  className="flex-shrink-0 bg-gray-50 hover:bg-white p-1.5 rounded-full shadow-sm hover:shadow-md transition-all duration-200 border border-gray-200"
-                  aria-label={
-                    isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"
-                  }
-                >
-                  <Heart
-                    className={`h-4 w-4 transition-all duration-200 ${
-                      isFavorite
-                        ? "text-red-500 fill-red-500"
-                        : "text-gray-400 hover:text-red-400"
-                    }`}
-                  />
-                </button>
+                {/* Boutons d'action */}
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  {/* Bouton voir sur la carte */}
+                  {item.lat && item.lng && onShowOnMap && (
+                    <button
+                      onClick={handleShowOnMapClick}
+                      className="bg-green-50 hover:bg-green-100 p-1.5 rounded-full shadow-sm hover:shadow-md transition-all duration-200 border border-green-200"
+                      aria-label="Voir sur la carte"
+                      title="Voir sur la carte"
+                    >
+                      <MapPin className="h-4 w-4 text-green-600" />
+                    </button>
+                  )}
+
+                  {/* Bouton favoris */}
+                  <button
+                    onClick={handleFavoriteClick}
+                    className="bg-gray-50 hover:bg-white p-1.5 rounded-full shadow-sm hover:shadow-md transition-all duration-200 border border-gray-200"
+                    aria-label={
+                      isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"
+                    }
+                  >
+                    <Heart
+                      className={`h-4 w-4 transition-all duration-200 ${
+                        isFavorite
+                          ? "text-red-500 fill-red-500"
+                          : "text-gray-400 hover:text-red-400"
+                      }`}
+                    />
+                  </button>
+                </div>
               </div>
 
               {/* Adresse */}
@@ -365,9 +393,10 @@ export default function Listing() {
   // ✅ Hooks Zustand
   const { visible: visibleListings = [] } = useListingsState();
   const { hoveredListingId } = useInteractionsState();
-  const { setHoveredListingId } = useInteractionsActions();
+  const { setHoveredListingId, setOpenInfoWindowId } = useInteractionsActions();
   const { setAllListings } = useListingsActions();
   const { bounds: mapBounds } = useMapboxState();
+  const { setCoordinates, setMapZoom } = useMapboxActions();
 
   // ✅ Hooks favoris depuis userStore
   const favorites = useUserFavorites();
@@ -445,6 +474,26 @@ export default function Listing() {
     setHoveredListingId?.(null);
   }, [setHoveredListingId]);
 
+  const handleShowOnMap = useCallback(
+    (listing) => {
+      if (!listing?.lat || !listing?.lng) return;
+
+      // Ouvrir le popup sur la carte
+      setOpenInfoWindowId?.(listing.id);
+
+      // Centrer la carte sur le listing avec un bon niveau de zoom
+      setCoordinates?.([listing.lng, listing.lat]);
+      setMapZoom?.(14);
+
+      // Scroll vers le haut pour voir la carte (optionnel)
+      window.scrollTo({ top: 0, behavior: "smooth" });
+
+      // Toast pour feedback utilisateur
+      toast.success(`Centrage sur ${listing.name}`);
+    },
+    [setOpenInfoWindowId, setCoordinates, setMapZoom]
+  );
+
   const handleRetry = useCallback(() => {
     window.location.reload();
   }, []);
@@ -477,6 +526,7 @@ export default function Listing() {
                 onMouseEnter={() => handleMouseEnter(item.id)}
                 onMouseLeave={handleMouseLeave}
                 onToggleFavorite={() => handleToggleFavorite(item.id)}
+                onShowOnMap={handleShowOnMap}
               />
             ))
           : !delayedLoading && <EmptyState onRetry={handleRetry} />}
