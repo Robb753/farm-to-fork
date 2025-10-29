@@ -121,11 +121,11 @@ export default function HeaderDesktop({ showSearchInHeader = true }) {
           <Link href="/" className="flex items-center space-x-2">
             <Image
               src="/logof2f.svg"
-              alt="Farm to Fork"
-              width={40}
-              height={40}
+              alt="Farm To Fork"
+              width={120} // ratio du logo (exemple)
+              height={32}
               priority
-              className="w-auto h-10"
+              className="h-8 w-auto" // <- on fixe la hauteur et on laisse la largeur auto
             />
             <span className="text-xl font-bold text-green-700 hidden sm:block">
               Farm To Fork

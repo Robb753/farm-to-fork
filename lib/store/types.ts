@@ -1,5 +1,3 @@
-// lib/store/types.ts
-
 export interface LatLng {
   lat: number;
   lng: number;

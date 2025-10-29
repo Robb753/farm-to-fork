@@ -1,675 +1,383 @@
-  "use client";
+"use client";
 
-  import { useEffect, useState } from "react";
-  import { useUser } from "@clerk/nextjs";
-  import { toast } from "sonner";
-  import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-  import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-  } from "@/components/ui/table";
-  import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-    CardFooter,
-  } from "@/components/ui/card";
-  import { Badge } from "@/components/ui/badge";
-  import { Button } from "@/components/ui/button";
-  import {
-    Loader2,
-    AlertTriangle,
-    Users,
-    ListChecks,
-    ShoppingBasket,
-    Eye,
-    Search
-  } from "@/utils/icons";
-  import { Input } from "@/components/ui/input";
-  import { useUserRole } from "@/lib/store/userStore";
-  import AppPieChart from "@/components/ui/AppPieChart";
-  import AppBarChart from "@/components/ui/AppBarChart";
+import { useEffect, useState, useMemo } from "react";
+import { useUser } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/utils/supabase/client";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import {
+  Loader2,
+  Plus,
+  Edit,
+  Eye,
+  MapPin,
+  Calendar,
+  CheckCircle,
+  Clock,
+  Trash2,
+} from "@/utils/icons";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 
-  export default function AdminDashboard() {
-    const { user, isLoaded, isSignedIn } = useUser();
-    const role = useUserRole();
-    const [users, setUsers] = useState([]);
-    const [requests, setRequests] = useState([]);
-    const [stats, setStats] = useState({
-      totalUsers: 0,
-      farmers: 0,
-      pendingRequests: 0,
-      activeListings: 0
-    });
-    const [loadingUsers, setLoadingUsers] = useState(true);
-    const [loadingRequests, setLoadingRequests] = useState(true);
-    const [loadingStats, setLoadingStats] = useState(true);
-    const [activeTab, setActiveTab] = useState("dashboard");
-    const [searchTerm, setSearchTerm] = useState("");
-    const [error, setError] = useState(null);
+export default function FarmerDashboard() {
+  const { user, isLoaded, isSignedIn } = useUser();
+  const router = useRouter();
 
-    useEffect(() => {
-      if (isLoaded && isSignedIn && role === "admin") {
-        fetchUsers();
-        fetchRequests();
-        fetchStats();
+  const [listing, setListing] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const redirectTarget = useMemo(() => "/admin", []);
+
+  useEffect(() => {
+    const fetchListing = async () => {
+      if (!isLoaded) return;
+
+      if (!isSignedIn) {
+        router.replace(
+          `/sign-in?redirect=${encodeURIComponent(redirectTarget)}`
+        );
+        return;
       }
-    }, [isLoaded, isSignedIn, role]);
 
-    const fetchUsers = async () => {
-      setError(null);
       try {
-        const res = await fetch("/api/get-all-users", {
-          headers: { "Cache-Control": "no-cache" },
-        });
+        const email =
+          user?.primaryEmailAddress?.emailAddress ||
+          user?.emailAddresses?.[0]?.emailAddress;
 
-        if (!res.ok) {
-          const errorText = await res.text();
-          console.error("API Response Error:", errorText);
-          throw new Error(`${res.status}: ${res.statusText || "Erreur serveur"}`);
+        if (!email) {
+          setError("Email non trouvé");
+          setLoading(false);
+          return;
         }
 
-        const data = await res.json();
-        setUsers(data.users || []);
-      } catch (err) {
-        console.error("Erreur chargement users:", err);
-        setError(err.message);
-        toast.error("Erreur de chargement des utilisateurs: " + err.message);
+        const { data, error: supabaseError } = await supabase
+          .from("listing")
+          .select("*")
+          .eq("createdBy", email)
+          .maybeSingle();
+
+        if (supabaseError) {
+          setError(
+            `Erreur Supabase: ${supabaseError.message || "Erreur inconnue"}`
+          );
+        } else {
+          setListing(data);
+        }
+      } catch (e) {
+        setError("Une erreur inattendue s'est produite");
       } finally {
-        setLoadingUsers(false);
+        setLoading(false);
       }
     };
 
-    const fetchRequests = async () => {
-      setError(null);
-      try {
-        const res = await fetch("/api/get-farmer-requests", {
-          headers: { "Cache-Control": "no-cache" },
-        });
+    fetchListing();
+  }, [isLoaded, isSignedIn, user, router, redirectTarget]);
 
-        if (!res.ok) {
-          const errorText = await res.text();
-          console.error("API Response Error:", errorText);
-          throw new Error(`${res.status}: ${res.statusText || "Erreur serveur"}`);
-        }
-
-        const data = await res.json();
-        setRequests(data.requests || []);
-      } catch (err) {
-        console.error("Erreur chargement requests:", err);
-        setError(err.message);
-        toast.error("Impossible de charger les demandes: " + err.message);
-      } finally {
-        setLoadingRequests(false);
-      }
-    };
-
-    const fetchStats = async () => {
-      setLoadingStats(true);
-      try {
-        const [listingsRes] = await Promise.all([fetch("/api/get-listings")]);
-
-        const listingsData = await listingsRes.json();
-        const activeCount = listingsData?.listings?.length || 0;
-
-        setStats({
-          totalUsers: users.length,
-          farmers: users.filter((u) => u.role === "farmer").length,
-          pendingRequests: requests.filter((r) => r.status === "pending").length,
-          activeListings: activeCount,
-        });
-      } catch (err) {
-        console.error("Erreur chargement stats:", err);
-        toast.error("Impossible de charger les statistiques");
-      } finally {
-        setLoadingStats(false);
-      }
-    };
-    
-
-    // Met à jour les statistiques quand les données sont chargées
-    useEffect(() => {
-      if (!loadingUsers && !loadingRequests) {
-        setStats(prev => ({
-          ...prev,
-          totalUsers: users.length,
-          farmers: users.filter(u => u.role === "farmer").length,
-          pendingRequests: requests.filter(r => r.status === "pending").length
-        }));
-      }
-    }, [loadingUsers, loadingRequests, users, requests]);
-
-    const handleAction = async (id, userId, role, status) => {
-      try {
-        const res = await fetch("/api/validate-farmer-request", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ requestId: id, userId, role, status })
-        });
-
-        if (!res.ok) {
-          const errorText = await res.text();
-          console.error("API Validation Error:", errorText);
-          throw new Error("Erreur de validation: " + res.statusText);
-        }
-
-        toast.success(status === "approved" ? "Producteur approuvé" : "Demande rejetée");
-
-        await fetchRequests();
-        await fetchUsers();
-        await fetchStats();
-
-        if (status === "approved") {
-          setActiveTab("users");
-        }
-      } catch (err) {
-        console.error("Erreur action:", err);
-        toast.error("Action impossible: " + err.message);
-      }
-    };
-
-    const handleApproveFarmer = async (userId) => {
-      try {
-        const res = await fetch("/api/update-user-role", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId, role: "farmer" })
-        });
-
-        if (!res.ok) throw new Error("Erreur lors de l'approbation du producteur.");
-        await fetchUsers();
-        toast.success("Rôle mis à jour avec succès.");
-      } catch (error) {
-        console.error("handleApproveFarmer:", error);
-        toast.error("Erreur lors de la mise à jour du rôle");
-      }
-    };
-
-    const renderLoading = () => (
-      <div className="flex justify-center items-center h-40">
-        <Loader2 className="h-8 w-8 animate-spin text-green-600" />
-        <span className="ml-2 text-gray-600">Chargement...</span>
-      </div>
-    );
-
-    const renderError = (message) => (
-      <div className="text-center py-10">
-        <div className="flex items-center justify-center mb-4">
-          <AlertTriangle className="h-8 w-8 text-amber-500" />
-        </div>
-        <p className="text-red-600 mb-2">{message}</p>
-        <Button
-          onClick={() => {
-            if (activeTab === "requests") fetchRequests();
-            else if (activeTab === "users") fetchUsers();
-            else fetchStats();
-          }}
-          className="mt-4"
-        >
-          Réessayer
-        </Button>
-      </div>
-    );
-
-    const renderEmpty = (message) => (
-      <div className="text-center py-10 text-gray-500">{message}</div>
-    );
-
-    // Fonction de filtrage
-    const filteredUsers = searchTerm 
-      ? users.filter(user => 
-          user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (user.role && user.role.toLowerCase().includes(searchTerm.toLowerCase()))
-        )
-      : users;
-
-    const filteredRequests = searchTerm
-      ? requests.filter(req => 
-          req.farm_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          req.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          req.location.toLowerCase().includes(searchTerm.toLowerCase())
-        )
-      : requests;
-
-    // Si l'utilisateur n'est pas admin, afficher un message approprié
-    if (isLoaded && (!isSignedIn || role !== "admin")) {
-      return (
-        <div className="container mx-auto py-8 px-4">
-          <Card className="border-t-4 border-t-amber-600">
-            <CardHeader>
-              <CardTitle className="text-2xl font-bold text-amber-700">
-                Accès restreint
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-center py-10 text-gray-600">
-                Vous devez être connecté avec un compte administrateur pour
-                accéder à cette page.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      );
-    }
-
+  if (loading) {
     return (
-      <div className="container mx-auto py-8 px-4">
-        <Card className="border-t-4 border-t-green-600">
-          <CardHeader>
-            <CardTitle className="text-2xl font-bold text-green-700">
-              Tableau de bord Administrateur
-            </CardTitle>
-            <CardDescription>
-              Gérez votre plateforme Farm to Fork
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-3 mb-6">
-                <TabsTrigger
-                  value="dashboard"
-                  className="data-[state=active]:bg-green-100 data-[state=active]:text-green-800"
-                >
-                  Tableau de bord
-                </TabsTrigger>
-                <TabsTrigger
-                  value="requests"
-                  className="data-[state=active]:bg-green-100 data-[state=active]:text-green-800"
-                >
-                  Demandes de producteurs
-                  {stats.pendingRequests > 0 && (
-                    <Badge className="ml-2 bg-green-600" variant="secondary">
-                      {stats.pendingRequests}
-                    </Badge>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger
-                  value="users"
-                  className="data-[state=active]:bg-green-100 data-[state=active]:text-green-800"
-                >
-                  Utilisateurs
-                </TabsTrigger>
-              </TabsList>
-
-              {/* Tableau de bord principal */}
-              <TabsContent value="dashboard">
-                {loadingStats ? (
-                  renderLoading()
-                ) : error ? (
-                  renderError(error)
-                ) : (
-                  <>
-                    {/* Cartes de statistiques */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                      <Card>
-                        <CardContent className="pt-6">
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <p className="text-gray-500 text-sm">
-                                Utilisateurs
-                              </p>
-                              <h3 className="text-2xl font-bold">
-                                {stats.totalUsers}
-                              </h3>
-                            </div>
-                            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                              <Users className="h-5 w-5 text-blue-600" />
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                      <Card>
-                        <CardContent className="pt-6">
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <p className="text-gray-500 text-sm">
-                                Producteurs
-                              </p>
-                              <h3 className="text-2xl font-bold">
-                                {stats.farmers}
-                              </h3>
-                            </div>
-                            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                              <ListChecks className="h-5 w-5 text-green-600" />
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                      <Card>
-                        <CardContent className="pt-6">
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <p className="text-gray-500 text-sm">Demandes</p>
-                              <h3 className="text-2xl font-bold">
-                                {stats.pendingRequests}
-                              </h3>
-                            </div>
-                            <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center">
-                              <ShoppingBasket className="h-5 w-5 text-yellow-600" />
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                      <Card>
-                        <CardContent className="pt-6">
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <p className="text-gray-500 text-sm">
-                                Fermes actives
-                              </p>
-                              <h3 className="text-2xl font-bold">
-                                {stats.activeListings}
-                              </h3>
-                            </div>
-                            <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
-                              <Eye className="h-5 w-5 text-purple-600" />
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
-
-                    {/* Graphiques */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>Répartition des utilisateurs</CardTitle>
-                        </CardHeader>
-                        <CardContent className="h-[300px]">
-                          <AppPieChart />
-                        </CardContent>
-                      </Card>
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>Activité récente</CardTitle>
-                        </CardHeader>
-                        <CardContent className="h-[300px]">
-                          <AppBarChart />
-                        </CardContent>
-                      </Card>
-                    </div>
-
-                    {/* Dernières demandes */}
-                    <Card>
-                      <CardHeader className="flex flex-row justify-between items-center">
-                        <CardTitle>Dernières demandes</CardTitle>
-                        <Button
-                          variant="outline"
-                          onClick={() => setActiveTab("requests")}
-                        >
-                          Voir tout
-                        </Button>
-                      </CardHeader>
-                      <CardContent>
-                        {requests.length === 0 ? (
-                          renderEmpty("Aucune demande en attente.")
-                        ) : (
-                          <div className="rounded-md border overflow-x-auto">
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead>Ferme</TableHead>
-                                  <TableHead>Email</TableHead>
-                                  <TableHead>Localisation</TableHead>
-                                  <TableHead>Actions</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                            </Table>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </>
-                )}
-              </TabsContent>
-
-              {/* Demandes de producteurs */}
-              <TabsContent value="requests">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-xl font-semibold text-gray-700">
-                    Demandes de statut producteur
-                  </h2>
-                  <div className="relative w-64">
-                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
-                    <Input
-                      placeholder="Rechercher..."
-                      className="pl-8"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                {loadingRequests ? (
-                  renderLoading()
-                ) : error ? (
-                  renderError(error)
-                ) : filteredRequests.length === 0 ? (
-                  renderEmpty(
-                    searchTerm
-                      ? "Aucun résultat pour cette recherche."
-                      : "Aucune demande en attente."
-                  )
-                ) : (
-                  <div className="rounded-md border overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Ferme</TableHead>
-                          <TableHead>Email</TableHead>
-                          <TableHead>Localisation</TableHead>
-                          <TableHead>Description</TableHead>
-                          <TableHead>Statut</TableHead>
-                          <TableHead>Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredRequests.map((r) => (
-                          <TableRow key={r.id}>
-                            <TableCell className="font-medium">
-                              {r.farm_name}
-                            </TableCell>
-                            <TableCell>{r.email}</TableCell>
-                            <TableCell>{r.location}</TableCell>
-                            <TableCell className="max-w-xs truncate">
-                              {r.description}
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                className={
-                                  r.status === "pending"
-                                    ? "bg-yellow-100 text-yellow-800"
-                                    : r.status === "approved"
-                                      ? "bg-green-100 text-green-800"
-                                      : "bg-red-100 text-red-800"
-                                }
-                              >
-                                {r.status === "pending"
-                                  ? "En attente"
-                                  : r.status === "approved"
-                                    ? "Approuvé"
-                                    : "Rejeté"}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              {r.status === "pending" && (
-                                <div className="flex space-x-2">
-                                  <Button
-                                    size="sm"
-                                    onClick={() =>
-                                      handleAction(
-                                        r.id,
-                                        r.user_id,
-                                        "farmer",
-                                        "approved"
-                                      )
-                                    }
-                                    variant="default"
-                                    className="bg-green-600 hover:bg-green-700"
-                                  >
-                                    Approuver
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    onClick={() =>
-                                      handleAction(
-                                        r.id,
-                                        r.user_id,
-                                        "user",
-                                        "rejected"
-                                      )
-                                    }
-                                    variant="outline"
-                                    className="text-red-600 border-red-600 hover:bg-red-50"
-                                  >
-                                    Rejeter
-                                  </Button>
-                                </div>
-                              )}
-                              {r.status !== "pending" && (
-                                <span className="text-sm text-gray-500">
-                                  Traité
-                                </span>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </TabsContent>
-
-              {/* Utilisateurs */}
-              <TabsContent value="users">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-xl font-semibold text-gray-700">
-                    Gestion des utilisateurs
-                  </h2>
-                  <div className="relative w-64">
-                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
-                    <Input
-                      placeholder="Rechercher..."
-                      className="pl-8"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                {loadingUsers ? (
-                  renderLoading()
-                ) : error ? (
-                  renderError(error)
-                ) : filteredUsers.length === 0 ? (
-                  renderEmpty(
-                    searchTerm
-                      ? "Aucun résultat pour cette recherche."
-                      : "Aucun utilisateur trouvé."
-                  )
-                ) : (
-                  <div className="rounded-md border overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>ID</TableHead>
-                          <TableHead>Email</TableHead>
-                          <TableHead>Rôle</TableHead>
-                          <TableHead>Date d'inscription</TableHead>
-                          <TableHead>Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredUsers.map((user, index) => (
-                          <TableRow
-                            key={
-                              user?.user_id ?? user?.email ?? `user-${index}`
-                            }
-                          >
-                            <TableCell className="font-medium">
-                              {user?.user_id
-                                ? `${user.user_id.substring(0, 8)}...`
-                                : "ID inconnu"}
-                            </TableCell>
-                            <TableCell>
-                              {user?.email ?? "Email inconnu"}
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                className={
-                                  user?.role === "admin"
-                                    ? "bg-purple-100 text-purple-800"
-                                    : user?.role === "farmer"
-                                      ? "bg-green-100 text-green-800"
-                                      : "bg-blue-100 text-blue-800"
-                                }
-                              >
-                                {user?.role === "admin"
-                                  ? "Admin"
-                                  : user?.role === "farmer"
-                                    ? "Producteur"
-                                    : "Utilisateur"}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              {user?.created_at
-                                ? new Date(user.created_at).toLocaleDateString(
-                                    "fr-FR"
-                                  )
-                                : "—"}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex space-x-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="text-blue-600 border-blue-600 hover:bg-blue-50"
-                                >
-                                  Voir détails
-                                </Button>
-                                {user?.role !== "admin" && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="text-red-600 border-red-600 hover:bg-red-50"
-                                  >
-                                    Suspendre
-                                  </Button>
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-          <CardFooter className="flex justify-between border-t pt-6">
-            <div className="text-sm text-gray-500">
-              Dernière synchronisation: {new Date().toLocaleString()}
-            </div>
-            <Button
-              variant="outline"
-              onClick={() => {
-                fetchUsers();
-                fetchRequests();
-                fetchStats();
-                toast.success("Données rafraîchies");
-              }}
-            >
-              Rafraîchir les données
-            </Button>
-          </CardFooter>
-        </Card>
+      <div className="min-h-screen flex justify-center items-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-green-600 mx-auto mb-4" />
+          <p className="text-gray-600">Chargement de votre espace...</p>
+        </div>
       </div>
     );
   }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex justify-center items-center">
+        <div className="text-center">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
+            <p className="text-red-600 mb-4">{error}</p>
+            <Button onClick={() => window.location.reload()}>Réessayer</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const handleDelete = async () => {
+    try {
+      if (!listing?.id) return;
+
+      // Supprime d’abord les enfants si pas de cascade en DB
+      await supabase
+        .from("listingImages")
+        .delete()
+        .eq("listing_id", listing.id);
+      await supabase.from("products").delete().eq("listing_id", listing.id);
+
+      const { error: delErr } = await supabase
+        .from("listing")
+        .delete()
+        .eq("id", listing.id);
+      if (delErr) throw delErr;
+
+      toast.success("Fiche supprimée avec succès !");
+      router.replace("/dashboard/farms");
+    } catch (e) {
+      console.error(e);
+      toast.error(e?.message || "Erreur lors de la suppression.");
+    }
+  };
+
+  if (!listing) {
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
+        <div className="text-center mb-12">
+          <h1 className="text-4xl font-bold text-green-700 mb-4">
+            Bienvenue sur votre espace Producteur
+          </h1>
+          <p className="text-gray-600 text-lg">
+            Commencez par créer votre première fiche de ferme
+          </p>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
+          <div className="p-8">
+            <div className="text-center">
+              <h2 className="text-2xl font-semibold text-gray-800 mb-4">
+                Créer votre ferme
+              </h2>
+              <p className="text-gray-600 mb-2">
+                Étape 1 : Ajoutez votre ferme pour commencer à vendre vos
+                produits
+              </p>
+              <p className="text-gray-700 mb-8">
+                Vous n'avez pas encore de ferme. Créez votre fiche pour
+                apparaître sur la carte et proposer vos produits.
+              </p>
+
+              <div className="w-full h-64 bg-gray-100 rounded-lg mb-8 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-gray-200 rounded-full mx-auto mb-4 flex items-center justify-center">
+                    <Plus className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <p className="text-gray-500">Ajoutez votre première ferme</p>
+                </div>
+              </div>
+
+              <Button
+                asChild
+                size="lg"
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <Link
+                  href="/add-new-listing"
+                  className="flex items-center gap-2"
+                >
+                  <Plus className="h-5 w-5" />
+                  Créer ma ferme
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-green-800 mb-2">
+          Tableau de bord producteur
+        </h1>
+        <p className="text-gray-600">
+          Gérez votre fiche ferme et vos informations
+        </p>
+      </div>
+
+      <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
+        <div className="bg-gradient-to-r from-green-50 to-green-100 px-6 py-4 border-b">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <h2 className="text-xl font-semibold text-green-800 mb-1">
+                {listing.name || "Ferme sans nom"}
+              </h2>
+              {listing.address && (
+                <div className="flex items-center text-gray-600 text-sm gap-2">
+                  <MapPin className="h-4 w-4 text-gray-500" />
+                  {listing.address}
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {listing.active ? (
+                <div className="flex items-center gap-1 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+                  <CheckCircle className="h-4 w-4" />
+                  Publiée
+                </div>
+              ) : (
+                <div className="flex items-center gap-1 px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium">
+                  <Clock className="h-4 w-4" />
+                  Brouillon
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6">
+          {listing.description && (
+            <div className="mb-6">
+              <h3 className="font-medium text-gray-800 mb-2">Description</h3>
+              <p className="text-gray-600 text-sm leading-relaxed">
+                {listing.description.length > 200
+                  ? `${listing.description.substring(0, 200)}...`
+                  : listing.description}
+              </p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            {Array.isArray(listing.product_type) &&
+              listing.product_type.length > 0 && (
+                <div>
+                  <h3 className="font-medium text-gray-800 mb-2">
+                    Types de produits
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {listing.product_type.map((type, idx) => (
+                      <span
+                        key={`${type}-${idx}`}
+                        className="px-2 py-1 bg-green-50 text-green-700 text-xs rounded-md border border-green-200"
+                      >
+                        {type}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+            {(listing.email || listing.phoneNumber || listing.website) && (
+              <div>
+                <h3 className="font-medium text-gray-800 mb-2">Contact</h3>
+                <div className="space-y-1 text-sm text-gray-600">
+                  {listing.email && <p>📧 {listing.email}</p>}
+                  {listing.phoneNumber && <p>📞 {listing.phoneNumber}</p>}
+                  {listing.website && (
+                    <p>
+                      🌐{" "}
+                      <a
+                        href={listing.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-green-600 hover:underline"
+                      >
+                        Site web
+                      </a>
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="text-xs text-gray-500 mb-6 space-y-1">
+            {listing.created_at && (
+              <div className="flex items-center gap-1">
+                <Calendar className="h-3 w-3" />
+                Créée le{" "}
+                {new Date(listing.created_at).toLocaleDateString("fr-FR", {
+                  day: "2-digit",
+                  month: "long",
+                  year: "numeric",
+                })}
+              </div>
+            )}
+            {listing.published_at && (
+              <div className="flex items-center gap-1">
+                <Calendar className="h-3 w-3" />
+                Publiée le{" "}
+                {new Date(listing.published_at).toLocaleDateString("fr-FR", {
+                  day: "2-digit",
+                  month: "long",
+                  year: "numeric",
+                })}
+              </div>
+            )}
+            {listing.modified_at && (
+              <div className="flex items-center gap-1">
+                <Calendar className="h-3 w-3" />
+                Modifiée le{" "}
+                {new Date(listing.modified_at).toLocaleDateString("fr-FR", {
+                  day: "2-digit",
+                  month: "long",
+                  year: "numeric",
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-wrap gap-3 pt-4 border-t">
+            <Button
+              asChild
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <Link href={`/edit-listing/${listing.id}`}>
+                <Edit className="h-4 w-4" />
+                Modifier la fiche
+              </Link>
+            </Button>
+
+            {listing.active && (
+              <Button
+                asChild
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                <Link href={`/view-listing/${listing.id}`}>
+                  <Eye className="h-4 w-4" />
+                  Voir la fiche publique
+                </Link>
+              </Button>
+            )}
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button className="bg-red-600 hover:bg-red-700 flex items-center gap-2">
+                  <Trash2 className="h-4 w-4" /> Supprimer la fiche
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="text-red-600">
+                    Supprimer cette fiche ?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Cette action est définitive. Les produits et images liés
+                    seront supprimés également.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Annuler</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-red-600 hover:bg-red-700"
+                    onClick={handleDelete}
+                  >
+                    Confirmer la suppression
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

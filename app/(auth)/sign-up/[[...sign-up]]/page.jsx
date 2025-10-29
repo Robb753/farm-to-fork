@@ -3,37 +3,33 @@
 import { SignUp, useUser } from "@clerk/nextjs";
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { updateClerkRole, syncProfileToSupabase } from "@/lib/syncUserUtils";
+import { useEffect, useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function SignUpPage() {
   const router = useRouter();
-  const { isSignedIn, isLoaded, user } = useUser();
+  const params = useSearchParams();
+  const { isSignedIn, isLoaded } = useUser();
 
+  // Supporte ?redirect=/chemin
+  const redirectTarget = useMemo(() => {
+    const r = params?.get("redirect");
+    return r && r.startsWith("/") ? r : "/";
+  }, [params]);
+
+  // Déjà connecté → redirection douce
   useEffect(() => {
-    if (isLoaded && isSignedIn && user) {
-      // Mettre à jour Clerk et Supabase avec le rôle par défaut
-      const sync = async () => {
-        try {
-          await updateClerkRole(user.id, "user");
-          await syncProfileToSupabase(user, "user");
-        } catch (err) {
-          console.error("[SignUpPage] Échec de synchronisation:", err);
-        } finally {
-          router.push("/");
-        }
-      };
-
-      sync();
+    if (isLoaded && isSignedIn) {
+      router.replace(redirectTarget);
     }
-  }, [isLoaded, isSignedIn, user, router]);
+  }, [isLoaded, isSignedIn, router, redirectTarget]);
 
   if (isLoaded && isSignedIn) return null;
 
   return (
     <section className="bg-white">
       <div className="grid grid-cols-1 lg:grid-cols-12 lg:min-h-screen">
+        {/* Image / branding */}
         <section className="relative flex h-32 sm:h-48 md:h-64 lg:h-full items-end bg-gray-900 lg:col-span-5 xl:col-span-6">
           <Image
             alt="Champs agricoles"
@@ -45,11 +41,11 @@ export default function SignUpPage() {
           <div className="hidden lg:block lg:relative lg:p-12">
             <Link className="block text-white" href="/">
               <span className="sr-only">Accueil</span>
-              {/* Icône ou logo */}
               <svg className="h-8 sm:h-10" viewBox="0 0 28 24" fill="none">
-                <path d="..." fill="currentColor" />
+                <path d="M0.41 10.3847C1.14777 7.4194..." fill="currentColor" />
               </svg>
             </Link>
+
             <h2 className="mt-6 text-3xl font-bold text-white">
               Rejoignez Farm To Fork !
             </h2>
@@ -60,10 +56,11 @@ export default function SignUpPage() {
           </div>
         </section>
 
+        {/* Formulaire */}
         <main className="flex items-center justify-center px-4 py-8 sm:px-8 sm:py-12 md:px-12 lg:col-span-7 lg:px-16 lg:py-12 xl:col-span-6">
           <div className="max-w-lg w-full">
             <div className="lg:hidden mb-4 text-center">
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
                 Rejoignez Farm To Fork !
               </h1>
               <p className="mt-2 text-gray-500">
@@ -72,11 +69,13 @@ export default function SignUpPage() {
             </div>
 
             <SignUp
-              routing="hash"
               signInUrl="/sign-in"
+              fallbackRedirectUrl={redirectTarget}
               appearance={{
                 elements: {
-                  formButtonPrimary: "bg-green-600 hover:bg-green-700",
+                  formButtonPrimary:
+                    "bg-green-600 hover:bg-green-700 focus:ring-2 focus:ring-green-500",
+                  card: "shadow-xl rounded-xl",
                 },
               }}
             />

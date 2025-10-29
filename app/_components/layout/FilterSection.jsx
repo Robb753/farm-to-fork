@@ -8,15 +8,15 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
-import { ChevronDown, X, Filter, Check, ArrowLeft } from "@/utils/icons";
+import { ChevronDown, X, Filter, Check, ArrowLeft } from "lucide-react"; // ✅ Import corrigé
 import {
   useFiltersState,
   useFiltersActions,
   filterSections,
-  useMapboxActions,
-  useMapboxState,
+  useMapActions,
+  useMapState,
   MAPBOX_CONFIG,
-} from "@/lib/store/mapboxListingsStore";
+} from "@/lib/store/mapListingsStore";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useUpdateExploreUrl } from "@/utils/updateExploreUrl";
 import ReactDOM from "react-dom";
@@ -240,10 +240,9 @@ const FilterSection = () => {
   const pathname = usePathname();
   const updateExploreUrl = useUpdateExploreUrl();
 
-  // Map actions/state pour reset propre de la vue
-  const { setCoordinates, setMapZoom, setMapPitch, setMapBearing } =
-    useMapboxActions();
-  const { mapInstance } = useMapboxState();
+  // ✅ Map actions/state pour reset propre de la vue - import corrigé
+  const { coordinates, mapZoom, mapInstance } = useMapState();
+  const { setCoordinates, setMapZoom } = useMapActions();
 
   const [hydratedFromUrl, setHydratedFromUrl] = useState(false);
   const [isMobileModalOpen, setIsMobileModalOpen] = useState(false);
@@ -351,26 +350,26 @@ const FilterSection = () => {
     [filters]
   );
 
-  // 🔁 Utilitaire : remettre la vue Europe (store + vraie carte)
+  // ✅ Utilitaire : remettre la vue Europe (store + vraie carte)
   const recenterEurope = useCallback(() => {
     const [lng, lat] = MAPBOX_CONFIG.center;
     setCoordinates({ lat, lng });
     setMapZoom(MAPBOX_CONFIG.zoom);
-    setMapPitch(0);
-    setMapBearing(0);
 
     // anime la carte si prête
     try {
-      mapInstance?.easeTo({
-        center: [lng, lat],
-        zoom: MAPBOX_CONFIG.zoom,
-        pitch: 0,
-        bearing: 0,
-        duration: 600,
-        essential: true,
-      });
+      if (mapInstance) {
+        mapInstance.easeTo({
+          center: [lng, lat],
+          zoom: MAPBOX_CONFIG.zoom,
+          pitch: 0,
+          bearing: 0,
+          duration: 600,
+          essential: true,
+        });
+      }
     } catch {}
-  }, [mapInstance, setCoordinates, setMapZoom, setMapPitch, setMapBearing]);
+  }, [mapInstance, setCoordinates, setMapZoom]); // ✅ Dependencies corrigées
 
   // Effacer TOUS les filtres (et nettoyer l'URL) + recentrer la carte
   const resetAllFilters = useCallback(() => {
@@ -443,7 +442,7 @@ const FilterSection = () => {
           ))}
 
           <div className="border-b pb-6">
-            <h3 className="mb-4 text-lg font-semibold">Type d’agriculture</h3>
+            <h3 className="mb-4 text-lg font-semibold">Type d'agriculture</h3>
             <div className="space-y-3">
               {mapFilterTypes.map((t) => {
                 const checked = (filters.mapType || []).includes(t.id);
@@ -515,13 +514,13 @@ const FilterSection = () => {
             ))}
 
             <DropdownPill
-              label="Type d’agriculture"
+              label="Type d'agriculture"
               values={filters.mapType}
               onClear={() => resetMapFilters()}
             >
               <div className="space-y-2">
                 <p className="text-sm font-medium text-gray-700">
-                  Type d’agriculture
+                  Type d'agriculture
                 </p>
                 <div className="grid grid-cols-1 gap-2">
                   {mapFilterTypes.map((t) => {

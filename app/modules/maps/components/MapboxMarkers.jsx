@@ -4,18 +4,18 @@ import React, { useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import mapboxgl from "mapbox-gl";
 import {
-  useMapboxState,
+  useMapState, // ✅ Import corrigé
   useListingsState,
   useInteractionsState,
   useInteractionsActions,
-} from "@/lib/store/mapboxListingsStore";
+} from "@/lib/store/mapListingsStore";
 import MarkerListingItem from "../../listings/components/MarkerListingItem";
 
 /**
  * Gère les markers + popups React sur la carte Mapbox
  */
 export default function MapboxMarkers() {
-  const { mapInstance } = useMapboxState();
+  const { mapInstance } = useMapState(); // ✅ Hook corrigé
   const { visible: visibleListings } = useListingsState();
   const { openInfoWindowId, hoveredListingId } = useInteractionsState();
   const { setOpenInfoWindowId, setHoveredListingId } = useInteractionsActions();
@@ -206,7 +206,7 @@ export default function MapboxMarkers() {
           setOpenInfoWindowId(id);
         });
 
-        // Crée l’entrée dans notre registry
+        // Crée l'entrée dans notre registry
         markersRef.current.set(id, {
           marker,
           popup,
@@ -279,5 +279,5 @@ export default function MapboxMarkers() {
   // (4) Nettoyage intégral au démontage
   useEffect(() => cleanupMarkers, []);
 
-  return null; // tout est géré côté Mapbox
+  return null;
 }

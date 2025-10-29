@@ -1,7 +1,9 @@
 import { z } from "zod";
 
-// Constantes pour les valeurs autorisées (basées sur vos composants)
-const PRODUCT_TYPES = [
+/* -------------------------------------------
+ * Constants
+ * -----------------------------------------*/
+export const PRODUCT_TYPES = [
   "Fruits",
   "Légumes",
   "Produits laitiers",
@@ -10,14 +12,14 @@ const PRODUCT_TYPES = [
   "Produits transformés",
 ] as const;
 
-const PRODUCTION_METHODS = [
+export const PRODUCTION_METHODS = [
   "Agriculture conventionnelle",
   "Agriculture biologique",
   "Agriculture durable",
   "Agriculture raisonnée",
 ] as const;
 
-const PURCHASE_MODES = [
+export const PURCHASE_MODES = [
   "Vente directe à la ferme",
   "Marché local",
   "Livraison à domicile",
@@ -25,7 +27,7 @@ const PURCHASE_MODES = [
   "Click & Collect",
 ] as const;
 
-const CERTIFICATIONS = [
+export const CERTIFICATIONS = [
   "Label AB",
   "Label Rouge",
   "AOC/AOP",
@@ -33,7 +35,7 @@ const CERTIFICATIONS = [
   "Demeter",
 ] as const;
 
-const AVAILABILITY_OPTIONS = [
+export const AVAILABILITY_OPTIONS = [
   "Saisonnière",
   "Toute l'année",
   "Pré-commande",
@@ -41,7 +43,7 @@ const AVAILABILITY_OPTIONS = [
   "Événements spéciaux",
 ] as const;
 
-const ADDITIONAL_SERVICES = [
+export const ADDITIONAL_SERVICES = [
   "Visite de la ferme",
   "Ateliers de cuisine",
   "Dégustation",
@@ -49,85 +51,126 @@ const ADDITIONAL_SERVICES = [
   "Événements pour professionnels",
 ] as const;
 
-// Validation des fichiers image
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+/* -------------------------------------------
+ * Helpers
+ * -----------------------------------------*/
+const normalizeUrl = (value?: string) => {
+  if (!value || value.trim() === "") return undefined;
+  const candidate = value.startsWith("http") ? value : `https://${value}`;
+  try {
+    return new URL(candidate).toString();
+  } catch {
+    return null;
+  }
+};
+
+const toE164FR = (value?: string) => {
+  if (!value || value.trim() === "") return undefined;
+  const digits = value.replace(/[^\d+]/g, "");
+  let num = digits.replace(/^00/, "+");
+  if (num.startsWith("0")) num = `+33${num.slice(1)}`;
+  return /^\+33\d{9}$/.test(num) ? num : null;
+};
+
+/* -------------------------------------------
+ * Images
+ * -----------------------------------------*/
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB per file
+const MAX_TOTAL_SIZE = 15 * 1024 * 1024; // 15MB total
 const ACCEPTED_IMAGE_TYPES = [
   "image/jpeg",
   "image/jpg",
   "image/png",
   "image/gif",
-];
+  "image/webp",
+  "image/avif",
+] as const;
 
-const imageFileSchema = z
-  .instanceof(File)
-  .refine((file) => file.size <= MAX_FILE_SIZE, {
-    message: "La taille du fichier ne doit pas dépasser 5MB",
+const fileLikeSchema = z
+  .custom<File>((val) => typeof File !== "undefined" && val instanceof File, {
+    message: "Fichier image invalide",
   })
-  .refine((file) => ACCEPTED_IMAGE_TYPES.includes(file.type), {
-    message: "Seuls les formats JPG, PNG et GIF sont acceptés",
+  .refine((file) => file.size <= MAX_FILE_SIZE, {
+    message: "La taille d'une image ne doit pas dépasser 5MB",
+  })
+  .refine((file) => ACCEPTED_IMAGE_TYPES.includes((file as File).type as any), {
+    message: "Formats acceptés: JPG, PNG, GIF, WEBP, AVIF",
   });
 
-// Validation du numéro de téléphone français
-const phoneRegex = /^(?:(?:\+|00)33|0)\s*[1-9](?:[\s.-]*\d{2}){4}$/;
-
-// Validation URL plus permissive (avec ou sans protocole)
-const urlSchema = z
+const imageUrlSchema = z
   .string()
-  .refine(
-    (url) => {
-      if (!url) return true; // Optionnel
-      // Ajouter https:// si pas de protocole
-      const urlToTest = url.startsWith("http") ? url : `https://${url}`;
-      try {
-        new URL(urlToTest);
-        return true;
-      } catch {
-        return false;
-      }
-    },
-    { message: "URL invalide" }
-  )
-  .transform((url) => {
-    if (!url) return url;
-    // Normaliser l'URL en ajoutant https:// si nécessaire
-    return url.startsWith("http") ? url : `https://${url}`;
+  .url("URL d'image invalide")
+  .refine((u) => /\.(jpe?g|png|gif|webp|avif)$/i.test(new URL(u).pathname), {
+    message:
+      "L'URL d'image doit se terminer par .jpg, .png, .gif, .webp, .avif",
   });
 
-// Schéma de base sans la validation croisée
+const imageItemSchema = z.union([fileLikeSchema, imageUrlSchema]);
+
+/* -------------------------------------------
+ * Single-field schemas that use effects (no .min/.max after them)
+ * -----------------------------------------*/
+const websiteSchema = z
+  .string()
+  .trim()
+  .optional()
+  .superRefine((value, ctx) => {
+    if (!value) return;
+    const normalized = normalizeUrl(value);
+    if (normalized === null) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "URL invalide" });
+    } else {
+      // @ts-expect-error stash normalized value
+      ctx.parent?.set("website", normalized);
+    }
+  });
+
+const phoneSchema = z
+  .string()
+  .optional()
+  .transform((s) => (s ? s.trim() : s))
+  .superRefine((value, ctx) => {
+    if (!value) return;
+    const e164 = toE164FR(value);
+    if (e164 === null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Numéro de téléphone invalide (format FR attendu)",
+      });
+    } else {
+      // @ts-expect-error stash normalized value
+      ctx.parent?.set("phoneNumber", e164);
+    }
+  });
+
+/* -------------------------------------------
+ * Base schema (use .trim() so .min/.max/.email exist)
+ * -----------------------------------------*/
 const baseEditListingSchema = z.object({
-  // Informations obligatoires
   name: z
     .string()
+    .trim()
     .min(1, "Le nom de la ferme est requis")
     .min(2, "Le nom doit contenir au moins 2 caractères")
     .max(100, "Le nom ne peut pas dépasser 100 caractères"),
 
   email: z
     .string()
+    .trim()
     .min(1, "L'email est requis")
     .email("Adresse email invalide"),
 
-  // Informations optionnelles avec validation
-  phoneNumber: z
-    .string()
-    .optional()
-    .refine((phone) => !phone || phoneRegex.test(phone), {
-      message: "Numéro de téléphone invalide (format français attendu)",
-    }),
+  phoneNumber: phoneSchema, // normalized if present
 
   description: z
     .string()
-    .optional()
-    .refine((desc) => !desc || desc.length >= 10, {
-      message: "La description doit contenir au moins 10 caractères",
-    })
-    .refine((desc) => !desc || desc.length <= 1000, {
-      message: "La description ne peut pas dépasser 1000 caractères",
-    }),
+    .trim()
+    .min(10, "La description doit contenir au moins 10 caractères")
+    .max(1000, "La description ne peut pas dépasser 1000 caractères")
+    .optional(),
 
-  website: urlSchema.optional(),
+  website: websiteSchema, // normalized to https://...
 
-  // Sélections avec validation des valeurs autorisées
   product_type: z
     .array(z.enum(PRODUCT_TYPES))
     .min(1, "Sélectionnez au moins un type de produit")
@@ -143,63 +186,66 @@ const baseEditListingSchema = z.object({
     .min(1, "Sélectionnez au moins un mode d'achat")
     .max(5, "Maximum 5 modes d'achat"),
 
-  // Optionnels avec validation
-  certifications: z
-    .array(z.enum(CERTIFICATIONS))
-    .max(5, "Maximum 5 certifications")
-    .default([]),
+  certifications: z.array(z.enum(CERTIFICATIONS)).max(5).default([]),
+  availability: z.array(z.enum(AVAILABILITY_OPTIONS)).max(5).default([]),
+  additional_services: z.array(z.enum(ADDITIONAL_SERVICES)).max(5).default([]),
 
-  availability: z
-    .array(z.enum(AVAILABILITY_OPTIONS))
-    .max(5, "Maximum 5 options de disponibilité")
-    .default([]),
-
-  additional_services: z
-    .array(z.enum(ADDITIONAL_SERVICES))
-    .max(5, "Maximum 5 services additionnels")
-    .default([]),
-
-  // Produits spécifiques - validation basée sur les noms dans vos JSON
   products: z
-    .array(z.string().min(1, "Nom de produit invalide"))
+    .array(z.string().trim().min(1, "Nom de produit invalide"))
     .max(50, "Maximum 50 produits sélectionnés")
     .default([]),
 
-  // Images avec validation stricte
   images: z
-    .array(imageFileSchema)
+    .array(imageItemSchema)
     .max(3, "Maximum 3 images autorisées")
-    .default([])
-    .refine(
-      (files) => {
-        // Vérifier que les noms de fichiers sont uniques
-        const names = files.map((f) => f.name);
-        return names.length === new Set(names).size;
-      },
-      {
-        message: "Les noms de fichiers doivent être uniques",
-      }
-    ),
+    .default([]),
 });
 
-// Schéma complet avec validation croisée
-export const editListingSchema = baseEditListingSchema.refine(
-  (data) => {
-    // Validation croisée : si des produits sont sélectionnés,
-    // ils doivent correspondre aux types de produits choisis
+/* -------------------------------------------
+ * Cross-field checks
+ * -----------------------------------------*/
+export const editListingSchema = baseEditListingSchema.superRefine(
+  (data, ctx) => {
+    // products => require product_type (extra safety)
     if (data.products.length > 0 && data.product_type.length === 0) {
-      return false;
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "Vous devez sélectionner des types de produits avant de choisir des produits spécifiques",
+        path: ["product_type"],
+      });
     }
-    return true;
-  },
-  {
-    message:
-      "Vous devez sélectionner des types de produits avant de choisir des produits spécifiques",
-    path: ["product_type"],
+
+    // images: total size
+    const files = (data.images as unknown[]).filter(
+      (i) => typeof i !== "string"
+    ) as File[];
+    const totalSize = files.reduce((acc, f) => acc + f.size, 0);
+    if (totalSize > MAX_TOTAL_SIZE) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "La taille totale des images ne doit pas dépasser 15MB",
+        path: ["images"],
+      });
+    }
+
+    // images: unique filenames
+    if (files.length > 0) {
+      const names = files.map((f) => f.name);
+      if (names.length !== new Set(names).size) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Les noms de fichiers doivent être uniques",
+          path: ["images"],
+        });
+      }
+    }
   }
 );
 
-// Schéma pour la validation partielle (brouillon)
+/* -------------------------------------------
+ * Draft schema
+ * -----------------------------------------*/
 export const editListingDraftSchema = baseEditListingSchema
   .partial({
     product_type: true,
@@ -207,21 +253,12 @@ export const editListingDraftSchema = baseEditListingSchema
     purchase_mode: true,
   })
   .extend({
-    // Seuls le nom et l'email restent obligatoires pour un brouillon
-    name: z.string().min(1, "Le nom de la ferme est requis"),
-    email: z.string().email("Adresse email invalide"),
+    name: z.string().trim().min(1, "Le nom de la ferme est requis"),
+    email: z.string().trim().email("Adresse email invalide"),
   });
 
-// Types exportés
+/* -------------------------------------------
+ * Types
+ * -----------------------------------------*/
 export type EditListingSchemaType = z.infer<typeof editListingSchema>;
 export type EditListingDraftSchemaType = z.infer<typeof editListingDraftSchema>;
-
-// Constantes exportées pour utilisation dans les composants
-export {
-  PRODUCT_TYPES,
-  PRODUCTION_METHODS,
-  PURCHASE_MODES,
-  CERTIFICATIONS,
-  AVAILABILITY_OPTIONS,
-  ADDITIONAL_SERVICES,
-};

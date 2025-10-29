@@ -35,13 +35,13 @@ import { Card } from "@/components/ui/card";
 
 // Project stores
 import {
-  useMapboxState,
-  useMapboxActions,
+  useMapState,
+  useMapActions,
   useListingsState,
   useListingsActions,
   useInteractionsActions,
   useFiltersState,
-} from "@/lib/store/mapboxListingsStore";
+} from "@/lib/store/mapListingsStore";
 
 import { useUser } from "@clerk/nextjs";
 import { useUserFavorites, useUserActions } from "@/lib/store/userStore";
@@ -297,9 +297,8 @@ const FarmCard = memo(function FarmCard({
 
 export default function MobileListingMapView() {
   // stores
-  const { mapInstance } = useMapboxState();
-  const { setCenter: setMapCenter, setZoom: setMapZoom } =
-    (useMapboxActions && useMapboxActions()) || {};
+  const { mapInstance } = useMapState();
+  const { setCoordinates, setMapZoom } = useMapActions();
   const filters = useFiltersState();
   const { visible, isLoading, hasMore, page } = useListingsState();
   const { fetchListings, resetListings } = useListingsActions();

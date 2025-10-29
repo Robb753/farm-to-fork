@@ -1,6 +1,6 @@
 "use client";
 
-import { MapPin, Clock, Award, Heart, Star, Users, Leaf } from "lucide-react";
+import { MapPin, Award, Heart, Star, Leaf } from "lucide-react";
 import React, {
   useState,
   useEffect,
@@ -16,11 +16,11 @@ import { toast } from "sonner";
 import {
   useListingsState,
   useListingsActions,
-  useMapboxState,
-  useMapboxActions,
+  useMapState,
+  useMapActions,
   useInteractionsState,
   useInteractionsActions,
-} from "@/lib/store/mapboxListingsStore";
+} from "@/lib/store/mapListingsStore";
 import { useUserFavorites, useUserActions } from "@/lib/store/userStore";
 
 import { useListingsWithImages } from "@/app/hooks/useListingsWithImages";
@@ -75,37 +75,6 @@ const EmptyState = ({ onRetry }) => (
       Élargissez votre recherche ou explorez d'autres zones pour découvrir des
       fermes locales exceptionnelles.
     </p>
-
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 w-full max-w-md">
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-            <MapPin className="h-4 w-4 text-green-600" />
-          </div>
-          <span className="font-medium text-gray-800">Déplacez la carte</span>
-        </div>
-        <p className="text-sm text-gray-600">Explorez différentes zones</p>
-      </div>
-
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-            <svg
-              className="h-4 w-4 text-blue-600"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="8" x2="12" y2="16" />
-              <line x1="8" y1="12" x2="16" y2="12" />
-            </svg>
-          </div>
-          <span className="font-medium text-gray-800">Zoom arrière</span>
-        </div>
-        <p className="text-sm text-gray-600">Voir une zone plus large</p>
-      </div>
-    </div>
   </div>
 );
 
@@ -149,21 +118,16 @@ const ListItem = React.memo(
     onToggleFavorite,
     onShowOnMap,
   }) => {
-    const [imageLoaded, setImageLoaded] = useState(false);
     const [imageError, setImageError] = useState(false);
 
     const getImageUrl = useCallback(() => {
-      // priorité: relations Supabase listingImages
       if (Array.isArray(item.listingImages) && item.listingImages.length > 0) {
         return item.listingImages[0]?.url || "/default-farm-image.jpg";
       }
       if (item.listingImages?.url) return item.listingImages.url;
-
-      // fallback éventuels
       if (item.image_url) return item.image_url;
       if (Array.isArray(item.images) && item.images.length > 0)
         return item.images[0];
-
       return "/default-farm-image.jpg";
     }, [item]);
 
@@ -200,15 +164,13 @@ const ListItem = React.memo(
           {/* Image */}
           <div className="relative w-32 sm:w-40 md:w-48 h-32 sm:h-36 flex-shrink-0">
             {!imageError ? (
-              <img
+              <OptimizedImage
                 src={imageUrl}
                 alt={`${item.name} - Ferme locale`}
-                className={`w-full h-full object-cover transition-all duration-500 group-hover:scale-105 ${
-                  imageLoaded ? "opacity-100" : "opacity-0"
-                }`}
-                onLoad={() => setImageLoaded(true)}
+                fill
+                sizes="(max-width: 640px) 40vw, 192px"
+                className="object-cover transition-all duration-500 group-hover:scale-105"
                 onError={() => setImageError(true)}
-                loading="lazy"
               />
             ) : (
               <div className="w-full h-full bg-gray-200 flex items-center justify-center">
@@ -223,7 +185,7 @@ const ListItem = React.memo(
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={2}
-                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2z"
                     />
                   </svg>
                   <span className="text-xs">Image non disponible</span>
@@ -271,6 +233,7 @@ const ListItem = React.memo(
                       className="bg-green-50 hover:bg-green-100 p-1.5 rounded-full shadow-sm hover:shadow-md transition-all duration-200 border border-green-200"
                       aria-label="Voir sur la carte"
                       title="Voir sur la carte"
+                      type="button"
                     >
                       <MapPin className="h-4 w-4 text-green-600" />
                     </button>
@@ -282,6 +245,7 @@ const ListItem = React.memo(
                     aria-label={
                       isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"
                     }
+                    type="button"
                   >
                     <Heart
                       className={`h-4 w-4 transition-all duration-200 ${
@@ -354,21 +318,24 @@ const ListItem = React.memo(
     );
   }
 );
-
 ListItem.displayName = "ListItem";
 
 /* ------------------------------
    Main component
+   → ajoute “Load more”
 ------------------------------ */
-export default function Listing() {
+export default function Listing({
+  onLoadMore, // () => void
+  hasMore = false,
+  isLoading = false,
+}) {
   // Zustand state
   const { visible: visibleListings = [] } = useListingsState();
   const { setAllListings } = useListingsActions();
-  const { bounds: mapBounds } = useMapboxState();
-  const { setCoordinates, setMapZoom } = useMapboxActions();
+  const { bounds: mapBounds } = useMapState();
 
   const { hoveredListingId } = useInteractionsState();
-  const { setHoveredListingId, setOpenInfoWindowId } = useInteractionsActions();
+  const { setHoveredListingId } = useInteractionsActions();
 
   // Favoris
   const favorites = useUserFavorites();
@@ -394,7 +361,7 @@ export default function Listing() {
     useListingsWithImages(visibleIds);
 
   // ---------------------------
-  // FETCH SUPABASE PAR BOUNDS
+  // FETCH SUPABASE PAR BOUNDS (initial + on bounds change)
   // ---------------------------
   const [isFetching, setIsFetching] = useState(false);
 
@@ -406,7 +373,6 @@ export default function Listing() {
     (async () => {
       try {
         setIsFetching(true);
-        // France approximative
         const south = 41.0,
           north = 51.5,
           west = -5.5,
@@ -484,28 +450,32 @@ export default function Listing() {
     };
   }, [mapBounds, setAllListings]);
 
-  // ⚠️ Supprime la boucle précédente: on ne pousse plus "listings" (images) dans allListings
-  // useEffect(() => {
-  //   if (listings.length > 0 && setAllListings) {
-  //     setAllListings(listings);
-  //   }
-  // }, [listings, setAllListings]);
-
-  // Loader combiné (fetch + images) avec petit délai pour éviter le clignotement
+  // Loader combiné (fetch + images) avec délai anti-clignotement
   const [delayedLoading, setDelayedLoading] = useState(true);
   const loadingTimerRef = useRef(null);
 
-  const effectiveLoading = isFetching || isLoadingImages;
+  const effectiveLoading = isFetching || isLoadingImages || isLoading;
 
   useEffect(() => {
+    if (loadingTimerRef.current) {
+      clearTimeout(loadingTimerRef.current);
+      loadingTimerRef.current = null;
+    }
+
     if (effectiveLoading) {
       setDelayedLoading(true);
-      if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
     } else {
-      loadingTimerRef.current = setTimeout(() => setDelayedLoading(false), 600);
+      loadingTimerRef.current = setTimeout(() => {
+        if (!loadingTimerRef.current) return;
+        setDelayedLoading(false);
+      }, 600);
     }
+
     return () => {
-      if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
+      if (loadingTimerRef.current) {
+        clearTimeout(loadingTimerRef.current);
+        loadingTimerRef.current = null;
+      }
     };
   }, [effectiveLoading]);
 
@@ -516,7 +486,7 @@ export default function Listing() {
         toast("Connectez-vous pour gérer vos favoris", {
           action: {
             label: "Se connecter",
-            onClick: () => openSignUp({ redirectUrl: "/signup" }),
+            onClick: () => openSignUp({ redirectUrl: "/sign-up" }),
           },
         });
         return;
@@ -536,11 +506,17 @@ export default function Listing() {
     [setHoveredListingId]
   );
 
+  const { setOpenInfoWindowId } = useInteractionsActions();
+  const { setCoordinates, setMapZoom } = useMapActions();
+
   const handleShowOnMap = useCallback(
     (listing) => {
-      if (!listing?.lat || !listing?.lng) return;
+      if (!listing?.lat || !listing?.lng) {
+        toast.info("Coordonnées manquantes pour cette ferme");
+        return;
+      }
       setOpenInfoWindowId?.(listing.id);
-      setCoordinates?.([listing.lng, listing.lat]);
+      setCoordinates?.({ lng: listing.lng, lat: listing.lat });
       setMapZoom?.(14);
       window.scrollTo({ top: 0, behavior: "smooth" });
       toast.success(`Centrage sur ${listing.name}`);
@@ -549,20 +525,45 @@ export default function Listing() {
   );
 
   const handleRetry = useCallback(() => {
-    // simple retry: on relance la requête en redemandant la même zone
     if (!mapBounds) {
-      // forcera l'effet "France"
       window.location.reload();
     } else {
       const [[west, south], [east, north]] = mapBounds;
       toast.info(
-        `Nouvel essai (${south.toFixed(2)}–${north.toFixed(2)} ; ${west.toFixed(
+        `Nouvel essai (${south.toFixed(2)}–${north.toFixed(
           2
-        )}–${east.toFixed(2)})`
+        )} ; ${west.toFixed(2)}–${east.toFixed(2)})`
       );
-      // L'effet bounds se relancera dès que la carte bouge ; ici on peut faire un léger pan/zoom si besoin.
     }
   }, [mapBounds]);
+
+  // ------------------------------
+  // Load more (auto + bouton)
+  // ------------------------------
+  const loadMoreRef = useRef(null);
+
+  // Auto-load au scroll (IntersectionObserver)
+  useEffect(() => {
+    if (!hasMore || !onLoadMore) return;
+    const el = loadMoreRef.current;
+    if (!el) return;
+
+    let locked = false;
+    const io = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry.isIntersecting && !locked && !isLoading) {
+          locked = true;
+          onLoadMore();
+          setTimeout(() => (locked = false), 800);
+        }
+      },
+      { rootMargin: "200px 0px" }
+    );
+
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasMore, onLoadMore, isLoading]);
 
   // Etat vide (pas d’IDs visibles ET pas en cours de chargement)
   if (visibleIds.length === 0 && !effectiveLoading) {
@@ -596,6 +597,22 @@ export default function Listing() {
               />
             ))
           : !delayedLoading && <EmptyState onRetry={handleRetry} />}
+
+        {/* LOAD MORE */}
+        {hasMore && (
+          <div className="mt-2 flex flex-col items-center gap-3">
+            <button
+              type="button"
+              onClick={onLoadMore}
+              disabled={isLoading}
+              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+            >
+              {isLoading ? "Chargement..." : "Charger plus"}
+            </button>
+            {/* Sentinelle pour auto-load */}
+            <div ref={loadMoreRef} className="h-8 w-8 opacity-0" />
+          </div>
+        )}
       </div>
     </div>
   );

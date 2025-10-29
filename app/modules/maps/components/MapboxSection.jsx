@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import {
-  useMapboxState,
-  useMapboxActions,
+  useMapState, // ✅ Import corrigé
+  useMapActions, // ✅ Import corrigé
   MAPBOX_CONFIG,
-} from "@/lib/store/mapboxListingsStore";
+} from "@/lib/store/mapListingsStore";
 import MapboxMarkers from "./MapboxMarkers";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || "";
@@ -20,29 +20,29 @@ const isValidLngLat = (v) =>
   isFiniteNumber(v[1]) &&
   !(v[0] === 0 && v[1] === 0); // évite le (0,0) Afrique
 
-export default function MapboxSection({ isMapExpanded = false }) {
+export default function MapboxSection({
+  isMapExpanded = false,
+  isMobile = false,
+}) {
   const wrapperRef = useRef(null);
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const userInteractingRef = useRef(false);
 
-  const { coordinates, zoom, style } = useMapboxState();
-  const {
-    setMapInstance,
-    setMapBounds,
-    setMapLoaded,
-    setMapLoading,
-    setMapZoom,
-    setMapPitch,
-    setMapBearing,
-    setCoordinates, // ⚠️ on l’utilise pour pousser le fallback France si nécessaire
-  } = useMapboxActions();
+  // ✅ États locaux pour gérer le loading et autres propriétés non présentes dans le store
+  const [isMapLoaded, setIsMapLoaded] = useState(false);
+  const [isMapLoading, setIsMapLoading] = useState(false);
+
+  // ✅ Hooks corrigés
+  const { coordinates, mapZoom, mapInstance } = useMapState();
+  const { setMapInstance, setMapBounds, setMapZoom, setCoordinates } =
+    useMapActions();
 
   // ---- 1️⃣ Initialisation (une seule fois) ----
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
-    setMapLoading(true);
+    setIsMapLoading(true);
 
     // Purge défensive
     try {
@@ -59,18 +59,18 @@ export default function MapboxSection({ isMapExpanded = false }) {
       ? coordinates
       : MAPBOX_CONFIG.center; // [2.2137, 46.2276]
     const initZoom =
-      typeof zoom === "number" && zoom >= MAPBOX_CONFIG.minZoom
-        ? zoom
-        : MAPBOX_CONFIG.zoom; // 5.6
+      typeof mapZoom === "number" && mapZoom >= MAPBOX_CONFIG.minZoom
+        ? mapZoom
+        : MAPBOX_CONFIG.zoom; // 4.6
 
     const map = new mapboxgl.Map({
       container: containerRef.current,
-      style: style || MAPBOX_CONFIG.style,
+      style: MAPBOX_CONFIG.style,
       center: initCenter,
       zoom: initZoom,
       minZoom: MAPBOX_CONFIG.minZoom,
       maxZoom: MAPBOX_CONFIG.maxZoom,
-      cooperativeGestures: true,
+      cooperativeGestures: !isMobile, // ✅ Désactive les gestes coopératifs sur mobile
       attributionControl: false,
       pitch: 0,
       bearing: 0,
@@ -79,15 +79,17 @@ export default function MapboxSection({ isMapExpanded = false }) {
 
     mapRef.current = map;
 
-    // Contrôles
-    map.addControl(
-      new mapboxgl.NavigationControl({ visualizePitch: true }),
-      "bottom-right"
-    );
-    map.addControl(
-      new mapboxgl.ScaleControl({ maxWidth: 80, unit: "metric" }),
-      "bottom-left"
-    );
+    // Contrôles (pas sur mobile pour éviter l'encombrement)
+    if (!isMobile) {
+      map.addControl(
+        new mapboxgl.NavigationControl({ visualizePitch: true }),
+        "bottom-right"
+      );
+      map.addControl(
+        new mapboxgl.ScaleControl({ maxWidth: 80, unit: "metric" }),
+        "bottom-left"
+      );
+    }
 
     const enforceFlatView = () => {
       try {
@@ -95,8 +97,6 @@ export default function MapboxSection({ isMapExpanded = false }) {
           map.setProjection("mercator");
         map.setPitch(0);
         map.setBearing(0);
-        setMapPitch(0);
-        setMapBearing(0);
       } catch {}
     };
 
@@ -104,22 +104,25 @@ export default function MapboxSection({ isMapExpanded = false }) {
 
     map.on("load", () => {
       setMapInstance(map);
-      setMapLoaded(true);
-      setMapLoading(false);
+      setIsMapLoaded(true);
+      setIsMapLoading(false);
       enforceFlatView();
 
       // Si le store était invalide (ex: [0,0] ou undefined), on pousse le fallback France
       if (!isValidLngLat(coordinates)) {
-        setCoordinates(MAPBOX_CONFIG.center);
+        setCoordinates({
+          lat: MAPBOX_CONFIG.center[1],
+          lng: MAPBOX_CONFIG.center[0],
+        });
         setMapZoom(MAPBOX_CONFIG.zoom);
       }
 
       // Bounds init → store
       const b = map.getBounds();
-      setMapBounds([
-        [b.getWest(), b.getSouth()],
-        [b.getEast(), b.getNorth()],
-      ]);
+      setMapBounds({
+        sw: { lat: b.getSouth(), lng: b.getWest() },
+        ne: { lat: b.getNorth(), lng: b.getEast() },
+      });
     });
 
     const onMoveStart = (e) => {
@@ -128,10 +131,10 @@ export default function MapboxSection({ isMapExpanded = false }) {
 
     const onMoveEnd = () => {
       const b = map.getBounds();
-      setMapBounds([
-        [b.getWest(), b.getSouth()],
-        [b.getEast(), b.getNorth()],
-      ]);
+      setMapBounds({
+        sw: { lat: b.getSouth(), lng: b.getWest() },
+        ne: { lat: b.getNorth(), lng: b.getEast() },
+      });
       setMapZoom(map.getZoom());
       // reset flag après un tick
       setTimeout(() => {
@@ -159,8 +162,8 @@ export default function MapboxSection({ isMapExpanded = false }) {
       } catch {
         if (containerRef.current) containerRef.current.innerHTML = "";
       }
-      setMapLoaded(false);
-      setMapLoading(false);
+      setIsMapLoaded(false);
+      setIsMapLoading(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -174,12 +177,13 @@ export default function MapboxSection({ isMapExpanded = false }) {
     if (userInteractingRef.current) return;
 
     // Ignore toute coordonnée invalide (évite le saut vers Afrique)
-    if (!isValidLngLat(coordinates)) return;
+    if (!coordinates || !isValidLngLat([coordinates.lng, coordinates.lat]))
+      return;
 
-    const [lng, lat] = coordinates;
+    const { lng, lat } = coordinates;
     const newZoom =
-      typeof zoom === "number" && zoom >= MAPBOX_CONFIG.minZoom
-        ? zoom
+      typeof mapZoom === "number" && mapZoom >= MAPBOX_CONFIG.minZoom
+        ? mapZoom
         : MAPBOX_CONFIG.zoom;
 
     const curCenter = map.getCenter();
@@ -199,15 +203,60 @@ export default function MapboxSection({ isMapExpanded = false }) {
       duration: 500,
       essential: true,
     });
-  }, [coordinates, zoom]);
+  }, [coordinates, mapZoom]);
 
   // ---- 3️⃣ Resize ----
   useEffect(() => {
     const map = mapRef.current;
+    if (!map || !isMapLoaded) return;
+
+    // Force resize après changement de layout avec délai plus long
+    const t1 = setTimeout(() => {
+      try {
+        map.resize();
+        console.log("Map resized after layout change");
+      } catch (e) {
+        console.warn("Map resize error:", e);
+      }
+    }, 100);
+
+    const t2 = setTimeout(() => {
+      try {
+        map.resize();
+      } catch (e) {
+        console.warn("Map resize error 2:", e);
+      }
+    }, 500);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [isMapExpanded, isMapLoaded]);
+
+  useEffect(() => {
+    const map = mapRef.current;
     if (!map) return;
-    const t = setTimeout(() => map.resize(), 350);
-    return () => clearTimeout(t);
-  }, [isMapExpanded]);
+
+    const onResize = () => {
+      try {
+        map.resize();
+      } catch (e) {
+        console.warn("Window resize error:", e);
+      }
+    };
+
+    window.addEventListener("resize", onResize);
+
+    // Force resize initial après le chargement
+    setTimeout(() => {
+      try {
+        map.resize();
+      } catch (e) {}
+    }, 1000);
+
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -216,6 +265,18 @@ export default function MapboxSection({ isMapExpanded = false }) {
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
+
+  // ✅ Indicateur de chargement
+  if (isMapLoading) {
+    return (
+      <div className="h-full w-full flex items-center justify-center bg-gray-50">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-sm text-gray-600">Chargement de la carte...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div ref={wrapperRef} className="h-full w-full relative">
@@ -226,8 +287,8 @@ export default function MapboxSection({ isMapExpanded = false }) {
         style={{ contain: "layout paint size" }}
       />
 
-      {/* Markers + popups contrôlés */}
-      <MapboxMarkers />
+      {/* Markers + popups contrôlés - seulement si la carte est chargée */}
+      {isMapLoaded && <MapboxMarkers />}
     </div>
   );
 }

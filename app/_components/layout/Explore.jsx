@@ -7,10 +7,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAllListingsWithImages } from "@/app/hooks/useAllListingsWithImages";
 import {
   useListingsActions,
-  useMapboxActions,
-  useMapboxState,
+  useMapActions,
+  useMapState,
   MAPBOX_CONFIG,
-} from "@/lib/store/mapboxListingsStore";
+} from "@/lib/store/mapListingsStore";
 
 const ListingMapView = dynamic(
   () => import("../../modules/listings/components/ListingMapView"),
@@ -30,10 +30,11 @@ export default function Explore() {
 
   const {
     coordinates: curCoords,
-    zoom: curZoom,
+    mapZoom: curZoom,
     mapInstance,
-  } = useMapboxState();
-  const { setCoordinates, setMapZoom } = useMapboxActions();
+  } = useMapState();
+
+  const { setCoordinates, setMapZoom } = useMapActions();
 
   // 0) Normalise l’URL si elle n’a pas lat/lng/zoom (fallback Europe)
   useEffect(() => {

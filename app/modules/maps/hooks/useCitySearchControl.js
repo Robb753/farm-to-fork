@@ -3,19 +3,18 @@
 import { useCallback } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import {
-  useMapboxState,
-  useMapboxActions,
+  useMapState, // ✅ Import corrigé
+  useMapActions, // ✅ Import corrigé
   useListingsActions,
-} from "@/lib/store/mapboxListingsStore";
+} from "@/lib/store/mapListingsStore";
 
 export default function useCitySearchControl({ setSearchCity }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const { mapInstance } = useMapboxState();
-  const { setCenter: setMapCenter, setZoom: setMapZoom } =
-    (useMapboxActions && useMapboxActions()) || {};
+  const { mapInstance } = useMapState(); // ✅ Hook corrigé
+  const { setCoordinates, setMapZoom } = useMapActions(); // ✅ Actions corrigées
   const { fetchListings } = useListingsActions();
 
   const easeToCenter = useCallback(
@@ -35,10 +34,14 @@ export default function useCitySearchControl({ setSearchCity }) {
   const getCurrentBBox = useCallback((map) => {
     if (!map) return null;
     const b = map.getBounds();
-    return [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()];
+    // ✅ Format cohérent avec le store
+    return {
+      sw: { lat: b.getSouth(), lng: b.getWest() },
+      ne: { lat: b.getNorth(), lng: b.getEast() },
+    };
   }, []);
 
-  /** Construit l’URL cible et navigue :
+  /** Construit l'URL cible et navigue :
    * - depuis la landing ("/") → push("/explore?...")
    * - depuis /explore → replace("/explore?...")
    */
@@ -50,8 +53,17 @@ export default function useCitySearchControl({ setSearchCity }) {
       if (Number.isFinite(lng)) params.set("lng", lng.toFixed(6));
       if (Number.isFinite(zoom)) params.set("zoom", String(zoom));
       if (cityLabel) params.set("city", cityLabel);
+
+      // ✅ Gestion flexible des formats de bbox
       if (Array.isArray(bbox) && bbox.length === 4) {
         params.set("bbox", bbox.map((n) => Number(n).toFixed(6)).join(","));
+      } else if (bbox && bbox.sw && bbox.ne) {
+        // Format objet vers tableau [west, south, east, north]
+        const bboxArray = [bbox.sw.lng, bbox.sw.lat, bbox.ne.lng, bbox.ne.lat];
+        params.set(
+          "bbox",
+          bboxArray.map((n) => Number(n).toFixed(6)).join(",")
+        );
       }
 
       const target = `/explore?${params.toString()}`;
@@ -97,7 +109,9 @@ export default function useCitySearchControl({ setSearchCity }) {
 
       // 3) Mettre à jour la carte (si elle existe déjà)
       try {
-        if (setMapCenter && hasCoords) setMapCenter({ lat, lng });
+        if (setCoordinates && hasCoords) {
+          setCoordinates({ lat, lng }); // ✅ Format objet
+        }
       } catch {}
       try {
         if (setMapZoom && Number.isFinite(zoom)) setMapZoom(zoom);
@@ -129,7 +143,7 @@ export default function useCitySearchControl({ setSearchCity }) {
       easeToCenter,
       getCurrentBBox,
       fetchListings,
-      setMapCenter,
+      setCoordinates, // ✅ Nom corrigé
       setMapZoom,
       navigateWithParams,
       setSearchCity,

@@ -1,59 +1,103 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 
+/**
+ * 🖼️ OptimizedImage – Wrapper Next.js amélioré
+ */
 const OptimizedImage = ({
   src,
-  alt,
+  alt = "image",
+  // Dimensionnement
+  fill, // si true => wrapper relatif + <Image fill />
   width,
   height,
-  fill,
   sizes,
+  // Rendu & perf
   priority = false,
-  className = "",
-  fallbackSrc = "/placeholder.png",
-  objectFit = "cover",
   quality = 75,
+  objectFit = "cover",
+  // UX état
+  className = "",
+  showSkeleton = true,
+  // placeholder/blur
   placeholder = "blur",
   blurDataURL,
+  // fallback
+  fallbackSrc = "/placeholder.png",
+  // callbacks
   onError,
+  onLoad,
+  // wrapper custom
+  wrapperClassName = "",
   ...props
 }) => {
-  const [imgSrc, setImgSrc] = useState(src);
+  const [imgSrc, setImgSrc] = useState(src || fallbackSrc);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
 
-  const defaultBlurDataURL =
-    "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkrHB0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q==";
+  // Blur par défaut si aucun blurDataURL fourni
+  const defaultBlurDataURL = useMemo(
+    () =>
+      "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkrHB0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q==",
+    []
+  );
 
-  const handleLoad = () => setIsLoading(false);
+  const handleLoad = (e) => {
+    setIsLoading(false);
+    onLoad?.(e);
+  };
 
   const handleError = () => {
-    setHasError(true);
+    if (!hasError) {
+      setHasError(true);
+      setImgSrc(fallbackSrc);
+    }
     setIsLoading(false);
-    setImgSrc(fallbackSrc);
     onError?.();
   };
 
-  const imageProps = {
-    src: imgSrc,
+  const resolvedPlaceholder =
+    blurDataURL || placeholder === "blur" ? "blur" : "empty";
+
+  const baseClass =
+    `${className} ` +
+    `${isLoading ? "opacity-0" : "opacity-100"} transition-opacity duration-300`;
+
+  // Props sûrs pour Next/Image
+  const imgProps = {
+    src: imgSrc || fallbackSrc,
     alt,
     quality,
-    className: `${className} ${isLoading ? "opacity-0" : "opacity-100"} transition-opacity duration-300`,
     onLoad: handleLoad,
     onError: handleError,
-    placeholder: blurDataURL || placeholder === "blur" ? "blur" : "empty",
+    placeholder: resolvedPlaceholder,
     blurDataURL: blurDataURL || defaultBlurDataURL,
     sizes: fill ? (sizes ?? "100vw") : sizes,
+    className: baseClass,
+    priority,
+    loading: priority ? undefined : "lazy",
+    style: { objectFit },
     ...props,
   };
 
+  if (!src && !fallbackSrc) {
+    console.warn("⚠️ OptimizedImage: aucun src ou fallbackSrc défini !");
+  }
+
+  // Mode fill
   if (fill) {
+    // retirer width/height si présents
+    const { width, height, ...safeProps } = imgProps;
+
     return (
-      <div className="relative overflow-hidden">
-        <Image {...imageProps} fill style={{ objectFit }} />
-        {isLoading && (
+      // ✅ donne une taille explicite au parent pour éviter le warning
+      <div
+        className={`relative w-full h-full overflow-hidden ${wrapperClassName}`}
+      >
+        <Image {...safeProps} fill />
+        {showSkeleton && isLoading && (
           <div className="absolute inset-0 bg-gray-200 animate-pulse" />
         )}
         {hasError && (
@@ -65,25 +109,23 @@ const OptimizedImage = ({
     );
   }
 
+  // Mode width/height
   return (
-    <div className="relative">
-      <Image
-        {...imageProps}
-        width={width}
-        height={height}
-        style={{ objectFit }}
-        priority={priority}
-      />
-      {isLoading && (
+    <div
+      className={`relative inline-block ${wrapperClassName}`}
+      style={width && height ? { width, height } : undefined}
+    >
+      <Image {...imgProps} width={width} height={height} />
+      {showSkeleton && isLoading && (
         <div
           className="absolute inset-0 bg-gray-200 animate-pulse"
-          style={{ width, height }}
+          style={width && height ? { width, height } : undefined}
         />
       )}
       {hasError && (
         <div
           className="absolute inset-0 flex items-center justify-center bg-gray-100"
-          style={{ width, height }}
+          style={width && height ? { width, height } : undefined}
         >
           <span className="text-gray-400 text-xs">Erreur</span>
         </div>
@@ -92,7 +134,9 @@ const OptimizedImage = ({
   );
 };
 
-// ✅ Composants spécialisés
+export default OptimizedImage;
+
+/* ---------------- Variantes ---------------- */
 
 export const AvatarImage = ({
   src,
@@ -109,6 +153,7 @@ export const AvatarImage = ({
     className={`rounded-full ${className}`}
     sizes="(max-width: 768px) 40px, 60px"
     quality={90}
+    showSkeleton={false}
     {...props}
   />
 );
@@ -163,5 +208,3 @@ export const ThumbnailImage = ({
     {...props}
   />
 );
-
-export default OptimizedImage;

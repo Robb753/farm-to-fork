@@ -8,16 +8,17 @@ import React, {
   useMemo,
 } from "react";
 import dynamic from "next/dynamic";
-import { MapPin, List, Maximize2, Minimize2, RefreshCw } from "@/utils/icons";
+import { MapPin, List, Maximize2, Minimize2, RefreshCw } from "lucide-react"; // ✅ Import corrigé
 import { toast } from "sonner";
 import FilterSection from "@/app/_components/layout/FilterSection";
 import Listing from "./Listing";
 import GlobalLoadingOverlay from "@/app/_components/ui/GlobalLoadingOverlay";
 import {
-  useMapboxState,
+  useMapState,
   useListingsState,
-  useListingsActions,
-} from "@/lib/store/mapboxListingsStore";
+  useMapActions,
+  useListingsActions, // ✅ Import ajouté
+} from "@/lib/store/mapListingsStore";
 
 // --- Version mobile (lazy) : pas de loader → évite un spinner en plus
 const MobileListingMapView = dynamic(() => import("./MobileListingMapView"), {
@@ -44,9 +45,9 @@ const useIsMobile = () => {
 };
 
 const DesktopListingMapView = () => {
-  const { mapInstance } = useMapboxState();
+  const { mapInstance } = useMapState();
   const { visible: visibleListings, isLoading, hasMore } = useListingsState();
-  const { fetchListings } = useListingsActions();
+  const { fetchListings } = useListingsActions(); // ✅ Hook ajouté
 
   const [isMapExpanded, setIsMapExpanded] = useState(false);
   const [page, setPage] = useState(1);
@@ -65,7 +66,7 @@ const DesktopListingMapView = () => {
     }
   }, []);
 
-  // --- Écoute Mapbox (on n’active que si l’événement vient d’un user)
+  // --- Écoute Mapbox (on n'active que si l'événement vient d'un user)
   useEffect(() => {
     if (!mapInstance) return;
 
@@ -247,7 +248,7 @@ const DesktopListingMapView = () => {
         >
           <MapboxSection isMapExpanded={isMapExpanded} />
 
-          {/* Contrôle d’agrandissement */}
+          {/* Contrôle d'agrandissement */}
           <div className="absolute right-4 top-4 z-20 flex flex-col gap-2">
             <button
               onClick={toggleMapSize}

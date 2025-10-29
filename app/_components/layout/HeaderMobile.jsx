@@ -135,11 +135,11 @@ export default function HeaderMobile() {
           <Link href="/" className="flex items-center gap-2 pl-1 shrink-0">
             <Image
               src="/logof2f.svg"
-              alt="Farm to Fork"
-              width={28}
-              height={28}
+              alt="Farm To Fork"
+              width={120} // ratio du logo (exemple)
+              height={32}
               priority
-              className="h-7 w-auto"
+              className="h-8 w-auto" // <- on fixe la hauteur et on laisse la largeur auto
             />
             <span className="hidden xs:block text-base font-bold text-green-700">
               Farm To Fork

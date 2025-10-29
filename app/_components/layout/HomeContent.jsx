@@ -28,8 +28,6 @@ function HomeContent() {
     <div>
       {/* Hero Section avec barre de recherche */}
       <div className="relative h-[420px] md:h-[540px] rounded-xl">
-        {/* Si tu as déjà un <Toaster /> global, supprime cette ligne */}
-        <Toaster richColors />
 
         {/* Vidéo en fond */}
         <video

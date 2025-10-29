@@ -1,4 +1,3 @@
-// lib/store/farm2forkStore.ts
 import { create } from "zustand";
 import { persist, subscribeWithSelector, devtools } from "zustand/middleware";
 import { supabase } from "@/utils/supabase/client";

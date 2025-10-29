@@ -1,5 +1,4 @@
-"use client";
-
+// app/events/page.jsx
 import Link from "next/link";
 import eventsData from "@/app/_data/eventsData.json";
 
@@ -17,15 +16,10 @@ export default function EventsPage() {
             className="relative flex flex-col justify-between bg-gradient-to-br from-green-50 to-white p-6 rounded-3xl shadow-md hover:shadow-lg transition-all duration-300 h-80"
           >
             <div>
-              {/* Titre */}
               <h2 className="text-2xl font-semibold text-gray-900 mb-3">
                 {event.title}
               </h2>
-
-              {/* Description */}
               <p className="text-gray-700 text-sm mb-4">{event.description}</p>
-
-              {/* Lieu et Date sur 2 lignes */}
               <div className="text-gray-500 text-sm">
                 📍 {event.location}
                 <br />
@@ -33,12 +27,9 @@ export default function EventsPage() {
               </div>
             </div>
 
-            {/* Footer de carte : badge + lien */}
             <div className="flex items-center justify-between mt-6">
               <span
-                className={`inline-block px-4 py-1 text-xs font-semibold rounded-full ${getBadgeColor(
-                  event.category
-                )}`}
+                className={`inline-block px-4 py-1 text-xs font-semibold rounded-full ${getBadgeColor(event.category)}`}
               >
                 {event.category}
               </span>
@@ -57,11 +48,8 @@ export default function EventsPage() {
   );
 }
 
-/**
- * Fonction pour choisir dynamiquement la couleur du badge selon la catégorie
- */
 function getBadgeColor(category) {
-  switch (category.toLowerCase()) {
+  switch ((category || "").toLowerCase()) {
     case "marché":
       return "bg-green-100 text-green-800";
     case "atelier":

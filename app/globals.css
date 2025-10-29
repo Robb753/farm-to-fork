@@ -179,3 +179,12 @@
 .mapboxgl-popup-tip {
   display: none !important;
 }
+
+[data-sonner-toaster] {
+  z-index: 9999 !important;
+}
+
+.mapboxgl-map {
+  min-width: 100% !important;
+  min-height: 500px !important;
+}

@@ -5,7 +5,7 @@ import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2, MapPin } from "lucide-react";
-import AddressSearch from "@/app/modules/maps/components/shared/AddressSearch";
+import AddressAutocompleteMapbox from "@/app/modules/maps/components/shared/AddressAutocompleteMapbox";
 import { supabase } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,8 +18,8 @@ import {
 } from "@/components/ui/card";
 
 export default function AddNewListing() {
-  const [selectedAddress, setSelectedAddress] = useState(null);
-  const [coordinates, setCoordinates] = useState(null);
+  const [selectedAddress, setSelectedAddress] = useState(null); // string (label)
+  const [coordinates, setCoordinates] = useState(null); // { lat, lng }
   const [loader, setLoader] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
 
@@ -31,24 +31,29 @@ export default function AddNewListing() {
     if (!isLoaded) return;
 
     if (!isSignedIn) {
-      router.push("/sign-in");
+      // redirection douce + retour vers cette page
+      const redirectTo = "/add-new-listing";
+      router.replace(`/sign-in?redirect=${encodeURIComponent(redirectTo)}`);
       return;
     }
 
     const role = user?.publicMetadata?.role;
     if (role && role !== "farmer") {
       toast.error("Cette page est réservée aux agriculteurs.");
-      router.push("/");
+      router.replace("/");
       return;
     }
 
     setIsChecking(false);
   }, [isLoaded, isSignedIn, user, router]);
 
-  const handleAddressSelect = (data) => {
-    setSelectedAddress(data.address);
-    setCoordinates(data.coordinates);
-    console.log("Adresse sélectionnée :", data);
+  // Mapbox: payload = { label, place_name, lng, lat, bbox?, address: { line1, city, postcode, region, country } }
+  const handleAddressSelect = (payload) => {
+    const { label, lat, lng } = payload || {};
+    setSelectedAddress(label || null);
+    setCoordinates(
+      Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null
+    );
   };
 
   const nexthandler = async () => {
@@ -63,8 +68,6 @@ export default function AddNewListing() {
 
       if (!email) throw new Error("Email introuvable.");
 
-      console.log("Email utilisateur:", email);
-
       // Vérifier si une fiche existe déjà
       const { data: existingListing, error: fetchError } = await supabase
         .from("listing")
@@ -73,29 +76,25 @@ export default function AddNewListing() {
         .maybeSingle();
 
       if (fetchError) {
-        console.error("Erreur lors de la vérification:", fetchError);
         throw fetchError;
       }
 
-      console.log("Fiche existante trouvée:", existingListing);
-
-      // Préparer le payload selon le schéma de votre DB
+      // Préparer le payload selon ton schéma
       const payload = {
         address: selectedAddress,
-        lat: parseFloat(coordinates.lat), // Conversion en float
-        lng: parseFloat(coordinates.lng), // Conversion en float
+        lat: parseFloat(coordinates.lat),
+        lng: parseFloat(coordinates.lng),
         createdBy: email,
         active: false,
         updated_at: new Date().toISOString(),
-        // Initialiser les champs requis selon votre schéma
+        // Initialiser champs
         name: null,
-        email: email, // Utiliser l'email de l'utilisateur par défaut
+        email: email,
         description: null,
         website: null,
         phoneNumber: null,
         profileImage: null,
         fullName: user?.fullName || null,
-        // Initialiser les arrays vides pour éviter les erreurs
         product_type: [],
         purchase_mode: [],
         production_method: [],
@@ -104,10 +103,8 @@ export default function AddNewListing() {
         additional_services: [],
       };
 
-      console.log("Payload à envoyer:", payload);
-
       if (existingListing) {
-        // Mise à jour de la fiche existante
+        // Mise à jour
         const { data, error } = await supabase
           .from("listing")
           .update(payload)
@@ -115,32 +112,24 @@ export default function AddNewListing() {
           .select()
           .single();
 
-        if (error) {
-          console.error("Erreur lors de la mise à jour:", error);
-          throw error;
-        }
+        if (error) throw error;
 
-        console.log("Fiche mise à jour:", data);
         toast.success("Adresse mise à jour avec succès !");
         router.push(`/edit-listing/${existingListing.id}`);
       } else {
-        // Création d'une nouvelle fiche
+        // Création
         const { data, error } = await supabase
           .from("listing")
           .insert([payload])
           .select()
           .single();
 
-        if (error) {
-          console.error("Erreur lors de la création:", error);
-          throw error;
-        }
-
-        console.log("Nouvelle fiche créée:", data);
+        if (error) throw error;
 
         if (data?.id) {
           toast.success("Nouvelle adresse ajoutée !");
-          router.push(`/EditListing/${data.id}`);
+          // ✅ route normalisée en minuscules
+          router.push(`/edit-listing/${data.id}`);
         } else {
           toast.error("Erreur inattendue : aucun ID retourné.");
         }
@@ -148,15 +137,17 @@ export default function AddNewListing() {
     } catch (error) {
       console.error("Erreur complète:", error);
 
-      // Messages d'erreur plus spécifiques
-      if (error.message?.includes("permission")) {
+      const msg =
+        (error && (error.message || error.error_description)) ||
+        "Erreur inconnue";
+      if (msg.includes("permission")) {
         toast.error("Erreur de permissions. Vérifiez vos droits d'accès.");
-      } else if (error.message?.includes("constraint")) {
+      } else if (msg.includes("constraint")) {
         toast.error("Erreur de contrainte de base de données.");
-      } else if (error.message?.includes("network")) {
+      } else if (msg.includes("network")) {
         toast.error("Erreur de connexion. Vérifiez votre connexion Internet.");
       } else {
-        toast.error(`Erreur: ${error.message || "Erreur inconnue"}`);
+        toast.error(`Erreur: ${msg}`);
       }
     } finally {
       setLoader(false);
@@ -198,20 +189,22 @@ export default function AddNewListing() {
             <label className="block text-sm font-medium text-gray-700">
               Adresse complète de votre ferme *
             </label>
-            <AddressSearch
-              onAddressSelect={handleAddressSelect}
+            <AddressAutocompleteMapbox
+              value={selectedAddress ?? ""}
+              onChange={setSelectedAddress}
+              onSelect={handleAddressSelect}
               placeholder="Numéro, rue, ville (ex : 123 Route des Champs, 67000 Strasbourg)"
-              className="w-full border-gray-300 focus:border-green-500 focus:ring-green-500"
+              country="FR"
             />
           </div>
 
-          {selectedAddress && (
+          {selectedAddress && coordinates && (
             <div className="p-3 bg-green-50 border border-green-100 rounded-md text-sm text-green-800">
               <strong>Adresse sélectionnée :</strong> {selectedAddress}
               <br />
               <small>
-                Coordonnées : {coordinates?.lat?.toFixed(6)},{" "}
-                {coordinates?.lng?.toFixed(6)}
+                Coordonnées : {coordinates.lat.toFixed(6)},{" "}
+                {coordinates.lng.toFixed(6)}
               </small>
             </div>
           )}

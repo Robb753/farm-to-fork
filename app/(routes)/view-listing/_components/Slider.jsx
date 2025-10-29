@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import Image from "next/image"; // ✅ AJOUTÉ ICI
 import {
   Carousel,
   CarouselContent,
@@ -9,8 +8,8 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel";
-import SafeImage from "@/components/ui/SafeImage";
 import { ChevronLeft, ChevronRight, X, ZoomIn } from "@/utils/icons";
+import OptimizedImage from "@/components/ui/OptimizedImage";
 
 function Slider({ imageList }) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -47,7 +46,6 @@ function Slider({ imageList }) {
     );
   }
 
-  // ✅ Ajout d'une sécurité si l’image est introuvable
   const currentImage = imageList[currentImageIndex];
 
   if (isModalOpen && currentImage) {
@@ -55,12 +53,15 @@ function Slider({ imageList }) {
       <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
         <div className="relative w-full h-full flex items-center justify-center p-4">
           <div className="relative w-full max-w-4xl h-[80vh] max-h-[80vh]">
-            <SafeImage // ✅ Remplacé <Image> par <SafeImage>
+            <OptimizedImage
               src={currentImage.url || defaultImage}
               fill
               sizes="90vw"
               alt={`Agrandissement image ${currentImageIndex + 1}`}
-              className="object-contain"
+              objectFit="contain"
+              className="bg-black"
+              fallbackSrc={defaultImage}
+              quality={85}
             />
           </div>
 
@@ -103,13 +104,16 @@ function Slider({ imageList }) {
                 className="relative aspect-[4/3] h-auto max-h-[400px] rounded-lg overflow-hidden cursor-pointer"
                 onClick={() => handleImageClick(index)}
               >
-                <SafeImage
+                <OptimizedImage
                   src={item.url || defaultImage}
                   fill
                   sizes="100vw"
                   alt={`image ${index + 1}`}
                   priority={index === 0}
-                  className="object-contain bg-white"
+                  objectFit="contain"
+                  className="bg-white"
+                  fallbackSrc={defaultImage}
+                  quality={80}
                 />
                 <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   <ZoomIn className="text-white w-10 h-10 bg-black/50 p-2 rounded-full" />
@@ -127,20 +131,22 @@ function Slider({ imageList }) {
           {imageList.map((item, index) => (
             <div
               key={index}
-              className={`relative h-16 w-16 flex-shrink-0 rounded-md overflow-hidden border-2 cursor-pointer 
-                ${
-                  currentImageIndex === index
-                    ? "border-green-500"
-                    : "border-transparent"
-                }`}
+              className={`relative h-16 w-16 flex-shrink-0 rounded-md overflow-hidden border-2 cursor-pointer ${
+                currentImageIndex === index
+                  ? "border-green-500"
+                  : "border-transparent"
+              }`}
               onClick={() => handleImageClick(index)}
             >
-              <SafeImage
+              <OptimizedImage
                 src={item.url || defaultImage}
                 fill
                 sizes="64px"
                 alt={`thumbnail ${index + 1}`}
-                className="object-contain bg-white"
+                objectFit="contain"
+                className="bg-white"
+                fallbackSrc={defaultImage}
+                quality={70}
                 priority
               />
             </div>
