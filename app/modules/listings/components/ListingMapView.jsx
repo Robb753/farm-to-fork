@@ -149,20 +149,20 @@ const DesktopListingMapView = () => {
         <div className="pointer-events-none fixed inset-0 z-20 bg-white/60 backdrop-blur-sm" />
       )}
 
-      {/* Filtres */}
+      {/* Filtres avec padding amélioré */}
       <div
         className={`sticky top-0 ${
           isModalOpen ? "z-40" : "z-[10]"
         } isolate border-b border-gray-200 bg-white shadow-sm`}
       >
-        <div className="[&_.max-w-6xl]:max-w-none [&_.px-3]:px-4">
+        <div className="px-2 lg:px-4">
           <FilterSection />
         </div>
       </div>
 
-      {/* Barre résultats + actions */}
+      {/* Barre résultats + actions avec padding amélioré */}
       <div
-        className={`flex items-center justify-between border-b border-gray-200 bg-white px-4 py-2 shadow-sm transition-all duration-300 ${
+        className={`flex items-center justify-between border-b border-gray-200 bg-white px-4 lg:px-6 py-3 shadow-sm transition-all duration-300 ${
           isModalOpen ? "pointer-events-none opacity-50" : ""
         }`}
       >
@@ -177,7 +177,7 @@ const DesktopListingMapView = () => {
           <button
             onClick={handleRefreshListings}
             disabled={isLoading}
-            className="group inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1.5 text-sm font-medium text-gray-700 transition hover:border-green-500 hover:bg-green-50 hover:text-green-700 disabled:opacity-50 disabled:hover:border-gray-200 disabled:hover:bg-white"
+            className="group inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 transition hover:border-green-500 hover:bg-green-50 hover:text-green-700 disabled:opacity-50 disabled:hover:border-gray-200 disabled:hover:bg-white"
           >
             <RefreshCw
               className={`h-4 w-4 ${
@@ -192,9 +192,9 @@ const DesktopListingMapView = () => {
 
         {/* Contrôles vue Liste / Carte */}
         <div className="hidden items-center gap-2 md:flex">
-          <div className="flex items-center rounded-md bg-gray-100 p-0.5">
+          <div className="flex items-center rounded-lg bg-gray-100 p-1">
             <button
-              className={`flex items-center gap-1 rounded-sm px-3 py-1.5 text-sm font-medium transition ${
+              className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition ${
                 !isMapExpanded
                   ? "bg-white text-gray-900 shadow-sm"
                   : "text-gray-600 hover:text-gray-900"
@@ -205,7 +205,7 @@ const DesktopListingMapView = () => {
               <span>Liste</span>
             </button>
             <button
-              className={`flex items-center gap-1 rounded-sm px-3 py-1.5 text-sm font-medium transition ${
+              className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition ${
                 isMapExpanded
                   ? "bg-white text-gray-900 shadow-sm"
                   : "text-gray-600 hover:text-gray-900"
@@ -219,16 +219,16 @@ const DesktopListingMapView = () => {
         </div>
       </div>
 
-      {/* Split Liste/Carte */}
-      <div className="relative flex h-[calc(100dvh-160px)] flex-col transition-all duration-500 ease-in-out md:flex-row">
-        {/* Liste */}
+      {/* Split Liste/Carte avec marges améliorées */}
+      <div className="relative flex h-[calc(100dvh-180px)] flex-col transition-all duration-500 ease-in-out md:flex-row">
+        {/* Liste avec padding interne */}
         <div
           className={`relative overflow-y-auto transition-all duration-500 ease-in-out ${
             isMapExpanded ? "hidden md:hidden" : "w-full md:basis-1/2"
           } ${isModalOpen ? "pointer-events-none opacity-50" : ""}`}
         >
           <div
-            className={`transition-opacity duration-300 ${
+            className={`p-4 lg:p-6 transition-opacity duration-300 ${
               globalBusy ? "opacity-60" : "opacity-100"
             }`}
           >
@@ -240,7 +240,7 @@ const DesktopListingMapView = () => {
           </div>
         </div>
 
-        {/* Carte */}
+        {/* Carte avec contrôles repositionnés */}
         <div
           className={`relative transition-all duration-500 ease-in-out ${
             isMapExpanded ? "w-full md:flex-1" : "w-full md:basis-1/2"
@@ -248,11 +248,11 @@ const DesktopListingMapView = () => {
         >
           <MapboxSection isMapExpanded={isMapExpanded} />
 
-          {/* Contrôle d'agrandissement */}
-          <div className="absolute right-4 top-4 z-20 flex flex-col gap-2">
+          {/* Contrôle d'agrandissement repositionné */}
+          <div className="absolute right-4 top-4 z-20 flex flex-col gap-3">
             <button
               onClick={toggleMapSize}
-              className="group rounded-xl border border-gray-200 bg-white p-2.5 text-gray-700 shadow-lg transition hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900 hover:shadow-xl"
+              className="group rounded-xl border border-gray-200 bg-white/95 backdrop-blur-sm p-3 text-gray-700 shadow-lg transition hover:border-gray-300 hover:bg-white hover:text-gray-900 hover:shadow-xl"
               title={isMapExpanded ? "Réduire la carte" : "Agrandir la carte"}
             >
               {isMapExpanded ? (
@@ -265,7 +265,7 @@ const DesktopListingMapView = () => {
         </div>
       </div>
 
-      {/* Bouton mobile flottant Liste/Carte */}
+      {/* Bouton mobile flottant Liste/Carte avec meilleur positionnement */}
       <div className="fixed bottom-6 right-6 z-50 md:hidden">
         <button
           onClick={toggleMapSize}
@@ -273,9 +273,9 @@ const DesktopListingMapView = () => {
         >
           <div className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-green-500 shadow-md">
             {isMapExpanded ? (
-              <MapPin className="h-3 w-3 text-white" />
-            ) : (
               <List className="h-3 w-3 text-white" />
+            ) : (
+              <MapPin className="h-3 w-3 text-white" />
             )}
           </div>
           {isMapExpanded ? (
