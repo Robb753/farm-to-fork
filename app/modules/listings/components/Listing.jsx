@@ -12,7 +12,7 @@ import { useUser, useClerk } from "@clerk/nextjs";
 import { supabase } from "@/utils/supabase/client";
 import { toast } from "sonner";
 
-// Zustand stores
+// ✅ Zustand stores - nouveau store unifié
 import {
   useListingsState,
   useListingsActions,
@@ -20,7 +20,8 @@ import {
   useMapActions,
   useInteractionsState,
   useInteractionsActions,
-} from "@/lib/store/mapListingsStore";
+} from "@/lib/store/migratedStore";
+
 import { useUserFavorites, useUserActions } from "@/lib/store/userStore";
 
 import { useListingsWithImages } from "@/app/hooks/useListingsWithImages";
@@ -322,14 +323,14 @@ ListItem.displayName = "ListItem";
 
 /* ------------------------------
    Main component
-   → ajoute “Load more”
+   → ajoute "Load more"
 ------------------------------ */
 export default function Listing({
   onLoadMore, // () => void
   hasMore = false,
   isLoading = false,
 }) {
-  // Zustand state
+  // ✅ Zustand state - nouveau store unifié
   const { visible: visibleListings = [] } = useListingsState();
   const { setAllListings } = useListingsActions();
   const { bounds: mapBounds } = useMapState();
@@ -507,7 +508,7 @@ export default function Listing({
   );
 
   const { setOpenInfoWindowId } = useInteractionsActions();
-  const { setCoordinates, setMapZoom } = useMapActions();
+  const { setCoordinates, setZoom } = useMapActions(); // ✅ setMapZoom → setZoom
 
   const handleShowOnMap = useCallback(
     (listing) => {
@@ -517,11 +518,11 @@ export default function Listing({
       }
       setOpenInfoWindowId?.(listing.id);
       setCoordinates?.({ lng: listing.lng, lat: listing.lat });
-      setMapZoom?.(14);
+      setZoom?.(14); // ✅ setMapZoom → setZoom
       window.scrollTo({ top: 0, behavior: "smooth" });
       toast.success(`Centrage sur ${listing.name}`);
     },
-    [setOpenInfoWindowId, setCoordinates, setMapZoom]
+    [setOpenInfoWindowId, setCoordinates, setZoom] // ✅ dependencies mises à jour
   );
 
   const handleRetry = useCallback(() => {
@@ -565,7 +566,7 @@ export default function Listing({
     return () => io.disconnect();
   }, [hasMore, onLoadMore, isLoading]);
 
-  // Etat vide (pas d’IDs visibles ET pas en cours de chargement)
+  // Etat vide (pas d'IDs visibles ET pas en cours de chargement)
   if (visibleIds.length === 0 && !effectiveLoading) {
     return (
       <div className="p-6 min-h-screen bg-gray-50">

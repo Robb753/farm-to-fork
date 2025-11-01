@@ -5,12 +5,14 @@ import React, { useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAllListingsWithImages } from "@/app/hooks/useAllListingsWithImages";
+
+// ✅ Import du nouveau store unifié
 import {
   useListingsActions,
   useMapActions,
   useMapState,
   MAPBOX_CONFIG,
-} from "@/lib/store/mapListingsStore";
+} from "@/lib/store/migratedStore";
 
 const ListingMapView = dynamic(
   () => import("../../modules/listings/components/ListingMapView"),
@@ -28,15 +30,16 @@ export default function Explore() {
   const { listingsWithImages } = useAllListingsWithImages();
   const { setAllListings } = useListingsActions();
 
+  // ✅ Utilisation du nouveau store unifié - zoom devient "zoom" au lieu de "mapZoom"
   const {
     coordinates: curCoords,
-    mapZoom: curZoom,
+    zoom: curZoom, // ✅ mapZoom → zoom
     mapInstance,
   } = useMapState();
 
-  const { setCoordinates, setMapZoom } = useMapActions();
+  const { setCoordinates, setZoom } = useMapActions(); // ✅ setMapZoom → setZoom
 
-  // 0) Normalise l’URL si elle n’a pas lat/lng/zoom (fallback Europe)
+  // 0) Normalise l'URL si elle n'a pas lat/lng/zoom (fallback Europe)
   useEffect(() => {
     const hasLat = searchParams.has("lat");
     const hasLng = searchParams.has("lng");
@@ -53,7 +56,7 @@ export default function Explore() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 1) Applique les paramètres d’URL -> store (sans appeler map.easeTo ni fetch ici)
+  // 1) Applique les paramètres d'URL -> store (sans appeler map.easeTo ni fetch ici)
   useEffect(() => {
     const lat = Number(searchParams.get("lat"));
     const lng = Number(searchParams.get("lng"));
@@ -75,12 +78,12 @@ export default function Explore() {
     const needZoom = curZoom == null || !approx(curZoom, targetZoom, 1e-3);
 
     if (needCenter) setCoordinates({ lat: targetLat, lng: targetLng });
-    if (needZoom) setMapZoom(targetZoom);
+    if (needZoom) setZoom(targetZoom); // ✅ setMapZoom → setZoom
 
     // IMPORTANT : pas de mapInstance.easeTo ici, MapboxSection le fera déjà
     // IMPORTANT : pas de fetchListings ici non plus (évite la boucle)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paramsKey]); // réagit uniquement aux changements d’URL
+  }, [paramsKey]); // réagit uniquement aux changements d'URL
 
   // 2) Injecte les listings préchargés si dispo (ne déclenche pas de refetch)
   useEffect(() => {

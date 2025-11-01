@@ -3,11 +3,14 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "@/utils/icons";
+
+// ✅ Import du nouveau store unifié
 import {
   filterSections,
   useFiltersState,
   useFiltersActions,
-} from "@/lib/store/mapListingsStore";
+} from "@/lib/store/migratedStore";
+
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 
 /* Construit un objet vide de filtres selon la forme du store */
@@ -44,7 +47,7 @@ export default function FiltersModal({ open = false, onClose }) {
   const router = useRouter();
   const pathname = usePathname();
 
-  // On édite une copie locale, puis on applique via “Voir les résultats”
+  // On édite une copie locale, puis on applique via "Voir les résultats"
   const [draft, setDraft] = useState(storeFilters);
 
   useEffect(() => {
@@ -109,7 +112,7 @@ export default function FiltersModal({ open = false, onClose }) {
     // 1) MAJ store + local draft
     resetFilters();
     setDraft(cleared);
-    // 2) Nettoyer l’URL tout en gardant lat/lng/zoom
+    // 2) Nettoyer l'URL tout en gardant lat/lng/zoom
     const query = buildUrlSearch(searchParams, cleared);
     router.replace(`${pathname}${query ? `?${query}` : ""}`, { scroll: false });
     onClose?.();
@@ -236,5 +239,4 @@ export default function FiltersModal({ open = false, onClose }) {
     </div>,
     document.body
   );
-
 }

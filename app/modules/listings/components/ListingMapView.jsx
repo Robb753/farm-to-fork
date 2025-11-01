@@ -8,31 +8,30 @@ import React, {
   useMemo,
 } from "react";
 import dynamic from "next/dynamic";
-import { MapPin, List, Maximize2, Minimize2, RefreshCw } from "lucide-react"; // ✅ Import corrigé
+import { MapPin, List, Maximize2, Minimize2 } from "lucide-react";
 import { toast } from "sonner";
 import FilterSection from "@/app/_components/layout/FilterSection";
 import Listing from "./Listing";
 import GlobalLoadingOverlay from "@/app/_components/ui/GlobalLoadingOverlay";
+
 import {
   useMapState,
   useListingsState,
-  useMapActions,
-  useListingsActions, // ✅ Import ajouté
-} from "@/lib/store/mapListingsStore";
+  useListingsActions,
+  useUIState,
+  useUIActions,
+} from "@/lib/store/migratedStore";
 
-// --- Version mobile (lazy) : pas de loader → évite un spinner en plus
 const MobileListingMapView = dynamic(() => import("./MobileListingMapView"), {
   ssr: false,
   loading: () => null,
 });
 
-// --- Carte (lazy) : pas de loader (spinner global suffit)
 const MapboxSection = dynamic(
   () => import("../../maps/components/MapboxSection"),
   { ssr: false, loading: () => null }
 );
 
-// --- Hook simple pour détecter le mobile ---
 const useIsMobile = () => {
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -46,33 +45,47 @@ const useIsMobile = () => {
 
 const DesktopListingMapView = () => {
   const { mapInstance } = useMapState();
-  const { visible: visibleListings, isLoading, hasMore } = useListingsState();
-  const { fetchListings } = useListingsActions(); // ✅ Hook ajouté
+  const {
+    visible: visibleListings,
+    isLoading,
+    hasMore,
+    page,
+    totalCount,
+  } = useListingsState();
+  const { fetchListings, setPage } = useListingsActions();
+  const { isMapExpanded } = useUIState();
+  const { setMapExpanded } = useUIActions();
 
-  const [isMapExpanded, setIsMapExpanded] = useState(false);
-  const [page, setPage] = useState(1);
-  const [totalResults, setTotalResults] = useState(0);
+  // UI locaux
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  // État "mouvement carte" uniquement pour interactions utilisateur
   const [isMapMoving, setIsMapMoving] = useState(false);
   const moveTimerRef = useRef(null);
+
+  // Mode de recherche manuel : la FilterSection affichera le CTA “Rechercher…”
+  const MANUAL_SEARCH = true;
+
   const setMovingDebounced = useCallback((val) => {
     if (moveTimerRef.current) clearTimeout(moveTimerRef.current);
     if (val) {
       setIsMapMoving(true);
     } else {
-      moveTimerRef.current = setTimeout(() => setIsMapMoving(false), 300);
+      moveTimerRef.current = setTimeout(() => setIsMapMoving(false), 250);
     }
   }, []);
 
-  // --- Écoute Mapbox (on n'active que si l'événement vient d'un user)
+  // écoute mapbox + notifie FilterSection que la zone a changé
   useEffect(() => {
     if (!mapInstance) return;
 
     const onStart = (e) => {
-      // e.originalEvent est présent pour les interactions utilisateur
-      if (e && e.originalEvent) setMovingDebounced(true);
+      if (e && e.originalEvent) {
+        setMovingDebounced(true);
+        if (MANUAL_SEARCH) {
+          window.dispatchEvent(
+            new CustomEvent("areaDirtyChange", { detail: true })
+          );
+        }
+      }
     };
     const onEnd = () => setMovingDebounced(false);
 
@@ -93,144 +106,121 @@ const DesktopListingMapView = () => {
     };
   }, [mapInstance, setMovingDebounced]);
 
-  // Écoute ouverture/fermeture d'une modale globale si tu en as
+  // écoute modale globale
   useEffect(() => {
     const handleModalEvent = (e) => setIsModalOpen(e.detail === true);
     window.addEventListener("modalOpen", handleModalEvent);
     return () => window.removeEventListener("modalOpen", handleModalEvent);
   }, []);
 
-  // Maj compteur résultats
-  useEffect(() => {
-    const n = Array.isArray(visibleListings) ? visibleListings.length : 0;
-    setTotalResults(n);
-  }, [visibleListings]);
-
+  // pagination
   const handleLoadMoreListings = useCallback(() => {
     if (isLoading || !hasMore) return;
     const newPage = page + 1;
     setPage(newPage);
     fetchListings({ page: newPage, append: true });
-  }, [page, hasMore, isLoading, fetchListings]);
+  }, [page, hasMore, isLoading, fetchListings, setPage]);
 
-  const handleRefreshListings = useCallback(() => {
-    setPage(1);
-    fetchListings({ page: 1, forceRefresh: true })
-      .then((data) => {
+  // handler demandé par FilterSection (CTA “Rechercher…”) → on l’expose via event
+  useEffect(() => {
+    const onSearchInArea = async () => {
+      if (!mapInstance) return;
+      try {
+        const b = mapInstance.getBounds?.();
+        if (!b) return;
+
+        const boundsObj = {
+          ne: { lat: b.getNorthEast().lat(), lng: b.getNorthEast().lng() },
+          sw: { lat: b.getSouthWest().lat(), lng: b.getSouthWest().lng() },
+        };
+
+        setPage(1);
+        const data = await fetchListings({
+          page: 1,
+          forceRefresh: true,
+          bounds: boundsObj,
+        });
+
+        // zone traitée → on informe la FilterSection
+        window.dispatchEvent(
+          new CustomEvent("areaDirtyChange", { detail: false })
+        );
+
         if (Array.isArray(data) && data.length > 0) {
           toast.success(`${data.length} fermes trouvées`);
         } else {
           toast.info("Aucune ferme trouvée dans cette zone");
         }
-      })
-      .catch(() => toast.error("Erreur lors de la recherche"));
-  }, [fetchListings]);
+      } catch {
+        toast.error("Erreur lors de la recherche");
+      }
+    };
 
-  const toggleMapSize = useCallback(() => setIsMapExpanded((p) => !p), []);
+    window.addEventListener("areaSearchRequested", onSearchInArea);
+    return () =>
+      window.removeEventListener("areaSearchRequested", onSearchInArea);
+  }, [fetchListings, mapInstance, setPage]);
 
-  // Unifie les états de chargement
+  const toggleMapSize = useCallback(
+    () => setMapExpanded(!isMapExpanded),
+    [isMapExpanded, setMapExpanded]
+  );
+
   const globalBusy = useMemo(
-    () => isLoading || isMapMoving,
+    () => isLoading || (MANUAL_SEARCH ? false : isMapMoving),
     [isLoading, isMapMoving]
   );
 
+  const displayedResultsCount = useMemo(() => {
+    return Array.isArray(visibleListings) ? visibleListings.length : 0;
+  }, [visibleListings]);
+
   return (
     <div className="relative flex flex-col bg-white">
-      {/* Spinner unique global */}
       <GlobalLoadingOverlay
         active={globalBusy}
-        label={
-          isMapMoving ? "Recherche en cours..." : "Mise à jour des résultats..."
-        }
+        label={isMapMoving ? "Déplacement de la carte..." : "Mise à jour..."}
       />
 
-      {/* Backdrop si modale ouverte */}
       {isModalOpen && (
         <div className="pointer-events-none fixed inset-0 z-20 bg-white/60 backdrop-blur-sm" />
       )}
 
-      {/* Filtres avec padding amélioré */}
+      {/* ✅ Filtres (intègrent maintenant le switch Liste/Carte + CTA “Rechercher…”) */}
       <div
-        className={`sticky top-0 ${
-          isModalOpen ? "z-40" : "z-[10]"
-        } isolate border-b border-gray-200 bg-white shadow-sm`}
+        className={`sticky top-0 ${isModalOpen ? "z-40" : "z-[10]"} isolate border-b border-gray-200 bg-white shadow-sm`}
       >
         <div className="px-2 lg:px-4">
           <FilterSection />
         </div>
       </div>
 
-      {/* Barre résultats + actions avec padding amélioré */}
-      <div
-        className={`flex items-center justify-between border-b border-gray-200 bg-white px-4 lg:px-6 py-3 shadow-sm transition-all duration-300 ${
-          isModalOpen ? "pointer-events-none opacity-50" : ""
-        }`}
-      >
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-600">
-            <span className="font-semibold text-gray-900">
-              {Number(totalResults).toLocaleString?.() ?? totalResults}
-            </span>{" "}
-            {totalResults > 1 ? "fermes trouvées" : "ferme trouvée"}
-          </span>
-
-          <button
-            onClick={handleRefreshListings}
-            disabled={isLoading}
-            className="group inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 transition hover:border-green-500 hover:bg-green-50 hover:text-green-700 disabled:opacity-50 disabled:hover:border-gray-200 disabled:hover:bg-white"
-          >
-            <RefreshCw
-              className={`h-4 w-4 ${
-                isLoading
-                  ? "animate-spin"
-                  : "transition-transform duration-300 group-hover:rotate-180"
-              }`}
-            />
-            <span>Actualiser</span>
-          </button>
-        </div>
-
-        {/* Contrôles vue Liste / Carte */}
-        <div className="hidden items-center gap-2 md:flex">
-          <div className="flex items-center rounded-lg bg-gray-100 p-1">
-            <button
-              className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition ${
-                !isMapExpanded
-                  ? "bg-white text-gray-900 shadow-sm"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
-              onClick={() => setIsMapExpanded(false)}
-            >
-              <List className="h-4 w-4" />
-              <span>Liste</span>
-            </button>
-            <button
-              className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition ${
-                isMapExpanded
-                  ? "bg-white text-gray-900 shadow-sm"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
-              onClick={() => setIsMapExpanded(true)}
-            >
-              <MapPin className="h-4 w-4" />
-              <span>Carte</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Split Liste/Carte avec marges améliorées */}
-      <div className="relative flex h-[calc(100dvh-180px)] flex-col transition-all duration-500 ease-in-out md:flex-row">
-        {/* Liste avec padding interne */}
+      {/* Split Liste / Carte */}
+      <div className="relative flex h-[calc(100vh-120px)] flex-col transition-all duration-500 ease-in-out md:flex-row">
+        {/* Liste */}
         <div
           className={`relative overflow-y-auto transition-all duration-500 ease-in-out ${
-            isMapExpanded ? "hidden md:hidden" : "w-full md:basis-1/2"
+            isMapExpanded ? "hidden md:w-0 md:opacity-0" : "w-full md:basis-1/2"
           } ${isModalOpen ? "pointer-events-none opacity-50" : ""}`}
         >
+          {/* Compteur au-dessus de la liste */}
+          <div className="mx-auto w-full max-w-6xl px-3 pt-3">
+            <span className="text-sm text-gray-600">
+              <span className="font-semibold text-gray-900">
+                {Number(displayedResultsCount).toLocaleString?.() ??
+                  displayedResultsCount}
+              </span>{" "}
+              {displayedResultsCount > 1 ? "fermes trouvées" : "ferme trouvée"}
+              {totalCount > displayedResultsCount && (
+                <span className="ml-1 text-gray-500">
+                  (sur {Number(totalCount).toLocaleString?.() ?? totalCount})
+                </span>
+              )}
+            </span>
+          </div>
+
           <div
-            className={`p-4 lg:p-6 transition-opacity duration-300 ${
-              globalBusy ? "opacity-60" : "opacity-100"
-            }`}
+            className={`p-4 lg:p-6 transition-opacity duration-300 ${globalBusy ? "opacity-60" : "opacity-100"}`}
           >
             <Listing
               onLoadMore={handleLoadMoreListings}
@@ -240,15 +230,15 @@ const DesktopListingMapView = () => {
           </div>
         </div>
 
-        {/* Carte avec contrôles repositionnés */}
+        {/* Carte */}
         <div
           className={`relative transition-all duration-500 ease-in-out ${
-            isMapExpanded ? "w-full md:flex-1" : "w-full md:basis-1/2"
+            isMapExpanded ? "w-full" : "w-full md:basis-1/2"
           } ${isModalOpen ? "pointer-events-none opacity-50" : ""}`}
         >
           <MapboxSection isMapExpanded={isMapExpanded} />
 
-          {/* Contrôle d'agrandissement repositionné */}
+          {/* Agrandir/réduire */}
           <div className="absolute right-4 top-4 z-20 flex flex-col gap-3">
             <button
               onClick={toggleMapSize}
@@ -265,7 +255,7 @@ const DesktopListingMapView = () => {
         </div>
       </div>
 
-      {/* Bouton mobile flottant Liste/Carte avec meilleur positionnement */}
+      {/* Mobile : bouton flottant Liste/Carte */}
       <div className="fixed bottom-6 right-6 z-50 md:hidden">
         <button
           onClick={toggleMapSize}
@@ -293,7 +283,7 @@ function ListingMapView() {
   const isMobile = useIsMobile();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-  if (!mounted) return null; // pas de spinner ici → évite un doublon
+  if (!mounted) return null;
   return isMobile ? <MobileListingMapView /> : <DesktopListingMapView />;
 }
 

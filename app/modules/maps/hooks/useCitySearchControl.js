@@ -2,19 +2,21 @@
 
 import { useCallback } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
+
+// ✅ Import du nouveau store unifié
 import {
-  useMapState, // ✅ Import corrigé
-  useMapActions, // ✅ Import corrigé
+  useMapState,
+  useMapActions,
   useListingsActions,
-} from "@/lib/store/mapListingsStore";
+} from "@/lib/store/migratedStore";
 
 export default function useCitySearchControl({ setSearchCity }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const { mapInstance } = useMapState(); // ✅ Hook corrigé
-  const { setCoordinates, setMapZoom } = useMapActions(); // ✅ Actions corrigées
+  const { mapInstance } = useMapState();
+  const { setCoordinates, setZoom } = useMapActions(); // ✅ setMapZoom → setZoom
   const { fetchListings } = useListingsActions();
 
   const easeToCenter = useCallback(
@@ -114,7 +116,7 @@ export default function useCitySearchControl({ setSearchCity }) {
         }
       } catch {}
       try {
-        if (setMapZoom && Number.isFinite(zoom)) setMapZoom(zoom);
+        if (setZoom && Number.isFinite(zoom)) setZoom(zoom); // ✅ setMapZoom → setZoom
       } catch {}
 
       // 4) Fetch listings seulement sur /explore
@@ -143,8 +145,8 @@ export default function useCitySearchControl({ setSearchCity }) {
       easeToCenter,
       getCurrentBBox,
       fetchListings,
-      setCoordinates, // ✅ Nom corrigé
-      setMapZoom,
+      setCoordinates,
+      setZoom, // ✅ setMapZoom → setZoom
       navigateWithParams,
       setSearchCity,
     ]

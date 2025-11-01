@@ -2,7 +2,9 @@
 
 import React, { useEffect, useRef } from "react";
 import mapboxgl from "mapbox-gl";
-import { useMapState, useListingsState } from "@/lib/store/mapListingsStore";
+
+// ✅ Import du nouveau store unifié
+import { useMapState, useListingsState } from "@/lib/store/migratedStore";
 
 /**
  * Version ultra-simple avec vérification robuste de l'état de la carte

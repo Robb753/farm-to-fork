@@ -33,7 +33,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 
-// Project stores
+// ✅ Import du nouveau store unifié
 import {
   useMapState,
   useMapActions,
@@ -41,7 +41,7 @@ import {
   useListingsActions,
   useInteractionsActions,
   useFiltersState,
-} from "@/lib/store/mapListingsStore";
+} from "@/lib/store/migratedStore";
 
 import { useUser } from "@clerk/nextjs";
 import { useUserFavorites, useUserActions } from "@/lib/store/userStore";
@@ -296,9 +296,9 @@ const FarmCard = memo(function FarmCard({
 /* ----------------------- Main component ----------------------- */
 
 export default function MobileListingMapView() {
-  // stores
+  // ✅ stores avec nouveau store unifié
   const { mapInstance } = useMapState();
-  const { setCoordinates, setMapZoom } = useMapActions();
+  const { setCoordinates, setZoom } = useMapActions(); // ✅ setMapZoom → setZoom
   const filters = useFiltersState();
   const { visible, isLoading, hasMore, page } = useListingsState();
   const { fetchListings, resetListings } = useListingsActions();
@@ -478,12 +478,17 @@ export default function MobileListingMapView() {
       if (typeof lat === "number" && typeof lng === "number")
         updateUrl({ lat, lng, zoom });
 
+      // ✅ Utilisation du nouveau store unifié
       try {
-        if (setMapCenter && typeof lat === "number" && typeof lng === "number")
-          setMapCenter({ lat, lng });
+        if (
+          setCoordinates &&
+          typeof lat === "number" &&
+          typeof lng === "number"
+        )
+          setCoordinates({ lat, lng });
       } catch {}
       try {
-        if (setMapZoom && typeof zoom === "number") setMapZoom(zoom);
+        if (setZoom && typeof zoom === "number") setZoom(zoom); // ✅ setMapZoom → setZoom
       } catch {}
 
       if (mapInstance && typeof lat === "number" && typeof lng === "number") {
@@ -507,8 +512,8 @@ export default function MobileListingMapView() {
       easeToCenter,
       getCurrentBBox,
       fetchListings,
-      setMapCenter,
-      setMapZoom,
+      setCoordinates, // ✅ setMapCenter → setCoordinates
+      setZoom, // ✅ setMapZoom → setZoom
       updateUrl,
     ]
   );
@@ -596,7 +601,7 @@ export default function MobileListingMapView() {
               Aucune ferme
             </h3>
             <p className="max-w-xs text-sm text-gray-600">
-              Essayez d’élargir la zone ou d’ajuster vos filtres.
+              Essayez d'élargir la zone ou d'ajuster vos filtres.
             </p>
           </div>
         ) : (

@@ -2,11 +2,14 @@
 
 import React, { useEffect, useRef } from "react";
 import mapboxgl from "mapbox-gl";
+
+// ✅ Import du nouveau store unifié
 import {
   useMapState,
   useMapActions,
   MAPBOX_CONFIG,
-} from "@/lib/store/mapListingsStore";
+} from "@/lib/store/migratedStore";
+
 import MapboxMarkers from "./MapboxMarkers";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || "";
@@ -64,13 +67,14 @@ export default function MapboxSection({ isMapExpanded = false }) {
   const mapRef = useRef(null);
   const userInteractingRef = useRef(false);
 
-  const { coordinates, mapZoom, isApiLoaded, isApiLoading } = useMapState();
+  // ✅ Utilisation du nouveau store unifié - zoom devient "zoom" au lieu de "mapZoom"
+  const { coordinates, zoom, isApiLoaded, isApiLoading } = useMapState();
   const {
     setMapInstance,
     setMapBounds,
     setApiLoaded,
     setApiLoading,
-    setMapZoom,
+    setZoom, // ✅ setMapZoom → setZoom
     setCoordinates,
   } = useMapActions();
 
@@ -96,8 +100,8 @@ export default function MapboxSection({ isMapExpanded = false }) {
       : MAPBOX_CONFIG.center; // [2.2137, 46.2276]
 
     const initZoom =
-      typeof mapZoom === "number" && mapZoom >= MAPBOX_CONFIG.minZoom
-        ? mapZoom
+      typeof zoom === "number" && zoom >= MAPBOX_CONFIG.minZoom // ✅ mapZoom → zoom
+        ? zoom
         : MAPBOX_CONFIG.zoom; // 4.6
 
     const map = new mapboxgl.Map({
@@ -147,7 +151,7 @@ export default function MapboxSection({ isMapExpanded = false }) {
       if (!isValidCoords(coordinates)) {
         const fallbackCoords = mapboxToStoreCoords(MAPBOX_CONFIG.center);
         setCoordinates(fallbackCoords);
-        setMapZoom(MAPBOX_CONFIG.zoom);
+        setZoom(MAPBOX_CONFIG.zoom); // ✅ setMapZoom → setZoom
       }
 
       // Bounds init → store (format array pour compatibilité)
@@ -168,7 +172,7 @@ export default function MapboxSection({ isMapExpanded = false }) {
         [b.getWest(), b.getSouth()],
         [b.getEast(), b.getNorth()],
       ]);
-      setMapZoom(map.getZoom());
+      setZoom(map.getZoom()); // ✅ setMapZoom → setZoom
 
       // Mettre à jour les coordonnées du centre
       const center = map.getCenter();
@@ -225,8 +229,8 @@ export default function MapboxSection({ isMapExpanded = false }) {
     if (!mapboxCoords) return;
 
     const newZoom =
-      typeof mapZoom === "number" && mapZoom >= MAPBOX_CONFIG.minZoom
-        ? mapZoom
+      typeof zoom === "number" && zoom >= MAPBOX_CONFIG.minZoom // ✅ mapZoom → zoom
+        ? zoom
         : MAPBOX_CONFIG.zoom;
 
     const curCenter = map.getCenter();
@@ -246,7 +250,7 @@ export default function MapboxSection({ isMapExpanded = false }) {
       duration: 500,
       essential: true,
     });
-  }, [coordinates, mapZoom]);
+  }, [coordinates, zoom]); // ✅ mapZoom → zoom
 
   // ---- 3️⃣ Resize ----
   useEffect(() => {
