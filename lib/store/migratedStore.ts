@@ -2,48 +2,13 @@
 import { create } from "zustand";
 import { persist, subscribeWithSelector, devtools } from "zustand/middleware";
 import { supabase } from "@/utils/supabase/client";
-
-// ==================== TYPES ====================
-export interface LatLng {
-  lat: number;
-  lng: number;
-}
-
-export interface MapBounds {
-  ne: LatLng;
-  sw: LatLng;
-}
-
-export interface Listing {
-  id: number;
-  name: string;
-  address: string;
-  lat: string;
-  lng: string;
-  availability?: "open" | "closed";
-  product_type?: string[];
-  certifications?: string[];
-  rating?: number;
-  listingImages?: Array<{ url: string; id: number }>;
-  description?: string;
-  email?: string;
-  phoneNumber?: string;
-  website?: string;
-  active?: boolean;
-  created_at?: string;
-  modified_at?: string;
-  published_at?: string;
-}
-
-export interface FilterState {
-  product_type: string[];
-  certifications: string[];
-  purchase_mode: string[];
-  production_method: string[];
-  additional_services: string[];
-  availability: string[];
-  mapType: string[];
-}
+// Imports des types centralisés
+import type {
+  LatLng,
+  MapBounds,
+  Listing,
+  FilterState,
+} from "./types";
 
 // ==================== STORE CONSOLIDÉ ====================
 interface Farm2ForkStore {
