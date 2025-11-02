@@ -1,55 +1,27 @@
 import { z } from "zod";
+// Import des constantes depuis la configuration centralisée
+import {
+  PRODUCT_TYPES,
+  PRODUCTION_METHODS,
+  PURCHASE_MODES,
+  CERTIFICATIONS,
+  AVAILABILITY_OPTIONS,
+  ADDITIONAL_SERVICES,
+  FILE_SIZE_LIMITS,
+  ACCEPTED_IMAGE_TYPES,
+} from "@/lib/config";
 
 /* -------------------------------------------
- * Constants
+ * Constants (réexportées depuis la config centralisée)
  * -----------------------------------------*/
-export const PRODUCT_TYPES = [
-  "Fruits",
-  "Légumes",
-  "Produits laitiers",
-  "Viande",
-  "Œufs",
-  "Produits transformés",
-] as const;
-
-export const PRODUCTION_METHODS = [
-  "Agriculture conventionnelle",
-  "Agriculture biologique",
-  "Agriculture durable",
-  "Agriculture raisonnée",
-] as const;
-
-export const PURCHASE_MODES = [
-  "Vente directe à la ferme",
-  "Marché local",
-  "Livraison à domicile",
-  "Point de vente collectif",
-  "Click & Collect",
-] as const;
-
-export const CERTIFICATIONS = [
-  "Label AB",
-  "Label Rouge",
-  "AOC/AOP",
-  "IGP",
-  "Demeter",
-] as const;
-
-export const AVAILABILITY_OPTIONS = [
-  "Saisonnière",
-  "Toute l'année",
-  "Pré-commande",
-  "Sur abonnement",
-  "Événements spéciaux",
-] as const;
-
-export const ADDITIONAL_SERVICES = [
-  "Visite de la ferme",
-  "Ateliers de cuisine",
-  "Dégustation",
-  "Activités pour enfants",
-  "Événements pour professionnels",
-] as const;
+export {
+  PRODUCT_TYPES,
+  PRODUCTION_METHODS,
+  PURCHASE_MODES,
+  CERTIFICATIONS,
+  AVAILABILITY_OPTIONS,
+  ADDITIONAL_SERVICES,
+};
 
 /* -------------------------------------------
  * Helpers
@@ -73,18 +45,10 @@ const toE164FR = (value?: string) => {
 };
 
 /* -------------------------------------------
- * Images
+ * Images (importées depuis la config centralisée)
  * -----------------------------------------*/
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB per file
-const MAX_TOTAL_SIZE = 15 * 1024 * 1024; // 15MB total
-const ACCEPTED_IMAGE_TYPES = [
-  "image/jpeg",
-  "image/jpg",
-  "image/png",
-  "image/gif",
-  "image/webp",
-  "image/avif",
-] as const;
+const MAX_FILE_SIZE = FILE_SIZE_LIMITS.MAX_FILE_SIZE;
+const MAX_TOTAL_SIZE = FILE_SIZE_LIMITS.MAX_TOTAL_SIZE;
 
 const fileLikeSchema = z
   .custom<File>((val) => typeof File !== "undefined" && val instanceof File, {
