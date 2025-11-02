@@ -98,77 +98,12 @@ interface Farm2ForkStore {
   reset: () => void;
 }
 
-// ==================== FILTRES (de mapListingsStore.js) ====================
-export const filterSections = [
-  {
-    title: "Produits",
-    key: "product_type",
-    items: [
-      "Fruits",
-      "Légumes",
-      "Produits laitiers",
-      "Viande",
-      "Œufs",
-      "Produits transformés",
-    ],
-  },
-  {
-    title: "Certifications",
-    key: "certifications",
-    items: ["Label AB", "Label Rouge", "AOP/AOC", "HVE", "Demeter"],
-  },
-  {
-    title: "Distribution",
-    key: "purchase_mode",
-    items: [
-      "Vente directe à la ferme",
-      "Marché local",
-      "Livraison à domicile",
-      "Drive fermier",
-    ],
-  },
-  {
-    title: "Production",
-    key: "production_method",
-    items: [
-      "Agriculture conventionnelle",
-      "Agriculture biologique",
-      "Agriculture durable",
-      "Agriculture raisonnée",
-    ],
-  },
-  {
-    title: "Services",
-    key: "additional_services",
-    items: [
-      "Visite de la ferme",
-      "Ateliers de cuisine",
-      "Hébergement",
-      "Activités pour enfants",
-      "Réservation pour événements",
-    ],
-  },
-  {
-    title: "Disponibilité",
-    key: "availability",
-    items: [
-      "Saisonnière",
-      "Toute l'année",
-      "Pré-commande",
-      "Sur abonnement",
-      "Événements spéciaux",
-    ],
-  },
-];
+// ==================== IMPORTS DE CONFIGURATION ====================
+// Import des filtres et config Mapbox depuis la configuration centralisée
+import { filterSections, MAPBOX_CONFIG } from "@/lib/config";
 
-// Config Mapbox
-export const MAPBOX_CONFIG = {
-  style: "mapbox://styles/mapbox/streets-v12",
-  center: [2.2137, 46.2276],
-  zoom: 4.6,
-  minZoom: 3,
-  maxZoom: 18,
-};
+// Réexportation pour backward compatibility
+export { filterSections, MAPBOX_CONFIG };
 
 // ==================== VALEURS INITIALES ====================
 const initialFilters: FilterState = {
