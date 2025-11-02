@@ -8,17 +8,10 @@ import {
 } from "@/lib/syncUserUtils";
 import { toast } from "sonner";
 import { supabase } from "@/utils/supabase/client";
-// (optionnel) importer le type Clerk si tu veux typer `user`
+// Types centralisés
+import type { UserProfile, Role } from "./types";
+// Type Clerk
 import type { User as ClerkUser } from "@clerk/nextjs/server"; // ou "@clerk/nextjs"
-
-interface UserProfile {
-  id: string;
-  email: string;
-  role: "user" | "farmer" | "admin";
-  favorites: number[];
-}
-
-type Role = "user" | "farmer" | "admin" | null;
 
 interface UserState {
   // État utilisateur
