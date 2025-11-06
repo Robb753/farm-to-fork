@@ -1,14 +1,9 @@
-// lib/store/migratedStore.ts
+// lib/store/migratedStore.ts - Version corrigée avec filtrage géographique
 import { create } from "zustand";
 import { persist, subscribeWithSelector, devtools } from "zustand/middleware";
 import { supabase } from "@/utils/supabase/client";
 // Imports des types centralisés
-import type {
-  LatLng,
-  MapBounds,
-  Listing,
-  FilterState,
-} from "./types";
+import type { LatLng, MapBounds, Listing, FilterState } from "./types";
 
 // ==================== STORE CONSOLIDÉ ====================
 interface Farm2ForkStore {
@@ -93,13 +88,17 @@ interface Farm2ForkStore {
   // UI Actions
   setMapExpanded: (expanded: boolean) => void;
 
+  // ✅ NOUVELLES ACTIONS pour la synchronisation géographique
+  updateMapBoundsAndFilter: (bounds: MapBounds | null) => void;
+  loadMoreListings: () => Promise<void>;
+  cleanupPagination: () => void;
+
   // Utility
   filterListings: () => void;
   reset: () => void;
 }
 
 // ==================== IMPORTS DE CONFIGURATION ====================
-// Import des filtres et config Mapbox depuis la configuration centralisée
 import { filterSections, MAPBOX_CONFIG } from "@/lib/config";
 
 // Réexportation pour backward compatibility
@@ -116,34 +115,80 @@ const initialFilters: FilterState = {
   mapType: [],
 };
 
+// ✅ FONCTION UTILITAIRE : Vérifier si un listing est dans les bounds
+const isListingInBounds = (
+  listing: Listing,
+  bounds: MapBounds | null
+): boolean => {
+  if (!bounds || !listing.lat || !listing.lng) {
+    return true; // Si pas de bounds, afficher tout
+  }
+
+  const lat = parseFloat(listing.lat);
+  const lng = parseFloat(listing.lng);
+
+  // Vérifier si les coordonnées sont valides
+  if (isNaN(lat) || isNaN(lng)) {
+    return false;
+  }
+
+  // Vérifier si dans les bounds
+  return (
+    lat >= bounds.sw.lat &&
+    lat <= bounds.ne.lat &&
+    lng >= bounds.sw.lng &&
+    lng <= bounds.ne.lng
+  );
+};
+
+// ✅ FONCTION DE FILTRAGE AMÉLIORÉE avec géolocalisation
 const filterListings = (
   allListings: Listing[],
-  filters: FilterState
+  filters: FilterState,
+  mapBounds: MapBounds | null = null
 ): Listing[] => {
+  if (!allListings || !Array.isArray(allListings)) return [];
+
+  let filtered = allListings;
+
+  // ✅ FILTRAGE GÉOGRAPHIQUE EN PREMIER
+  if (mapBounds) {
+    filtered = filtered.filter((listing) =>
+      isListingInBounds(listing, mapBounds)
+    );
+    console.log(
+      `[filterListings] Geographic filter: ${filtered.length}/${allListings.length} listings in bounds`
+    );
+  }
+
+  // Filtres traditionnels (produits, certifications, etc.)
   const hasActiveFilters = Object.values(filters).some(
     (arr) => Array.isArray(arr) && arr.length > 0
   );
-  if (!hasActiveFilters || !allListings || !Array.isArray(allListings))
-    return allListings || [];
 
-  return allListings.filter((listing) =>
-    Object.entries(filters).every(([key, values]) => {
-      if (!Array.isArray(values) || values.length === 0) return true;
+  if (hasActiveFilters) {
+    filtered = filtered.filter((listing) =>
+      Object.entries(filters).every(([key, values]) => {
+        if (!Array.isArray(values) || values.length === 0 || key === "mapType")
+          return true;
 
-      // Vérifier si la propriété existe sur le listing
-      if (!(key in listing)) return false;
+        // Vérifier si la propriété existe sur le listing
+        if (!(key in listing)) return false;
 
-      const listingValue = (listing as any)[key];
-      const listingValues = Array.isArray(listingValue)
-        ? listingValue
-        : listingValue
-          ? [listingValue]
-          : [];
+        const listingValue = (listing as any)[key];
+        const listingValues = Array.isArray(listingValue)
+          ? listingValue
+          : listingValue
+            ? [listingValue]
+            : [];
 
-      if (listingValues.length === 0) return false;
-      return values.some((v) => listingValues.includes(v));
-    })
-  );
+        if (listingValues.length === 0) return false;
+        return values.some((v) => listingValues.includes(v));
+      })
+    );
+  }
+
+  return filtered;
 };
 
 // ==================== STORE PRINCIPAL ====================
@@ -194,13 +239,16 @@ export const useFarm2ForkStore = create<Farm2ForkStore>()(
               },
             })),
 
-          setMapBounds: (bounds) =>
+          setMapBounds: (bounds) => {
             set((state) => ({
               map: {
                 ...state.map,
                 bounds: bounds,
               },
-            })),
+            }));
+            // ✅ Auto-refiltrer quand les bounds changent
+            setTimeout(() => get().filterListings(), 0);
+          },
 
           setZoom: (zoom) =>
             set((state) => ({
@@ -237,7 +285,11 @@ export const useFarm2ForkStore = create<Farm2ForkStore>()(
           // ==================== LISTINGS ACTIONS ====================
           setAllListings: (listings) => {
             const state = get();
-            const filtered = filterListings(listings, state.filters);
+            const filtered = filterListings(
+              listings,
+              state.filters,
+              state.map.bounds
+            );
             set((prevState) => ({
               listings: {
                 ...prevState.listings,
@@ -292,7 +344,11 @@ export const useFarm2ForkStore = create<Farm2ForkStore>()(
           addListings: (newListings) => {
             const state = get();
             const combined = [...state.listings.all, ...newListings];
-            const filtered = filterListings(combined, state.filters);
+            const filtered = filterListings(
+              combined,
+              state.filters,
+              state.map.bounds
+            );
             set((prevState) => ({
               listings: {
                 ...prevState.listings,
@@ -317,7 +373,7 @@ export const useFarm2ForkStore = create<Farm2ForkStore>()(
               },
             })),
 
-          // ==================== FETCH LISTINGS (version améliorée) ====================
+          // ==================== FETCH LISTINGS (version corrigée) ====================
           fetchListings: async (options = {}) => {
             const state = get();
             const {
@@ -327,6 +383,14 @@ export const useFarm2ForkStore = create<Farm2ForkStore>()(
               bounds = null,
               bbox = null,
             } = options;
+
+            // ✅ PROTECTION : Si on sait qu'il n'y a plus de données, arrêter
+            if (page > 1 && !state.listings.hasMore) {
+              console.log(
+                `[fetchListings] Page ${page}: Pas de données supplémentaires disponibles`
+              );
+              return [];
+            }
 
             // Validation et nettoyage des paramètres
             const cleanPage = Math.max(1, page);
@@ -348,7 +412,7 @@ export const useFarm2ForkStore = create<Farm2ForkStore>()(
 
               // Appliquer les filtres actifs
               Object.entries(state.filters).forEach(([key, values]) => {
-                if (values && values.length > 0) {
+                if (values && values.length > 0 && key !== "mapType") {
                   query = query.contains(key, values);
                 }
               });
@@ -369,6 +433,10 @@ export const useFarm2ForkStore = create<Farm2ForkStore>()(
                     .lte("lat", mapBounds.ne.lat)
                     .gte("lng", mapBounds.sw.lng)
                     .lte("lng", mapBounds.ne.lng);
+                  console.log(
+                    "[fetchListings] Applied geographic filter:",
+                    mapBounds
+                  );
                 } else if (
                   Array.isArray(activeBounds) &&
                   activeBounds.length === 4
@@ -380,12 +448,34 @@ export const useFarm2ForkStore = create<Farm2ForkStore>()(
                     .lte("lat", north)
                     .gte("lng", west)
                     .lte("lng", east);
+                  console.log(
+                    "[fetchListings] Applied bbox filter:",
+                    activeBounds
+                  );
                 }
               }
 
               // Pagination avec gestion d'erreur
               const limit = 20;
               const offset = (cleanPage - 1) * limit;
+
+              // ✅ PROTECTION : Ne pas faire de requête si offset trop grand
+              const currentState = get();
+              const currentTotal = currentState.listings.totalCount;
+              if (currentTotal > 0 && offset >= currentTotal) {
+                console.log(
+                  `[fetchListings] Offset ${offset} >= total ${currentTotal}, arrêt de la pagination`
+                );
+                set((prevState) => ({
+                  listings: {
+                    ...prevState.listings,
+                    isLoading: false,
+                    hasMore: false,
+                  },
+                }));
+                return [];
+              }
+
               query = query
                 .range(offset, offset + limit - 1)
                 .order("created_at", { ascending: false });
@@ -396,14 +486,29 @@ export const useFarm2ForkStore = create<Farm2ForkStore>()(
 
               const listings = data || [];
 
+              // ✅ LOGIQUE CORRIGÉE : Calculer hasMore correctement
+              const totalCount = count || 0;
+              const currentItemsCount = append
+                ? state.listings.all.length + listings.length
+                : listings.length;
+
+              const hasMore =
+                listings.length > 0 &&
+                currentItemsCount < totalCount &&
+                listings.length === limit;
+
+              console.log(
+                `[fetchListings] Page ${cleanPage}: ${listings.length} items, total: ${totalCount}, hasMore: ${hasMore}`
+              );
+
               set((prevState) => ({
                 listings: {
                   ...prevState.listings,
                   all: append
                     ? [...prevState.listings.all, ...listings]
                     : listings,
-                  hasMore: (count || 0) > offset + limit,
-                  totalCount: count || 0,
+                  hasMore: hasMore,
+                  totalCount: totalCount,
                   page: cleanPage,
                   isLoading: false,
                 },
@@ -415,13 +520,82 @@ export const useFarm2ForkStore = create<Farm2ForkStore>()(
               return listings;
             } catch (error) {
               console.error("Error fetching listings:", error);
+
+              // ✅ GESTION D'ERREUR AMÉLIORÉE : Arrêter la pagination en cas d'erreur
               set((prevState) => ({
                 listings: {
                   ...prevState.listings,
                   isLoading: false,
+                  hasMore: false,
                 },
               }));
               return [];
+            }
+          },
+
+          // ✅ NOUVELLE ACTION : Mettre à jour bounds et refiltrer
+          updateMapBoundsAndFilter: (bounds) => {
+            set((state) => ({
+              map: {
+                ...state.map,
+                bounds: bounds,
+              },
+            }));
+
+            // Refiltrer immédiatement avec les nouveaux bounds
+            get().filterListings();
+
+            console.log(
+              "[updateMapBoundsAndFilter] Updated bounds and refiltered listings"
+            );
+          },
+
+          // ✅ FONCTION AMÉLIORÉE : LoadMore avec protection
+          loadMoreListings: async () => {
+            const state = get();
+
+            // Protection multiple
+            if (state.listings.isLoading) {
+              console.log(
+                "[loadMoreListings] Déjà en cours de chargement, skip"
+              );
+              return;
+            }
+
+            if (!state.listings.hasMore) {
+              console.log(
+                "[loadMoreListings] Pas de données supplémentaires, skip"
+              );
+              return;
+            }
+
+            const nextPage = state.listings.page + 1;
+            console.log(`[loadMoreListings] Chargement page ${nextPage}`);
+
+            await get().fetchListings({
+              page: nextPage,
+              append: true,
+            });
+          },
+
+          // ✅ NOUVELLE FONCTION : Vérifier et nettoyer la pagination
+          cleanupPagination: () => {
+            const state = get();
+            const { totalCount, page } = state.listings;
+            const limit = 20;
+            const maxPage = Math.ceil(totalCount / limit) || 1;
+
+            if (page > maxPage) {
+              console.log(
+                `[cleanupPagination] Page ${page} > maxPage ${maxPage}, reset à 1`
+              );
+              set((prevState) => ({
+                listings: {
+                  ...prevState.listings,
+                  page: 1,
+                  hasMore: totalCount > limit,
+                },
+              }));
             }
           },
 
@@ -520,9 +694,14 @@ export const useFarm2ForkStore = create<Farm2ForkStore>()(
             })),
 
           // ==================== UTILS ====================
+          // ✅ FONCTION CORRIGÉE : Filtrage avec géolocalisation
           filterListings: () => {
             const state = get();
-            const filtered = filterListings(state.listings.all, state.filters);
+            const filtered = filterListings(
+              state.listings.all,
+              state.filters,
+              state.map.bounds // ✅ Passer les bounds à la fonction
+            );
 
             set((prevState) => ({
               listings: {
@@ -621,6 +800,7 @@ export const useMapActions = () =>
     setMapInstance: state.setMapInstance,
     setApiLoaded: state.setApiLoaded,
     setApiLoading: state.setApiLoading,
+    updateMapBoundsAndFilter: state.updateMapBoundsAndFilter, // ✅ NOUVEAU
   }));
 
 export const useListingsActions = () =>
@@ -634,6 +814,8 @@ export const useListingsActions = () =>
     addListings: state.addListings,
     resetListings: state.resetListings,
     fetchListings: state.fetchListings,
+    loadMoreListings: state.loadMoreListings, // ✅ NOUVEAU
+    cleanupPagination: state.cleanupPagination, // ✅ NOUVEAU
   }));
 
 export const useInteractionsActions = () =>
@@ -650,6 +832,7 @@ export const useFiltersActions = () =>
     resetFilters: state.resetFilters,
     setFilters: state.setFilters,
     setFiltersHydrated: state.setFiltersHydrated,
+    filterListings: state.filterListings, // ✅ Exposer pour usage externe
   }));
 
 export const useUIActions = () =>

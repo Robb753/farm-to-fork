@@ -70,8 +70,6 @@ Améliorations :
 - ✅ Création de `UIState` (isMapExpanded, isMobile)
 - ✅ Ajout d'aliases backward compatibility (MapStateType, ListingsStateType, UserStateType)
 - ✅ Marquage de types legacy comme @deprecated
-
-#### `lib/store/appStore.ts`
 **Changements** :
 ```typescript
 // AVANT : 47 lignes de types dupliqués (lignes 6-52)
@@ -141,7 +139,6 @@ import type { UserProfile, Role } from "./types";
 
 | Fichier | Lignes Avant | Duplications | Lignes Après | Gain |
 |---------|--------------|--------------|--------------|------|
-| appStore.ts | 775 | 47 | 733 | -42 |
 | migratedStore.ts | 771 | 40 | 736 | -35 |
 | userStore.ts | 358 | 8 | 350 | -8 |
 | types.ts | 109 | 0 | 207 | +98* |
@@ -257,7 +254,6 @@ Les anciens imports continuent de fonctionner grâce aux réexportations dans le
 
 ### Modifiés
 - ✅ lib/store/types.ts
-- ✅ lib/store/appStore.ts
 - ✅ lib/store/migratedStore.ts
 - ✅ lib/store/userStore.ts
 

@@ -72,12 +72,7 @@ Types pour les composants UI :
 - `StatusBadgeProps` - Props des badges de statut
 
 ## Migration depuis les Anciens Types
-
-### Avant (types dupliqués)
 ```typescript
-// ❌ Types dupliqués dans chaque fichier
-// lib/store/appStore.ts
-export interface LatLng { lat: number; lng: number; }
 
 // lib/store/migratedStore.ts
 export interface LatLng { lat: number; lng: number; }
@@ -121,7 +116,6 @@ import type { LatLng, UserProfile } from "./types";
 - ✅ Création de `enums.ts` pour les énumérations
 - ✅ Enrichissement de `lib/store/types.ts`
 - ✅ Création de `ui.ts` pour les types UI
-- ✅ Suppression des duplications dans appStore.ts
 - ✅ Suppression des duplications dans migratedStore.ts
 - ✅ Suppression des duplications dans userStore.ts
 - ✅ Création du fichier index.ts pour exports centralisés

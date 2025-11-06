@@ -208,32 +208,55 @@ export const filterSections = [
  */
 export const COLORS = {
   // Couleurs principales
-  PRIMARY: "#16a34a", // Vert principal
+  PRIMARY: "#16a34a", // Vert principal Farm To Fork
   PRIMARY_BG: "#f0fdf4", // Fond vert clair
-  PRIMARY_DARK: "#15803d", // Vert foncé
+  PRIMARY_DARK: "#15803d", // Vert foncé pour les hovers
 
   // Couleurs de bordure et séparation
-  BORDER: "#e5e7eb", // Bordure grise
+  BORDER: "#e5e7eb", // Bordure grise standard
   BORDER_LIGHT: "#f3f4f6", // Bordure grise claire
+  BORDER_DARK: "#374151", // Bordure sombre pour footer/dark mode
 
   // Couleurs de texte
   TEXT_PRIMARY: "#111827", // Texte noir principal
   TEXT_SECONDARY: "#6b7280", // Texte gris secondaire
   TEXT_MUTED: "#9ca3af", // Texte gris atténué
   TEXT_LIGHT: "#666", // Texte gris clair (legacy)
+  TEXT_WHITE: "#ffffff", // Texte blanc pour fond sombre
 
   // Couleurs de fond
-  BG_WHITE: "#ffffff",
+  BG_WHITE: "#ffffff", // Fond blanc principal
   BG_GRAY: "#f9fafb", // Fond gris clair
-  BG_GRAY_LIGHT: "#f3f4f6",
+  BG_GRAY_LIGHT: "#f3f4f6", // Fond gris très clair
+  BG_DARK: "#111827", // Fond sombre pour footer/dark mode
 
-  // Couleurs d'action
+  // Couleurs d'action et d'état
   LINK: "#2563eb", // Bleu pour les liens
   SUCCESS: "#16a34a", // Vert succès
+  SUCCESS_BG: "#dcfce7", // Fond vert succès
   ERROR: "#dc2626", // Rouge erreur
   WARNING: "#f59e0b", // Orange avertissement
   INFO: "#3b82f6", // Bleu information
 } as const;
+
+/**
+ * Type dérivé pour s'assurer que seules les couleurs définies sont utilisées
+ */
+export type ColorKey = keyof typeof COLORS;
+
+/**
+ * Helper pour vérifier qu'une couleur existe
+ */
+export const isValidColor = (color: string): color is ColorKey => {
+  return color in COLORS;
+};
+
+/**
+ * Helper pour obtenir une couleur avec fallback
+ */
+export const getColor = (colorKey: ColorKey, fallback?: string): string => {
+  return COLORS[colorKey] || fallback || "#000000";
+};
 
 // ==================== CLÉS DE STOCKAGE ====================
 
@@ -254,7 +277,7 @@ export const STORAGE_KEYS = {
  */
 export const PAGINATION = {
   DEFAULT_PAGE_SIZE: 20, // Nombre d'items par page (migratedStore)
-  LEGACY_PAGE_SIZE: 10, // Ancien nombre d'items (appStore)
+  LEGACY_PAGE_SIZE: 10,
   MAX_PAGE_SIZE: 100,
   DEFAULT_PAGE: 1,
 } as const;
@@ -292,6 +315,13 @@ export const PATHS = {
   EDIT_LISTING: "/edit-listing",
   ADMIN: "/admin",
   ADMIN_NOTIFICATIONS: "/admin/notifications",
+  REQUEST_CONFIRMATION: "/request-confirmation",
+  SIGNUP_FARMER: "/signup-farmer",
+  BECOME_FARMER: "/become-farmer",
+  CONTACT: "/contact",
+  SIGN_IN: "/sign-in",
+  SIGN_UP: "/sign-up",
+  DASHBOARD: "/dashboard",
 
   // API Routes
   API_LISTINGS: "/api/get-listings",
@@ -354,4 +384,17 @@ export const CONSTANTS = {
   PATHS,
   DATE_FORMATS,
   DEFAULT_LOCALE,
+} as const;
+
+export const FEEDBACK_CONFIG = {
+  SUBMIT_URL: "https://submit-form.com/6Rlha6Mzr",
+  BASE_URL: "https://www.farmtofork.fr",
+  SUCCESS_URL: "https://www.farmtofork.fr/feedback/success",
+  ERROR_URL: "https://www.farmtofork.fr/feedback/error",
+} as const;
+
+export const USER_ROLES = {
+  ADMIN: "admin",
+  FARMER: "farmer",
+  USER: "user",
 } as const;

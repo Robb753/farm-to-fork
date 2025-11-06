@@ -2,10 +2,12 @@
 module.exports = {
   darkMode: ["class"],
   content: [
-    "./pages/**/*.{js,jsx}",
-    "./components/**/*.{js,jsx}",
-    "./app/**/*.{js,jsx}",
-    "./src/**/*.{js,jsx}",
+    // ✅ CORRECTION CRITIQUE : Ajouter .tsx et .ts
+    "./pages/**/*.{js,jsx,ts,tsx}",
+    "./components/**/*.{js,jsx,ts,tsx}",
+    "./app/**/*.{js,jsx,ts,tsx}",
+    "./lib/**/*.{js,jsx,ts,tsx}", // ✅ AJOUTÉ : Scanner vos composants dans lib/
+    "./src/**/*.{js,jsx,ts,tsx}",
   ],
   prefix: "",
   theme: {
@@ -23,10 +25,13 @@ module.exports = {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+
+        // ✅ CORRECTION : Couleur primary compatible avec vos COLORS
         primary: {
-          DEFAULT: "rgba(9, 82, 40, .8)",
+          DEFAULT: "#10b981", // Couleur de votre COLORS.PRIMARY
           foreground: "hsl(var(--primary-foreground))",
         },
+
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
           foreground: "hsl(var(--secondary-foreground))",
@@ -51,6 +56,13 @@ module.exports = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+
+        // ✅ AJOUTÉ : Couleurs Farm to Fork
+        "farm-green": {
+          DEFAULT: "#10b981",
+          dark: "#059669",
+          light: "#34d399",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -73,7 +85,14 @@ module.exports = {
       },
     },
   },
-  plugins: [require("tailwindcss-animate"), require("daisyui")],
+  plugins: [
+    require("tailwindcss-animate"),
+    // ✅ TEMPORAIRE : Désactiver daisyui pour tester
+    // require("daisyui")
+  ],
+
+  // ✅ Configuration daisyui temporairement désactivée
+  /*
   daisyui: {
     themes: [
       {
@@ -94,4 +113,5 @@ module.exports = {
       "garden",
     ],
   },
+  */
 };

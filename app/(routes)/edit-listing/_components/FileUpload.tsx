@@ -1,37 +1,87 @@
-// FileUpload.tsx
 "use client";
 
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import { Trash2, Globe } from "@/utils/icons";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import { COLORS } from "@/lib/config";
 
-// Types pour les informations de fichier
+/**
+ * Interfaces TypeScript pour FileUpload
+ */
 interface FileInfo {
   name: string;
   size: string;
 }
 
-// Types pour les images existantes
 interface ImageItem {
   url: string;
 }
 
-// Types pour les props du composant
 interface FileUploadProps {
+  /** Fonction callback pour transmettre les fichiers au parent */
   setImages: (files: File[]) => void;
+  /** Liste des images existantes (optionnel) */
   imageList?: ImageItem[];
+  /** Nombre maximum d'images autorisées */
+  maxImages?: number;
+  /** Taille maximale par fichier en Mo */
+  maxFileSize?: number;
+  /** Types de fichiers acceptés */
+  acceptedTypes?: string[];
+  /** Classe CSS personnalisée */
+  className?: string;
+  /** Afficher la barre de progression */
+  showProgress?: boolean;
 }
 
-const FileUpload: React.FC<FileUploadProps> = ({ setImages, imageList }) => {
+interface ValidationResult {
+  isValid: boolean;
+  error?: string;
+}
+
+/**
+ * Configuration par défaut
+ */
+const DEFAULT_CONFIG = {
+  maxImages: 3,
+  maxFileSize: 5, // Mo
+  acceptedTypes: [
+    "image/png",
+    "image/gif",
+    "image/jpeg",
+    "image/jpg",
+    "image/webp",
+  ],
+  acceptString: "image/png, image/gif, image/jpeg, image/jpg, image/webp",
+};
+
+/**
+ * Hook pour la gestion de l'état des fichiers
+ */
+const useFileUpload = (
+  setImages: (files: File[]) => void,
+  maxImages: number
+) => {
   const [imagePreview, setImagePreview] = useState<string[]>([]);
   const [fileInfo, setFileInfo] = useState<FileInfo[]>([]);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [currentFiles, setCurrentFiles] = useState<File[]>([]);
-
-  // Ref pour éviter les appels multiples
   const isUpdatingRef = useRef<boolean>(false);
 
-  // Fonction pour simuler le progrès de l'upload
+  const notifyParent = useCallback(
+    (files: File[]): void => {
+      if (isUpdatingRef.current) return;
+
+      isUpdatingRef.current = true;
+      requestAnimationFrame(() => {
+        setImages(files);
+        isUpdatingRef.current = false;
+      });
+    },
+    [setImages]
+  );
+
   const simulateProgress = useCallback((): void => {
     setUploadProgress(0);
     let progress = 0;
@@ -44,72 +94,317 @@ const FileUpload: React.FC<FileUploadProps> = ({ setImages, imageList }) => {
     }, 100);
   }, []);
 
-  // Fonction pour notifier le parent avec protection contre les appels multiples
-  const notifyParent = useCallback(
-    (files: File[]): void => {
-      if (isUpdatingRef.current) return;
+  return {
+    imagePreview,
+    setImagePreview,
+    fileInfo,
+    setFileInfo,
+    uploadProgress,
+    setUploadProgress,
+    currentFiles,
+    setCurrentFiles,
+    notifyParent,
+    simulateProgress,
+  };
+};
 
-      isUpdatingRef.current = true;
+/**
+ * Utilitaires de validation
+ */
+class FileValidator {
+  static validateFiles(
+    files: File[],
+    currentCount: number,
+    maxImages: number,
+    maxFileSize: number,
+    acceptedTypes: string[]
+  ): ValidationResult {
+    // Vérification du nombre maximum
+    if (files.length + currentCount > maxImages) {
+      return {
+        isValid: false,
+        error: `Vous pouvez importer un maximum de ${maxImages} images.`,
+      };
+    }
 
-      // Utiliser requestAnimationFrame pour différer l'appel
-      requestAnimationFrame(() => {
-        setImages(files);
-        isUpdatingRef.current = false;
-      });
-    },
-    [setImages]
-  );
+    // Vérification de la taille des fichiers
+    const oversizedFiles = files.filter(
+      (file) => file.size > maxFileSize * 1024 * 1024
+    );
+    if (oversizedFiles.length > 0) {
+      return {
+        isValid: false,
+        error: `Certaines images dépassent la taille maximale de ${maxFileSize} Mo.`,
+      };
+    }
 
-  // Gestion de l'upload de fichiers
+    // Vérification des types de fichiers
+    const invalidTypeFiles = files.filter(
+      (file) => !acceptedTypes.includes(file.type)
+    );
+    if (invalidTypeFiles.length > 0) {
+      return {
+        isValid: false,
+        error: "Certains fichiers ne sont pas dans un format supporté.",
+      };
+    }
+
+    return { isValid: true };
+  }
+
+  static formatFileSize(bytes: number): string {
+    return (bytes / 1024 / 1024).toFixed(2) + " Mo";
+  }
+
+  static createFileInfo(files: File[]): FileInfo[] {
+    return files.map((file) => ({
+      name: file.name,
+      size: FileValidator.formatFileSize(file.size),
+    }));
+  }
+}
+
+/**
+ * Composant de prévisualisation d'image
+ */
+interface ImagePreviewProps {
+  src: string;
+  index: number;
+  fileInfo: FileInfo;
+  onRemove: (index: number) => void;
+}
+
+const ImagePreview: React.FC<ImagePreviewProps> = ({
+  src,
+  index,
+  fileInfo,
+  onRemove,
+}) => (
+  <div className="relative group">
+    <img
+      src={src}
+      className="rounded-lg object-cover h-[100px] w-[100px] shadow-sm transition-transform hover:scale-105"
+      alt={`Aperçu ${index + 1}`}
+      loading="lazy"
+    />
+    <p
+      className="text-xs text-center mt-1 truncate"
+      style={{ color: COLORS.TEXT_SECONDARY }}
+    >
+      {fileInfo.size}
+    </p>
+    <button
+      type="button"
+      onClick={() => onRemove(index)}
+      className="absolute top-1 right-1 rounded-full p-1 opacity-80 hover:opacity-100 transition-opacity shadow-sm"
+      style={{
+        backgroundColor: COLORS.BG_WHITE,
+        color: COLORS.ERROR,
+      }}
+      title="Supprimer cette image"
+    >
+      <Trash2 size={16} />
+    </button>
+  </div>
+);
+
+/**
+ * Composant de barre de progression
+ */
+interface ProgressBarProps {
+  progress: number;
+}
+
+const ProgressBar: React.FC<ProgressBarProps> = ({ progress }) => (
+  <div
+    className="w-full h-2 rounded-full overflow-hidden mb-4"
+    style={{ backgroundColor: COLORS.BG_GRAY }}
+  >
+    <div
+      className="h-full transition-all duration-200 ease-out"
+      style={{
+        width: `${progress}%`,
+        backgroundColor: COLORS.SUCCESS,
+      }}
+    />
+  </div>
+);
+
+/**
+ * Zone de drop pour les fichiers
+ */
+interface DropzoneProps {
+  onFileSelect: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  acceptedTypes: string;
+  maxImages: number;
+  maxFileSize: number;
+}
+
+const Dropzone: React.FC<DropzoneProps> = ({
+  onFileSelect,
+  acceptedTypes,
+  maxImages,
+  maxFileSize,
+}) => (
+  <label
+    htmlFor="dropzone-file"
+    className="flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-lg cursor-pointer transition-colors hover:scale-[1.01]"
+    style={{
+      borderColor: COLORS.BORDER,
+      backgroundColor: COLORS.BG_GRAY,
+    }}
+    onMouseEnter={(e) => {
+      e.currentTarget.style.backgroundColor = COLORS.BG_WHITE;
+      e.currentTarget.style.borderColor = COLORS.PRIMARY;
+    }}
+    onMouseLeave={(e) => {
+      e.currentTarget.style.backgroundColor = COLORS.BG_GRAY;
+      e.currentTarget.style.borderColor = COLORS.BORDER;
+    }}
+  >
+    <input
+      id="dropzone-file"
+      type="file"
+      multiple
+      className="hidden"
+      onChange={onFileSelect}
+      accept={acceptedTypes}
+    />
+
+    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+      <svg
+        className="w-8 h-8 mb-4"
+        style={{ color: COLORS.TEXT_MUTED }}
+        aria-hidden="true"
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 20 16"
+      >
+        <path
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="2"
+          d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"
+        />
+      </svg>
+      <p className="mb-2 text-sm" style={{ color: COLORS.TEXT_MUTED }}>
+        <span className="font-semibold" style={{ color: COLORS.TEXT_PRIMARY }}>
+          Cliquez pour importer
+        </span>{" "}
+        ou glissez-déposez vos images (max {maxImages})
+      </p>
+      <p className="text-xs" style={{ color: COLORS.TEXT_MUTED }}>
+        Formats : JPG, PNG, GIF, WebP – Max : {maxFileSize} Mo/image
+      </p>
+    </div>
+  </label>
+);
+
+/**
+ * Composant FileUpload principal
+ *
+ * Features:
+ * - Upload multiple de fichiers avec validation
+ * - Prévisualisation des images avec suppression
+ * - Barre de progression animée
+ * - Gestion des images existantes
+ * - Validation de taille et de type
+ * - Design system cohérent
+ * - Performance optimisée
+ * - Accessibilité complète
+ *
+ * @param props - Configuration du composant
+ * @returns Composant d'upload de fichiers
+ */
+const FileUpload: React.FC<FileUploadProps> = ({
+  setImages,
+  imageList = [],
+  maxImages = DEFAULT_CONFIG.maxImages,
+  maxFileSize = DEFAULT_CONFIG.maxFileSize,
+  acceptedTypes = DEFAULT_CONFIG.acceptedTypes,
+  className = "",
+  showProgress = true,
+}) => {
+  const {
+    imagePreview,
+    setImagePreview,
+    fileInfo,
+    setFileInfo,
+    uploadProgress,
+    currentFiles,
+    setCurrentFiles,
+    notifyParent,
+    simulateProgress,
+  } = useFileUpload(setImages, maxImages);
+
+  /**
+   * Gestion de l'upload de fichiers avec validation
+   */
   const handleFileUpload = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>): void => {
       const files = Array.from(event.target.files || []);
 
-      // Vérification du nombre maximum d'images
-      if (files.length + imagePreview.length > 3) {
-        toast.error("Vous pouvez importer un maximum de 3 images.");
-        return;
-      }
+      if (files.length === 0) return;
 
-      // Validation des fichiers (taille max 5MB par image)
-      const oversizedFiles = files.filter(
-        (file) => file.size > 5 * 1024 * 1024
+      // Validation des fichiers
+      const validation = FileValidator.validateFiles(
+        files,
+        imagePreview.length,
+        maxImages,
+        maxFileSize,
+        acceptedTypes
       );
-      if (oversizedFiles.length > 0) {
-        toast.error("Certaines images dépassent la taille maximale de 5 Mo.");
+
+      if (!validation.isValid) {
+        toast.error(validation.error);
+        event.target.value = "";
         return;
       }
 
       // Création des previews et infos
       const previews = files.map((file) => URL.createObjectURL(file));
-      const info: FileInfo[] = files.map((file) => ({
-        name: file.name,
-        size: (file.size / 1024 / 1024).toFixed(2) + " Mo",
-      }));
-
+      const info = FileValidator.createFileInfo(files);
       const newFiles = [...currentFiles, ...files];
 
-      // Mise à jour groupée des états locaux
+      // Mise à jour groupée des états
       setCurrentFiles(newFiles);
       setImagePreview((prev) => [...prev, ...previews]);
       setFileInfo((prev) => [...prev, ...info]);
 
-      // Notification au parent
+      // Notification au parent et progression
       notifyParent(newFiles);
+      if (showProgress) {
+        simulateProgress();
+      }
 
-      // Démarrer la simulation du progrès
-      simulateProgress();
-
-      // Réinitialiser l'input pour permettre la sélection du même fichier
+      // Réinitialiser l'input
       event.target.value = "";
+
+      toast.success(
+        `${files.length} image${files.length > 1 ? "s" : ""} ajoutée${files.length > 1 ? "s" : ""}`
+      );
     },
-    [currentFiles, imagePreview.length, notifyParent, simulateProgress]
+    [
+      currentFiles,
+      imagePreview.length,
+      maxImages,
+      maxFileSize,
+      acceptedTypes,
+      notifyParent,
+      simulateProgress,
+      showProgress,
+      setCurrentFiles,
+      setImagePreview,
+      setFileInfo,
+    ]
   );
 
-  // Suppression d'une prévisualisation
+  /**
+   * Suppression d'une prévisualisation
+   */
   const removePreview = useCallback(
     (index: number): void => {
-      // Nettoyer l'URL de l'objet pour éviter les fuites mémoire
       const urlToRevoke = imagePreview[index];
       if (urlToRevoke) {
         URL.revokeObjectURL(urlToRevoke);
@@ -117,40 +412,49 @@ const FileUpload: React.FC<FileUploadProps> = ({ setImages, imageList }) => {
 
       const newFiles = currentFiles.filter((_, i) => i !== index);
 
-      // Mise à jour groupée des états locaux
       setImagePreview((prev) => prev.filter((_, i) => i !== index));
       setFileInfo((prev) => prev.filter((_, i) => i !== index));
       setCurrentFiles(newFiles);
 
-      // Notification au parent
       notifyParent(newFiles);
-
       toast.info("Image retirée de la prévisualisation");
     },
-    [currentFiles, imagePreview, notifyParent]
+    [
+      currentFiles,
+      imagePreview,
+      notifyParent,
+      setImagePreview,
+      setFileInfo,
+      setCurrentFiles,
+    ]
   );
 
-  // Réinitialisation complète
+  /**
+   * Réinitialisation complète
+   */
   const resetAll = useCallback((): void => {
-    // Nettoyer toutes les URLs d'objets
     imagePreview.forEach((url) => {
       URL.revokeObjectURL(url);
     });
 
-    // Réinitialisation des états locaux
     setImagePreview([]);
     setFileInfo([]);
     setCurrentFiles([]);
-    setUploadProgress(0);
-
-    // Notification au parent
     notifyParent([]);
 
     toast.success("Images réinitialisées");
-  }, [imagePreview, notifyParent]);
+  }, [
+    imagePreview,
+    notifyParent,
+    setImagePreview,
+    setFileInfo,
+    setCurrentFiles,
+  ]);
 
-  // Nettoyage des URLs lors du démontage du composant
-  React.useEffect(() => {
+  /**
+   * Nettoyage des URLs lors du démontage
+   */
+  useEffect(() => {
     return () => {
       imagePreview.forEach((url) => {
         URL.revokeObjectURL(url);
@@ -159,52 +463,34 @@ const FileUpload: React.FC<FileUploadProps> = ({ setImages, imageList }) => {
   }, [imagePreview]);
 
   return (
-    <div>
-      <input
-        id="dropzone-file"
-        type="file"
-        multiple
-        className="hidden"
-        onChange={handleFileUpload}
-        accept="image/png, image/gif, image/jpeg, image/jpg, image/webp"
-      />
-
-      <div className="flex items-center justify-between w-full mb-2">
-        <label
-          htmlFor="dropzone-file"
-          className="flex flex-col items-center justify-center w-full h-64 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:hover:border-gray-500 dark:hover:bg-gray-600 transition-colors"
-        >
-          <div className="flex flex-col items-center justify-center pt-5 pb-6">
-            <svg
-              className="w-8 h-8 mb-4 text-gray-500 dark:text-gray-400"
-              aria-hidden="true"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 20 16"
-            >
-              <path
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"
-              />
-            </svg>
-            <p className="mb-2 text-sm text-gray-500 dark:text-gray-400">
-              <span className="font-semibold">Cliquez pour importer</span> ou
-              glissez-déposez vos images (max 3)
-            </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Formats : JPG, PNG, GIF, WebP – Max : 5 Mo/image
-            </p>
-          </div>
-        </label>
+    <div className={cn("space-y-4", className)}>
+      {/* Zone de drop et bouton de reset */}
+      <div className="flex items-start gap-4">
+        <div className="flex-1">
+          <Dropzone
+            onFileSelect={handleFileUpload}
+            acceptedTypes={DEFAULT_CONFIG.acceptString}
+            maxImages={maxImages}
+            maxFileSize={maxFileSize}
+          />
+        </div>
 
         {imagePreview.length > 0 && (
           <button
             type="button"
             onClick={resetAll}
-            className="ml-4 text-sm flex items-center gap-1 text-red-600 hover:text-red-800 transition-colors"
+            className="flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors"
+            style={{
+              borderColor: COLORS.ERROR + "30",
+              color: COLORS.ERROR,
+              backgroundColor: COLORS.ERROR + "10",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = COLORS.ERROR + "20";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = COLORS.ERROR + "10";
+            }}
           >
             <Globe size={16} />
             Réinitialiser
@@ -213,59 +499,62 @@ const FileUpload: React.FC<FileUploadProps> = ({ setImages, imageList }) => {
       </div>
 
       {/* Barre de progression */}
-      {uploadProgress > 0 && uploadProgress < 100 && (
-        <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden mb-4">
-          <div
-            className="bg-green-500 h-full transition-all duration-200 ease-out"
-            style={{ width: `${uploadProgress}%` }}
-          />
-        </div>
+      {showProgress && uploadProgress > 0 && uploadProgress < 100 && (
+        <ProgressBar progress={uploadProgress} />
       )}
 
       {/* Prévisualisations des nouvelles images */}
       {imagePreview.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-10 gap-3 mt-5">
-          {imagePreview.map((src, index) => (
-            <div key={`preview-${index}`} className="relative group">
-              <img
+        <div>
+          <h4
+            className="text-sm font-medium mb-3"
+            style={{ color: COLORS.TEXT_PRIMARY }}
+          >
+            Nouvelles images ({imagePreview.length})
+          </h4>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-10 gap-3">
+            {imagePreview.map((src, index) => (
+              <ImagePreview
+                key={`preview-${index}`}
                 src={src}
-                className="rounded-lg object-cover h-[100px] w-[100px] shadow-sm"
-                alt={`Aperçu ${index + 1}`}
-                loading="lazy"
+                index={index}
+                fileInfo={fileInfo[index]}
+                onRemove={removePreview}
               />
-              <p className="text-xs text-gray-600 text-center mt-1 truncate">
-                {fileInfo[index]?.size}
-              </p>
-              <button
-                type="button"
-                onClick={() => removePreview(index)}
-                className="absolute top-1 right-1 bg-white rounded-full p-1 text-red-500 opacity-80 hover:opacity-100 transition-opacity shadow-sm"
-                title="Supprimer cette image"
-              >
-                <Trash2 size={16} />
-              </button>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
 
       {/* Images existantes */}
-      {imageList && imageList.length > 0 && (
-        <div className="mt-5">
-          <h4 className="text-sm font-medium text-gray-700 mb-3">
-            Images actuelles
+      {imageList.length > 0 && (
+        <div>
+          <h4
+            className="text-sm font-medium mb-3"
+            style={{ color: COLORS.TEXT_PRIMARY }}
+          >
+            Images actuelles ({imageList.length})
           </h4>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-10 gap-3">
             {imageList.map((image, index) => (
               <div key={`existing-${index}`} className="relative">
                 <img
-                  src={image?.url}
+                  src={image.url}
                   width={100}
                   height={100}
                   className="rounded-lg object-cover h-[100px] w-[100px] shadow-sm"
                   alt={`Image existante ${index + 1}`}
                   loading="lazy"
                 />
+                <div
+                  className="absolute top-1 left-1 px-1 py-0.5 rounded text-xs font-medium"
+                  style={{
+                    backgroundColor: COLORS.INFO,
+                    color: COLORS.TEXT_WHITE,
+                  }}
+                >
+                  Actuelle
+                </div>
               </div>
             ))}
           </div>
@@ -273,21 +562,47 @@ const FileUpload: React.FC<FileUploadProps> = ({ setImages, imageList }) => {
       )}
 
       {/* Indicateur du nombre d'images */}
-      <div className="flex justify-between items-center mt-4 text-xs text-gray-500">
+      <div
+        className="flex justify-between items-center pt-3 border-t text-xs"
+        style={{
+          borderColor: COLORS.BORDER,
+          color: COLORS.TEXT_MUTED,
+        }}
+      >
         <span>
           {imagePreview.length} nouvelle{imagePreview.length !== 1 ? "s" : ""}{" "}
           image{imagePreview.length !== 1 ? "s" : ""}
-          {imageList && imageList.length > 0 && (
+          {imageList.length > 0 && (
             <>
               {" "}
               + {imageList.length} existante{imageList.length !== 1 ? "s" : ""}
             </>
           )}
         </span>
-        <span>Maximum : 3 images</span>
+        <span>Maximum : {maxImages} images</span>
+      </div>
+
+      {/* Résumé des limites */}
+      <div
+        className="p-3 rounded-lg text-xs"
+        style={{
+          backgroundColor: COLORS.INFO + "10",
+          borderColor: COLORS.INFO + "30",
+        }}
+      >
+        <div className="flex flex-wrap gap-4">
+          <span>📁 Formats : JPG, PNG, GIF, WebP</span>
+          <span>📏 Taille max : {maxFileSize} Mo/image</span>
+          <span>🔢 Limite : {maxImages} images</span>
+        </div>
       </div>
     </div>
   );
 };
 
 export default FileUpload;
+
+/**
+ * Export des types pour utilisation externe
+ */
+export type { FileUploadProps, FileInfo, ImageItem, ValidationResult };
