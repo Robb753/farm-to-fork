@@ -488,116 +488,130 @@ export default function ModernAuthSystem() {
   );
 
   // Étape 3: Inscription Clerk
-  const SignupStep = () => (
-    <div className="p-8">
-      <div className="mb-6 text-center">
-        <h2
-          className="text-xl font-bold mb-2"
-          style={{ color: COLORS.TEXT_PRIMARY }}
-        >
-          {selectedRole === "farmer"
-            ? "Créer votre compte producteur"
-            : "Créer votre compte"}
-        </h2>
-        <p className="text-sm" style={{ color: COLORS.TEXT_SECONDARY }}>
-          {selectedRole === "farmer"
-            ? "Dernière étape avant de pouvoir publier votre ferme"
-            : "Rejoignez la communauté Farm To Fork"}
-        </p>
-      </div>
+  const SignupStep = () => {
+    // Empêcher l'affichage si déjà connecté
+    if (user) {
+      return null;
+    }
 
-      <SignUp
-        routing="hash"
-        signInUrl="#/sign-in"
-        fallbackRedirectUrl={PATHS.HOME}
-        forceRedirectUrl={PATHS.HOME}
-        appearance={{
-          elements: {
-            formButtonPrimary: "bg-green-600 hover:bg-green-700",
-            card: "shadow-none border-0",
-            headerTitle: "hidden",
-            headerSubtitle: "hidden",
-            footerAction: "hidden",
-          },
-        }}
-        unsafeMetadata={{
-          role: selectedRole,
-          farmerData: selectedRole === "farmer" ? farmerRequestData : null,
-        }}
-      />
+    return (
+      <div className="p-8">
+        <div className="mb-6 text-center">
+          <h2
+            className="text-xl font-bold mb-2"
+            style={{ color: COLORS.TEXT_PRIMARY }}
+          >
+            {selectedRole === "farmer"
+              ? "Créer votre compte producteur"
+              : "Créer votre compte"}
+          </h2>
+          <p className="text-sm" style={{ color: COLORS.TEXT_SECONDARY }}>
+            {selectedRole === "farmer"
+              ? "Dernière étape avant de pouvoir publier votre ferme"
+              : "Rejoignez la communauté Farm To Fork"}
+          </p>
+        </div>
 
-      <div className="mt-4 text-center">
-        <button
-          onClick={() =>
-            setMode(selectedRole === "farmer" ? "farmer-request" : "welcome")
-          }
-          className="text-sm transition-colors"
-          style={{ color: COLORS.TEXT_SECONDARY }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.color = COLORS.TEXT_PRIMARY;
+        <SignUp
+          routing="hash"
+          signInUrl="#/sign-in"
+          fallbackRedirectUrl={PATHS.HOME}
+          forceRedirectUrl={PATHS.HOME}
+          appearance={{
+            elements: {
+              formButtonPrimary: "bg-green-600 hover:bg-green-700",
+              card: "shadow-none border-0",
+              headerTitle: "hidden",
+              headerSubtitle: "hidden",
+              footerAction: "hidden",
+            },
           }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = COLORS.TEXT_SECONDARY;
+          unsafeMetadata={{
+            role: selectedRole,
+            farmerData: selectedRole === "farmer" ? farmerRequestData : null,
           }}
-        >
-          ← Retour
-        </button>
+        />
+
+        <div className="mt-4 text-center">
+          <button
+            onClick={() =>
+              setMode(selectedRole === "farmer" ? "farmer-request" : "welcome")
+            }
+            className="text-sm transition-colors"
+            style={{ color: COLORS.TEXT_SECONDARY }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = COLORS.TEXT_PRIMARY;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = COLORS.TEXT_SECONDARY;
+            }}
+          >
+            ← Retour
+          </button>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // Étape 4: Connexion Clerk
-  const SigninStep = () => (
-    <div className="p-6">
-      <div className="mb-6 text-center">
-        <h2
-          className="text-xl font-bold mb-2"
-          style={{ color: COLORS.TEXT_PRIMARY }}
-        >
-          Bon retour sur Farm To Fork
-        </h2>
-        <p className="text-sm" style={{ color: COLORS.TEXT_SECONDARY }}>
-          Connectez-vous pour accéder à votre espace
-        </p>
-      </div>
+  const SigninStep = () => {
+    // Empêcher l'affichage si déjà connecté
+    if (user) {
+      return null;
+    }
 
-      <SignIn
-        routing="hash"
-        signUpUrl="#/sign-up"
-        fallbackRedirectUrl={PATHS.HOME}
-        forceRedirectUrl={PATHS.HOME}
-        appearance={{
-          elements: {
-            formButtonPrimary: "bg-green-600 hover:bg-green-700",
-            card: "shadow-none border-0",
-            headerTitle: "hidden",
-            headerSubtitle: "hidden",
-            footerActionLink: "text-green-600 hover:text-green-700",
-            footerAction: "hidden",
-          },
-        }}
-      />
+    return (
+      <div className="p-6">
+        <div className="mb-6 text-center">
+          <h2
+            className="text-xl font-bold mb-2"
+            style={{ color: COLORS.TEXT_PRIMARY }}
+          >
+            Bon retour sur Farm To Fork
+          </h2>
+          <p className="text-sm" style={{ color: COLORS.TEXT_SECONDARY }}>
+            Connectez-vous pour accéder à votre espace
+          </p>
+        </div>
 
-      <div className="mt-4 text-center">
-        <p className="text-sm mb-2" style={{ color: COLORS.TEXT_SECONDARY }}>
-          Pas encore de compte ?
-        </p>
-        <button
-          onClick={() => setMode("welcome")}
-          className="font-medium text-sm transition-colors"
-          style={{ color: COLORS.PRIMARY }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.color = COLORS.PRIMARY_DARK;
+        <SignIn
+          routing="hash"
+          signUpUrl="#/sign-up"
+          fallbackRedirectUrl={PATHS.HOME}
+          forceRedirectUrl={PATHS.HOME}
+          appearance={{
+            elements: {
+              formButtonPrimary: "bg-green-600 hover:bg-green-700",
+              card: "shadow-none border-0",
+              headerTitle: "hidden",
+              headerSubtitle: "hidden",
+              footerActionLink: "text-green-600 hover:text-green-700",
+              footerAction: "hidden",
+            },
           }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = COLORS.PRIMARY;
-          }}
-        >
-          Créer un compte
-        </button>
+        />
+
+        <div className="mt-4 text-center">
+          <p className="text-sm mb-2" style={{ color: COLORS.TEXT_SECONDARY }}>
+            Pas encore de compte ?
+          </p>
+          <button
+            onClick={() => setMode("welcome")}
+            className="font-medium text-sm transition-colors"
+            style={{ color: COLORS.PRIMARY }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = COLORS.PRIMARY_DARK;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = COLORS.PRIMARY;
+            }}
+          >
+            Créer un compte
+          </button>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div
