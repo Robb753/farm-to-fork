@@ -76,20 +76,22 @@ export const syncProfileToSupabase = async (
     const email = getEmailFromUser(user);
     if (!email) throw new Error("Email non disponible");
 
-    const { data, error } = await supabase.from("profiles").upsert(
-      {
-        user_id: user.id,
-        email,
-        role,
-        farm_id: 0, // Valeur par défaut (sera mise à jour plus tard)
-        updated_at: new Date().toISOString(),
-        favorites: "[]", // Chaîne JSON vide pour le champ text
-      },
-      {
+    // Préparer les données du profil (sans favorites pour éviter les erreurs de type)
+    const profileData: any = {
+      user_id: user.id,
+      email,
+      role,
+      farm_id: 0, // Valeur par défaut (sera mise à jour plus tard)
+      updated_at: new Date().toISOString(),
+      // On n'inclut pas favorites ici - la valeur par défaut de la colonne sera utilisée
+    };
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .upsert(profileData, {
         onConflict: "user_id",
         ignoreDuplicates: false,
-      }
-    );
+      });
 
     if (error) {
       console.error("[DEBUG] Erreur Supabase:", error);
