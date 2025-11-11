@@ -20,7 +20,7 @@ export interface Database {
           email: string;
           role: "user" | "farmer" | "admin";
           farm_id: number | null;
-          favorites: string; // Type text dans Supabase
+          favorites: Json; // Type jsonb dans Supabase (array de numbers)
           updated_at: string;
         };
         Insert: {
@@ -30,7 +30,7 @@ export interface Database {
           email: string;
           role?: "user" | "farmer" | "admin";
           farm_id?: number | null;
-          favorites?: string;
+          favorites?: Json;
           updated_at?: string;
         };
         Update: {
@@ -40,7 +40,7 @@ export interface Database {
           email?: string;
           role?: "user" | "farmer" | "admin";
           farm_id?: number | null;
-          favorites?: string;
+          favorites?: Json;
           updated_at?: string;
         };
         Relationships: [];

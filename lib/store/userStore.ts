@@ -48,18 +48,6 @@ interface UserState {
   logoutReset: () => Promise<void>;
 }
 
-const parseFavorites = (favorites: string | null): string[] => {
-  if (!favorites) return [];
-
-  try {
-    const parsed = JSON.parse(favorites);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (error) {
-    console.warn("Erreur parsing favorites:", error);
-    return [];
-  }
-};
-
 const INITIAL_STATE: Omit<
   UserState,
   | "setProfile"
@@ -113,15 +101,16 @@ export const useUserStore = create<UserState>()(
 
             if (error) throw error;
 
-            // Parser le JSON string en array
+            // Avec jsonb, Supabase retourne déjà le tableau parsé
             let favoritesArray: number[] = [];
             if (data?.favorites) {
-              try {
-                favoritesArray = JSON.parse(data.favorites);
-              } catch (parseError) {
+              // Si c'est déjà un tableau, utiliser directement
+              if (Array.isArray(data.favorites)) {
+                favoritesArray = data.favorites as number[];
+              } else {
                 console.warn(
-                  "[UserStore] Erreur parsing favorites:",
-                  parseError
+                  "[UserStore] Format de favorites inattendu:",
+                  data.favorites
                 );
                 favoritesArray = [];
               }
@@ -169,10 +158,10 @@ export const useUserStore = create<UserState>()(
           });
 
           try {
-            // Synchronisation avec Supabase (stringify pour le champ text)
+            // Synchronisation avec Supabase (jsonb accepte directement le tableau)
             const { error } = await supabase
               .from("profiles")
-              .update({ favorites: JSON.stringify(updatedFavorites) })
+              .update({ favorites: updatedFavorites })
               .eq("user_id", userId);
 
             if (error) throw error;
