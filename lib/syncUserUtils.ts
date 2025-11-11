@@ -83,7 +83,7 @@ export const syncProfileToSupabase = async (
         role,
         farm_id: 0, // Valeur par défaut (sera mise à jour plus tard)
         updated_at: new Date().toISOString(),
-        favorites: [], // Tableau vide - Supabase le convertira automatiquement
+        favorites: "[]", // Chaîne JSON vide pour le champ text
       },
       {
         onConflict: "user_id",
