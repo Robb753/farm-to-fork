@@ -74,6 +74,28 @@ interface ListItemProps {
   onShowOnMap?: (item: ListingItem) => void;
 }
 
+// ✅ FONCTION UTILITAIRE : Transformation sécurisée des données Supabase vers Listing
+const transformSupabaseToListing = (item: any): any => {
+  return {
+    ...item,
+    // Convertir lat/lng number → string
+    lat: String(item.lat),
+    lng: String(item.lng),
+
+    // Gérer availability: forcer undefined si pas "open" ou "closed"
+    availability:
+      item.availability === "open" || item.availability === "closed"
+        ? item.availability
+        : undefined,
+
+    // S'assurer que les arrays sont bien des arrays
+    product_type: Array.isArray(item.product_type) ? item.product_type : [],
+    certifications: Array.isArray(item.certifications)
+      ? item.certifications
+      : [],
+  };
+};
+
 /* ------------------------------
    UI: Loader & Empty state
 ------------------------------ */
@@ -615,7 +637,11 @@ export default function Listing({
           .limit(500);
 
         if (error) throw error;
-        if (!cancelled) setAllListings(data ?? []);
+        if (!cancelled) {
+          // ✅ CORRECTION FINALE : Utiliser la fonction de transformation
+          const transformedData = (data ?? []).map(transformSupabaseToListing);
+          setAllListings(transformedData);
+        }
       } catch (e) {
         console.error(e);
         toast.error("Impossible de charger les fermes (zone France).");
@@ -659,7 +685,11 @@ export default function Listing({
           .limit(500);
 
         if (error) throw error;
-        if (!cancelled) setAllListings(data ?? []);
+        if (!cancelled) {
+          // ✅ CORRECTION FINALE : Utiliser la fonction de transformation
+          const transformedData = (data ?? []).map(transformSupabaseToListing);
+          setAllListings(transformedData);
+        }
       } catch (e) {
         console.error(e);
         toast.error("Erreur lors du chargement des fermes.");

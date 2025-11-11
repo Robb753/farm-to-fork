@@ -1,5 +1,3 @@
-import { UserRole, Availability } from "@/lib/types/enums";
-
 // ==================== TYPES DE BASE ====================
 
 /**

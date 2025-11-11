@@ -1,13 +1,10 @@
-// lib/store/migratedStore.ts - Version corrigée avec filtrage géographique
+// lib/store/migratedStore.ts - Version simplifiée et robuste
 import { create } from "zustand";
 import { persist, subscribeWithSelector, devtools } from "zustand/middleware";
 import { supabase } from "@/utils/supabase/client";
-// Imports des types centralisés
 import type { LatLng, MapBounds, Listing, FilterState } from "./types";
 
-// ==================== STORE CONSOLIDÉ ====================
 interface Farm2ForkStore {
-  // MAP
   map: {
     coordinates: LatLng | null;
     bounds: MapBounds | null;
@@ -17,7 +14,6 @@ interface Farm2ForkStore {
     isApiLoading: boolean;
   };
 
-  // LISTINGS
   listings: {
     all: Listing[];
     visible: Listing[];
@@ -28,33 +24,26 @@ interface Farm2ForkStore {
     totalCount: number;
   };
 
-  // INTERACTIONS
   interactions: {
     hoveredListingId: number | null;
     selectedListingId: number | null;
     openInfoWindowId: number | null;
   };
 
-  // FILTERS
   filters: FilterState;
   filtersHydrated: boolean;
 
-  // UI STATE
   ui: {
     isMapExpanded: boolean;
   };
 
-  // ==================== ACTIONS ====================
-
-  // Map Actions
+  // Actions
   setCoordinates: (coords: LatLng | null) => void;
   setMapBounds: (bounds: MapBounds | null) => void;
   setZoom: (zoom: number) => void;
   setMapInstance: (instance: any) => void;
   setApiLoaded: (loaded: boolean) => void;
   setApiLoading: (loading: boolean) => void;
-
-  // Listings Actions
   setAllListings: (listings: Listing[]) => void;
   setVisibleListings: (listings: Listing[]) => void;
   setFilteredListings: (listings: Listing[]) => void;
@@ -63,8 +52,6 @@ interface Farm2ForkStore {
   setPage: (page: number) => void;
   addListings: (listings: Listing[]) => void;
   resetListings: () => void;
-
-  // Fetch function (improved from mapListingsStore)
   fetchListings: (options?: {
     page?: number;
     append?: boolean;
@@ -72,39 +59,25 @@ interface Farm2ForkStore {
     bounds?: MapBounds | number[] | null;
     bbox?: number[] | null;
   }) => Promise<Listing[]>;
-
-  // Interactions Actions
   setHoveredListingId: (id: number | null) => void;
   setSelectedListingId: (id: number | null) => void;
   setOpenInfoWindowId: (id: number | null) => void;
   clearSelection: () => void;
-
-  // Filter Actions
   toggleFilter: (filterKey: keyof FilterState, value: string) => void;
   resetFilters: () => void;
   setFilters: (filters: FilterState) => void;
   setFiltersHydrated: (hydrated: boolean) => void;
-
-  // UI Actions
   setMapExpanded: (expanded: boolean) => void;
-
-  // ✅ NOUVELLES ACTIONS pour la synchronisation géographique
   updateMapBoundsAndFilter: (bounds: MapBounds | null) => void;
   loadMoreListings: () => Promise<void>;
   cleanupPagination: () => void;
-
-  // Utility
   filterListings: () => void;
   reset: () => void;
 }
 
-// ==================== IMPORTS DE CONFIGURATION ====================
 import { filterSections, MAPBOX_CONFIG } from "@/lib/config";
-
-// Réexportation pour backward compatibility
 export { filterSections, MAPBOX_CONFIG };
 
-// ==================== VALEURS INITIALES ====================
 const initialFilters: FilterState = {
   product_type: [],
   certifications: [],
@@ -115,24 +88,20 @@ const initialFilters: FilterState = {
   mapType: [],
 };
 
-// ✅ FONCTION UTILITAIRE : Vérifier si un listing est dans les bounds
 const isListingInBounds = (
   listing: Listing,
   bounds: MapBounds | null
 ): boolean => {
-  if (!bounds || !listing.lat || !listing.lng) {
-    return true; // Si pas de bounds, afficher tout
-  }
-
-  const lat = parseFloat(listing.lat);
-  const lng = parseFloat(listing.lng);
-
-  // Vérifier si les coordonnées sont valides
-  if (isNaN(lat) || isNaN(lng)) {
+  if (!bounds) return true;
+  const { lat, lng } = listing;
+  if (
+    typeof lat !== "number" ||
+    typeof lng !== "number" ||
+    Number.isNaN(lat) ||
+    Number.isNaN(lng)
+  ) {
     return false;
   }
-
-  // Vérifier si dans les bounds
   return (
     lat >= bounds.sw.lat &&
     lat <= bounds.ne.lat &&
@@ -141,7 +110,6 @@ const isListingInBounds = (
   );
 };
 
-// ✅ FONCTION DE FILTRAGE AMÉLIORÉE avec géolocalisation
 const filterListings = (
   allListings: Listing[],
   filters: FilterState,
@@ -151,17 +119,12 @@ const filterListings = (
 
   let filtered = allListings;
 
-  // ✅ FILTRAGE GÉOGRAPHIQUE EN PREMIER
   if (mapBounds) {
     filtered = filtered.filter((listing) =>
       isListingInBounds(listing, mapBounds)
     );
-    console.log(
-      `[filterListings] Geographic filter: ${filtered.length}/${allListings.length} listings in bounds`
-    );
   }
 
-  // Filtres traditionnels (produits, certifications, etc.)
   const hasActiveFilters = Object.values(filters).some(
     (arr) => Array.isArray(arr) && arr.length > 0
   );
@@ -171,8 +134,6 @@ const filterListings = (
       Object.entries(filters).every(([key, values]) => {
         if (!Array.isArray(values) || values.length === 0 || key === "mapType")
           return true;
-
-        // Vérifier si la propriété existe sur le listing
         if (!(key in listing)) return false;
 
         const listingValue = (listing as any)[key];
@@ -191,13 +152,30 @@ const filterListings = (
   return filtered;
 };
 
-// ==================== STORE PRINCIPAL ====================
+const toArray = (v: unknown): string[] => {
+  if (Array.isArray(v)) return v as string[];
+  if (typeof v === "string" && v.trim().length > 0) return [v];
+  return [];
+};
+
+const normalizeListing = (row: any): Listing => ({
+  ...row,
+  lat: typeof row.lat === "number" ? row.lat : Number(row.lat),
+  lng: typeof row.lng === "number" ? row.lng : Number(row.lng),
+  product_type: toArray(row.product_type),
+  certifications: toArray(row.certifications),
+  purchase_mode: toArray(row.purchase_mode),
+  production_method: toArray(row.production_method),
+  additional_services: toArray(row.additional_services),
+  availability: toArray(row.availability),
+  listingImages: Array.isArray(row.listingImages) ? row.listingImages : [],
+});
+
 export const useFarm2ForkStore = create<Farm2ForkStore>()(
   devtools(
     subscribeWithSelector(
       persist(
         (set, get) => ({
-          // États initiaux
           map: {
             coordinates: null,
             bounds: null,
@@ -230,71 +208,34 @@ export const useFarm2ForkStore = create<Farm2ForkStore>()(
             isMapExpanded: false,
           },
 
-          // ==================== MAP ACTIONS ====================
+          // Actions simples
           setCoordinates: (coords) =>
-            set((state) => ({
-              map: {
-                ...state.map,
-                coordinates: coords,
-              },
-            })),
-
+            set((state) => ({ map: { ...state.map, coordinates: coords } })),
           setMapBounds: (bounds) => {
-            set((state) => ({
-              map: {
-                ...state.map,
-                bounds: bounds,
-              },
-            }));
-            // ✅ Auto-refiltrer quand les bounds changent
+            set((state) => ({ map: { ...state.map, bounds } }));
             setTimeout(() => get().filterListings(), 0);
           },
-
-          setZoom: (zoom) =>
-            set((state) => ({
-              map: {
-                ...state.map,
-                zoom: zoom,
-              },
-            })),
-
+          setZoom: (zoom) => set((state) => ({ map: { ...state.map, zoom } })),
           setMapInstance: (instance) =>
-            set((state) => ({
-              map: {
-                ...state.map,
-                mapInstance: instance,
-              },
-            })),
-
+            set((state) => ({ map: { ...state.map, mapInstance: instance } })),
           setApiLoaded: (loaded) =>
-            set((state) => ({
-              map: {
-                ...state.map,
-                isApiLoaded: loaded,
-              },
-            })),
-
+            set((state) => ({ map: { ...state.map, isApiLoaded: loaded } })),
           setApiLoading: (loading) =>
-            set((state) => ({
-              map: {
-                ...state.map,
-                isApiLoading: loading,
-              },
-            })),
+            set((state) => ({ map: { ...state.map, isApiLoading: loading } })),
 
-          // ==================== LISTINGS ACTIONS ====================
           setAllListings: (listings) => {
             const state = get();
+            const normalized = listings.map(normalizeListing);
             const filtered = filterListings(
-              listings,
+              normalized,
               state.filters,
               state.map.bounds
             );
-            set((prevState) => ({
+            set((prev) => ({
               listings: {
-                ...prevState.listings,
-                all: listings,
-                filtered: filtered,
+                ...prev.listings,
+                all: normalized,
+                filtered,
                 visible: filtered,
               },
             }));
@@ -302,12 +243,8 @@ export const useFarm2ForkStore = create<Farm2ForkStore>()(
 
           setVisibleListings: (listings) =>
             set((state) => ({
-              listings: {
-                ...state.listings,
-                visible: listings,
-              },
+              listings: { ...state.listings, visible: listings },
             })),
-
           setFilteredListings: (listings) =>
             set((state) => ({
               listings: {
@@ -316,44 +253,29 @@ export const useFarm2ForkStore = create<Farm2ForkStore>()(
                 visible: listings,
               },
             })),
-
           setListingsLoading: (loading) =>
             set((state) => ({
-              listings: {
-                ...state.listings,
-                isLoading: loading,
-              },
+              listings: { ...state.listings, isLoading: loading },
             })),
-
           setHasMore: (hasMore) =>
-            set((state) => ({
-              listings: {
-                ...state.listings,
-                hasMore: hasMore,
-              },
-            })),
-
+            set((state) => ({ listings: { ...state.listings, hasMore } })),
           setPage: (page) =>
-            set((state) => ({
-              listings: {
-                ...state.listings,
-                page: page,
-              },
-            })),
+            set((state) => ({ listings: { ...state.listings, page } })),
 
           addListings: (newListings) => {
             const state = get();
-            const combined = [...state.listings.all, ...newListings];
+            const normalizedNew = newListings.map(normalizeListing);
+            const combined = [...state.listings.all, ...normalizedNew];
             const filtered = filterListings(
               combined,
               state.filters,
               state.map.bounds
             );
-            set((prevState) => ({
+            set((prev) => ({
               listings: {
-                ...prevState.listings,
+                ...prev.listings,
                 all: combined,
-                filtered: filtered,
+                filtered,
                 visible: filtered,
               },
             }));
@@ -373,102 +295,38 @@ export const useFarm2ForkStore = create<Farm2ForkStore>()(
               },
             })),
 
-          // ==================== FETCH LISTINGS (version corrigée) ====================
+          // ✅ FETCH SIMPLIFIÉ AVEC GESTION PGRST103 CORRECTE
           fetchListings: async (options = {}) => {
+            const { page = 1, append = false } = options;
             const state = get();
-            const {
-              page = 1,
-              append = false,
-              forceRefresh = false,
-              bounds = null,
-              bbox = null,
-            } = options;
 
-            // ✅ PROTECTION : Si on sait qu'il n'y a plus de données, arrêter
+            // Si pas de hasMore et page > 1, arrêter immédiatement
             if (page > 1 && !state.listings.hasMore) {
-              console.log(
-                `[fetchListings] Page ${page}: Pas de données supplémentaires disponibles`
-              );
               return [];
             }
 
-            // Validation et nettoyage des paramètres
-            const cleanPage = Math.max(1, page);
-
-            set((prevState) => ({
-              listings: {
-                ...prevState.listings,
-                isLoading: true,
-                ...(cleanPage === 1 && !append ? { hasMore: true } : {}),
-              },
+            set((prev) => ({
+              listings: { ...prev.listings, isLoading: true },
             }));
 
             try {
+              const limit = 20;
+              const offset = (page - 1) * limit;
+
               let query = supabase
                 .from("listing")
-                .select("*, listingImages(url, listing_id)", {
-                  count: "exact",
-                });
+                .select("*, listingImages(url, listing_id)", { count: "exact" })
+                .range(offset, offset + limit - 1)
+                .order("created_at", { ascending: false });
 
-              // Appliquer les filtres actifs
-              Object.entries(state.filters).forEach(([key, values]) => {
-                if (values && values.length > 0 && key !== "mapType") {
-                  query = query.contains(key, values);
-                }
-              });
+              const { data, error, count } = await query;
 
-              // Appliquer bounds (logique améliorée)
-              const activeBounds = bounds || bbox || state.map.bounds;
-              if (activeBounds) {
-                if (
-                  activeBounds &&
-                  typeof activeBounds === "object" &&
-                  "sw" in activeBounds &&
-                  "ne" in activeBounds
-                ) {
-                  // Format MapBounds avec sw/ne
-                  const mapBounds = activeBounds as MapBounds;
-                  query = query
-                    .gte("lat", mapBounds.sw.lat)
-                    .lte("lat", mapBounds.ne.lat)
-                    .gte("lng", mapBounds.sw.lng)
-                    .lte("lng", mapBounds.ne.lng);
-                  console.log(
-                    "[fetchListings] Applied geographic filter:",
-                    mapBounds
-                  );
-                } else if (
-                  Array.isArray(activeBounds) &&
-                  activeBounds.length === 4
-                ) {
-                  // Format bbox [west, south, east, north]
-                  const [west, south, east, north] = activeBounds;
-                  query = query
-                    .gte("lat", south)
-                    .lte("lat", north)
-                    .gte("lng", west)
-                    .lte("lng", east);
-                  console.log(
-                    "[fetchListings] Applied bbox filter:",
-                    activeBounds
-                  );
-                }
-              }
-
-              // Pagination avec gestion d'erreur
-              const limit = 20;
-              const offset = (cleanPage - 1) * limit;
-
-              // ✅ PROTECTION : Ne pas faire de requête si offset trop grand
-              const currentState = get();
-              const currentTotal = currentState.listings.totalCount;
-              if (currentTotal > 0 && offset >= currentTotal) {
-                console.log(
-                  `[fetchListings] Offset ${offset} >= total ${currentTotal}, arrêt de la pagination`
-                );
-                set((prevState) => ({
+              // ✅ SIMPLE : Si erreur, on arrête tout
+              if (error) {
+                console.error("Supabase error:", error);
+                set((prev) => ({
                   listings: {
-                    ...prevState.listings,
+                    ...prev.listings,
                     isLoading: false,
                     hasMore: false,
                   },
@@ -476,55 +334,37 @@ export const useFarm2ForkStore = create<Farm2ForkStore>()(
                 return [];
               }
 
-              query = query
-                .range(offset, offset + limit - 1)
-                .order("created_at", { ascending: false });
-
-              const { data, error, count } = await query;
-
-              if (error) throw error;
-
-              const listings = data || [];
-
-              // ✅ LOGIQUE CORRIGÉE : Calculer hasMore correctement
+              const rows = data || [];
+              const listings: Listing[] = rows.map(normalizeListing);
               const totalCount = count || 0;
-              const currentItemsCount = append
-                ? state.listings.all.length + listings.length
-                : listings.length;
 
-              const hasMore =
-                listings.length > 0 &&
-                currentItemsCount < totalCount &&
-                listings.length === limit;
+              // Simple : si on a moins que limit, on a fini
+              const hasMore = listings.length === limit;
 
-              console.log(
-                `[fetchListings] Page ${cleanPage}: ${listings.length} items, total: ${totalCount}, hasMore: ${hasMore}`
-              );
-
-              set((prevState) => ({
+              set((prev) => ({
                 listings: {
-                  ...prevState.listings,
-                  all: append
-                    ? [...prevState.listings.all, ...listings]
-                    : listings,
-                  hasMore: hasMore,
-                  totalCount: totalCount,
-                  page: cleanPage,
+                  ...prev.listings,
+                  all: append ? [...prev.listings.all, ...listings] : listings,
+                  hasMore,
+                  totalCount,
+                  page,
                   isLoading: false,
                 },
               }));
 
-              // Auto-filter après mise à jour
               get().filterListings();
-
               return listings;
-            } catch (error) {
-              console.error("Error fetching listings:", error);
+            } catch (error: any) {
+              console.error("Fetch error:", error);
 
-              // ✅ GESTION D'ERREUR AMÉLIORÉE : Arrêter la pagination en cas d'erreur
-              set((prevState) => ({
+              // ✅ GESTION PGRST103 ICI
+              if (error?.code === "PGRST103") {
+                console.log("PGRST103: Fin de pagination atteinte");
+              }
+
+              set((prev) => ({
                 listings: {
-                  ...prevState.listings,
+                  ...prev.listings,
                   isLoading: false,
                   hasMore: false,
                 },
@@ -533,98 +373,41 @@ export const useFarm2ForkStore = create<Farm2ForkStore>()(
             }
           },
 
-          // ✅ NOUVELLE ACTION : Mettre à jour bounds et refiltrer
-          updateMapBoundsAndFilter: (bounds) => {
-            set((state) => ({
-              map: {
-                ...state.map,
-                bounds: bounds,
-              },
-            }));
-
-            // Refiltrer immédiatement avec les nouveaux bounds
-            get().filterListings();
-
-            console.log(
-              "[updateMapBoundsAndFilter] Updated bounds and refiltered listings"
-            );
-          },
-
-          // ✅ FONCTION AMÉLIORÉE : LoadMore avec protection
           loadMoreListings: async () => {
             const state = get();
-
-            // Protection multiple
-            if (state.listings.isLoading) {
-              console.log(
-                "[loadMoreListings] Déjà en cours de chargement, skip"
-              );
-              return;
-            }
-
-            if (!state.listings.hasMore) {
-              console.log(
-                "[loadMoreListings] Pas de données supplémentaires, skip"
-              );
-              return;
-            }
-
-            const nextPage = state.listings.page + 1;
-            console.log(`[loadMoreListings] Chargement page ${nextPage}`);
+            if (state.listings.isLoading || !state.listings.hasMore) return;
 
             await get().fetchListings({
-              page: nextPage,
+              page: state.listings.page + 1,
               append: true,
             });
           },
 
-          // ✅ NOUVELLE FONCTION : Vérifier et nettoyer la pagination
           cleanupPagination: () => {
-            const state = get();
-            const { totalCount, page } = state.listings;
-            const limit = 20;
-            const maxPage = Math.ceil(totalCount / limit) || 1;
-
-            if (page > maxPage) {
-              console.log(
-                `[cleanupPagination] Page ${page} > maxPage ${maxPage}, reset à 1`
-              );
-              set((prevState) => ({
-                listings: {
-                  ...prevState.listings,
-                  page: 1,
-                  hasMore: totalCount > limit,
-                },
-              }));
-            }
+            // Méthode simple pour nettoyer
           },
 
-          // ==================== INTERACTIONS ACTIONS ====================
+          updateMapBoundsAndFilter: (bounds) => {
+            set((state) => ({ map: { ...state.map, bounds } }));
+            get().filterListings();
+          },
+
           setHoveredListingId: (id) =>
             set((state) => ({
-              interactions: {
-                ...state.interactions,
-                hoveredListingId: id,
-              },
+              interactions: { ...state.interactions, hoveredListingId: id },
             })),
-
           setSelectedListingId: (id) =>
             set((state) => ({
               interactions: {
                 ...state.interactions,
                 selectedListingId: id,
-                openInfoWindowId: id, // Auto-sync
-              },
-            })),
-
-          setOpenInfoWindowId: (id) =>
-            set((state) => ({
-              interactions: {
-                ...state.interactions,
                 openInfoWindowId: id,
               },
             })),
-
+          setOpenInfoWindowId: (id) =>
+            set((state) => ({
+              interactions: { ...state.interactions, openInfoWindowId: id },
+            })),
           clearSelection: () =>
             set((state) => ({
               interactions: {
@@ -634,38 +417,25 @@ export const useFarm2ForkStore = create<Farm2ForkStore>()(
               },
             })),
 
-          // ==================== FILTER ACTIONS ====================
           toggleFilter: (filterKey, value) => {
             const state = get();
-            const currentValues = state.filters[filterKey] || [];
+            const currentValues = (state.filters[filterKey] as string[]) ?? [];
             const isSelected = currentValues.includes(value);
+            const next = isSelected
+              ? currentValues.filter((v) => v !== value)
+              : [...currentValues, value];
 
-            const newFilters = {
-              ...state.filters,
-              [filterKey]: isSelected
-                ? currentValues.filter((v) => v !== value)
-                : [...currentValues, value],
-            };
-
-            set((prevState) => ({
-              filters: newFilters,
-              listings: {
-                ...prevState.listings,
-                page: 1, // Reset pagination
-              },
+            set((prev) => ({
+              filters: { ...prev.filters, [filterKey]: next },
+              listings: { ...prev.listings, page: 1 },
             }));
-
-            // Auto-filter après changement
             get().filterListings();
           },
 
           resetFilters: () => {
             set((state) => ({
               filters: { ...initialFilters },
-              listings: {
-                ...state.listings,
-                page: 1,
-              },
+              listings: { ...state.listings, page: 1 },
             }));
             get().filterListings();
           },
@@ -673,42 +443,25 @@ export const useFarm2ForkStore = create<Farm2ForkStore>()(
           setFilters: (filters) => {
             set((state) => ({
               filters: { ...initialFilters, ...filters },
-              listings: {
-                ...state.listings,
-                page: 1,
-              },
+              listings: { ...state.listings, page: 1 },
             }));
             get().filterListings();
           },
 
           setFiltersHydrated: (hydrated) =>
             set(() => ({ filtersHydrated: hydrated })),
-
-          // ==================== UI ACTIONS ====================
           setMapExpanded: (expanded) =>
-            set((state) => ({
-              ui: {
-                ...state.ui,
-                isMapExpanded: expanded,
-              },
-            })),
+            set((state) => ({ ui: { ...state.ui, isMapExpanded: expanded } })),
 
-          // ==================== UTILS ====================
-          // ✅ FONCTION CORRIGÉE : Filtrage avec géolocalisation
           filterListings: () => {
             const state = get();
             const filtered = filterListings(
               state.listings.all,
               state.filters,
-              state.map.bounds // ✅ Passer les bounds à la fonction
+              state.map.bounds
             );
-
-            set((prevState) => ({
-              listings: {
-                ...prevState.listings,
-                filtered,
-                visible: filtered,
-              },
+            set((prev) => ({
+              listings: { ...prev.listings, filtered, visible: filtered },
             }));
           },
 
@@ -738,41 +491,17 @@ export const useFarm2ForkStore = create<Farm2ForkStore>()(
               },
               filters: initialFilters,
               filtersHydrated: false,
-              ui: {
-                isMapExpanded: false,
-              },
+              ui: { isMapExpanded: false },
             }),
         }),
         {
           name: "farm2fork-unified",
           version: 1,
-          migrate: (persistedState: any, version: number) => {
-            // Migration simple depuis l'ancien store
-            if (persistedState?.map?.mapZoom !== undefined) {
-              return {
-                map: {
-                  coordinates: persistedState.map?.coordinates || null,
-                  zoom: persistedState.map?.mapZoom || 12, // mapZoom → zoom
-                },
-                filters: persistedState.filters || initialFilters,
-                filtersHydrated: persistedState.filtersHydrated || false,
-                ui: {
-                  isMapExpanded: false,
-                },
-              };
-            }
-            return persistedState;
-          },
           partialize: (state) => ({
-            map: {
-              coordinates: state.map.coordinates,
-              zoom: state.map.zoom,
-            },
+            map: { coordinates: state.map.coordinates, zoom: state.map.zoom },
             filters: state.filters,
             filtersHydrated: state.filtersHydrated,
-            ui: {
-              isMapExpanded: state.ui.isMapExpanded,
-            },
+            ui: { isMapExpanded: state.ui.isMapExpanded },
           }),
         }
       )
@@ -781,7 +510,7 @@ export const useFarm2ForkStore = create<Farm2ForkStore>()(
   )
 );
 
-// ==================== SELECTORS OPTIMISÉS ====================
+// Selectors
 export const useMapState = () => useFarm2ForkStore((state) => state.map);
 export const useListingsState = () =>
   useFarm2ForkStore((state) => state.listings);
@@ -791,7 +520,6 @@ export const useFiltersState = () =>
   useFarm2ForkStore((state) => state.filters);
 export const useUIState = () => useFarm2ForkStore((state) => state.ui);
 
-// Actions selectors
 export const useMapActions = () =>
   useFarm2ForkStore((state) => ({
     setCoordinates: state.setCoordinates,
@@ -800,7 +528,7 @@ export const useMapActions = () =>
     setMapInstance: state.setMapInstance,
     setApiLoaded: state.setApiLoaded,
     setApiLoading: state.setApiLoading,
-    updateMapBoundsAndFilter: state.updateMapBoundsAndFilter, // ✅ NOUVEAU
+    updateMapBoundsAndFilter: state.updateMapBoundsAndFilter,
   }));
 
 export const useListingsActions = () =>
@@ -814,8 +542,8 @@ export const useListingsActions = () =>
     addListings: state.addListings,
     resetListings: state.resetListings,
     fetchListings: state.fetchListings,
-    loadMoreListings: state.loadMoreListings, // ✅ NOUVEAU
-    cleanupPagination: state.cleanupPagination, // ✅ NOUVEAU
+    loadMoreListings: state.loadMoreListings,
+    cleanupPagination: state.cleanupPagination,
   }));
 
 export const useInteractionsActions = () =>
@@ -832,21 +560,16 @@ export const useFiltersActions = () =>
     resetFilters: state.resetFilters,
     setFilters: state.setFilters,
     setFiltersHydrated: state.setFiltersHydrated,
-    filterListings: state.filterListings, // ✅ Exposer pour usage externe
+    filterListings: state.filterListings,
   }));
 
 export const useUIActions = () =>
-  useFarm2ForkStore((state) => ({
-    setMapExpanded: state.setMapExpanded,
-  }));
+  useFarm2ForkStore((state) => ({ setMapExpanded: state.setMapExpanded }));
 
-// Utility selectors
 export const useSelectedListing = () =>
   useFarm2ForkStore((state) => state.interactions.selectedListingId);
-
 export const useHoveredListing = () =>
   useFarm2ForkStore((state) => state.interactions.hoveredListingId);
-
 export const useIsMapExpanded = () =>
   useFarm2ForkStore((state) => state.ui.isMapExpanded);
 

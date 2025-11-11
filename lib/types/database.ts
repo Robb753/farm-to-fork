@@ -70,6 +70,7 @@ export interface Database {
           updated_at: string | null;
           lat: number; // Type float8
           lng: number; // Type float8
+          opening_hours: Json | null;
         };
         Insert: {
           id?: number;
@@ -95,6 +96,7 @@ export interface Database {
           updated_at?: string | null;
           lat: number;
           lng: number;
+          opening_hours?: Json | null;
         };
         Update: {
           id?: number;
@@ -120,6 +122,7 @@ export interface Database {
           updated_at?: string | null;
           lat?: number;
           lng?: number;
+          opening_hours?: Json | null;
         };
         Relationships: [];
       };
@@ -233,6 +236,162 @@ export interface Database {
           },
         ];
       };
+      reviews: {
+        Row: {
+          id: number;
+          listing_id: number;
+          user_id: string | null;
+          rating: number;
+          title: string | null;
+          comment: string;
+          reviewer_name: string | null;
+          reviewer_email: string | null;
+          is_verified: boolean;
+          visit_type: string | null;
+          purchased_products: Json | null;
+          visit_date: string | null;
+          helpful_count: number;
+          not_helpful_count: number;
+          reported_count: number;
+          status: string;
+          moderated_by: string | null;
+          moderated_at: string | null;
+          rejection_reason: string | null;
+          created_at: string;
+          updated_at: string;
+          ip_address: string | null;
+          user_agent: string | null;
+          source: string;
+        };
+        Insert: {
+          id?: number;
+          listing_id: number;
+          user_id?: string | null;
+          rating: number;
+          title?: string | null;
+          comment: string;
+          reviewer_name?: string | null;
+          reviewer_email?: string | null;
+          is_verified?: boolean;
+          visit_type?: string | null;
+          purchased_products?: Json | null;
+          visit_date?: string | null;
+          helpful_count?: number;
+          not_helpful_count?: number;
+          reported_count?: number;
+          status?: string;
+          moderated_by?: string | null;
+          moderated_at?: string | null;
+          rejection_reason?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          ip_address?: string | null;
+          user_agent?: string | null;
+          source?: string;
+        };
+        Update: {
+          id?: number;
+          listing_id?: number;
+          user_id?: string | null;
+          rating?: number;
+          title?: string | null;
+          comment?: string;
+          reviewer_name?: string | null;
+          reviewer_email?: string | null;
+          is_verified?: boolean;
+          visit_type?: string | null;
+          purchased_products?: Json | null;
+          visit_date?: string | null;
+          helpful_count?: number;
+          not_helpful_count?: number;
+          reported_count?: number;
+          status?: string;
+          moderated_by?: string | null;
+          moderated_at?: string | null;
+          rejection_reason?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          ip_address?: string | null;
+          user_agent?: string | null;
+          source?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "reviews_listing_id_fkey";
+            columns: ["listing_id"];
+            referencedRelation: "listing";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      review_votes: {
+        Row: {
+          id: number;
+          review_id: number;
+          user_id: string;
+          vote_type: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          review_id: number;
+          user_id: string;
+          vote_type: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          review_id?: number;
+          user_id?: string;
+          vote_type?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "review_votes_review_id_fkey";
+            columns: ["review_id"];
+            referencedRelation: "reviews";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      review_reports: {
+        Row: {
+          id: number;
+          review_id: number;
+          reporter_user_id: string;
+          reason: string;
+          description: string | null;
+          status: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          review_id: number;
+          reporter_user_id: string;
+          reason: string;
+          description?: string | null;
+          status?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          review_id?: number;
+          reporter_user_id?: string;
+          reason?: string;
+          description?: string | null;
+          status?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "review_reports_review_id_fkey";
+            columns: ["review_id"];
+            referencedRelation: "reviews";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -271,6 +430,10 @@ export type ListingImage = Database["public"]["Tables"]["listingImages"]["Row"];
 export type FarmerRequest =
   Database["public"]["Tables"]["farmer_requests"]["Row"];
 export type Product = Database["public"]["Tables"]["products"]["Row"];
+export type Review = Database["public"]["Tables"]["reviews"]["Row"];
+export type ReviewVote = Database["public"]["Tables"]["review_votes"]["Row"];
+export type ReviewReport =
+  Database["public"]["Tables"]["review_reports"]["Row"];
 
 // Types pour les insertions (sans les champs auto-générés)
 export type ProfileInsert = Database["public"]["Tables"]["profiles"]["Insert"];
@@ -280,6 +443,11 @@ export type ListingImageInsert =
 export type FarmerRequestInsert =
   Database["public"]["Tables"]["farmer_requests"]["Insert"];
 export type ProductInsert = Database["public"]["Tables"]["products"]["Insert"];
+export type ReviewInsert = Database["public"]["Tables"]["reviews"]["Insert"];
+export type ReviewVoteInsert =
+  Database["public"]["Tables"]["review_votes"]["Insert"];
+export type ReviewReportInsert =
+  Database["public"]["Tables"]["review_reports"]["Insert"];
 
 // Types pour les mises à jour
 export type ProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"];
@@ -289,6 +457,11 @@ export type ListingImageUpdate =
 export type FarmerRequestUpdate =
   Database["public"]["Tables"]["farmer_requests"]["Update"];
 export type ProductUpdate = Database["public"]["Tables"]["products"]["Update"];
+export type ReviewUpdate = Database["public"]["Tables"]["reviews"]["Update"];
+export type ReviewVoteUpdate =
+  Database["public"]["Tables"]["review_votes"]["Update"];
+export type ReviewReportUpdate =
+  Database["public"]["Tables"]["review_reports"]["Update"];
 
 // Types pour les énumérations
 export type UserRole = Database["public"]["Enums"]["user_role"];

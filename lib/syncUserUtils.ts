@@ -58,7 +58,7 @@ export const updateClerkRole = async (
 };
 
 /**
- * Synchronise le profil utilisateur avec Supabase
+ * ✅ CORRECTION COMPLÈTE: Synchronise le profil utilisateur avec Supabase
  */
 export const syncProfileToSupabase = async (
   user: UserResource,
@@ -76,29 +76,40 @@ export const syncProfileToSupabase = async (
     const email = getEmailFromUser(user);
     if (!email) throw new Error("Email non disponible");
 
-    const { data, error } = await supabase.from("profiles").upsert(
-      {
-        user_id: user.id,
-        email,
-        role,
-        farm_id: 0, // Valeur par défaut (sera mise à jour plus tard)
-        updated_at: new Date().toISOString(),
-        favorites: [], // Tableau vide - Supabase le convertira automatiquement
-      },
-      {
+    // ✅ CORRECTION: Ne pas mettre farm_id pour les utilisateurs normaux
+    const profileData: any = {
+      user_id: user.id,
+      email,
+      role,
+      updated_at: new Date().toISOString(),
+      favorites: JSON.stringify([]), // ✅ JSON.stringify pour compatibilité Supabase
+    };
+
+    // ✅ Seulement ajouter farm_id si c'est un farmer ET qu'on a un listing
+    if (role === "farmer" && options.createListing) {
+      try {
+        const listingId = await ensureFarmerListing(user.id);
+        profileData.farm_id = listingId;
+      } catch (listingError) {
+        console.warn(
+          "[DEBUG] Impossible de créer le listing, profil sans farm_id:",
+          listingError
+        );
+        // On continue sans farm_id plutôt que de faire échouer toute la création
+      }
+    }
+    // ✅ Pour les users normaux, on ne met PAS de farm_id (NULL par défaut)
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .upsert(profileData, {
         onConflict: "user_id",
         ignoreDuplicates: false,
-      }
-    );
+      });
 
     if (error) {
       console.error("[DEBUG] Erreur Supabase:", error);
       throw new Error(`Erreur Supabase: ${error.message}`);
-    }
-
-    // Créer un listing si nécessaire pour les farmers
-    if (role === "farmer" && options.createListing) {
-      await ensureFarmerListing(user.id);
     }
 
     return true;
@@ -119,44 +130,44 @@ const listingCreationQueue: Array<{
 }> = [];
 
 /**
- * Assure qu'un farmer a un listing dans Supabase
+ * ✅ CORRECTION: Utiliser l'userId au lieu de l'email pour éviter les conflits
  */
-export const ensureFarmerListing = async (email: string): Promise<number> => {
-  if (!email) return Promise.reject(new Error("Email manquant"));
+export const ensureFarmerListing = async (userId: string): Promise<number> => {
+  if (!userId) return Promise.reject(new Error("UserId manquant"));
 
   if (isCreatingListing) {
     return new Promise((resolve, reject) => {
-      listingCreationQueue.push({ email, resolve, reject });
+      listingCreationQueue.push({ email: userId, resolve, reject }); // Réutilise la queue existante
     });
   }
 
   isCreatingListing = true;
 
   try {
-    // Vérifier si le listing existe déjà
+    // Vérifier si le listing existe déjà avec l'userId
     const { data: existingListing, error: checkError } = await supabase
       .from("listing")
       .select("id")
-      .eq("createdBy", email)
+      .eq("createdBy", userId)
       .maybeSingle();
 
     if (checkError) throw checkError;
     if (existingListing) return existingListing.id;
 
-    // Créer un nouveau listing avec les champs selon le vrai schéma
+    // Créer un nouveau listing avec les champs requis
     const { data: newListing, error: createError } = await supabase
       .from("listing")
       .insert({
-        name: `Listing ${email.split("@")[0]}`, // Nom par défaut
+        name: `Ferme de ${userId.substring(0, 8)}`, // Nom par défaut basé sur l'userId
         address: "À compléter", // Champ requis
-        lat: 48.8566, // Paris par défaut (champ float8)
-        lng: 2.3522, // Paris par défaut (champ float8)
-        createdBy: email, // Champ existant dans ta DB
+        lat: 46.2276, // Centre de la France par défaut
+        lng: 2.2137, // Centre de la France par défaut
+        createdBy: userId, // ✅ userId au lieu de l'email
         active: false,
-        email: email, // Aussi disponible dans le schéma
         created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       })
-      .select()
+      .select("id")
       .single();
 
     if (createError) {
@@ -165,7 +176,7 @@ export const ensureFarmerListing = async (email: string): Promise<number> => {
         const { data: conflictListing } = await supabase
           .from("listing")
           .select("id")
-          .eq("createdBy", email)
+          .eq("createdBy", userId)
           .maybeSingle();
 
         if (conflictListing) return conflictListing.id;

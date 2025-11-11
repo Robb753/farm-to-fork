@@ -264,7 +264,9 @@ export const useUserStore = create<UserState>()(
             }
 
             // 3) Synchroniser/mettre à jour le profil Supabase
-            await syncProfileToSupabase(user, resolvedRole);
+            await syncProfileToSupabase(user, resolvedRole, {
+              createListing: resolvedRole === "farmer",
+            });
 
             setReady(true);
           } catch (e: unknown) {
