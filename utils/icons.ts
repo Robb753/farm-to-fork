@@ -24,7 +24,7 @@ export type {
 
 export {
   // ==================== NAVIGATION & UI ====================
-  /** Icône de recherche */
+  /** Icone de recherche */
   Search,
   /** Menu hamburger */
   Menu,

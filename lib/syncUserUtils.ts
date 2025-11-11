@@ -1,18 +1,37 @@
-// lib/syncUserUtils.js
-
+// lib/syncUserUtils.ts
 import { supabase } from "@/utils/supabase/client";
+import type { UserResource } from "@clerk/types";
 
-export const getEmailFromUser = (user) => {
+/**
+ * Types pour la synchronisation utilisateur
+ */
+interface SyncProfileOptions {
+  createListing?: boolean;
+}
+
+type AllowedRole = "user" | "farmer";
+
+/**
+ * Extrait l'email principal d'un utilisateur Clerk
+ */
+export const getEmailFromUser = (user: UserResource | null): string | null => {
+  if (!user) return null;
+
   return (
-    user?.primaryEmailAddress?.emailAddress ||
-    user?.emailAddresses?.[0]?.emailAddress ||
+    user.primaryEmailAddress?.emailAddress ||
+    user.emailAddresses?.[0]?.emailAddress ||
     null
   );
 };
 
-export const updateClerkRole = async (userId, role) => {
+/**
+ * Met à jour le rôle utilisateur dans Clerk via API
+ */
+export const updateClerkRole = async (
+  userId: string,
+  role: AllowedRole
+): Promise<boolean> => {
   try {
-
     const response = await fetch("/api/update-user-role", {
       method: "POST",
       headers: {
@@ -38,14 +57,17 @@ export const updateClerkRole = async (userId, role) => {
   }
 };
 
+/**
+ * Synchronise le profil utilisateur avec Supabase
+ */
 export const syncProfileToSupabase = async (
-  user,
-  role,
-  { createListing = false } = {}
-) => {
+  user: UserResource,
+  role: AllowedRole,
+  options: SyncProfileOptions = {}
+): Promise<boolean> => {
   if (!user) throw new Error("Utilisateur non défini");
 
-  const allowedRoles = ["user", "farmer"];
+  const allowedRoles: AllowedRole[] = ["user", "farmer"];
   if (!allowedRoles.includes(role)) {
     throw new Error(`[SECURITE] Tentative de rôle invalide: ${role}`);
   }
@@ -54,15 +76,14 @@ export const syncProfileToSupabase = async (
     const email = getEmailFromUser(user);
     if (!email) throw new Error("Email non disponible");
 
-
     const { data, error } = await supabase.from("profiles").upsert(
       {
         user_id: user.id,
         email,
         role,
+        farm_id: 0, // Valeur par défaut (sera mise à jour plus tard)
         updated_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        favorites: [],
+        favorites: JSON.stringify([]), // String directement pour le champ text
       },
       {
         onConflict: "user_id",
@@ -75,9 +96,9 @@ export const syncProfileToSupabase = async (
       throw new Error(`Erreur Supabase: ${error.message}`);
     }
 
-
-    if (role === "farmer" && createListing) {
-      await ensureFarmerListing(email);
+    // Créer un listing si nécessaire pour les farmers
+    if (role === "farmer" && options.createListing) {
+      await ensureFarmerListing(user.id);
     }
 
     return true;
@@ -87,10 +108,20 @@ export const syncProfileToSupabase = async (
   }
 };
 
+/**
+ * Queue de création de listings pour éviter les conflits
+ */
 let isCreatingListing = false;
-let listingCreationQueue = [];
+const listingCreationQueue: Array<{
+  email: string;
+  resolve: (id: number) => void;
+  reject: (error: Error) => void;
+}> = [];
 
-export const ensureFarmerListing = async (email) => {
+/**
+ * Assure qu'un farmer a un listing dans Supabase
+ */
+export const ensureFarmerListing = async (email: string): Promise<number> => {
   if (!email) return Promise.reject(new Error("Email manquant"));
 
   if (isCreatingListing) {
@@ -102,6 +133,7 @@ export const ensureFarmerListing = async (email) => {
   isCreatingListing = true;
 
   try {
+    // Vérifier si le listing existe déjà
     const { data: existingListing, error: checkError } = await supabase
       .from("listing")
       .select("id")
@@ -111,11 +143,17 @@ export const ensureFarmerListing = async (email) => {
     if (checkError) throw checkError;
     if (existingListing) return existingListing.id;
 
+    // Créer un nouveau listing avec les champs selon le vrai schéma
     const { data: newListing, error: createError } = await supabase
       .from("listing")
       .insert({
-        createdBy: email,
+        name: `Listing ${email.split("@")[0]}`, // Nom par défaut
+        address: "À compléter", // Champ requis
+        lat: 48.8566, // Paris par défaut (champ float8)
+        lng: 2.3522, // Paris par défaut (champ float8)
+        createdBy: email, // Champ existant dans ta DB
         active: false,
+        email: email, // Aussi disponible dans le schéma
         created_at: new Date().toISOString(),
       })
       .select()
@@ -123,6 +161,7 @@ export const ensureFarmerListing = async (email) => {
 
     if (createError) {
       if (createError.code === "23505") {
+        // Conflit - listing créé entre temps
         const { data: conflictListing } = await supabase
           .from("listing")
           .select("id")
@@ -143,14 +182,21 @@ export const ensureFarmerListing = async (email) => {
   } finally {
     isCreatingListing = false;
 
+    // Traiter le prochain élément de la queue
     if (listingCreationQueue.length > 0) {
-      const next = listingCreationQueue.shift();
+      const next = listingCreationQueue.shift()!;
       ensureFarmerListing(next.email).then(next.resolve).catch(next.reject);
     }
   }
 };
 
-export const getProfileFromSupabase = async (userId, maxAttempts = 5) => {
+/**
+ * Récupère le profil depuis Supabase avec retry automatique
+ */
+export const getProfileFromSupabase = async (
+  userId: string,
+  maxAttempts: number = 5
+): Promise<{ role: AllowedRole } | null> => {
   let attempt = 0;
 
   while (attempt < maxAttempts) {
@@ -162,13 +208,13 @@ export const getProfileFromSupabase = async (userId, maxAttempts = 5) => {
       .eq("user_id", userId)
       .single();
 
-    if (data) return data;
+    if (data) return data as { role: AllowedRole };
 
     if (error?.code === "PGRST116" && attempt < maxAttempts) {
       console.warn(
         `[DEBUG] Tentative ${attempt} : profil non trouvé, nouvelle tentative...`
       );
-      await new Promise((res) => setTimeout(res, 400)); // attendre 400 ms
+      await new Promise((res) => setTimeout(res, 400 * attempt)); // Backoff exponentiel
     } else {
       console.error("[DEBUG] Erreur récupération profil Supabase:", error);
       return null;
@@ -178,14 +224,26 @@ export const getProfileFromSupabase = async (userId, maxAttempts = 5) => {
   return null;
 };
 
-export const determineUserRole = async (user) => {
+/**
+ * Détermine le rôle utilisateur à partir de Clerk et/ou Supabase
+ */
+export const determineUserRole = async (
+  user: UserResource
+): Promise<AllowedRole> => {
   if (!user?.id) return "user";
 
-  const clerkRole = user?.publicMetadata?.role;
-  if (["user", "farmer"].includes(clerkRole)) return clerkRole;
+  // Vérifier d'abord les métadonnées Clerk
+  const clerkRole = (user.publicMetadata as any)?.role;
+  if (["user", "farmer"].includes(clerkRole)) {
+    return clerkRole as AllowedRole;
+  }
 
-  const profile = await getProfileFromSupabase(user.id); // ⬅️ retry intégré
-  if (["user", "farmer"].includes(profile?.role)) return profile.role;
+  // Fallback vers Supabase avec retry intégré
+  const profile = await getProfileFromSupabase(user.id);
+  if (profile?.role && ["user", "farmer"].includes(profile.role)) {
+    return profile.role;
+  }
 
+  // Valeur par défaut sécurisée
   return "user";
 };

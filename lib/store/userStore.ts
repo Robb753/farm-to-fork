@@ -10,8 +10,8 @@ import { toast } from "sonner";
 import { supabase } from "@/utils/supabase/client";
 // Types centralisés
 import type { UserProfile, Role } from "./types";
-// Type Clerk
-import type { User as ClerkUser } from "@clerk/nextjs/server"; // ou "@clerk/nextjs"
+// Type Clerk corrigé
+import type { UserResource } from "@clerk/types";
 
 interface UserState {
   // État utilisateur
@@ -33,8 +33,8 @@ interface UserState {
   setSyncError: (error: string | null) => void;
 
   // Actions métier
-  syncUser: (user: ClerkUser | null) => Promise<void>;
-  resyncRole: (user: ClerkUser | null) => Promise<void>;
+  syncUser: (user: UserResource | null) => Promise<void>;
+  resyncRole: (user: UserResource | null) => Promise<void>;
 
   // Actions favorites (optimisées avec Supabase sync)
   loadFavorites: (userId: string) => Promise<void>;
@@ -47,6 +47,18 @@ interface UserState {
   reset: () => void;
   logoutReset: () => Promise<void>;
 }
+
+const parseFavorites = (favorites: string | null): string[] => {
+  if (!favorites) return [];
+
+  try {
+    const parsed = JSON.parse(favorites);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.warn("Erreur parsing favorites:", error);
+    return [];
+  }
+};
 
 const INITIAL_STATE: Omit<
   UserState,
@@ -101,12 +113,26 @@ export const useUserStore = create<UserState>()(
 
             if (error) throw error;
 
+            // Parser le JSON string en array
+            let favoritesArray: number[] = [];
+            if (data?.favorites) {
+              try {
+                favoritesArray = JSON.parse(data.favorites);
+              } catch (parseError) {
+                console.warn(
+                  "[UserStore] Erreur parsing favorites:",
+                  parseError
+                );
+                favoritesArray = [];
+              }
+            }
+
             set((state) => {
               if (!state.profile) return state;
               return {
                 profile: {
                   ...state.profile,
-                  favorites: data?.favorites || [],
+                  favorites: favoritesArray,
                 },
               };
             });
@@ -124,7 +150,8 @@ export const useUserStore = create<UserState>()(
             return;
           }
 
-          const isCurrentlyFavorite = state.profile.favorites.includes(listingId);
+          const isCurrentlyFavorite =
+            state.profile.favorites.includes(listingId);
           const updatedFavorites = isCurrentlyFavorite
             ? state.profile.favorites.filter((id) => id !== listingId)
             : [...state.profile.favorites, listingId];
@@ -142,18 +169,16 @@ export const useUserStore = create<UserState>()(
           });
 
           try {
-            // Synchronisation avec Supabase
+            // Synchronisation avec Supabase (stringify pour le champ text)
             const { error } = await supabase
               .from("profiles")
-              .update({ favorites: updatedFavorites })
+              .update({ favorites: JSON.stringify(updatedFavorites) })
               .eq("user_id", userId);
 
             if (error) throw error;
 
             toast.success(
-              isCurrentlyFavorite
-                ? "Retiré des favoris"
-                : "Ajouté aux favoris"
+              isCurrentlyFavorite ? "Retiré des favoris" : "Ajouté aux favoris"
             );
           } catch (error) {
             console.error("[UserStore] Error toggling favorite:", error);
