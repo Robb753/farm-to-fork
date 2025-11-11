@@ -9,7 +9,7 @@ interface SyncProfileOptions {
   createListing?: boolean;
 }
 
-type AllowedRole = "user" | "farmer";
+type AllowedRole = "user" | "farmer" | "admin";
 
 /**
  * Extrait l'email principal d'un utilisateur Clerk
@@ -67,7 +67,7 @@ export const syncProfileToSupabase = async (
 ): Promise<boolean> => {
   if (!user) throw new Error("Utilisateur non défini");
 
-  const allowedRoles: AllowedRole[] = ["user", "farmer"];
+  const allowedRoles: AllowedRole[] = ["user", "farmer", "admin"];
   if (!allowedRoles.includes(role)) {
     throw new Error(`[SECURITE] Tentative de rôle invalide: ${role}`);
   }
@@ -83,7 +83,7 @@ export const syncProfileToSupabase = async (
         role,
         farm_id: 0, // Valeur par défaut (sera mise à jour plus tard)
         updated_at: new Date().toISOString(),
-        favorites: JSON.stringify([]), // String directement pour le champ text
+        favorites: [], // Tableau vide - Supabase le convertira automatiquement
       },
       {
         onConflict: "user_id",
@@ -234,13 +234,13 @@ export const determineUserRole = async (
 
   // Vérifier d'abord les métadonnées Clerk
   const clerkRole = (user.publicMetadata as any)?.role;
-  if (["user", "farmer"].includes(clerkRole)) {
+  if (["user", "farmer", "admin"].includes(clerkRole)) {
     return clerkRole as AllowedRole;
   }
 
   // Fallback vers Supabase avec retry intégré
   const profile = await getProfileFromSupabase(user.id);
-  if (profile?.role && ["user", "farmer"].includes(profile.role)) {
+  if (profile?.role && ["user", "farmer", "admin"].includes(profile.role)) {
     return profile.role;
   }
 
