@@ -344,9 +344,10 @@ const PRODUCT_UNITS = [
 
 // ==================== INTERFACES TYPESCRIPT ====================
 
-interface AddProductProps {
+// ✅ Interface Next.js pour les pages avec paramètres dynamiques
+interface PageProps {
   params: { id: string };
-  className?: string;
+  searchParams?: { [key: string]: string | string[] | undefined };
 }
 
 interface ProductFormData {
@@ -516,9 +517,9 @@ const FormValidation: React.FC<FormValidationProps> = ({
 };
 
 /**
- * Composant AddProduct principal avec données produits réelles
+ * ✅ Composant Page Next.js conforme - export default direct
  */
-const AddProduct: React.FC<AddProductProps> = ({ params, className = "" }) => {
+export default function AddProductPage({ params }: PageProps) {
   const router = useRouter();
   const { user, isLoaded, isSignedIn } = useUser();
 
@@ -575,13 +576,12 @@ const AddProduct: React.FC<AddProductProps> = ({ params, className = "" }) => {
       try {
         const productName = getProductName();
 
-        // ✅ CORRECTION : Préparation des données selon le schéma Supabase réel
         const productData: ProductInsert = {
           name: productName,
           description: `${formData.description}\n\nCatégorie: ${formData.subcategory}\nPrix: ${formData.price}€/${formData.unit}\nQuantité disponible: ${formData.quantity}${formData.delivery_options ? `\nOptions de livraison: ${formData.delivery_options}` : ""}`,
           price: parseFloat(formData.price),
           unit: formData.unit,
-          available: true, // Par défaut disponible
+          available: true,
           listing_id: parseInt(params.id, 10),
           created_at: new Date().toISOString(),
         };
@@ -655,7 +655,7 @@ const AddProduct: React.FC<AddProductProps> = ({ params, className = "" }) => {
   ].filter(Boolean) as string[];
 
   return (
-    <div className={cn("container max-w-2xl mx-auto py-12 px-4", className)}>
+    <div className="container max-w-2xl mx-auto py-12 px-4">
       <Card
         className="border-t-4 shadow-sm hover:shadow transition-shadow duration-300"
         style={{ borderTopColor: COLORS.PRIMARY }}
@@ -982,8 +982,7 @@ const AddProduct: React.FC<AddProductProps> = ({ params, className = "" }) => {
       </Card>
     </div>
   );
-};
+}
 
-export default AddProduct;
-
-export type { AddProductProps, ProductFormData, ProductUnit };
+// ✅ Export des types pour réutilisation si nécessaire
+export type { ProductFormData, ProductUnit };
