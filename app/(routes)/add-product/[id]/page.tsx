@@ -575,23 +575,15 @@ const AddProduct: React.FC<AddProductProps> = ({ params, className = "" }) => {
       try {
         const productName = getProductName();
 
-        // Préparation des données selon le schéma Supabase
+        // ✅ CORRECTION : Préparation des données selon le schéma Supabase réel
         const productData: ProductInsert = {
           name: productName,
-          category: formData.subcategory, // Utilise la sous-catégorie comme catégorie
-          type:
-            selectedCategoryData?.data.find((p) => p.name === productName)
-              ?.type || "produit",
-          labels: [
-            `Prix: ${formData.price}€/${formData.unit}`,
-            `Quantité: ${formData.quantity}`,
-            ...(formData.delivery_options
-              ? [`Livraison: ${formData.delivery_options}`]
-              : []),
-          ],
+          description: `${formData.description}\n\nCatégorie: ${formData.subcategory}\nPrix: ${formData.price}€/${formData.unit}\nQuantité disponible: ${formData.quantity}${formData.delivery_options ? `\nOptions de livraison: ${formData.delivery_options}` : ""}`,
+          price: parseFloat(formData.price),
+          unit: formData.unit,
+          available: true, // Par défaut disponible
           listing_id: parseInt(params.id, 10),
           created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
         };
 
         await ProductService.createProduct(productData);
@@ -628,7 +620,6 @@ const AddProduct: React.FC<AddProductProps> = ({ params, className = "" }) => {
       params?.id,
       formData,
       getProductName,
-      selectedCategoryData,
       router,
     ]
   );
