@@ -1,3 +1,5 @@
+"use client"
+
 import { COLORS } from "@/lib/config";
 import React from "react";
 
