@@ -45,7 +45,7 @@ const MapboxCitySearch = dynamic(
 /**
  * Composant HomeContent principal de Farm To Fork
  *
- * Version finale avec styles robustes qui contournent les conflits CSS
+ * ✅ Version corrigée avec z-index et isolation fixés pour la dropdown Mapbox
  */
 const HomeContent: React.FC<HomeContentProps> = ({
   className = "",
@@ -59,13 +59,14 @@ const HomeContent: React.FC<HomeContentProps> = ({
           position: "relative",
           height: "500px",
           borderRadius: "12px",
-          overflow: "hidden",
+          overflow: "visible", // ✅ CHANGÉ : visible au lieu de hidden
           background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
           display: "block",
           width: "100%",
           minHeight: "500px",
           zIndex: 1,
           marginBottom: "2rem",
+          isolation: "auto", // ✅ AJOUTÉ : Empêche l'isolation qui casse le z-index
         }}
       >
         {/* Vidéo en arrière-plan (optionnelle) */}
@@ -83,6 +84,7 @@ const HomeContent: React.FC<HomeContentProps> = ({
             height: "100%",
             objectFit: "cover",
             zIndex: 1,
+            borderRadius: "12px", // ✅ AJOUTÉ : Garde les coins arrondis
           }}
           onError={(e) => {
             // Masquer la vidéo en cas d'erreur - le gradient restera
@@ -100,6 +102,7 @@ const HomeContent: React.FC<HomeContentProps> = ({
             bottom: 0,
             background: "rgba(0,0,0,0.4)",
             zIndex: 2,
+            borderRadius: "12px", // ✅ AJOUTÉ : Garde les coins arrondis
           }}
         />
 
@@ -149,48 +152,25 @@ const HomeContent: React.FC<HomeContentProps> = ({
             l'Europe
           </p>
 
-          {/* Recherche Mapbox */}
+          {/* ✅ CORRECTION : Container de recherche Mapbox avec z-index forcé */}
           <div
-            style={{ width: "100%", maxWidth: "500px", marginBottom: "25px" }}
+            className="hero-search-container" // ✅ Classe CSS spéciale
+            style={{
+              width: "100%",
+              maxWidth: "500px",
+              marginBottom: "25px",
+              position: "relative", // ✅ CRUCIAL
+              zIndex: 200, // ✅ Z-index très élevé
+              isolation: "auto", // ✅ Pas d'isolation
+            }}
+            data-hero-root="true" // ✅ Attribut data pour cibler en CSS
           >
             <MapboxCitySearch
               variant="hero"
               placeholder="🔍 Entrez une ville pour explorer..."
-              className="w-full"
+              className="w-full mapbox-dropdown"
             />
           </div>
-
-          {/* Bouton vers la carte */}
-          {onViewMap && (
-            <button
-              onClick={onViewMap}
-              style={{
-                padding: "15px 30px",
-                backgroundColor: "white",
-                color: "#059669",
-                fontWeight: "bold",
-                borderRadius: "50px",
-                border: "none",
-                fontSize: "16px",
-                cursor: "pointer",
-                boxShadow: "0 4px 15px rgba(0,0,0,0.2)",
-                transition: "all 0.2s ease",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "scale(1.05)";
-                e.currentTarget.style.boxShadow = "0 6px 20px rgba(0,0,0,0.3)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "scale(1)";
-                e.currentTarget.style.boxShadow = "0 4px 15px rgba(0,0,0,0.2)";
-              }}
-            >
-              🗺️ Voir la carte des producteurs
-            </button>
-          )}
         </div>
       </div>
 
@@ -202,6 +182,35 @@ const HomeContent: React.FC<HomeContentProps> = ({
       <div style={{ marginTop: "3rem" }}>
         <EuropeanFeatures />
       </div>
+
+      {/* ✅ CSS inline pour forcer la dropdown au-dessus */}
+      <style jsx global>{`
+        /* Container hero sans isolation */
+        [data-hero-root="true"] {
+          isolation: auto !important;
+          z-index: 200 !important;
+          position: relative !important;
+        }
+
+        /* Force la dropdown Mapbox au-dessus de tout */
+        [data-hero-root="true"] [role="listbox"],
+        [data-hero-root="true"] .dropdown-menu,
+        .mapbox-dropdown [role="listbox"],
+        .mapbox-dropdown .dropdown-menu {
+          position: absolute !important;
+          z-index: 99999 !important;
+          background: white !important;
+          border: 1px solid #e5e7eb !important;
+          border-radius: 12px !important;
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1) !important;
+        }
+
+        /* Supprime l'isolation des parents qui cassent le z-index */
+        .hero-search-container,
+        .hero-search-container * {
+          isolation: auto !important;
+        }
+      `}</style>
     </div>
   );
 };

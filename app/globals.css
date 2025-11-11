@@ -1,9 +1,13 @@
+/* ============ Tailwind ============ */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@import 'mapbox-gl/dist/mapbox-gl.css';
+/* ============ Vendors ============ */
+/* Import Mapbox CSS AVANT nos overrides pour pouvoir surcharger proprement */
+@import "mapbox-gl/dist/mapbox-gl.css";
 
+/* ============ Base (variables + reset doux) ============ */
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -60,184 +64,247 @@
     --chart-5: 340 75% 55%;
   }
 
-  /* ✅ RÈGLES MOINS AGRESSIVES */
-  html {
-    scroll-behavior: smooth;
-  }
-  
+  html { scroll-behavior: smooth; }
   body {
-    background-color: white;
-    color: #1f2937;
+    background-color: #ffffff;
+    color: #1f2937; /* gray-800 */
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   }
-  
-  /* ✅ ÉVITER LE RESET GLOBAL AGRESSIF */
-  /* Remplacé: * { @apply border-border; } */
 }
 
-@keyframes marker-bounce {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  30% {
-    transform: translateY(-10px);
-  }
-  60% {
-    transform: translateY(-5px);
-  }
-}
-
-.marker-hover-effect {
-  animation: marker-bounce 0.6s ease-in-out;
-}
-
+/* ============ Utils légers ============ */
 @layer utilities {
-  .no-gap-bottom {
-    margin-bottom: 0 !important;
-    padding-bottom: 0 !important;
-  }
+  .no-gap-bottom { margin-bottom: 0 !important; padding-bottom: 0 !important; }
 }
 
-/* Styles personnalisés pour les popups Mapbox */
-.mapboxgl-popup {
-  z-index: 100;
+/* ============ Markers (animation ponctuelle) ============ */
+@keyframes marker-bounce {
+  0%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-10px); }
+  60% { transform: translateY(-5px); }
+}
+/* Ajoute/retire cette classe côté JS pour déclencher l’anim une fois */
+.marker-bounce { animation: marker-bounce .6s ease-in-out; }
+
+/* ============ Mapbox – Dropdown & superposition ============ */
+/* Wrapper appliqué sur l'input de recherche (voir composant) */
+.mapbox-dropdown { position: relative; z-index: 50; }
+
+.mapbox-dropdown [role="listbox"],
+.mapbox-dropdown .dropdown-menu {
+  position: absolute;
+  z-index: 9999 !important;
+  background: #fff;
+  border: 1px solid #e5e7eb; /* gray-200 */
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0,0,0,.15);
+}
+
+/* Empêche certains parents (backdrop-blur, sticky…) de clipper les enfants */
+[style*="backdrop-filter"],
+.backdrop-blur,
+.sticky,
+.relative[data-hero-root="true"] {
+  isolation: auto !important;
+  z-index: 200 !important;
+  position: relative !important;
+}
+
+[data-hero-root="true"],
+[data-hero-root="true"] * {
+  isolation: auto !important;
+}
+
+[data-hero-root="true"] {
+  z-index: 100 !important;
+  position: relative !important;
+}
+
+.mapbox-dropdown [role="listbox"],
+.mapbox-dropdown .dropdown-menu,
+[class*="mapbox"] [role="listbox"],
+[class*="mapbox"] [class*="dropdown"],
+[class*="mapbox"] [class*="suggestions"] {
+  position: absolute !important;
+  z-index: 99999 !important;
+  background: white !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 12px !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+  max-height: 320px !important;
+  overflow-y: auto !important;
+}
+
+/* Supprime l'isolation qui casse le z-index */
+.backdrop-blur,
+.backdrop-blur-sm {
+  isolation: auto !important;
+}
+
+/* Force les containers hero à ne pas clipper leurs enfants */
+[style*="backdrop-filter"] {
+  isolation: auto !important;
+}
+
+/* Container spécifique pour la recherche hero */
+.hero-search-container {
+  isolation: auto !important;
+  z-index: 200 !important;
+  position: relative !important;
+}
+
+/* ============ Fix additionnel si problème persiste ============ */
+
+/* Portal pour forcer la dropdown au niveau body si nécessaire */
+.mapbox-dropdown-portal {
+  position: fixed !important;
+  z-index: 99999 !important;
+  pointer-events: auto !important;
+}
+
+.hero-search-container [role="listbox"],
+.mapbox-dropdown [role="listbox"] {
+  z-index: 99999 !important;
+  position: absolute !important;
+}
+
+/* ============ Mapbox – Popups (version consolidée) ============ */
+.mapboxgl-popup { z-index: 100; animation: popup-appear .3s ease-out; }
+@keyframes popup-appear {
+  0% { opacity: 0; transform: translateY(-10px) scale(.95); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .mapboxgl-popup-content {
   padding: 0 !important;
   border-radius: 12px !important;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15), 0 4px 12px rgba(0, 0, 0, 0.1) !important;
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: 0 10px 40px rgba(0,0,0,.15), 0 4px 12px rgba(0,0,0,.1) !important;
+  border: 1px solid rgba(0,0,0,.05);
   overflow: hidden;
-  background: white;
+  background: #fff;
 }
-
-.mapboxgl-popup-tip {
-  border-top-color: white !important;
-}
+.mapboxgl-popup-tip { border-top-color: #fff !important; }
 
 .mapboxgl-popup-close-button {
   right: 8px !important;
   top: 8px !important;
   font-size: 24px !important;
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #6b7280 !important;
-  background: white;
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  color: #6b7280 !important; /* gray-500 */
+  background: #fff;
   border-radius: 50%;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0,0,0,.1);
+  transition: all .2s ease;
   z-index: 10;
-  padding: 0;
-  line-height: 1;
+  padding: 0; line-height: 1;
 }
-
 .mapboxgl-popup-close-button:hover {
-  background: #f3f4f6 !important;
-  color: #1f2937 !important;
+  background: #f3f4f6 !important; /* gray-100 */
+  color: #1f2937 !important;      /* gray-800 */
   transform: scale(1.1);
 }
 
-.mapboxgl-popup-close-button:focus {
-  outline: none;
+.header .mapbox-dropdown [role="listbox"],
+header .mapbox-dropdown [role="listbox"],
+[class*="header"] .mapbox-dropdown [role="listbox"],
+.mapbox-dropdown.header-search [role="listbox"] {
+  z-index: 999999 !important;
+  position: absolute !important;
+  background: white !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 12px !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15) !important;
+  max-height: 320px !important;
+  overflow-y: auto !important;
+  width: 100% !important;
+  top: calc(100% + 8px) !important;
+  left: 0 !important;
 }
 
-/* Style pour les popups de fermes */
-.farm-marker-popup .mapboxgl-popup-content {
-  min-width: 280px;
-  max-width: 300px;
+/* Assure que les filtres/navigation restent en dessous */
+.filter-section,
+.filter-bar,
+[class*="filter"],
+.navigation,
+.sticky {
+  z-index: 50 !important;
 }
 
-.farm-marker-popup .mapboxgl-popup-tip {
-  border-top-color: white !important;
+/* Force pour les headers sticky/fixed */
+header,
+.header,
+[role="banner"] {
+  z-index: 100 !important;
 }
 
-/* Animation d'apparition des popups */
-.mapboxgl-popup {
-  animation: popup-appear 0.3s ease-out;
+/* Mais la dropdown header reste au-dessus de tout */
+header .mapbox-dropdown,
+.header .mapbox-dropdown {
+  z-index: 999999 !important;
+  position: relative !important;
 }
 
-@keyframes popup-appear {
-  0% {
-    opacity: 0;
-    transform: translateY(-10px) scale(0.95);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+/* ============ Utilities pour fermer la dropdown ============ */
+
+/* Classe pour forcer la fermeture */
+.mapbox-dropdown.closed [role="listbox"],
+.mapbox-dropdown[data-closed="true"] [role="listbox"] {
+  display: none !important;
 }
 
+/* Animation de fermeture */
+.mapbox-dropdown [role="listbox"].closing {
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  pointer-events: none;
+}
+
+body[data-route*="/explore"] .mapbox-dropdown [role="listbox"] {
+  display: none !important;
+}
+
+/* Variantes de popup spécifiques */
+.farm-marker-popup .mapboxgl-popup-content { min-width: 280px; max-width: 300px; }
+
+/* ============ Plein écran Map wrapper ============ */
 :where(.mapbox-wrapper, .relative).mapbox-wrapper:fullscreen,
 .mapbox-wrapper:-webkit-full-screen {
   width: 100vw !important;
   height: 100vh !important;
 }
 
-.mapboxgl-popup-content {
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  padding: 0 !important;
-}
+/* ============ Divers ============ */
+[data-sonner-toaster] { z-index: 9999 !important; }
 
-.mapboxgl-popup-tip {
-  display: none !important;
-}
-
-[data-sonner-toaster] {
-  z-index: 9999 !important;
-}
-
-.mapboxgl-map {
-  min-width: 100% !important;
-  min-height: 500px !important;
-}
-
-/* ✅ PROTECTION DES COMPOSANTS FARM TO FORK */
+/* ====== Farm to Fork sections (safe reset local) ====== */
 .explore-nearby-section,
 .european-features-section,
 .home-content-section {
-  /* Réinitialisation pour nos sections */
   background: inherit;
   color: inherit;
 }
 
-/* ✅ STYLES SPÉCIFIQUES POUR NOS COMPOSANTS */
+/* ====== Composants visuels optionnels ====== */
 .f2f-card {
-  background: white;
+  background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px rgba(0,0,0,.1);
 }
-
 .f2f-button {
-  background: #10b981;
-  color: white;
-  border: none;
-  border-radius: 50px;
-  padding: 12px 24px;
-  font-weight: 600;
-  transition: all 0.2s ease;
+  background: #10b981; color: #fff;
+  border: none; border-radius: 50px;
+  padding: 12px 24px; font-weight: 600;
+  transition: all .2s ease;
 }
+.f2f-button:hover { background: #059669; transform: translateY(-1px); }
+.f2f-text-primary { color: #1f2937; }
+.f2f-text-secondary { color: #6b7280; }
+.f2f-text-muted { color: #9ca3af; }
 
-.f2f-button:hover {
-  background: #059669;
-  transform: translateY(-1px);
-}
-
-.f2f-text-primary {
-  color: #1f2937;
-}
-
-.f2f-text-secondary {
-  color: #6b7280;
-}
-
-.f2f-text-muted {
-  color: #9ca3af;
-}
+/* ====== SUPPRIMÉES volontairement ======
+   .mapboxgl-map { min-height: 500px !important; }
+   (à gérer au niveau des composants via Tailwind, ex: min-h-[500px])
+========================================== */

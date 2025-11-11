@@ -240,6 +240,13 @@ const MapboxCitySearch: React.FC<MapboxCitySearchProps> = ({
         } else {
           router.replace(target, { scroll: false });
         }
+        setTimeout(() => {
+          setShowSuggestions(false); // ✅ Fermer les suggestions
+          setSuggestions([]); // ✅ Vider les suggestions
+          if (variant === "header") {
+            setSearchText(""); // ✅ Vider le texte pour header seulement
+          }
+        }, 100);
 
         console.debug(`Navigation vers: ${target}`);
       } catch (error) {
@@ -510,7 +517,7 @@ const MapboxCitySearch: React.FC<MapboxCitySearchProps> = ({
       {showSuggestions && suggestions.length > 0 && (
         <div
           ref={suggestionsRef}
-          className="absolute top-full left-0 right-0 mt-2 rounded-xl shadow-xl z-[400] max-h-80 overflow-y-auto"
+          className="absolute top-full left-0 right-0 mt-2 rounded-xl shadow-xl z-[9999] max-h-80 overflow-y-auto"
           style={{
             backgroundColor: COLORS.BG_WHITE,
             border: `1px solid ${COLORS.BORDER}`,

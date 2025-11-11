@@ -281,7 +281,7 @@ const DesktopListingMapView = (): JSX.Element => {
   }, []);
 
   return (
-    <div 
+    <div
       className="relative flex flex-col"
       style={{ backgroundColor: COLORS.BG_WHITE }}
     >
@@ -292,7 +292,7 @@ const DesktopListingMapView = (): JSX.Element => {
 
       {/* ✅ Overlay pour modale */}
       {isModalOpen && (
-        <div 
+        <div
           className="pointer-events-none fixed inset-0 z-20 backdrop-blur-sm"
           style={{ backgroundColor: `${COLORS.BG_WHITE}99` }} // 60% opacity
         />
@@ -302,11 +302,12 @@ const DesktopListingMapView = (): JSX.Element => {
       <div
         className={cn(
           "sticky top-0 isolate border-b shadow-sm",
-          isModalOpen ? "z-40" : "z-[10]"
+          isModalOpen ? "z-40" : "z-[5]"
         )}
         style={{
           backgroundColor: COLORS.BG_WHITE,
           borderColor: COLORS.BORDER,
+          isolation: "auto",
         }}
       >
         <div className="px-2 lg:px-4">
@@ -316,24 +317,20 @@ const DesktopListingMapView = (): JSX.Element => {
 
       {/* ✅ Split view Liste / Carte */}
       <div className="relative flex h-[calc(100vh-120px)] flex-col transition-all duration-500 ease-in-out md:flex-row">
-        
         {/* ✅ Section Liste */}
         <div
           className={cn(
             "relative overflow-y-auto transition-all duration-500 ease-in-out",
-            isMapExpanded 
-              ? "hidden md:w-0 md:opacity-0" 
+            isMapExpanded
+              ? "hidden md:w-0 md:opacity-0"
               : "w-full md:basis-1/2",
             isModalOpen && "pointer-events-none opacity-50"
           )}
         >
           {/* ✅ Compteur de résultats */}
           <div className="mx-auto w-full max-w-6xl px-3 pt-3">
-            <span 
-              className="text-sm"
-              style={{ color: COLORS.TEXT_SECONDARY }}
-            >
-              <span 
+            <span className="text-sm" style={{ color: COLORS.TEXT_SECONDARY }}>
+              <span
                 className="font-semibold"
                 style={{ color: COLORS.TEXT_PRIMARY }}
               >
@@ -341,10 +338,7 @@ const DesktopListingMapView = (): JSX.Element => {
               </span>{" "}
               {displayedResultsCount > 1 ? "fermes trouvées" : "ferme trouvée"}
               {totalCount > displayedResultsCount && (
-                <span 
-                  className="ml-1"
-                  style={{ color: COLORS.TEXT_MUTED }}
-                >
+                <span className="ml-1" style={{ color: COLORS.TEXT_MUTED }}>
                   (sur {formatNumber(totalCount)})
                 </span>
               )}
@@ -436,7 +430,7 @@ const DesktopListingMapView = (): JSX.Element => {
           type="button"
         >
           {/* ✅ Badge indicateur */}
-          <div 
+          <div
             className={cn(
               "absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center",
               "rounded-full border-2 shadow-md"
@@ -447,18 +441,12 @@ const DesktopListingMapView = (): JSX.Element => {
             }}
           >
             {isMapExpanded ? (
-              <List 
-                className="h-3 w-3" 
-                style={{ color: COLORS.BG_WHITE }}
-              />
+              <List className="h-3 w-3" style={{ color: COLORS.BG_WHITE }} />
             ) : (
-              <MapPin 
-                className="h-3 w-3" 
-                style={{ color: COLORS.BG_WHITE }}
-              />
+              <MapPin className="h-3 w-3" style={{ color: COLORS.BG_WHITE }} />
             )}
           </div>
-          
+
           {/* ✅ Icône principale */}
           {isMapExpanded ? (
             <List className="h-6 w-6 transition-transform group-hover:scale-110" />

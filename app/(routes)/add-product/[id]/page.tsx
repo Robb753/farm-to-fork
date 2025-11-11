@@ -31,150 +31,415 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { COLORS } from "@/lib/config";
+import type { ProductInsert } from "@/lib/types/database";
+
+// ==================== DONNÉES PRODUITS RÉELLES ====================
 
 /**
- * Interfaces TypeScript pour AddProduct
+ * Base de données complète des légumes
  */
+const VEGETABLES_DATA = [
+  // Légumes racines
+  { name: "Carotte", category: "racine", type: "légume", labels: [] },
+  { name: "Betterave rouge", category: "racine", type: "légume", labels: [] },
+  { name: "Radis rose", category: "racine", type: "légume", labels: [] },
+  { name: "Radis noir", category: "racine", type: "légume", labels: [] },
+  { name: "Panais", category: "racine", type: "légume", labels: [] },
+  { name: "Topinambour", category: "racine", type: "légume", labels: [] },
+  { name: "Navet", category: "racine", type: "légume", labels: [] },
+  { name: "Rutabaga", category: "racine", type: "légume", labels: [] },
+
+  // Légumes bulbes
+  { name: "Oignon jaune", category: "bulbe", type: "légume", labels: [] },
+  { name: "Oignon rouge", category: "bulbe", type: "légume", labels: [] },
+  { name: "Échalote", category: "bulbe", type: "légume", labels: [] },
+  { name: "Ail", category: "bulbe", type: "légume", labels: [] },
+  { name: "Poireau", category: "bulbe", type: "légume", labels: [] },
+
+  // Légumes feuilles
+  { name: "Laitue", category: "feuille", type: "légume", labels: [] },
+  { name: "Épinard", category: "feuille", type: "légume", labels: [] },
+  { name: "Mâche", category: "feuille", type: "légume", labels: [] },
+  { name: "Roquette", category: "feuille", type: "légume", labels: [] },
+  { name: "Chou kale", category: "feuille", type: "légume", labels: [] },
+
+  // Légumes fruits
+  { name: "Tomate", category: "fruit", type: "légume", labels: [] },
+  { name: "Courgette", category: "fruit", type: "légume", labels: [] },
+  { name: "Aubergine", category: "fruit", type: "légume", labels: [] },
+  { name: "Poivron", category: "fruit", type: "légume", labels: [] },
+  { name: "Concombre", category: "fruit", type: "légume", labels: [] },
+];
+
+/**
+ * Base de données complète des fruits
+ */
+const FRUITS_DATA = [
+  // Fruits à pépins
+  { name: "Pomme", category: "à pépins", type: "fruit", labels: [] },
+  { name: "Poire", category: "à pépins", type: "fruit", labels: [] },
+  { name: "Coing", category: "à pépins", type: "fruit", labels: [] },
+
+  // Fruits à noyau
+  { name: "Cerise", category: "à noyau", type: "fruit", labels: [] },
+  { name: "Prune", category: "à noyau", type: "fruit", labels: [] },
+  { name: "Pêche", category: "à noyau", type: "fruit", labels: [] },
+  { name: "Abricot", category: "à noyau", type: "fruit", labels: [] },
+
+  // Petits fruits
+  { name: "Fraise", category: "petit fruit", type: "fruit", labels: [] },
+  { name: "Framboise", category: "petit fruit", type: "fruit", labels: [] },
+  { name: "Groseille", category: "petit fruit", type: "fruit", labels: [] },
+  { name: "Cassis", category: "petit fruit", type: "fruit", labels: [] },
+  { name: "Myrtille", category: "petit fruit", type: "fruit", labels: [] },
+
+  // Fruits secs
+  { name: "Noix", category: "fruit sec", type: "fruit", labels: [] },
+  { name: "Noisette", category: "fruit sec", type: "fruit", labels: [] },
+  { name: "Châtaigne", category: "fruit sec", type: "fruit", labels: [] },
+];
+
+/**
+ * Base de données complète des produits laitiers
+ */
+const DAIRY_DATA = [
+  // Laits
+  {
+    name: "Lait cru de vache",
+    category: "lait",
+    type: "produit laitier",
+    labels: [],
+  },
+  {
+    name: "Lait cru de chèvre",
+    category: "lait",
+    type: "produit laitier",
+    labels: ["fermier"],
+  },
+  {
+    name: "Lait cru de brebis",
+    category: "lait",
+    type: "produit laitier",
+    labels: ["fermier"],
+  },
+
+  // Yaourts
+  {
+    name: "Yaourt nature",
+    category: "yaourt",
+    type: "produit laitier",
+    labels: [],
+  },
+  {
+    name: "Yaourt de chèvre",
+    category: "yaourt",
+    type: "produit laitier",
+    labels: ["fermier"],
+  },
+  {
+    name: "Yaourt aux fruits",
+    category: "yaourt",
+    type: "produit laitier",
+    labels: [],
+  },
+
+  // Fromages
+  {
+    name: "Fromage de chèvre frais",
+    category: "fromage de chèvre",
+    type: "produit laitier",
+    labels: ["fermier"],
+  },
+  {
+    name: "Fromage de chèvre affiné",
+    category: "fromage de chèvre",
+    type: "produit laitier",
+    labels: ["fermier"],
+  },
+  {
+    name: "Comté",
+    category: "fromage AOP",
+    type: "produit laitier",
+    labels: ["AOP"],
+  },
+  {
+    name: "Roquefort",
+    category: "fromage AOP",
+    type: "produit laitier",
+    labels: ["AOP"],
+  },
+
+  // Beurres et crèmes
+  {
+    name: "Beurre doux",
+    category: "beurre",
+    type: "produit laitier",
+    labels: [],
+  },
+  {
+    name: "Beurre demi-sel",
+    category: "beurre",
+    type: "produit laitier",
+    labels: [],
+  },
+  {
+    name: "Crème fraîche",
+    category: "crème",
+    type: "produit laitier",
+    labels: [],
+  },
+];
+
+/**
+ * Configuration principale des produits
+ */
+const PRODUCT_CATEGORIES = [
+  {
+    value: "vegetables",
+    label: "Légumes",
+    data: VEGETABLES_DATA,
+    subcategories: [
+      "racine",
+      "bulbe",
+      "feuille",
+      "fruit",
+      "tubercule",
+      "légumineuse",
+      "inflorescence",
+      "tige",
+    ],
+  },
+  {
+    value: "fruits",
+    label: "Fruits",
+    data: FRUITS_DATA,
+    subcategories: [
+      "à pépins",
+      "à noyau",
+      "petit fruit",
+      "fruit sec",
+      "méditerranéen",
+      "exotique acclimaté",
+      "agrume",
+    ],
+  },
+  {
+    value: "dairy",
+    label: "Produits laitiers",
+    data: DAIRY_DATA,
+    subcategories: [
+      "lait",
+      "yaourt",
+      "fromage de chèvre",
+      "fromage AOP",
+      "fromage affiné",
+      "beurre",
+      "crème",
+      "fromage frais",
+    ],
+  },
+  {
+    value: "meat",
+    label: "Viande",
+    data: [
+      {
+        name: "Bœuf de race",
+        category: "bœuf",
+        type: "viande",
+        labels: ["fermier"],
+      },
+      {
+        name: "Porc fermier",
+        category: "porc",
+        type: "viande",
+        labels: ["fermier"],
+      },
+      {
+        name: "Volaille fermière",
+        category: "volaille",
+        type: "viande",
+        labels: ["fermier"],
+      },
+      {
+        name: "Agneau",
+        category: "agneau",
+        type: "viande",
+        labels: ["fermier"],
+      },
+    ],
+    subcategories: ["bœuf", "porc", "volaille", "agneau", "gibier"],
+  },
+  {
+    value: "eggs",
+    label: "Œufs",
+    data: [
+      {
+        name: "Œufs de poule fermiers",
+        category: "œufs de poule",
+        type: "œuf",
+        labels: ["fermier"],
+      },
+      {
+        name: "Œufs de canard",
+        category: "œufs de canard",
+        type: "œuf",
+        labels: ["fermier"],
+      },
+      {
+        name: "Œufs d'oie",
+        category: "œufs d'oie",
+        type: "œuf",
+        labels: ["fermier"],
+      },
+    ],
+    subcategories: ["œufs de poule", "œufs de canard", "œufs d'oie"],
+  },
+  {
+    value: "honey",
+    label: "Miel et produits de la ruche",
+    data: [
+      {
+        name: "Miel de fleurs",
+        category: "miel",
+        type: "produit de la ruche",
+        labels: ["apiculteur"],
+      },
+      {
+        name: "Miel d'acacia",
+        category: "miel",
+        type: "produit de la ruche",
+        labels: ["apiculteur"],
+      },
+      {
+        name: "Propolis",
+        category: "autre",
+        type: "produit de la ruche",
+        labels: ["apiculteur"],
+      },
+      {
+        name: "Gelée royale",
+        category: "autre",
+        type: "produit de la ruche",
+        labels: ["apiculteur"],
+      },
+    ],
+    subcategories: ["miel", "autre"],
+  },
+];
+
+/**
+ * Unités de mesure adaptées
+ */
+const PRODUCT_UNITS = [
+  { value: "kg", label: "Kilogramme (kg)" },
+  { value: "g", label: "Gramme (g)" },
+  { value: "unit", label: "Unité" },
+  { value: "box", label: "Caisse/Barquette" },
+  { value: "dozen", label: "Douzaine" },
+  { value: "l", label: "Litre (L)" },
+  { value: "ml", label: "Millilitre (mL)" },
+  { value: "bunch", label: "Botte" },
+  { value: "basket", label: "Panier" },
+];
+
+// ==================== INTERFACES TYPESCRIPT ====================
+
 interface AddProductProps {
-  /** Paramètres de route contenant l'ID du listing */
-  params: {
-    id: string;
-  };
-  /** Classe CSS personnalisée */
+  params: { id: string };
   className?: string;
 }
 
 interface ProductFormData {
-  title: string;
-  category: ProductCategory;
+  selectedProduct: string;
+  customName: string;
+  category: string;
+  subcategory: string;
   price: string;
-  unit: ProductUnit;
+  unit: string;
   quantity: string;
   description: string;
   delivery_options: string;
-  listingId: string | null;
 }
 
-interface ProductData {
-  title: string;
-  category: ProductCategory;
-  price: string;
-  unit: ProductUnit;
-  quantity: string;
-  description: string;
-  delivery_options: string;
-  listing_id: string;
-  created_by: string;
-  active: boolean;
-  created_at: string;
-}
+type ProductUnit =
+  | "kg"
+  | "g"
+  | "unit"
+  | "box"
+  | "dozen"
+  | "l"
+  | "ml"
+  | "bunch"
+  | "basket";
 
-type ProductCategory =
-  | "vegetables"
-  | "fruits"
-  | "dairy"
-  | "meat"
-  | "eggs"
-  | "honey"
-  | "other"
-  | "";
+// ==================== HOOKS ====================
 
-type ProductUnit = "kg" | "g" | "unit" | "box" | "dozen" | "l" | "ml";
-
-/**
- * Configuration des catégories de produits
- */
-const PRODUCT_CATEGORIES: Array<{
-  value: ProductCategory;
-  label: string;
-}> = [
-  { value: "vegetables", label: "Légumes" },
-  { value: "fruits", label: "Fruits" },
-  { value: "dairy", label: "Produits laitiers" },
-  { value: "meat", label: "Viande" },
-  { value: "eggs", label: "Œufs" },
-  { value: "honey", label: "Miel et produits de la ruche" },
-  { value: "other", label: "Autre" },
-];
-
-/**
- * Configuration des unités de mesure
- */
-const PRODUCT_UNITS: Array<{
-  value: ProductUnit;
-  label: string;
-}> = [
-  { value: "kg", label: "Kilogramme (kg)" },
-  { value: "g", label: "Gramme (g)" },
-  { value: "unit", label: "Unité" },
-  { value: "box", label: "Caisse" },
-  { value: "dozen", label: "Douzaine" },
-  { value: "l", label: "Litre (L)" },
-  { value: "ml", label: "Millilitre (mL)" },
-];
-
-/**
- * Hook pour la gestion du formulaire de produit
- */
 const useProductForm = (listingId: string) => {
   const [formData, setFormData] = useState<ProductFormData>({
-    title: "",
+    selectedProduct: "",
+    customName: "",
     category: "",
+    subcategory: "",
     price: "",
     unit: "kg",
     quantity: "",
     description: "",
     delivery_options: "",
-    listingId,
   });
 
-  const [loading, setLoading] = useState<boolean>(false);
-  const [isPublishing, setIsPublishing] = useState<boolean>(false);
+  const [loading, setLoading] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   const handleChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>): void => {
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       const { name, value } = e.target;
-      setFormData((prev) => ({
-        ...prev,
-        [name]: value,
-      }));
+      setFormData((prev) => ({ ...prev, [name]: value }));
     },
     []
   );
 
   const handleSelectChange = useCallback(
-    (name: keyof ProductFormData, value: string): void => {
-      setFormData((prev) => ({
-        ...prev,
-        [name]: value,
-      }));
+    (name: keyof ProductFormData, value: string) => {
+      setFormData((prev) => {
+        const newData = { ...prev, [name]: value };
+
+        // Reset des champs dépendants
+        if (name === "category") {
+          newData.subcategory = "";
+          newData.selectedProduct = "";
+          newData.customName = "";
+        }
+
+        if (name === "subcategory") {
+          newData.selectedProduct = "";
+          newData.customName = "";
+        }
+
+        return newData;
+      });
     },
     []
   );
 
+  const getProductName = useCallback((): string => {
+    if (formData.selectedProduct === "custom") {
+      return formData.customName;
+    }
+    return formData.selectedProduct;
+  }, [formData.selectedProduct, formData.customName]);
+
   const isFormValid = useCallback((): boolean => {
+    const productName = getProductName();
     return Boolean(
-      formData.title &&
+      productName &&
         formData.category &&
+        formData.subcategory &&
         formData.price &&
         formData.unit &&
         formData.quantity &&
         formData.description
     );
-  }, [formData]);
-
-  const resetForm = useCallback((): void => {
-    setFormData({
-      title: "",
-      category: "",
-      price: "",
-      unit: "kg",
-      quantity: "",
-      description: "",
-      delivery_options: "",
-      listingId,
-    });
-  }, [listingId]);
+  }, [formData, getProductName]);
 
   return {
     formData,
@@ -184,28 +449,28 @@ const useProductForm = (listingId: string) => {
     setIsPublishing,
     handleChange,
     handleSelectChange,
+    getProductName,
     isFormValid,
-    resetForm,
   };
 };
 
-/**
- * Service pour les opérations Supabase de produits
- */
+// ==================== SERVICES ====================
+
 class ProductService {
   static async createProduct(
-    productData: ProductData
-  ): Promise<{ id: string }> {
+    productData: ProductInsert
+  ): Promise<{ id: number }> {
     try {
       const { data, error } = await supabase
         .from("products")
         .insert(productData)
-        .select()
+        .select("id")
         .single();
 
       if (error) throw error;
-      if (!data?.id)
+      if (!data?.id) {
         throw new Error("Aucun ID retourné lors de la création du produit");
+      }
 
       return data;
     } catch (error) {
@@ -215,8 +480,10 @@ class ProductService {
   }
 }
 
+// ==================== COMPOSANTS ====================
+
 /**
- * Composant de validation visuelle du formulaire
+ * Composant de validation visuelle
  */
 interface FormValidationProps {
   isValid: boolean;
@@ -249,20 +516,7 @@ const FormValidation: React.FC<FormValidationProps> = ({
 };
 
 /**
- * Composant AddProduct principal
- *
- * Features:
- * - Formulaire complet de création de produit
- * - Validation stricte avec feedback visuel
- * - Gestion Supabase avec types appropriés
- * - Modes brouillon et publication
- * - Confirmation de publication
- * - Design system cohérent
- * - Loading states optimisés
- * - Gestion d'erreurs contextualisée
- *
- * @param props - Configuration du composant
- * @returns Composant de création de produit
+ * Composant AddProduct principal avec données produits réelles
  */
 const AddProduct: React.FC<AddProductProps> = ({ params, className = "" }) => {
   const router = useRouter();
@@ -276,11 +530,22 @@ const AddProduct: React.FC<AddProductProps> = ({ params, className = "" }) => {
     setIsPublishing,
     handleChange,
     handleSelectChange,
+    getProductName,
     isFormValid,
   } = useProductForm(params?.id || "");
 
+  // Données dynamiques basées sur la sélection
+  const selectedCategoryData = PRODUCT_CATEGORIES.find(
+    (cat) => cat.value === formData.category
+  );
+  const availableSubcategories = selectedCategoryData?.subcategories || [];
+  const availableProducts =
+    selectedCategoryData?.data.filter(
+      (product) => product.category === formData.subcategory
+    ) || [];
+
   /**
-   * Gestion de la soumission du formulaire
+   * Gestion de la soumission
    */
   const handleSubmit = useCallback(
     async (
@@ -299,50 +564,46 @@ const AddProduct: React.FC<AddProductProps> = ({ params, className = "" }) => {
         return;
       }
 
+      if (!params?.id) {
+        toast.error("ID du listing manquant");
+        return;
+      }
+
       setLoading(true);
       setIsPublishing(publish);
 
       try {
-        const userEmail =
-          user.primaryEmailAddress?.emailAddress ||
-          user.emailAddresses?.[0]?.emailAddress;
+        const productName = getProductName();
 
-        if (!userEmail) {
-          throw new Error("Email utilisateur non trouvé");
-        }
-
-        if (!params?.id) {
-          throw new Error("ID du listing manquant");
-        }
-
-        // Préparer les données du produit
-        const productData: ProductData = {
-          title: formData.title,
-          category: formData.category,
-          price: formData.price,
-          unit: formData.unit,
-          quantity: formData.quantity,
-          description: formData.description,
-          delivery_options: formData.delivery_options,
-          listing_id: params.id,
-          created_by: userEmail,
-          active: publish,
+        // Préparation des données selon le schéma Supabase
+        const productData: ProductInsert = {
+          name: productName,
+          category: formData.subcategory, // Utilise la sous-catégorie comme catégorie
+          type:
+            selectedCategoryData?.data.find((p) => p.name === productName)
+              ?.type || "produit",
+          labels: [
+            `Prix: ${formData.price}€/${formData.unit}`,
+            `Quantité: ${formData.quantity}`,
+            ...(formData.delivery_options
+              ? [`Livraison: ${formData.delivery_options}`]
+              : []),
+          ],
+          listing_id: parseInt(params.id, 10),
           created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         };
 
-        // Créer le produit
         await ProductService.createProduct(productData);
 
-        // Messages de succès
-        if (publish) {
-          toast.success("Produit publié avec succès !");
-        } else {
-          toast.success("Produit enregistré comme brouillon");
-        }
+        toast.success(
+          publish
+            ? "Produit publié avec succès !"
+            : "Produit enregistré avec succès"
+        );
 
-        // Redirection avec délai pour l'UX
         setTimeout(() => {
-          router.push("/farmer/products");
+          router.push(`/listing/${params.id}`);
         }, 1500);
       } catch (error) {
         console.error("Erreur lors de l'ajout du produit:", error);
@@ -352,12 +613,6 @@ const AddProduct: React.FC<AddProductProps> = ({ params, className = "" }) => {
 
         if (errorMessage.includes("permission")) {
           toast.error("Erreur de permissions. Vérifiez vos droits d'accès.");
-        } else if (errorMessage.includes("constraint")) {
-          toast.error("Erreur de contrainte de base de données.");
-        } else if (errorMessage.includes("network")) {
-          toast.error(
-            "Erreur de connexion. Vérifiez votre connexion Internet."
-          );
         } else {
           toast.error(`Erreur lors de l'enregistrement: ${errorMessage}`);
         }
@@ -372,20 +627,20 @@ const AddProduct: React.FC<AddProductProps> = ({ params, className = "" }) => {
       user,
       params?.id,
       formData,
+      getProductName,
+      selectedCategoryData,
       router,
-      setLoading,
-      setIsPublishing,
     ]
   );
 
-  // Vérification d'authentification
+  // Loading state
   if (!isLoaded) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="flex flex-col items-center gap-4">
-          <div
-            className="animate-spin h-12 w-12 rounded-full border-t-2 border-b-2"
-            style={{ borderColor: COLORS.PRIMARY }}
+          <Loader2
+            className="h-12 w-12 animate-spin"
+            style={{ color: COLORS.PRIMARY }}
           />
           <p style={{ color: COLORS.TEXT_SECONDARY }}>Chargement...</p>
         </div>
@@ -398,9 +653,11 @@ const AddProduct: React.FC<AddProductProps> = ({ params, className = "" }) => {
     return null;
   }
 
+  const productName = getProductName();
   const requiredFields = [
-    !formData.title && "Titre de l'annonce",
-    !formData.category && "Catégorie",
+    !productName && "Nom du produit",
+    !formData.category && "Catégorie principale",
+    !formData.subcategory && "Sous-catégorie",
     !formData.price && "Prix",
     !formData.quantity && "Quantité disponible",
     !formData.description && "Description du produit",
@@ -420,94 +677,154 @@ const AddProduct: React.FC<AddProductProps> = ({ params, className = "" }) => {
             Ajouter un nouveau produit
           </CardTitle>
           <CardDescription style={{ color: COLORS.TEXT_SECONDARY }}>
-            Renseignez les détails de votre produit pour le publier sur la
-            plateforme
+            Sélectionnez votre produit dans notre base de données ou créez un
+            produit personnalisé
           </CardDescription>
         </CardHeader>
 
         <CardContent>
-          <form id="productForm" className="space-y-6">
-            {/* Titre */}
-            <div className="space-y-2">
-              <Label
-                htmlFor="title"
-                className="font-medium"
-                style={{ color: COLORS.TEXT_PRIMARY }}
-              >
-                Titre de l'annonce *
-              </Label>
-              <Input
-                id="title"
-                placeholder="Ex: Tomates fraîches bio"
-                name="title"
-                value={formData.title}
-                onChange={handleChange}
-                required
-              />
-            </div>
-
-            {/* Catégorie */}
+          <form className="space-y-6">
+            {/* Catégorie principale */}
             <div className="space-y-2">
               <Label
                 htmlFor="category"
                 className="font-medium"
                 style={{ color: COLORS.TEXT_PRIMARY }}
               >
-                Catégorie *
+                Catégorie principale *
               </Label>
               <select
                 id="category"
-                name="category"
                 value={formData.category}
                 onChange={(e) => handleSelectChange("category", e.target.value)}
-                className="w-full px-3 py-2 border rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-offset-1"
+                className="w-full px-3 py-2 border rounded-md bg-white text-sm focus:outline-none focus:ring-2"
                 style={{
                   borderColor: COLORS.BORDER,
                   color: COLORS.TEXT_PRIMARY,
                 }}
-                onFocus={(e) => {
-                  e.target.style.borderColor = COLORS.PRIMARY;
-                  e.target.style.boxShadow = `0 0 0 2px ${COLORS.PRIMARY}20`;
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = COLORS.BORDER;
-                  e.target.style.boxShadow = "none";
-                }}
                 required
               >
                 <option value="">Sélectionnez une catégorie</option>
-                {PRODUCT_CATEGORIES.map((category) => (
-                  <option key={category.value} value={category.value}>
-                    {category.label}
+                {PRODUCT_CATEGORIES.map((cat) => (
+                  <option key={cat.value} value={cat.value}>
+                    {cat.label}
                   </option>
                 ))}
               </select>
             </div>
 
+            {/* Sous-catégorie */}
+            {formData.category && (
+              <div className="space-y-2">
+                <Label
+                  htmlFor="subcategory"
+                  className="font-medium"
+                  style={{ color: COLORS.TEXT_PRIMARY }}
+                >
+                  Sous-catégorie *
+                </Label>
+                <select
+                  id="subcategory"
+                  value={formData.subcategory}
+                  onChange={(e) =>
+                    handleSelectChange("subcategory", e.target.value)
+                  }
+                  className="w-full px-3 py-2 border rounded-md bg-white text-sm focus:outline-none focus:ring-2"
+                  style={{
+                    borderColor: COLORS.BORDER,
+                    color: COLORS.TEXT_PRIMARY,
+                  }}
+                  required
+                >
+                  <option value="">Sélectionnez une sous-catégorie</option>
+                  {availableSubcategories.map((sub) => (
+                    <option key={sub} value={sub}>
+                      {sub}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Sélection du produit */}
+            {formData.subcategory && (
+              <div className="space-y-2">
+                <Label
+                  htmlFor="selectedProduct"
+                  className="font-medium"
+                  style={{ color: COLORS.TEXT_PRIMARY }}
+                >
+                  Produit *
+                </Label>
+                <select
+                  id="selectedProduct"
+                  value={formData.selectedProduct}
+                  onChange={(e) =>
+                    handleSelectChange("selectedProduct", e.target.value)
+                  }
+                  className="w-full px-3 py-2 border rounded-md bg-white text-sm focus:outline-none focus:ring-2"
+                  style={{
+                    borderColor: COLORS.BORDER,
+                    color: COLORS.TEXT_PRIMARY,
+                  }}
+                  required
+                >
+                  <option value="">Sélectionnez un produit</option>
+                  {availableProducts.map((product) => (
+                    <option key={product.name} value={product.name}>
+                      {product.name}
+                    </option>
+                  ))}
+                  <option value="custom">➕ Produit personnalisé</option>
+                </select>
+              </div>
+            )}
+
+            {/* Nom personnalisé */}
+            {formData.selectedProduct === "custom" && (
+              <div className="space-y-2">
+                <Label
+                  htmlFor="customName"
+                  className="font-medium"
+                  style={{ color: COLORS.TEXT_PRIMARY }}
+                >
+                  Nom du produit personnalisé *
+                </Label>
+                <Input
+                  id="customName"
+                  name="customName"
+                  value={formData.customName}
+                  onChange={handleChange}
+                  placeholder="Ex: Tomates cerises variété ancienne"
+                  required
+                />
+              </div>
+            )}
+
             {/* Prix, Unité, Quantité */}
             <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2 col-span-1">
+              <div className="space-y-2">
                 <Label
                   htmlFor="price"
                   className="font-medium"
                   style={{ color: COLORS.TEXT_PRIMARY }}
                 >
-                  Prix *
+                  Prix (€) *
                 </Label>
                 <Input
                   id="price"
+                  name="price"
                   type="number"
                   step="0.01"
                   min="0"
-                  placeholder="0.00"
-                  name="price"
                   value={formData.price}
                   onChange={handleChange}
+                  placeholder="0.00"
                   required
                 />
               </div>
 
-              <div className="space-y-2 col-span-1">
+              <div className="space-y-2">
                 <Label
                   htmlFor="unit"
                   className="font-medium"
@@ -517,21 +834,12 @@ const AddProduct: React.FC<AddProductProps> = ({ params, className = "" }) => {
                 </Label>
                 <select
                   id="unit"
-                  name="unit"
                   value={formData.unit}
                   onChange={(e) => handleSelectChange("unit", e.target.value)}
-                  className="w-full px-3 py-2 border rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-offset-1"
+                  className="w-full px-3 py-2 border rounded-md bg-white text-sm focus:outline-none focus:ring-2"
                   style={{
                     borderColor: COLORS.BORDER,
                     color: COLORS.TEXT_PRIMARY,
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = COLORS.PRIMARY;
-                    e.target.style.boxShadow = `0 0 0 2px ${COLORS.PRIMARY}20`;
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = COLORS.BORDER;
-                    e.target.style.boxShadow = "none";
                   }}
                   required
                 >
@@ -543,22 +851,22 @@ const AddProduct: React.FC<AddProductProps> = ({ params, className = "" }) => {
                 </select>
               </div>
 
-              <div className="space-y-2 col-span-1">
+              <div className="space-y-2">
                 <Label
                   htmlFor="quantity"
                   className="font-medium"
                   style={{ color: COLORS.TEXT_PRIMARY }}
                 >
-                  Quantité disponible *
+                  Quantité *
                 </Label>
                 <Input
                   id="quantity"
+                  name="quantity"
                   type="number"
                   min="1"
-                  placeholder="10"
-                  name="quantity"
                   value={formData.quantity}
                   onChange={handleChange}
+                  placeholder="10"
                   required
                 />
               </div>
@@ -575,11 +883,11 @@ const AddProduct: React.FC<AddProductProps> = ({ params, className = "" }) => {
               </Label>
               <Textarea
                 id="description"
-                placeholder="Décrivez votre produit en détail (variété, méthode de culture, fraîcheur, etc.)"
-                className="min-h-[120px]"
                 name="description"
                 value={formData.description}
                 onChange={handleChange}
+                placeholder="Décrivez votre produit en détail (variété, méthode de culture, fraîcheur, etc.)"
+                className="min-h-[120px]"
                 required
               />
             </div>
@@ -595,18 +903,15 @@ const AddProduct: React.FC<AddProductProps> = ({ params, className = "" }) => {
               </Label>
               <Textarea
                 id="delivery_options"
-                placeholder="Ex: Livraison à domicile dans un rayon de 20km, récupération à la ferme le weekend..."
-                className="min-h-[80px]"
                 name="delivery_options"
                 value={formData.delivery_options}
                 onChange={handleChange}
+                placeholder="Ex: Livraison à domicile, récupération à la ferme..."
+                className="min-h-[80px]"
               />
-              <p className="text-sm mt-1" style={{ color: COLORS.TEXT_MUTED }}>
-                Précisez les modalités de livraison ou de récupération
-              </p>
             </div>
 
-            {/* Validation du formulaire */}
+            {/* Validation */}
             <FormValidation
               isValid={isFormValid()}
               requiredFields={requiredFields}
@@ -621,7 +926,6 @@ const AddProduct: React.FC<AddProductProps> = ({ params, className = "" }) => {
           <Button
             variant="outline"
             onClick={() => router.back()}
-            className="flex items-center"
             disabled={loading}
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -629,12 +933,10 @@ const AddProduct: React.FC<AddProductProps> = ({ params, className = "" }) => {
           </Button>
 
           <div className="flex gap-3">
-            {/* Bouton Brouillon */}
             <Button
               variant="outline"
               disabled={loading || !isFormValid()}
               onClick={(e) => handleSubmit(e, false)}
-              className="flex items-center"
             >
               {loading && !isPublishing ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -644,26 +946,13 @@ const AddProduct: React.FC<AddProductProps> = ({ params, className = "" }) => {
               Enregistrer
             </Button>
 
-            {/* Bouton Publier avec confirmation */}
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
                   disabled={loading || !isFormValid()}
-                  className="transition-colors"
                   style={{
                     backgroundColor: COLORS.PRIMARY,
                     color: COLORS.TEXT_WHITE,
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!loading && isFormValid()) {
-                      e.currentTarget.style.backgroundColor =
-                        COLORS.PRIMARY_DARK;
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (isFormValid()) {
-                      e.currentTarget.style.backgroundColor = COLORS.PRIMARY;
-                    }
                   }}
                 >
                   {loading && isPublishing ? (
@@ -679,15 +968,14 @@ const AddProduct: React.FC<AddProductProps> = ({ params, className = "" }) => {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Publier ce produit ?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Une fois publié, votre produit sera visible par tous les
-                    utilisateurs.
+                    Une fois publié, votre produit "{productName}" sera visible
+                    par tous les utilisateurs.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Annuler</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={(e) => handleSubmit(e, true)}
-                    className="transition-colors"
                     style={{
                       backgroundColor: COLORS.PRIMARY,
                       color: COLORS.TEXT_WHITE,
@@ -707,7 +995,4 @@ const AddProduct: React.FC<AddProductProps> = ({ params, className = "" }) => {
 
 export default AddProduct;
 
-/**
- * Export des types pour utilisation externe
- */
-export type { AddProductProps, ProductFormData, ProductCategory, ProductUnit };
+export type { AddProductProps, ProductFormData, ProductUnit };
