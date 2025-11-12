@@ -58,33 +58,6 @@ const supabase = createClient<Database>(
 
 /**
  * API Route pour soumettre une candidature de producteur
- *
- * Cette route permet de :
- * - Enregistrer une demande de producteur en base
- * - Valider tous les champs requis
- * - Éviter les doublons de candidature
- * - Envoyer une notification aux administrateurs
- * - Gérer les erreurs de manière robuste
- *
- * @param req - Requête contenant les données de candidature
- * @returns Réponse JSON avec succès/erreur
- *
- * @example
- * ```typescript
- * // Côté client
- * const response = await fetch("/api/apply-farmer", {
- *   method: "POST",
- *   headers: { "Content-Type": "application/json" },
- *   body: JSON.stringify({
- *     userId: "user_123456",
- *     email: "farmer@example.com",
- *     farmName: "Ferme du Bonheur",
- *     phone: "+33123456789",
- *     location: "Lyon, France",
- *     description: "Producteur bio de légumes frais"
- *   })
- * });
- * ```
  */
 export async function POST(
   req: NextRequest
@@ -329,71 +302,3 @@ export async function POST(
     );
   }
 }
-
-/**
- * Fonction utilitaire pour valider les données de candidature
- *
- * @param data - Données à valider
- * @returns Objet avec validation result et erreurs
- */
-export function validateFarmerApplication(data: any): {
-  isValid: boolean;
-  errors: string[];
-} {
-  const errors: string[] = [];
-
-  // Validation des champs requis
-  const requiredFields = [
-    "userId",
-    "email",
-    "farmName",
-    "phone",
-    "location",
-    "description",
-  ];
-
-  for (const field of requiredFields) {
-    if (
-      !data[field] ||
-      (typeof data[field] === "string" && data[field].trim().length === 0)
-    ) {
-      errors.push(`Le champ ${field} est requis`);
-    }
-  }
-
-  // Validation du format email
-  if (data.email) {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(data.email.trim())) {
-      errors.push("Format email invalide");
-    }
-  }
-
-  // Validation du format userId
-  if (data.userId && !data.userId.startsWith("user_")) {
-    errors.push("Format userId invalide");
-  }
-
-  // Validation de la longueur
-  if (data.farmName && data.farmName.trim().length < 2) {
-    errors.push("Le nom de ferme doit contenir au moins 2 caractères");
-  }
-
-  if (data.description && data.description.trim().length < 10) {
-    errors.push("La description doit contenir au moins 10 caractères");
-  }
-
-  return {
-    isValid: errors.length === 0,
-    errors,
-  };
-}
-
-/**
- * Export des types pour utilisation externe
- */
-export type {
-  ApplyFarmerRequestBody,
-  ApplyFarmerResponse,
-  FarmerRequestInsert,
-};

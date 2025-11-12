@@ -1,201 +1,595 @@
-// app/api/update-user-role/route.ts
+// app/api/admin/validate-farmer-request/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { clerkClient } from "@clerk/nextjs/server";
+import { auth } from "@clerk/nextjs/server";
+import { sendFarmerRequestStatusEmail } from "@/lib/config/email-notifications";
+import type { Database } from "@/lib/types/database";
 
 /**
- * Types pour la requête de mise à jour de rôle
+ * Types pour la requête de validation
  */
-interface UpdateUserRoleRequestBody {
+interface ValidateFarmerRequestBody {
+  requestId: string | number;
   userId: string;
-  role: "user" | "farmer" | "admin";
+  role: "farmer" | "admin" | "user";
+  status: "approved" | "rejected";
+  reason?: string; // Optionnel : raison de la décision
+}
+
+/**
+ * Types pour les données de la demande farmer
+ */
+interface FarmerRequestData {
+  id: number;
+  user_id: string;
+  email: string;
+  farm_name: string;
+  location: string;
+  description: string | null;
+  phone: string | null;
+  website: string | null;
+  products: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  approved_by_admin_at: string | null;
 }
 
 /**
  * Type pour la réponse API
  */
-interface UpdateUserRoleResponse {
+interface ApiResponse {
   success: boolean;
+  message: string;
   error?: string;
-  message?: string;
+  timestamp?: string;
+  createdListingId?: number;
   details?: string;
 }
 
 /**
- * Rôles autorisés dans l'application
+ * Type pour la validation des données
  */
-const VALID_ROLES = ["user", "farmer", "admin"] as const;
-type ValidRole = (typeof VALID_ROLES)[number];
+interface ValidationResult {
+  isValid: boolean;
+  errors: string[];
+  sanitizedData?: ValidateFarmerRequestBody;
+}
 
 /**
- * API Route pour mettre à jour le rôle d'un utilisateur
+ * Configuration pour Next.js 14.2 - Export obligatoire
+ */
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+/**
+ * Constantes de validation
+ */
+const VALID_STATUSES = ["approved", "rejected"] as const;
+const VALID_ROLES = ["farmer", "admin", "user"] as const;
+const MAX_REASON_LENGTH = 500;
+
+/**
+ * Création sécurisée du client Supabase
+ */
+function createSupabaseClient() {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error(
+      "Variables d'environnement Supabase manquantes. " +
+        "Vérifiez SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY dans votre fichier .env"
+    );
+  }
+
+  return createClient<Database>(supabaseUrl, supabaseKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+}
+
+/**
+ * Fonction pour valider et sanitiser les données de validation
+ */
+function validateFarmerRequestData(data: any): ValidationResult {
+  const errors: string[] = [];
+
+  if (!data || typeof data !== "object") {
+    return {
+      isValid: false,
+      errors: ["Aucune donnée fournie ou format invalide"],
+    };
+  }
+
+  // Validation du requestId
+  const requestId = data.requestId;
+  if (!requestId) {
+    errors.push("L'ID de la demande est requis");
+  } else {
+    const numericRequestId = Number(requestId);
+    if (isNaN(numericRequestId) || numericRequestId <= 0) {
+      errors.push("L'ID de la demande doit être un nombre positif");
+    }
+  }
+
+  // Validation du userId
+  const userId = typeof data.userId === "string" ? data.userId.trim() : "";
+  if (!userId) {
+    errors.push("L'ID utilisateur est requis");
+  } else if (!/^user_[a-zA-Z0-9]{24,}$/.test(userId)) {
+    errors.push("Format d'ID utilisateur invalide");
+  }
+
+  // Validation du rôle
+  const role =
+    typeof data.role === "string" ? data.role.trim().toLowerCase() : "";
+  if (!role) {
+    errors.push("Le rôle est requis");
+  } else if (!VALID_ROLES.includes(role as any)) {
+    errors.push(
+      `Le rôle doit être l'un des suivants: ${VALID_ROLES.join(", ")}`
+    );
+  }
+
+  // Validation du statut
+  const status =
+    typeof data.status === "string" ? data.status.trim().toLowerCase() : "";
+  if (!status) {
+    errors.push("Le statut est requis");
+  } else if (!VALID_STATUSES.includes(status as any)) {
+    errors.push(
+      `Le statut doit être l'un des suivants: ${VALID_STATUSES.join(", ")}`
+    );
+  }
+
+  // Validation de la raison (optionnelle)
+  const reason =
+    typeof data.reason === "string" ? data.reason.trim() : undefined;
+  if (reason && reason.length > MAX_REASON_LENGTH) {
+    errors.push(
+      `La raison ne peut pas dépasser ${MAX_REASON_LENGTH} caractères`
+    );
+  }
+
+  // Si pas d'erreurs, retourner les données sanitisées
+  if (errors.length === 0) {
+    const sanitizedData: ValidateFarmerRequestBody = {
+      requestId: Number(requestId),
+      userId,
+      role: role as any,
+      status: status as any,
+      ...(reason && { reason }),
+    };
+
+    return {
+      isValid: true,
+      errors: [],
+      sanitizedData,
+    };
+  }
+
+  return {
+    isValid: false,
+    errors,
+  };
+}
+
+/**
+ * Fonction pour vérifier les permissions administrateur
+ */
+async function checkAdminPermissions(requestingUserId: string): Promise<{
+  hasPermission: boolean;
+  error?: string;
+}> {
+  try {
+    const requestingUser = await clerkClient.users.getUser(requestingUserId);
+    const userRole = requestingUser.publicMetadata?.role as string;
+
+    if (userRole !== "admin") {
+      return {
+        hasPermission: false,
+        error:
+          "Seuls les administrateurs peuvent valider les demandes de producteurs",
+      };
+    }
+
+    return { hasPermission: true };
+  } catch (error) {
+    console.error(
+      "[VALIDATE] Erreur lors de la vérification des permissions:",
+      error
+    );
+    return {
+      hasPermission: false,
+      error: "Impossible de vérifier les permissions",
+    };
+  }
+}
+
+/**
+ * Fonction pour créer automatiquement un listing approuvé
+ */
+async function createListingForApprovedFarmer(
+  supabase: ReturnType<typeof createSupabaseClient>,
+  farmerRequest: FarmerRequestData,
+  userId: string
+): Promise<{ success: boolean; listingId?: number; error?: string }> {
+  try {
+    const {
+      farm_name,
+      location,
+      description,
+      phone,
+      website,
+      email,
+      products,
+    } = farmerRequest;
+
+    const listingData = {
+      createdBy: userId,
+      name: farm_name,
+      description: description || null,
+      phoneNumber: phone || null,
+      email,
+      website: website || null,
+      address: location,
+      product_type: products || null,
+      status: "draft" as const,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      lat: 0, // À mettre à jour via géocodage
+      lng: 0, // À mettre à jour via géocodage
+      active: true,
+    };
+
+    const { data: insertedListing, error: insertListingError } = await supabase
+      .from("listing")
+      .insert([listingData])
+      .select("id")
+      .single();
+
+    if (insertListingError || !insertedListing) {
+      console.error("[VALIDATE] Erreur création listing:", insertListingError);
+      return {
+        success: false,
+        error: "Impossible de créer la fiche producteur",
+      };
+    }
+
+    // Mise à jour du profil avec farm_id
+    const { error: profileLinkError } = await supabase
+      .from("profiles")
+      .update({
+        farm_id: insertedListing.id,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", userId);
+
+    if (profileLinkError) {
+      console.warn(
+        "[VALIDATE] Erreur liaison profil-listing:",
+        profileLinkError
+      );
+      // Non bloquant
+    }
+
+    return {
+      success: true,
+      listingId: insertedListing.id,
+    };
+  } catch (error) {
+    console.error("[VALIDATE] Erreur lors de la création du listing:", error);
+    return {
+      success: false,
+      error: "Erreur inattendue lors de la création du listing",
+    };
+  }
+}
+
+/**
+ * API Route pour valider une demande de producteur
  *
- * Cette route permet de :
- * - Mettre à jour le rôle d'un utilisateur dans Clerk
- * - Valider que le rôle est autorisé
- * - Gérer les erreurs de manière robuste
+ * Cette route permet aux admins de :
+ * - Approuver ou rejeter une demande de producteur
+ * - Mettre à jour le rôle utilisateur dans Clerk et Supabase
+ * - Créer automatiquement un listing si approuvé
+ * - Envoyer un email de notification
+ * - Enregistrer la raison de la décision
  *
- * @param req - Requête contenant userId et role
+ * @param req - Requête contenant requestId, userId, role, status, reason
  * @returns Réponse JSON avec succès/erreur
- *
- * @example
- * ```typescript
- * // Côté client
- * const response = await fetch("/api/update-user-role", {
- *   method: "POST",
- *   headers: { "Content-Type": "application/json" },
- *   body: JSON.stringify({
- *     userId: "user_123456",
- *     role: "farmer"
- *   })
- * });
- * ```
  */
 export async function POST(
   req: NextRequest
-): Promise<NextResponse<UpdateUserRoleResponse>> {
+): Promise<NextResponse<ApiResponse>> {
+  const timestamp = new Date().toISOString();
+
   try {
+    // Vérification de l'authentification
+    const { userId: requestingUserId } = auth();
+    if (!requestingUserId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Non authentifié",
+          message: "Vous devez être connecté pour effectuer cette action",
+          timestamp,
+        },
+        { status: 401 }
+      );
+    }
+
+    // Vérification des permissions administrateur
+    const permissionCheck = await checkAdminPermissions(requestingUserId);
+    if (!permissionCheck.hasPermission) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Permissions insuffisantes",
+          message: permissionCheck.error || "Accès refusé",
+          timestamp,
+        },
+        { status: 403 }
+      );
+    }
+
     // Parse et validation du corps de requête
-    let body: UpdateUserRoleRequestBody;
+    let requestBody: any;
 
     try {
-      body = await req.json();
+      const contentType = req.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Type de contenu invalide",
+            message: "Le content-type doit être application/json",
+            timestamp,
+          },
+          { status: 400 }
+        );
+      }
+
+      requestBody = await req.json();
     } catch (parseError) {
-      console.error("[API] Erreur parsing JSON:", parseError);
+      console.error("[VALIDATE] Erreur parsing JSON:", parseError);
       return NextResponse.json(
         {
           success: false,
           error: "Corps de requête JSON invalide",
-          message: "Impossible de parser la requête",
+          message: "Impossible de parser la requête JSON",
+          timestamp,
         },
         { status: 400 }
       );
     }
 
-    const { userId, role } = body;
+    // Validation et sanitisation des données
+    const validation = validateFarmerRequestData(requestBody);
 
-    // Validation des paramètres requis
-    if (!userId) {
+    if (!validation.isValid) {
+      console.warn("[VALIDATE] Validation échouée:", validation.errors);
       return NextResponse.json(
         {
           success: false,
-          error: "Paramètre userId manquant",
-          message: "L'ID utilisateur est requis",
+          error: "Données de requête invalides",
+          message: validation.errors.join(", "),
+          timestamp,
         },
         { status: 400 }
       );
     }
 
-    if (!role) {
+    const { requestId, userId, role, status, reason } =
+      validation.sanitizedData!;
+
+    console.log("✅ [VALIDATE] Validation demande producteur:", {
+      requestId,
+      userId,
+      role,
+      status,
+      validatedBy: requestingUserId,
+    });
+
+    // Création du client Supabase
+    const supabase = createSupabaseClient();
+
+    // 1. Récupération de la demande
+    const { data: farmerRequestData, error: requestError } = await supabase
+      .from("farmer_requests")
+      .select("*")
+      .eq("id", requestId)
+      .single();
+
+    if (requestError || !farmerRequestData) {
+      console.error("[VALIDATE] Demande introuvable:", requestError);
       return NextResponse.json(
         {
           success: false,
-          error: "Paramètre role manquant",
-          message: "Le rôle est requis",
+          error: "Demande introuvable",
+          message: "La demande spécifiée n'existe pas",
+          timestamp,
         },
-        { status: 400 }
+        { status: 404 }
       );
     }
 
-    // Validation du type de userId (doit être une string non vide)
-    if (typeof userId !== "string" || userId.trim().length === 0) {
+    const farmerRequest = farmerRequestData as FarmerRequestData;
+
+    // Vérifier que la demande est en attente
+    if (farmerRequest.status !== "pending") {
       return NextResponse.json(
         {
           success: false,
-          error: "userId invalide",
-          message: "L'ID utilisateur doit être une chaîne non vide",
+          error: "Demande déjà traitée",
+          message: `Cette demande a déjà été ${farmerRequest.status}`,
+          timestamp,
         },
         { status: 400 }
       );
     }
 
-    // Validation du rôle autorisé
-    if (!VALID_ROLES.includes(role as ValidRole)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Rôle invalide",
-          message: `Le rôle doit être l'un des suivants: ${VALID_ROLES.join(", ")}`,
-        },
-        { status: 400 }
-      );
-    }
-
-    console.log(
-      `[API] Mise à jour rôle pour userId: ${userId} vers rôle: ${role}`
-    );
-
-    // Mise à jour du rôle dans Clerk
+    // 2. Mise à jour du rôle Clerk
     try {
       await clerkClient.users.updateUser(userId, {
-        publicMetadata: { role },
+        publicMetadata: {
+          role,
+          roleUpdatedAt: timestamp,
+          roleUpdatedBy: requestingUserId,
+          ...(reason && { roleChangeReason: reason }),
+        },
       });
+      console.log("✅ [VALIDATE] Rôle Clerk mis à jour avec succès");
+    } catch (clerkError: any) {
+      console.error("[VALIDATE] Erreur Clerk update:", clerkError);
+      const errorMessage = (clerkError as any)?.message || String(clerkError);
 
-      console.log(
-        `✅ [API] Rôle mis à jour avec succès pour userId: ${userId}`
-      );
-
-      return NextResponse.json({
-        success: true,
-        message: `Rôle mis à jour vers "${role}" avec succès`,
-      });
-    } catch (clerkError) {
-      console.error("[API] Erreur Clerk updateUser:", clerkError);
-
-      // Gestion des erreurs spécifiques de Clerk
-      if (clerkError instanceof Error) {
-        if (clerkError.message.includes("not found")) {
-          return NextResponse.json(
-            {
-              success: false,
-              error: "Utilisateur non trouvé",
-              message: "L'utilisateur spécifié n'existe pas",
-            },
-            { status: 404 }
-          );
-        }
-
-        if (clerkError.message.includes("unauthorized")) {
-          return NextResponse.json(
-            {
-              success: false,
-              error: "Non autorisé",
-              message: "Permissions insuffisantes pour cette opération",
-            },
-            { status: 403 }
-          );
-        }
+      if (
+        errorMessage.includes("not found") ||
+        (clerkError as any)?.status === 404
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Utilisateur introuvable",
+            message: "L'utilisateur spécifié n'existe pas dans Clerk",
+            timestamp,
+          },
+          { status: 404 }
+        );
       }
 
-      // Erreur Clerk générique
       return NextResponse.json(
         {
           success: false,
           error: "Erreur lors de la mise à jour du rôle",
-          message: "Impossible de mettre à jour le rôle utilisateur",
+          message: "Impossible de mettre à jour le rôle dans Clerk",
+          timestamp,
           details:
-            process.env.NODE_ENV === "development"
-              ? clerkError instanceof Error
-                ? clerkError.message
-                : String(clerkError)
-              : undefined,
+            process.env.NODE_ENV === "development" ? errorMessage : undefined,
         },
         { status: 500 }
       );
     }
-  } catch (error) {
-    console.error("[API] Erreur update-user-role:", error);
 
-    // Gestion d'erreur avec détails selon l'environnement
+    // 3. Mise à jour du rôle dans Supabase (profil)
+    const { error: profileUpdateError } = await supabase
+      .from("profiles")
+      .update({
+        role,
+        updated_at: timestamp,
+      })
+      .eq("user_id", userId);
+
+    if (profileUpdateError) {
+      console.error("[VALIDATE] Erreur update profil:", profileUpdateError);
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Erreur lors de la mise à jour du profil",
+          message: "Impossible de mettre à jour le profil Supabase",
+          timestamp,
+        },
+        { status: 500 }
+      );
+    }
+
+    console.log("✅ [VALIDATE] Profil Supabase mis à jour avec succès");
+
+    // 4. Mise à jour de la demande (statut + timestamp)
+    const updateData = {
+      status,
+      updated_at: timestamp,
+      approved_by_admin_at: status === "approved" ? timestamp : null,
+      ...(reason && { admin_reason: reason }),
+      validated_by: requestingUserId,
+    };
+
+    const { error: requestUpdateError } = await supabase
+      .from("farmer_requests")
+      .update(updateData)
+      .eq("id", requestId);
+
+    if (requestUpdateError) {
+      console.error("[VALIDATE] Erreur update demande:", requestUpdateError);
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Erreur lors de la mise à jour de la demande",
+          message: "Impossible de mettre à jour le statut de la demande",
+          timestamp,
+        },
+        { status: 500 }
+      );
+    }
+
+    console.log("✅ [VALIDATE] Demande mise à jour avec succès");
+
+    let createdListingId: number | undefined;
+
+    // 5. Création automatique du listing si approuvé
+    if (status === "approved") {
+      const listingResult = await createListingForApprovedFarmer(
+        supabase,
+        farmerRequest,
+        userId
+      );
+
+      if (!listingResult.success) {
+        // Le listing n'a pas pu être créé, mais on ne bloque pas la validation
+        console.warn("[VALIDATE] Échec création listing:", listingResult.error);
+      } else {
+        createdListingId = listingResult.listingId;
+        console.log("✅ [VALIDATE] Listing créé avec ID:", createdListingId);
+      }
+    }
+
+    // 6. Envoi de l'email de statut au producteur
+    try {
+      await sendFarmerRequestStatusEmail(farmerRequest, status);
+      console.log("📧 [VALIDATE] Email de statut envoyé avec succès");
+    } catch (emailError) {
+      console.warn("[VALIDATE] Email non envoyé:", emailError);
+      // Non bloquant - on continue même si l'email échoue
+    }
+
+    // Réponse de succès
+    const successMessage =
+      status === "approved"
+        ? `Demande approuvée avec succès${createdListingId ? `. Listing créé (ID: ${createdListingId})` : ""}.`
+        : "Demande rejetée avec succès.";
+
+    return NextResponse.json(
+      {
+        success: true,
+        message: successMessage,
+        timestamp,
+        ...(createdListingId && { createdListingId }),
+      },
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+        },
+      }
+    );
+  } catch (error) {
+    console.error("[VALIDATE] Erreur serveur critique:", error);
+
     const isDev = process.env.NODE_ENV === "development";
 
     return NextResponse.json(
       {
         success: false,
-        error: "Erreur serveur interne",
-        message: "Une erreur inattendue s'est produite",
-        ...(isDev && {
-          details: error instanceof Error ? error.message : String(error),
-        }),
+        error: "Erreur interne lors de la validation",
+        message: "Une erreur inattendue s'est produite sur le serveur",
+        timestamp,
+        details: isDev && error instanceof Error ? error.message : undefined,
       },
       { status: 500 }
     );
@@ -203,16 +597,11 @@ export async function POST(
 }
 
 /**
- * Fonction utilitaire pour valider un rôle
- *
- * @param role - Rôle à valider
- * @returns true si le rôle est valide
- */
-export function isValidRole(role: string): role is ValidRole {
-  return VALID_ROLES.includes(role as ValidRole);
-}
-
-/**
  * Export des types pour utilisation externe
  */
-export type { UpdateUserRoleRequestBody, UpdateUserRoleResponse, ValidRole };
+export type {
+  ValidateFarmerRequestBody,
+  FarmerRequestData,
+  ApiResponse,
+  ValidationResult,
+};

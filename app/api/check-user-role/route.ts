@@ -1,238 +1,210 @@
-// app/api/get-user-info/route.ts
-import { clerkClient } from "@clerk/nextjs/server";
+// app/api/update-user-role/route.ts
 import { NextRequest, NextResponse } from "next/server";
-
-// Force dynamic pour éviter la mise en cache des données utilisateur
-export const dynamic = "force-dynamic";
+import { clerkClient } from "@clerk/nextjs/server";
 
 /**
- * Type pour les métadonnées publiques Clerk
+ * Types pour la requête de mise à jour de rôle
  */
-interface ClerkPublicMetadata {
-  role?: string;
-  [key: string]: any;
+interface UpdateUserRoleRequestBody {
+  userId: string;
+  role: "user" | "farmer" | "admin";
 }
 
 /**
  * Type pour la réponse API
  */
-interface GetUserInfoResponse {
+interface UpdateUserRoleResponse {
   success: boolean;
-  userId?: string;
-  email?: string;
-  role?: string;
-  isValidRole?: boolean;
-  hasRole?: boolean;
-  allMetadata?: ClerkPublicMetadata;
   error?: string;
+  message?: string;
   details?: string;
 }
 
 /**
- * Rôles valides dans l'application
+ * Rôles autorisés dans l'application
  */
 const VALID_ROLES = ["user", "farmer", "admin"] as const;
-type ValidRole = typeof VALID_ROLES[number];
+type ValidRole = (typeof VALID_ROLES)[number];
 
 /**
- * API Route pour récupérer les informations utilisateur depuis Clerk
- * 
+ * Fonction utilitaire interne pour valider un rôle
+ */
+function isValidRole(role: string): role is ValidRole {
+  return VALID_ROLES.includes(role as ValidRole);
+}
+
+/**
+ * API Route pour mettre à jour le rôle d'un utilisateur
+ *
  * Cette route permet de :
- * - Récupérer les informations d'un utilisateur par son ID
- * - Extraire le rôle depuis les métadonnées publiques
- * - Valider si le rôle est autorisé dans l'application
- * - Retourner l'email principal de l'utilisateur
- * 
- * @param req - Requête avec userId en query parameter
- * @returns Réponse JSON avec les informations utilisateur
- * 
+ * - Mettre à jour le rôle d'un utilisateur dans Clerk
+ * - Valider que le rôle est autorisé
+ * - Gérer les erreurs de manière robuste
+ *
+ * @param req - Requête contenant userId et role
+ * @returns Réponse JSON avec succès/erreur
+ *
  * @example
  * ```typescript
- * // Récupération des infos utilisateur
- * const response = await fetch("/api/get-user-info?userId=user_123456");
- * const userInfo = await response.json();
- * 
- * if (userInfo.success) {
- *   console.log("Rôle:", userInfo.role);
- *   console.log("Email:", userInfo.email);
- *   console.log("Rôle valide:", userInfo.isValidRole);
- * }
+ * // Côté client
+ * const response = await fetch("/api/update-user-role", {
+ *   method: "POST",
+ *   headers: { "Content-Type": "application/json" },
+ *   body: JSON.stringify({
+ *     userId: "user_123456",
+ *     role: "farmer"
+ *   })
+ * });
  * ```
  */
-export async function GET(req: NextRequest): Promise<NextResponse<GetUserInfoResponse>> {
+export async function POST(
+  req: NextRequest
+): Promise<NextResponse<UpdateUserRoleResponse>> {
   try {
-    // Extraction du userId depuis les paramètres de query
-    const { searchParams } = new URL(req.url);
-    const userId = searchParams.get("userId");
+    // Parse et validation du corps de requête
+    let body: UpdateUserRoleRequestBody;
 
-    // Validation du paramètre userId
+    try {
+      body = await req.json();
+    } catch (parseError) {
+      console.error("[API] Erreur parsing JSON:", parseError);
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Corps de requête JSON invalide",
+          message: "Impossible de parser la requête",
+        },
+        { status: 400 }
+      );
+    }
+
+    const { userId, role } = body;
+
+    // Validation des paramètres requis
     if (!userId) {
       return NextResponse.json(
-        { 
+        {
           success: false,
           error: "Paramètre userId manquant",
+          message: "L'ID utilisateur est requis",
         },
         { status: 400 }
       );
     }
 
+    if (!role) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Paramètre role manquant",
+          message: "Le rôle est requis",
+        },
+        { status: 400 }
+      );
+    }
+
+    // Validation du type de userId (doit être une string non vide)
     if (typeof userId !== "string" || userId.trim().length === 0) {
       return NextResponse.json(
-        { 
+        {
           success: false,
-          error: "Paramètre userId invalide",
+          error: "userId invalide",
+          message: "L'ID utilisateur doit être une chaîne non vide",
         },
         { status: 400 }
       );
     }
 
-    // Validation du format userId Clerk (doit commencer par "user_")
-    if (!userId.startsWith("user_")) {
+    // Validation du rôle autorisé
+    if (!isValidRole(role)) {
       return NextResponse.json(
-        { 
+        {
           success: false,
-          error: "Format userId invalide - doit être un ID Clerk valide",
+          error: "Rôle invalide",
+          message: `Le rôle doit être l'un des suivants: ${VALID_ROLES.join(", ")}`,
         },
         { status: 400 }
       );
     }
 
-    console.log(`[GET USER INFO] Récupération infos pour userId: ${userId}`);
+    console.log(
+      `[API] Mise à jour rôle pour userId: ${userId} vers rôle: ${role}`
+    );
 
-    // Récupération de l'utilisateur depuis Clerk
-    let user;
+    // Mise à jour du rôle dans Clerk
     try {
-      user = await clerkClient.users.getUser(userId);
+      await clerkClient.users.updateUser(userId, {
+        publicMetadata: { role },
+      });
+
+      console.log(
+        `✅ [API] Rôle mis à jour avec succès pour userId: ${userId}`
+      );
+
+      return NextResponse.json({
+        success: true,
+        message: `Rôle mis à jour vers "${role}" avec succès`,
+      });
     } catch (clerkError) {
-      console.error("[GET USER INFO] Erreur Clerk:", clerkError);
-      
-      // Gestion spécifique des erreurs Clerk
+      console.error("[API] Erreur Clerk updateUser:", clerkError);
+
+      // Gestion des erreurs spécifiques de Clerk
       if (clerkError instanceof Error) {
-        if (clerkError.message.includes("not found") || clerkError.message.includes("404")) {
+        if (clerkError.message.includes("not found")) {
           return NextResponse.json(
-            { 
+            {
               success: false,
               error: "Utilisateur non trouvé",
+              message: "L'utilisateur spécifié n'existe pas",
             },
             { status: 404 }
           );
         }
 
-        if (clerkError.message.includes("unauthorized") || clerkError.message.includes("403")) {
+        if (clerkError.message.includes("unauthorized")) {
           return NextResponse.json(
-            { 
+            {
               success: false,
-              error: "Non autorisé à accéder à ces informations",
+              error: "Non autorisé",
+              message: "Permissions insuffisantes pour cette opération",
             },
             { status: 403 }
           );
         }
       }
 
+      // Erreur Clerk générique
       return NextResponse.json(
-        { 
+        {
           success: false,
-          error: "Erreur lors de la récupération des données utilisateur",
-          details: process.env.NODE_ENV === "development" ? 
-            (clerkError instanceof Error ? clerkError.message : String(clerkError)) : 
-            undefined
+          error: "Erreur lors de la mise à jour du rôle",
+          message: "Impossible de mettre à jour le rôle utilisateur",
+          details:
+            process.env.NODE_ENV === "development"
+              ? clerkError instanceof Error
+                ? clerkError.message
+                : String(clerkError)
+              : undefined,
         },
         { status: 500 }
       );
     }
-
-    // Vérification que l'utilisateur existe
-    if (!user) {
-      return NextResponse.json(
-        { 
-          success: false,
-          error: "Utilisateur non trouvé",
-        },
-        { status: 404 }
-      );
-    }
-
-    // Extraction des informations utilisateur
-    const publicMetadata = (user.publicMetadata || {}) as ClerkPublicMetadata;
-    const userRole = publicMetadata.role as string | undefined;
-    
-    // Récupération de l'email principal
-    const primaryEmail = user.primaryEmailAddress?.emailAddress;
-    const fallbackEmail = user.emailAddresses?.[0]?.emailAddress;
-    const email = primaryEmail || fallbackEmail;
-
-    // Validation du rôle
-    const hasRole = !!userRole;
-    const isValidRole = userRole ? VALID_ROLES.includes(userRole as ValidRole) : false;
-
-    console.log(`✅ [GET USER INFO] Infos récupérées pour ${userId}: role=${userRole}, email=${email}`);
-
-    // Construction de la réponse
-    const response: GetUserInfoResponse = {
-      success: true,
-      userId,
-      email: email || "email inconnu",
-      role: userRole || "undefined",
-      isValidRole,
-      hasRole,
-      allMetadata: publicMetadata,
-    };
-
-    return NextResponse.json(response);
-
   } catch (error) {
-    console.error("[GET USER INFO] Erreur serveur:", error);
-    
-    // Gestion d'erreur générale avec détails selon l'environnement
+    console.error("[API] Erreur update-user-role:", error);
+
+    // Gestion d'erreur avec détails selon l'environnement
     const isDev = process.env.NODE_ENV === "development";
-    
+
     return NextResponse.json(
-      { 
+      {
         success: false,
-        error: "Erreur interne du serveur",
-        ...(isDev && { 
-          details: error instanceof Error ? error.message : "Erreur inconnue"
-        })
+        error: "Erreur serveur interne",
+        message: "Une erreur inattendue s'est produite",
+        ...(isDev && {
+          details: error instanceof Error ? error.message : String(error),
+        }),
       },
       { status: 500 }
     );
   }
 }
-
-/**
- * Fonction utilitaire pour valider un rôle utilisateur
- * 
- * @param role - Rôle à valider
- * @returns true si le rôle est valide
- */
-export function isValidUserRole(role: string | undefined): role is ValidRole {
-  if (!role) return false;
-  return VALID_ROLES.includes(role as ValidRole);
-}
-
-/**
- * Fonction utilitaire pour extraire le rôle depuis les métadonnées Clerk
- * 
- * @param metadata - Métadonnées publiques Clerk
- * @returns Rôle extrait et validation
- */
-export function extractUserRole(metadata: ClerkPublicMetadata | null | undefined): {
-  role: string | undefined;
-  hasRole: boolean;
-  isValid: boolean;
-} {
-  const role = metadata?.role as string | undefined;
-  const hasRole = !!role;
-  const isValid = isValidUserRole(role);
-
-  return { role, hasRole, isValid };
-}
-
-/**
- * Export des types pour utilisation externe
- */
-export type {
-  GetUserInfoResponse,
-  ClerkPublicMetadata,
-  ValidRole,
-};
