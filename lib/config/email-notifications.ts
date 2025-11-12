@@ -1,7 +1,7 @@
 "use server";
 
 import { Resend } from "resend";
-import { EMAIL_CONFIG, EMAIL_SUBJECTS, EMAIL_BUILDERS } from "@/lib/config";
+import { EMAIL_CONFIG, EMAIL_SUBJECTS, EMAIL_BUILDERS } from "./email.config";
 
 // Types TypeScript
 interface FarmerRequest {

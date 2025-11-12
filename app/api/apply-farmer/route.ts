@@ -3,6 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 /**
  * Types pour la candidature de producteur
  */

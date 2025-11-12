@@ -3,332 +3,235 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
 
-/**
- * Type pour un listing de base retourné par l'API
- */
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+// ——— Types ———
 interface ListingBasic {
   id: number;
   created_at: string;
   createdBy: string;
-  coordinates: any; // JSON type from Supabase
+  coordinates: any;
   active: boolean;
 }
 
-/**
- * Type pour la réponse API
- */
 interface GetListingsResponse {
   listings?: ListingBasic[];
   error?: string;
   message?: string;
-  count?: number;
+  count?: number; // total rows in DB matching filters
   pagination?: {
     total: number;
     page: number;
     limit: number;
     hasMore: boolean;
   };
+  timestamp?: string;
+  details?: string;
 }
 
-/**
- * Type pour les paramètres de requête optionnels
- */
 interface GetListingsParams {
-  limit?: number;
-  offset?: number;
-  sortBy?: "created_at" | "id";
-  sortOrder?: "asc" | "desc";
-  includeInactive?: boolean;
+  limit: number; // always set (defaulted below)
+  offset: number; // always set (defaulted below)
+  sortBy: "created_at" | "id";
+  sortOrder: "asc" | "desc";
+  includeInactive: boolean;
 }
 
-/**
- * Configuration pour Next.js 14.2 - Export obligatoire
- */
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
-
-/**
- * Création sécurisée du client Supabase
- */
+// ——— Supabase client ———
 function createSupabaseClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
   if (!supabaseUrl || !supabaseKey) {
     throw new Error(
-      "Variables d'environnement Supabase manquantes. " +
-        "Vérifiez NEXT_PUBLIC_SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY dans votre fichier .env"
+      "Variables d'environnement Supabase manquantes. Vérifiez NEXT_PUBLIC_SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY."
     );
   }
-
   return createClient<Database>(supabaseUrl, supabaseKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
+    auth: { autoRefreshToken: false, persistSession: false },
   });
 }
 
-/**
- * Fonction utilitaire pour valider les paramètres de requête
- */
+// ——— Params validation ———
 function validateListingParams(searchParams: URLSearchParams): {
   isValid: boolean;
   errors: string[];
   params: GetListingsParams;
 } {
   const errors: string[] = [];
-  const params: GetListingsParams = {};
 
-  // Validation de limit
   const limitStr = searchParams.get("limit");
-  if (limitStr) {
-    const limit = parseInt(limitStr, 10);
-    if (isNaN(limit) || limit < 1 || limit > 100) {
-      errors.push("Le limit doit être un nombre entre 1 et 100");
-    } else {
-      params.limit = limit;
-    }
-  }
-
-  // Validation de offset
   const offsetStr = searchParams.get("offset");
+  const sortByStr = searchParams.get("sortBy");
+  const sortOrderStr = searchParams.get("sortOrder");
+  const includeInactiveStr = searchParams.get("includeInactive");
+
+  let limit = 50;
+  if (limitStr) {
+    const n = parseInt(limitStr, 10);
+    if (Number.isNaN(n) || n < 1 || n > 100) errors.push("limit ∈ [1,100]");
+    else limit = n;
+  }
+
+  let offset = 0;
   if (offsetStr) {
-    const offset = parseInt(offsetStr, 10);
-    if (isNaN(offset) || offset < 0) {
-      errors.push("L'offset doit être un nombre positif ou nul");
-    } else {
-      params.offset = offset;
-    }
+    const n = parseInt(offsetStr, 10);
+    if (Number.isNaN(n) || n < 0) errors.push("offset ≥ 0");
+    else offset = n;
   }
 
-  // Validation de sortBy
-  const sortBy = searchParams.get("sortBy");
   const validSortFields = ["created_at", "id"] as const;
-  if (sortBy) {
-    if (validSortFields.includes(sortBy as any)) {
-      params.sortBy = sortBy as (typeof validSortFields)[number];
-    } else {
-      errors.push(
-        `sortBy doit être l'un des suivants: ${validSortFields.join(", ")}`
-      );
-    }
-  } else {
-    params.sortBy = "created_at"; // Valeur par défaut
+  const sortBy = validSortFields.includes(sortByStr as any)
+    ? (sortByStr as "created_at" | "id")
+    : "created_at";
+
+  let sortOrder: "asc" | "desc" = "desc";
+  if (sortOrderStr) {
+    if (sortOrderStr === "asc" || sortOrderStr === "desc")
+      sortOrder = sortOrderStr;
+    else errors.push("sortOrder ∈ {'asc','desc'}");
   }
 
-  // Validation de sortOrder
-  const sortOrder = searchParams.get("sortOrder");
-  if (sortOrder) {
-    if (["asc", "desc"].includes(sortOrder)) {
-      params.sortOrder = sortOrder as "asc" | "desc";
-    } else {
-      errors.push("sortOrder doit être 'asc' ou 'desc'");
-    }
-  } else {
-    params.sortOrder = "desc"; // Valeur par défaut
-  }
-
-  // Validation de includeInactive (nouveau paramètre optionnel)
-  const includeInactive = searchParams.get("includeInactive");
-  if (includeInactive) {
-    params.includeInactive = includeInactive === "true";
-  } else {
-    params.includeInactive = false; // Par défaut, on n'inclut que les actifs
-  }
+  const includeInactive = includeInactiveStr === "true";
 
   return {
     isValid: errors.length === 0,
     errors,
-    params,
+    params: { limit, offset, sortBy, sortOrder, includeInactive },
   };
 }
 
-/**
- * API Route pour récupérer les listings de fermes
- *
- * Cette route permet de :
- * - Récupérer tous les listings actifs (par défaut)
- * - Supporter la pagination avec limit/offset
- * - Supporter le tri par différents champs
- * - Inclure optionnellement les listings inactifs
- * - Compter le nombre total de résultats
- * - Gérer les erreurs de manière robuste
- *
- * @param req - Requête avec paramètres de query optionnels
- * @returns Réponse JSON avec la liste des listings
- *
- * @example
- * ```typescript
- * // Récupération simple des listings actifs
- * const response = await fetch("/api/get-listings");
- * const { listings } = await response.json();
- *
- * // Avec pagination et tri
- * const response = await fetch("/api/get-listings?limit=10&offset=0&sortBy=created_at&sortOrder=desc");
- *
- * // Inclure les listings inactifs
- * const response = await fetch("/api/get-listings?includeInactive=true");
- * ```
- */
+// ——— Handler ———
 export async function GET(
   req: NextRequest
 ): Promise<NextResponse<GetListingsResponse>> {
-  try {
-    // Extraction et validation des paramètres de query
-    const { searchParams } = new URL(req.url);
-    const validation = validateListingParams(searchParams);
+  const timestamp = new Date().toISOString();
 
-    if (!validation.isValid) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const { isValid, errors, params } = validateListingParams(searchParams);
+
+    if (!isValid) {
       return NextResponse.json(
         {
           error: "Paramètres de requête invalides",
-          message: validation.errors.join(", "),
+          message: errors.join(", "),
+          timestamp,
         },
         { status: 400 }
       );
     }
 
-    const params = validation.params;
-    console.log(`[API] Récupération des listings avec params:`, params);
-
-    // Création du client Supabase
     const supabase = createSupabaseClient();
 
-    // Construction de la requête Supabase avec count pour pagination
-    let query = supabase
+    // 1) HEAD count first to avoid 416/PGRST103 on oversized offset
+    let countQuery = supabase
       .from("listing")
-      .select("id, created_at, createdBy, coordinates, active", {
-        count: "exact",
-      })
-      .order(params.sortBy!, { ascending: params.sortOrder === "asc" });
+      .select("id", { count: "exact", head: true });
 
-    // Filtrage par statut actif (sauf si includeInactive est true)
-    if (!params.includeInactive) {
-      query = query.eq("active", true);
+    if (!params.includeInactive) countQuery = countQuery.eq("active", true);
+
+    const { count: total, error: headError } = await countQuery;
+    if (headError) {
+      console.error("[GET-LISTINGS] Count error:", headError);
+      return NextResponse.json(
+        {
+          error: "Erreur lors du comptage",
+          message: "Impossible d'accéder à la base de données",
+          timestamp,
+        },
+        { status: 500 }
+      );
     }
 
-    // Application de la pagination si spécifiée
-    if (params.limit !== undefined) {
-      const start = params.offset || 0;
-      const end = start + params.limit - 1;
-      query = query.range(start, end);
-    } else if (params.offset !== undefined) {
-      // Si offset sans limit, on applique une limite par défaut
-      const defaultLimit = 50;
-      const end = params.offset + defaultLimit - 1;
-      query = query.range(params.offset, end);
+    const totalCount = total ?? 0;
+
+    // If offset is beyond total, short-circuit with empty page
+    if (params.offset >= totalCount && totalCount > 0) {
+      const page = Math.floor(params.offset / params.limit);
+      return NextResponse.json(
+        {
+          listings: [],
+          count: totalCount,
+          message: "Aucun résultat pour cette page (offset au-delà du total).",
+          timestamp,
+          pagination: {
+            total: totalCount,
+            page,
+            limit: params.limit,
+            hasMore: false,
+          },
+        },
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "public, max-age=30, stale-while-revalidate=300",
+          },
+        }
+      );
     }
 
-    // Exécution de la requête
-    const { data, error, count } = await query;
+    // 2) Data query with range (safe now)
+    let dataQuery = supabase
+      .from("listing")
+      .select("id, created_at, createdBy, coordinates, active")
+      .order(params.sortBy, { ascending: params.sortOrder === "asc" });
 
+    if (!params.includeInactive) dataQuery = dataQuery.eq("active", true);
+
+    const start = params.offset;
+    const end = Math.max(start, start + params.limit - 1);
+    dataQuery = dataQuery.range(start, end);
+
+    const { data, error } = await dataQuery;
     if (error) {
-      console.error("[API] Erreur Supabase:", error.message);
+      console.error("[GET-LISTINGS] Data error:", error);
       return NextResponse.json(
         {
           error: "Erreur lors de la récupération des listings",
           message: "Impossible d'accéder à la base de données",
+          timestamp,
         },
         { status: 500 }
       );
     }
 
-    // Validation des données retournées
-    if (!Array.isArray(data)) {
-      console.error("[API] Format de données inattendu:", typeof data);
-      return NextResponse.json(
-        {
-          error: "Format de données inattendu",
-          message: "La réponse de la base de données n'est pas valide",
+    const currentPage = Math.floor(params.offset / params.limit);
+    const hasMore = params.offset + params.limit < totalCount;
+
+    return NextResponse.json(
+      {
+        listings: (data ?? []) as ListingBasic[],
+        count: totalCount,
+        message: `${data?.length ?? 0} listing(s) ${params.includeInactive ? "total" : "actif(s)"} récupéré(s)`,
+        timestamp,
+        pagination: {
+          total: totalCount,
+          page: currentPage,
+          limit: params.limit,
+          hasMore,
         },
-        { status: 500 }
-      );
-    }
-
-    console.log(
-      `✅ [API] ${data.length} listings récupérés avec succès (total: ${count})`
-    );
-
-    // Construction de la réponse avec métadonnées
-    const response: GetListingsResponse = {
-      listings: data as ListingBasic[],
-      count: data.length,
-      message: `${data.length} listing(s) ${params.includeInactive ? "total" : "actif(s)"} récupéré(s)`,
-    };
-
-    // Ajout des informations de pagination si utilisée
-    if (params.limit !== undefined) {
-      const currentPage = Math.floor((params.offset || 0) / params.limit);
-      const totalCount = count ?? 0;
-
-      response.pagination = {
-        total: totalCount,
-        page: currentPage,
-        limit: params.limit,
-        hasMore: (params.offset || 0) + params.limit < totalCount,
-      };
-    }
-
-    // Retour avec headers appropriés pour Next.js 14.2
-    return NextResponse.json(response, {
-      status: 200,
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "public, max-age=60, stale-while-revalidate=300", // Cache pendant 1 min
       },
-    });
-  } catch (error) {
-    console.error("[API] Erreur serveur:", error);
-
-    // Gestion d'erreur avec détails selon l'environnement
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "public, max-age=30, stale-while-revalidate=300",
+        },
+      }
+    );
+  } catch (err) {
+    console.error("[GET-LISTINGS] Erreur serveur critique:", err);
     const isDev = process.env.NODE_ENV === "development";
-
     return NextResponse.json(
       {
         error: "Erreur serveur lors de la récupération des listings",
         message: "Une erreur inattendue s'est produite",
-        ...(isDev && {
-          details: error instanceof Error ? error.message : String(error),
-        }),
+        timestamp,
+        details: isDev && err instanceof Error ? err.message : undefined,
       },
       { status: 500 }
     );
   }
 }
-
-/**
- * Fonction utilitaire pour valider les paramètres de pagination
- * @deprecated Utilisez validateListingParams à la place
- */
-export function validatePaginationParams(
-  limit?: number,
-  offset?: number
-): {
-  isValid: boolean;
-  errors: string[];
-} {
-  const errors: string[] = [];
-
-  if (limit !== undefined) {
-    if (isNaN(limit) || limit < 1 || limit > 100) {
-      errors.push("Le limit doit être un nombre entre 1 et 100");
-    }
-  }
-
-  if (offset !== undefined) {
-    if (isNaN(offset) || offset < 0) {
-      errors.push("L'offset doit être un nombre positif ou nul");
-    }
-  }
-
-  return {
-    isValid: errors.length === 0,
-    errors,
-  };
-}
-
-/**
- * Export des types pour utilisation externe
- */
-export type { ListingBasic, GetListingsResponse, GetListingsParams };

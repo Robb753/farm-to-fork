@@ -75,8 +75,8 @@ interface Farm2ForkStore {
   reset: () => void;
 }
 
-import { filterSections, MAPBOX_CONFIG } from "@/lib/config";
-export { filterSections, MAPBOX_CONFIG };
+import { FILTER_SECTIONS } from "@/lib/config/constants";
+import { MAPBOX_CONFIG } from "@/lib/config/map.config";
 
 const initialFilters: FilterState = {
   product_type: [],
@@ -88,18 +88,10 @@ const initialFilters: FilterState = {
   mapType: [],
 };
 
-const isListingInBounds = (
-  listing: Listing,
-  bounds: MapBounds | null
-): boolean => {
+const isListingInBounds = (listing: Listing, bounds: MapBounds | null): boolean => {
   if (!bounds) return true;
   const { lat, lng } = listing;
-  if (
-    typeof lat !== "number" ||
-    typeof lng !== "number" ||
-    Number.isNaN(lat) ||
-    Number.isNaN(lng)
-  ) {
+  if (typeof lat !== "number" || typeof lng !== "number" || Number.isNaN(lat) || Number.isNaN(lng)) {
     return false;
   }
   return (
@@ -110,38 +102,25 @@ const isListingInBounds = (
   );
 };
 
-const filterListings = (
-  allListings: Listing[],
-  filters: FilterState,
-  mapBounds: MapBounds | null = null
-): Listing[] => {
+const filterListings = (allListings: Listing[], filters: FilterState, mapBounds: MapBounds | null = null): Listing[] => {
   if (!allListings || !Array.isArray(allListings)) return [];
 
   let filtered = allListings;
 
   if (mapBounds) {
-    filtered = filtered.filter((listing) =>
-      isListingInBounds(listing, mapBounds)
-    );
+    filtered = filtered.filter((listing) => isListingInBounds(listing, mapBounds));
   }
 
-  const hasActiveFilters = Object.values(filters).some(
-    (arr) => Array.isArray(arr) && arr.length > 0
-  );
+  const hasActiveFilters = Object.values(filters).some((arr) => Array.isArray(arr) && arr.length > 0);
 
   if (hasActiveFilters) {
     filtered = filtered.filter((listing) =>
       Object.entries(filters).every(([key, values]) => {
-        if (!Array.isArray(values) || values.length === 0 || key === "mapType")
-          return true;
+        if (!Array.isArray(values) || values.length === 0 || key === "mapType") return true;
         if (!(key in listing)) return false;
 
         const listingValue = (listing as any)[key];
-        const listingValues = Array.isArray(listingValue)
-          ? listingValue
-          : listingValue
-            ? [listingValue]
-            : [];
+        const listingValues = Array.isArray(listingValue) ? listingValue : listingValue ? [listingValue] : [];
 
         if (listingValues.length === 0) return false;
         return values.some((v) => listingValues.includes(v));
@@ -209,91 +188,43 @@ export const useFarm2ForkStore = create<Farm2ForkStore>()(
           },
 
           // Actions simples
-          setCoordinates: (coords) =>
-            set((state) => ({ map: { ...state.map, coordinates: coords } })),
+          setCoordinates: (coords) => set((state) => ({ map: { ...state.map, coordinates: coords } })),
           setMapBounds: (bounds) => {
             set((state) => ({ map: { ...state.map, bounds } }));
             setTimeout(() => get().filterListings(), 0);
           },
           setZoom: (zoom) => set((state) => ({ map: { ...state.map, zoom } })),
-          setMapInstance: (instance) =>
-            set((state) => ({ map: { ...state.map, mapInstance: instance } })),
-          setApiLoaded: (loaded) =>
-            set((state) => ({ map: { ...state.map, isApiLoaded: loaded } })),
-          setApiLoading: (loading) =>
-            set((state) => ({ map: { ...state.map, isApiLoading: loading } })),
+          setMapInstance: (instance) => set((state) => ({ map: { ...state.map, mapInstance: instance } })),
+          setApiLoaded: (loaded) => set((state) => ({ map: { ...state.map, isApiLoaded: loaded } })),
+          setApiLoading: (loading) => set((state) => ({ map: { ...state.map, isApiLoading: loading } })),
 
           setAllListings: (listings) => {
             const state = get();
             const normalized = listings.map(normalizeListing);
-            const filtered = filterListings(
-              normalized,
-              state.filters,
-              state.map.bounds
-            );
-            set((prev) => ({
-              listings: {
-                ...prev.listings,
-                all: normalized,
-                filtered,
-                visible: filtered,
-              },
-            }));
+            const filtered = filterListings(normalized, state.filters, state.map.bounds);
+            set((prev) => ({ listings: { ...prev.listings, all: normalized, filtered, visible: filtered } }));
           },
 
-          setVisibleListings: (listings) =>
-            set((state) => ({
-              listings: { ...state.listings, visible: listings },
-            })),
-          setFilteredListings: (listings) =>
-            set((state) => ({
-              listings: {
-                ...state.listings,
-                filtered: listings,
-                visible: listings,
-              },
-            })),
-          setListingsLoading: (loading) =>
-            set((state) => ({
-              listings: { ...state.listings, isLoading: loading },
-            })),
-          setHasMore: (hasMore) =>
-            set((state) => ({ listings: { ...state.listings, hasMore } })),
-          setPage: (page) =>
-            set((state) => ({ listings: { ...state.listings, page } })),
+          setVisibleListings: (listings) => set((state) => ({ listings: { ...state.listings, visible: listings } })),
+          setFilteredListings: (listings) => set((state) => ({ listings: { ...state.listings, filtered: listings, visible: listings } })),
+          setListingsLoading: (loading) => set((state) => ({ listings: { ...state.listings, isLoading: loading } })),
+          setHasMore: (hasMore) => set((state) => ({ listings: { ...state.listings, hasMore } })),
+          setPage: (page) => set((state) => ({ listings: { ...state.listings, page } })),
 
           addListings: (newListings) => {
             const state = get();
             const normalizedNew = newListings.map(normalizeListing);
             const combined = [...state.listings.all, ...normalizedNew];
-            const filtered = filterListings(
-              combined,
-              state.filters,
-              state.map.bounds
-            );
-            set((prev) => ({
-              listings: {
-                ...prev.listings,
-                all: combined,
-                filtered,
-                visible: filtered,
-              },
-            }));
+            const filtered = filterListings(combined, state.filters, state.map.bounds);
+            set((prev) => ({ listings: { ...prev.listings, all: combined, filtered, visible: filtered } }));
           },
 
-          resetListings: () =>
-            set((state) => ({
-              listings: {
-                ...state.listings,
-                all: [],
-                visible: [],
-                filtered: [],
-                page: 1,
-                hasMore: true,
-                totalCount: 0,
-                isLoading: false,
-              },
-            })),
+          resetListings: () => set((state) => ({
+            listings: {
+              ...state.listings,
+              all: [], visible: [], filtered: [], page: 1, hasMore: true, totalCount: 0, isLoading: false
+            }
+          })),
 
           // ✅ FETCH SIMPLIFIÉ AVEC GESTION PGRST103 CORRECTE
           fetchListings: async (options = {}) => {
@@ -305,9 +236,7 @@ export const useFarm2ForkStore = create<Farm2ForkStore>()(
               return [];
             }
 
-            set((prev) => ({
-              listings: { ...prev.listings, isLoading: true },
-            }));
+            set((prev) => ({ listings: { ...prev.listings, isLoading: true } }));
 
             try {
               const limit = 20;
@@ -324,13 +253,7 @@ export const useFarm2ForkStore = create<Farm2ForkStore>()(
               // ✅ SIMPLE : Si erreur, on arrête tout
               if (error) {
                 console.error("Supabase error:", error);
-                set((prev) => ({
-                  listings: {
-                    ...prev.listings,
-                    isLoading: false,
-                    hasMore: false,
-                  },
-                }));
+                set((prev) => ({ listings: { ...prev.listings, isLoading: false, hasMore: false } }));
                 return [];
               }
 
@@ -354,21 +277,16 @@ export const useFarm2ForkStore = create<Farm2ForkStore>()(
 
               get().filterListings();
               return listings;
+
             } catch (error: any) {
               console.error("Fetch error:", error);
-
+              
               // ✅ GESTION PGRST103 ICI
               if (error?.code === "PGRST103") {
                 console.log("PGRST103: Fin de pagination atteinte");
               }
-
-              set((prev) => ({
-                listings: {
-                  ...prev.listings,
-                  isLoading: false,
-                  hasMore: false,
-                },
-              }));
+              
+              set((prev) => ({ listings: { ...prev.listings, isLoading: false, hasMore: false } }));
               return [];
             }
           },
@@ -376,11 +294,8 @@ export const useFarm2ForkStore = create<Farm2ForkStore>()(
           loadMoreListings: async () => {
             const state = get();
             if (state.listings.isLoading || !state.listings.hasMore) return;
-
-            await get().fetchListings({
-              page: state.listings.page + 1,
-              append: true,
-            });
+            
+            await get().fetchListings({ page: state.listings.page + 1, append: true });
           },
 
           cleanupPagination: () => {
@@ -392,38 +307,16 @@ export const useFarm2ForkStore = create<Farm2ForkStore>()(
             get().filterListings();
           },
 
-          setHoveredListingId: (id) =>
-            set((state) => ({
-              interactions: { ...state.interactions, hoveredListingId: id },
-            })),
-          setSelectedListingId: (id) =>
-            set((state) => ({
-              interactions: {
-                ...state.interactions,
-                selectedListingId: id,
-                openInfoWindowId: id,
-              },
-            })),
-          setOpenInfoWindowId: (id) =>
-            set((state) => ({
-              interactions: { ...state.interactions, openInfoWindowId: id },
-            })),
-          clearSelection: () =>
-            set((state) => ({
-              interactions: {
-                hoveredListingId: null,
-                selectedListingId: null,
-                openInfoWindowId: null,
-              },
-            })),
+          setHoveredListingId: (id) => set((state) => ({ interactions: { ...state.interactions, hoveredListingId: id } })),
+          setSelectedListingId: (id) => set((state) => ({ interactions: { ...state.interactions, selectedListingId: id, openInfoWindowId: id } })),
+          setOpenInfoWindowId: (id) => set((state) => ({ interactions: { ...state.interactions, openInfoWindowId: id } })),
+          clearSelection: () => set((state) => ({ interactions: { hoveredListingId: null, selectedListingId: null, openInfoWindowId: null } })),
 
           toggleFilter: (filterKey, value) => {
             const state = get();
             const currentValues = (state.filters[filterKey] as string[]) ?? [];
             const isSelected = currentValues.includes(value);
-            const next = isSelected
-              ? currentValues.filter((v) => v !== value)
-              : [...currentValues, value];
+            const next = isSelected ? currentValues.filter((v) => v !== value) : [...currentValues, value];
 
             set((prev) => ({
               filters: { ...prev.filters, [filterKey]: next },
@@ -433,66 +326,32 @@ export const useFarm2ForkStore = create<Farm2ForkStore>()(
           },
 
           resetFilters: () => {
-            set((state) => ({
-              filters: { ...initialFilters },
-              listings: { ...state.listings, page: 1 },
-            }));
+            set((state) => ({ filters: { ...initialFilters }, listings: { ...state.listings, page: 1 } }));
             get().filterListings();
           },
 
           setFilters: (filters) => {
-            set((state) => ({
-              filters: { ...initialFilters, ...filters },
-              listings: { ...state.listings, page: 1 },
-            }));
+            set((state) => ({ filters: { ...initialFilters, ...filters }, listings: { ...state.listings, page: 1 } }));
             get().filterListings();
           },
 
-          setFiltersHydrated: (hydrated) =>
-            set(() => ({ filtersHydrated: hydrated })),
-          setMapExpanded: (expanded) =>
-            set((state) => ({ ui: { ...state.ui, isMapExpanded: expanded } })),
+          setFiltersHydrated: (hydrated) => set(() => ({ filtersHydrated: hydrated })),
+          setMapExpanded: (expanded) => set((state) => ({ ui: { ...state.ui, isMapExpanded: expanded } })),
 
           filterListings: () => {
             const state = get();
-            const filtered = filterListings(
-              state.listings.all,
-              state.filters,
-              state.map.bounds
-            );
-            set((prev) => ({
-              listings: { ...prev.listings, filtered, visible: filtered },
-            }));
+            const filtered = filterListings(state.listings.all, state.filters, state.map.bounds);
+            set((prev) => ({ listings: { ...prev.listings, filtered, visible: filtered } }));
           },
 
-          reset: () =>
-            set({
-              map: {
-                coordinates: null,
-                bounds: null,
-                zoom: 12,
-                mapInstance: null,
-                isApiLoaded: false,
-                isApiLoading: false,
-              },
-              listings: {
-                all: [],
-                visible: [],
-                filtered: [],
-                isLoading: false,
-                hasMore: true,
-                page: 1,
-                totalCount: 0,
-              },
-              interactions: {
-                hoveredListingId: null,
-                selectedListingId: null,
-                openInfoWindowId: null,
-              },
-              filters: initialFilters,
-              filtersHydrated: false,
-              ui: { isMapExpanded: false },
-            }),
+          reset: () => set({
+            map: { coordinates: null, bounds: null, zoom: 12, mapInstance: null, isApiLoaded: false, isApiLoading: false },
+            listings: { all: [], visible: [], filtered: [], isLoading: false, hasMore: true, page: 1, totalCount: 0 },
+            interactions: { hoveredListingId: null, selectedListingId: null, openInfoWindowId: null },
+            filters: initialFilters,
+            filtersHydrated: false,
+            ui: { isMapExpanded: false },
+          }),
         }),
         {
           name: "farm2fork-unified",
@@ -512,65 +371,54 @@ export const useFarm2ForkStore = create<Farm2ForkStore>()(
 
 // Selectors
 export const useMapState = () => useFarm2ForkStore((state) => state.map);
-export const useListingsState = () =>
-  useFarm2ForkStore((state) => state.listings);
-export const useInteractionsState = () =>
-  useFarm2ForkStore((state) => state.interactions);
-export const useFiltersState = () =>
-  useFarm2ForkStore((state) => state.filters);
+export const useListingsState = () => useFarm2ForkStore((state) => state.listings);
+export const useInteractionsState = () => useFarm2ForkStore((state) => state.interactions);
+export const useFiltersState = () => useFarm2ForkStore((state) => state.filters);
 export const useUIState = () => useFarm2ForkStore((state) => state.ui);
 
-export const useMapActions = () =>
-  useFarm2ForkStore((state) => ({
-    setCoordinates: state.setCoordinates,
-    setMapBounds: state.setMapBounds,
-    setZoom: state.setZoom,
-    setMapInstance: state.setMapInstance,
-    setApiLoaded: state.setApiLoaded,
-    setApiLoading: state.setApiLoading,
-    updateMapBoundsAndFilter: state.updateMapBoundsAndFilter,
-  }));
+export const useMapActions = () => useFarm2ForkStore((state) => ({
+  setCoordinates: state.setCoordinates,
+  setMapBounds: state.setMapBounds,
+  setZoom: state.setZoom,
+  setMapInstance: state.setMapInstance,
+  setApiLoaded: state.setApiLoaded,
+  setApiLoading: state.setApiLoading,
+  updateMapBoundsAndFilter: state.updateMapBoundsAndFilter,
+}));
 
-export const useListingsActions = () =>
-  useFarm2ForkStore((state) => ({
-    setAllListings: state.setAllListings,
-    setVisibleListings: state.setVisibleListings,
-    setFilteredListings: state.setFilteredListings,
-    setListingsLoading: state.setListingsLoading,
-    setHasMore: state.setHasMore,
-    setPage: state.setPage,
-    addListings: state.addListings,
-    resetListings: state.resetListings,
-    fetchListings: state.fetchListings,
-    loadMoreListings: state.loadMoreListings,
-    cleanupPagination: state.cleanupPagination,
-  }));
+export const useListingsActions = () => useFarm2ForkStore((state) => ({
+  setAllListings: state.setAllListings,
+  setVisibleListings: state.setVisibleListings,
+  setFilteredListings: state.setFilteredListings,
+  setListingsLoading: state.setListingsLoading,
+  setHasMore: state.setHasMore,
+  setPage: state.setPage,
+  addListings: state.addListings,
+  resetListings: state.resetListings,
+  fetchListings: state.fetchListings,
+  loadMoreListings: state.loadMoreListings,
+  cleanupPagination: state.cleanupPagination,
+}));
 
-export const useInteractionsActions = () =>
-  useFarm2ForkStore((state) => ({
-    setHoveredListingId: state.setHoveredListingId,
-    setSelectedListingId: state.setSelectedListingId,
-    setOpenInfoWindowId: state.setOpenInfoWindowId,
-    clearSelection: state.clearSelection,
-  }));
+export const useInteractionsActions = () => useFarm2ForkStore((state) => ({
+  setHoveredListingId: state.setHoveredListingId,
+  setSelectedListingId: state.setSelectedListingId,
+  setOpenInfoWindowId: state.setOpenInfoWindowId,
+  clearSelection: state.clearSelection,
+}));
 
-export const useFiltersActions = () =>
-  useFarm2ForkStore((state) => ({
-    toggleFilter: state.toggleFilter,
-    resetFilters: state.resetFilters,
-    setFilters: state.setFilters,
-    setFiltersHydrated: state.setFiltersHydrated,
-    filterListings: state.filterListings,
-  }));
+export const useFiltersActions = () => useFarm2ForkStore((state) => ({
+  toggleFilter: state.toggleFilter,
+  resetFilters: state.resetFilters,
+  setFilters: state.setFilters,
+  setFiltersHydrated: state.setFiltersHydrated,
+  filterListings: state.filterListings,
+}));
 
-export const useUIActions = () =>
-  useFarm2ForkStore((state) => ({ setMapExpanded: state.setMapExpanded }));
+export const useUIActions = () => useFarm2ForkStore((state) => ({ setMapExpanded: state.setMapExpanded }));
 
-export const useSelectedListing = () =>
-  useFarm2ForkStore((state) => state.interactions.selectedListingId);
-export const useHoveredListing = () =>
-  useFarm2ForkStore((state) => state.interactions.hoveredListingId);
-export const useIsMapExpanded = () =>
-  useFarm2ForkStore((state) => state.ui.isMapExpanded);
+export const useSelectedListing = () => useFarm2ForkStore((state) => state.interactions.selectedListingId);
+export const useHoveredListing = () => useFarm2ForkStore((state) => state.interactions.hoveredListingId);
+export const useIsMapExpanded = () => useFarm2ForkStore((state) => state.ui.isMapExpanded);
 
 export default useFarm2ForkStore;
