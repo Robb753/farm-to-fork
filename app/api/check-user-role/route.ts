@@ -1,17 +1,10 @@
-// app/api/get-user-info/route.ts
+// app/api/check-user-role/route.ts
 import { clerkClient } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
+import { isValidUserRole, VALID_ROLES, type ClerkPublicMetadata, type ValidRole } from "@/lib/utils/userRole";
 
 // Force dynamic pour éviter la mise en cache des données utilisateur
 export const dynamic = "force-dynamic";
-
-/**
- * Type pour les métadonnées publiques Clerk
- */
-interface ClerkPublicMetadata {
-  role?: string;
-  [key: string]: any;
-}
 
 /**
  * Type pour la réponse API
@@ -27,12 +20,6 @@ interface GetUserInfoResponse {
   error?: string;
   details?: string;
 }
-
-/**
- * Rôles valides dans l'application
- */
-const VALID_ROLES = ["user", "farmer", "admin"] as const;
-type ValidRole = typeof VALID_ROLES[number];
 
 /**
  * API Route pour récupérer les informations utilisateur depuis Clerk
@@ -182,15 +169,15 @@ export async function GET(req: NextRequest): Promise<NextResponse<GetUserInfoRes
 
   } catch (error) {
     console.error("[GET USER INFO] Erreur serveur:", error);
-    
+
     // Gestion d'erreur générale avec détails selon l'environnement
     const isDev = process.env.NODE_ENV === "development";
-    
+
     return NextResponse.json(
-      { 
+      {
         success: false,
         error: "Erreur interne du serveur",
-        ...(isDev && { 
+        ...(isDev && {
           details: error instanceof Error ? error.message : "Erreur inconnue"
         })
       },
@@ -198,41 +185,3 @@ export async function GET(req: NextRequest): Promise<NextResponse<GetUserInfoRes
     );
   }
 }
-
-/**
- * Fonction utilitaire pour valider un rôle utilisateur
- * 
- * @param role - Rôle à valider
- * @returns true si le rôle est valide
- */
-export function isValidUserRole(role: string | undefined): role is ValidRole {
-  if (!role) return false;
-  return VALID_ROLES.includes(role as ValidRole);
-}
-
-/**
- * Fonction utilitaire pour extraire le rôle depuis les métadonnées Clerk
- * 
- * @param metadata - Métadonnées publiques Clerk
- * @returns Rôle extrait et validation
- */
-export function extractUserRole(metadata: ClerkPublicMetadata | null | undefined): {
-  role: string | undefined;
-  hasRole: boolean;
-  isValid: boolean;
-} {
-  const role = metadata?.role as string | undefined;
-  const hasRole = !!role;
-  const isValid = isValidUserRole(role);
-
-  return { role, hasRole, isValid };
-}
-
-/**
- * Export des types pour utilisation externe
- */
-export type {
-  GetUserInfoResponse,
-  ClerkPublicMetadata,
-  ValidRole,
-};

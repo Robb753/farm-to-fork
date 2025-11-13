@@ -120,7 +120,7 @@ interface Product {
 }
 
 interface ListingData {
-  id: string;
+  id: number;
   name: string;
   email: string;
   phoneNumber: string;
@@ -254,7 +254,7 @@ const STEPS: StepItem[] = [
  */
 class ListingService {
   static async uploadImages(
-    listingId: string,
+    listingId: number,
     images: (string | File)[]
   ): Promise<void> {
     try {
@@ -301,7 +301,7 @@ class ListingService {
   }
 
   static async fetchListing(
-    id: string,
+    id: number,
     userEmail: string
   ): Promise<ListingData> {
     try {
@@ -316,6 +316,8 @@ class ListingService {
       if (!data) throw new Error("Aucun listing trouvé");
 
       // ✅ Sanitisation des données au niveau du service pour garantir les types corrects
+      const toArray = (val: any): any[] => Array.isArray(val) ? val : [];
+
       const sanitizedData: ListingData = {
         id: data.id,
         name: data.name || "",
@@ -323,21 +325,21 @@ class ListingService {
         phoneNumber: data.phoneNumber || "",
         description: data.description || "",
         website: data.website || "",
-        product_type: (data.product_type || []).filter(isValidProductType),
-        production_method: (data.production_method || []).filter(
+        product_type: toArray(data.product_type).filter(isValidProductType),
+        production_method: toArray(data.production_method).filter(
           isValidProductionMethod
         ),
-        purchase_mode: (data.purchase_mode || []).filter(isValidPurchaseMode),
-        certifications: (data.certifications || []).filter(
+        purchase_mode: toArray(data.purchase_mode).filter(isValidPurchaseMode),
+        certifications: toArray(data.certifications).filter(
           isValidCertification
         ),
-        availability: (data.availability || []).filter(isValidAvailability),
-        additional_services: (data.additional_services || []).filter(
+        availability: toArray(data.availability).filter(isValidAvailability),
+        additional_services: toArray(data.additional_services).filter(
           isValidAdditionalService
         ),
-        products: data.products || [],
+        products: toArray((data as any).products),
         active: data.active || false,
-        listingImages: data.listingImages || [],
+        listingImages: toArray(data.listingImages),
       };
 
       return sanitizedData;
@@ -348,7 +350,7 @@ class ListingService {
   }
 
   static async updateListing(
-    id: string,
+    id: number,
     values: EditListingSchemaType,
     isPublishing: boolean,
     currentActive: boolean
@@ -366,7 +368,7 @@ class ListingService {
 
       const { error } = await supabase
         .from("listing")
-        .update(updateData)
+        .update(updateData as any)
         .eq("id", id);
 
       if (error) throw error;
@@ -377,7 +379,7 @@ class ListingService {
   }
 
   static async updateProducts(
-    listingId: string,
+    listingId: number,
     products: string[]
   ): Promise<void> {
     try {
@@ -484,7 +486,12 @@ const EditListing: React.FC<EditListingProps> = ({
           throw new Error("Email utilisateur non trouvé");
         }
 
-        const data = await ListingService.fetchListing(params.id, userEmail);
+        const listingId = parseInt(params.id, 10);
+        if (isNaN(listingId)) {
+          throw new Error("ID de listing invalide");
+        }
+
+        const data = await ListingService.fetchListing(listingId, userEmail);
 
         setListing(data);
 
@@ -536,20 +543,25 @@ const EditListing: React.FC<EditListingProps> = ({
       setIsSubmitting(true);
 
       try {
+        const listingId = parseInt(params.id, 10);
+        if (isNaN(listingId)) {
+          throw new Error("ID de listing invalide");
+        }
+
         // Mise à jour du listing principal
         await ListingService.updateListing(
-          params.id,
+          listingId,
           values,
           isPublishing,
           listing.active
         );
 
         // Mise à jour des produits
-        await ListingService.updateProducts(params.id, values.products);
+        await ListingService.updateProducts(listingId, values.products);
 
         // ✅ Upload des images avec types corrects
         if (values.images.length > 0) {
-          await ListingService.uploadImages(params.id, values.images);
+          await ListingService.uploadImages(listingId, values.images);
         }
 
         // Messages de succès et navigation

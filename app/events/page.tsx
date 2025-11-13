@@ -1,3 +1,5 @@
+"use client";
+
 // app/events/page.tsx
 import Link from "next/link";
 import eventsData from "@/app/_data/eventsData.json";

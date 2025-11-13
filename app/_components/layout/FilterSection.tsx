@@ -374,7 +374,7 @@ const FilterSection: React.FC = () => {
     const params = new URLSearchParams(window.location.search);
     const urlFilters: Partial<FilterState> = {};
 
-    (filterSections as FilterSectionDef[]).forEach(({ key }) => {
+    (filterSections as any as FilterSectionDef[]).forEach(({ key }) => {
       const raw = params.get(key);
       if (raw && isFilterKey(key)) {
         urlFilters[key] = raw.split(",").filter(Boolean);
@@ -573,7 +573,7 @@ const FilterSection: React.FC = () => {
       <div className="w-full border-b border-gray-100 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60">
         <div className="mx-auto max-w-6xl px-3">
           <div className="no-scrollbar flex h-12 items-center gap-2 overflow-x-auto py-2 [scrollbar-width:none] [-ms-overflow-style:none]">
-            {(filterSections as FilterSectionDef[]).map(
+            {(filterSections as any as FilterSectionDef[]).map(
               ({ title, key, items }) => {
                 if (!isFilterKey(key)) return null; // Narrowing ⬅️
 
