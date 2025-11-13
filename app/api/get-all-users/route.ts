@@ -3,6 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
 
+// Force dynamic pour éviter la mise en cache
+export const dynamic = "force-dynamic";
+
 /**
  * Type pour un profil utilisateur
  */
