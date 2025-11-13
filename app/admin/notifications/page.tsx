@@ -34,7 +34,7 @@ import { cn } from "@/lib/utils";
  * Interface pour les demandes d'accès producteur
  */
 interface FarmerRequest {
-  id: string;
+  id: number;
   user_id: string;
   farm_name: string;
   location: string;
@@ -57,7 +57,7 @@ type RequestStatus = FarmerRequest["status"];
  * Interface pour les actions de validation
  */
 interface ValidationPayload {
-  requestId: string;
+  requestId: number;
   userId: string;
   role: string;
   status: RequestStatus;
@@ -150,7 +150,7 @@ export default function AdminNotificationsPage(): JSX.Element {
 
       if (error) throw error;
 
-      setNotifications(data || []);
+      setNotifications((data || []) as FarmerRequest[]);
     } catch (error) {
       console.error("Erreur de chargement:", error);
       toast.error("Impossible de charger les notifications");
@@ -170,7 +170,7 @@ export default function AdminNotificationsPage(): JSX.Element {
    * Traite une action d'approbation ou de rejet
    */
   const handleAction = async (
-    requestId: string,
+    requestId: number,
     userId: string,
     role: string,
     status: RequestStatus

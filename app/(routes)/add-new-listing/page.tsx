@@ -70,7 +70,7 @@ interface ListingPayload {
 }
 
 interface ExistingListing {
-  id: string;
+  id: number;
 }
 
 type UserRole = "farmer" | "admin" | "user";
@@ -223,18 +223,18 @@ class ListingService {
     }
   }
 
-  static async createListing(payload: ListingPayload): Promise<{ id: string }> {
+  static async createListing(payload: ListingPayload): Promise<{ id: number }> {
     try {
       const { data, error } = await supabase
         .from("listing")
-        .insert([payload])
+        .insert([payload as any])
         .select()
         .single();
 
       if (error) throw error;
       if (!data?.id) throw new Error("Aucun ID retourné lors de la création");
 
-      return data;
+      return data as { id: number };
     } catch (error) {
       console.error("Erreur lors de la création du listing:", error);
       throw error;
@@ -242,19 +242,19 @@ class ListingService {
   }
 
   static async updateListing(
-    id: string,
+    id: number,
     payload: ListingPayload
-  ): Promise<{ id: string }> {
+  ): Promise<{ id: number }> {
     try {
       const { data, error } = await supabase
         .from("listing")
-        .update(payload)
+        .update(payload as any)
         .eq("id", id)
         .select()
         .single();
 
       if (error) throw error;
-      return data;
+      return data as { id: number };
     } catch (error) {
       console.error("Erreur lors de la mise à jour du listing:", error);
       throw error;

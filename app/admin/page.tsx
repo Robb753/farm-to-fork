@@ -90,7 +90,7 @@ export default function FarmerDashboard(): JSX.Element {
             `Erreur Supabase: ${supabaseError.message || "Erreur inconnue"}`
           );
         } else {
-          setListing(data);
+          setListing(data as any as Listing);
         }
       } catch (err) {
         console.error("Erreur lors de la récupération:", err);

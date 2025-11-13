@@ -90,7 +90,7 @@ export default function FarmerDashboard(): JSX.Element {
           );
         } else {
           console.log("Données récupérées avec succès:", data);
-          setListing(data);
+          setListing(data as any as Listing);
         }
       } catch (err) {
         console.error("Erreur générale:", err);

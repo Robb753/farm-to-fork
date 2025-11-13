@@ -31,8 +31,8 @@ export interface Listing {
   id: number;
   name: string;
   address: string;
-  lat: string;
-  lng: string;
+  lat: number;
+  lng: number;
   availability?: "open" | "closed";
   product_type?: string[];
   certifications?: string[];

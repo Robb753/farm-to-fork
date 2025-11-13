@@ -432,32 +432,3 @@ export async function POST(
   }
 }
 
-/**
- * Fonction utilitaire pour valider les données de demande
- * @deprecated Utilisez validateAndSanitizeNotificationData pour une validation plus robuste
- */
-export function validateNotificationData(data: any): {
-  isValid: boolean;
-  errors: string[];
-} {
-  const validation = validateAndSanitizeNotificationData(data);
-  return {
-    isValid: validation.isValid,
-    errors: validation.errors,
-  };
-}
-
-/**
- * Export des types pour utilisation externe
- */
-export type {
-  AdminNotificationRequestBody,
-  AdminNotificationResponse,
-  EmailServiceResponse,
-  ValidationResult,
-};
-
-/**
- * Export des constantes de validation pour utilisation externe
- */
-export { VALIDATION_RULES };
