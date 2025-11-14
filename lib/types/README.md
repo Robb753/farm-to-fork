@@ -74,7 +74,6 @@ Types pour les composants UI :
 ## Migration depuis les Anciens Types
 ```typescript
 
-// lib/store/migratedStore.ts
 export interface LatLng { lat: number; lng: number; }
 
 // lib/store/userStore.ts
@@ -116,7 +115,6 @@ import type { LatLng, UserProfile } from "./types";
 - ✅ Création de `enums.ts` pour les énumérations
 - ✅ Enrichissement de `lib/store/types.ts`
 - ✅ Création de `ui.ts` pour les types UI
-- ✅ Suppression des duplications dans migratedStore.ts
 - ✅ Suppression des duplications dans userStore.ts
 - ✅ Création du fichier index.ts pour exports centralisés
 - ✅ Documentation complète

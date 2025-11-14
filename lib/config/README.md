@@ -52,11 +52,6 @@ const primaryColor = COLORS.PRIMARY; // "#16a34a"
 const sections = FILTER_SECTIONS; // Array de FilterSection
 ```
 
-**Remplace** :
-- ❌ `lib/store/migratedStore.ts` - `filterSections` (lignes 102-162)
-- ❌ `app/schemas/editListingSchema.ts` - Constantes (lignes 6-52)
-- ❌ `lib/config/email-notifications.js` - 26 couleurs hardcodées
-
 ---
 
 ### 2. `map.config.ts`
@@ -87,10 +82,6 @@ const mapConfig = {
 // Changer de style
 const satelliteStyle = MAP_STYLES.SATELLITE;
 ```
-
-**Remplace** :
-- ❌ `lib/store/migratedStore.ts` - `MAPBOX_CONFIG` (lignes 164-171)
-- ❌ Valeurs hardcodées dans divers composants de carte
 
 ---
 
@@ -438,7 +429,6 @@ console.assert(MAPBOX_CONFIG.zoom === 4.6, "Zoom par défaut correct");
 
 | Ancien Fichier | Nouveau Fichier | Status |
 |----------------|-----------------|--------|
-| `lib/store/migratedStore.ts` (filterSections) | `lib/config/constants.ts` | ✅ Migré |
 | `app/schemas/editListingSchema.ts` (constantes) | `lib/config/constants.ts` | ✅ Migré |
 | `config/email-config.js` | `lib/config/email.config.ts` | ✅ Fusionné |
 | `lib/config/email-notifications.js` (couleurs) | `lib/config/email.config.ts` | ✅ Fusionné |

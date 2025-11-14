@@ -11,18 +11,11 @@ import dynamic from "next/dynamic";
 import { MapPin, List, Maximize2, Minimize2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import FilterSection from "@/app/_components/layout/FilterSection";
+import FilterSection from "@/app/_components/layout/FilterSection/FilterSection";
 import Listing from "./Listing";
 import GlobalLoadingOverlay from "@/app/_components/ui/GlobalLoadingOverlay";
-
-import {
-  useMapState,
-  useListingsState,
-  useListingsActions,
-  useUIState,
-  useUIActions,
-} from "@/lib/store/migratedStore";
 import { COLORS } from "@/lib/config";
+import { useListingsActions, useListingsState, useMapState, useUIActions, useUIState } from "@/lib/store";
 
 /**
  * Interface pour les bounds de la carte

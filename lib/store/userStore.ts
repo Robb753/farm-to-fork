@@ -1,4 +1,4 @@
-// lib/store/userStore.ts
+// lib/store/userStore.ts - Version corrigée
 import { create } from "zustand";
 import { persist, subscribeWithSelector } from "zustand/middleware";
 import {
@@ -8,10 +8,18 @@ import {
 } from "@/lib/syncUserUtils";
 import { toast } from "sonner";
 import { supabase } from "@/utils/supabase/client";
-// Types centralisés
-import type { UserProfile, Role } from "./types";
-// Type Clerk corrigé
+// Type Clerk
 import type { UserResource } from "@clerk/types";
+
+// Types locaux pour éviter les imports problématiques
+export interface UserProfile {
+  id: string;
+  email: string;
+  role: "user" | "farmer" | "admin";
+  favorites: number[];
+}
+
+export type Role = "user" | "farmer" | "admin" | null;
 
 interface UserState {
   // État utilisateur
@@ -340,7 +348,6 @@ export const useUserStore = create<UserState>()(
 );
 
 // ==================== SELECTORS ====================
-// (préférables aux champs "computed" dans le store)
 export const useUserProfile = () => useUserStore((s) => s.profile);
 export const useUserRole = () => useUserStore((s) => s.role);
 export const useIsFarmer = () => useUserStore((s) => s.role === "farmer");

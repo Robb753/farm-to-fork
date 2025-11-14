@@ -59,6 +59,9 @@ const baseConfig = {
     ];
   },
 
+  // 🔧 CORRIGÉ : Packages externes pour Next.js 15 -----------------------
+  serverExternalPackages: ["@supabase/supabase-js"],
+
   // Expérimental -----------------------------------------------------------
   experimental: {
     optimizePackageImports: [
@@ -74,14 +77,13 @@ const baseConfig = {
       "recharts",
       "framer-motion",
     ],
-    serverComponentsExternalPackages: ["@supabase/supabase-js"],
   },
 
   // Global -----------------------------------------------------------------
   compress: true,
   poweredByHeader: false,
   reactStrictMode: true,
-  swcMinify: true,
+  // 🔧 SUPPRIMÉ : swcMinify est activé par défaut en Next.js 15
   productionBrowserSourceMaps: false,
   trailingSlash: false,
   onDemandEntries: {

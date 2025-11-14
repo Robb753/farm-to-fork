@@ -21,33 +21,25 @@ export type ProductType = (typeof PRODUCT_TYPES)[number];
 
 // ==================== CERTIFICATIONS ====================
 
-/**
- * Certifications et labels disponibles
- * Note: Harmonisé entre editListingSchema et migratedStore
- */
 export const CERTIFICATIONS = [
   "Label AB",
   "Label Rouge",
-  "AOC/AOP", // Harmonisé (était "AOP/AOC" dans migratedStore)
+  "AOC/AOP",
   "IGP",
   "Demeter",
-  "HVE", // Ajouté depuis migratedStore
+  "HVE",
 ] as const;
 
 export type Certification = (typeof CERTIFICATIONS)[number];
 
 // ==================== MODES D'ACHAT ====================
 
-/**
- * Modes d'achat / distribution disponibles
- * Note: Harmonisé entre editListingSchema et migratedStore
- */
 export const PURCHASE_MODES = [
   "Vente directe à la ferme",
   "Marché local",
   "Livraison à domicile",
-  "Point de vente collectif", // De editListingSchema
-  "Drive fermier", // De migratedStore
+  "Point de vente collectif",
+  "Drive fermier",
   "Click & Collect",
 ] as const;
 
@@ -69,18 +61,14 @@ export type ProductionMethod = (typeof PRODUCTION_METHODS)[number];
 
 // ==================== SERVICES ADDITIONNELS ====================
 
-/**
- * Services additionnels proposés par les producteurs
- * Note: Harmonisé entre editListingSchema et migratedStore
- */
 export const ADDITIONAL_SERVICES = [
   "Visite de la ferme",
   "Ateliers de cuisine",
   "Dégustation",
   "Activités pour enfants",
-  "Hébergement", // De migratedStore
-  "Réservation pour événements", // De migratedStore
-  "Événements pour professionnels", // De editListingSchema
+  "Hébergement",
+  "Réservation pour événements",
+  "Événements pour professionnels",
 ] as const;
 
 export type AdditionalService = (typeof ADDITIONAL_SERVICES)[number];
@@ -276,7 +264,7 @@ export const STORAGE_KEYS = {
  * Paramètres de pagination pour les listings
  */
 export const PAGINATION = {
-  DEFAULT_PAGE_SIZE: 20, // Nombre d'items par page (migratedStore)
+  DEFAULT_PAGE_SIZE: 10,
   LEGACY_PAGE_SIZE: 10,
   MAX_PAGE_SIZE: 100,
   DEFAULT_PAGE: 1,
