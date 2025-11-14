@@ -35,20 +35,14 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 
 // ✅ Import du nouveau store unifié
-import {
-  useMapState,
-  useMapActions,
-  useListingsState,
-  useListingsActions,
-  useInteractionsActions,
-  useFiltersState,
-} from "@/lib/store/migratedStore";
 
 import { useUser } from "@clerk/nextjs";
 import { useUserFavorites, useUserActions } from "@/lib/store/userStore";
 import { ListingImage } from "@/components/ui/OptimizedImage";
-import { openMobileFilters } from "@/app/_components/layout/FilterSection";
+import { openMobileFilters } from "@/app/_components/layout/FilterSection/FilterSection";
 import { COLORS } from "@/lib/config";
+import { useInteractionsActions, useListingsActions, useListingsState, useMapActions, useMapState } from "@/lib/store";
+import { useFiltersState } from "@/lib/store/filtersStore";
 
 /**
  * Interfaces TypeScript

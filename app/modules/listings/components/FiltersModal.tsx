@@ -3,16 +3,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "@/utils/icons";
-import { COLORS, filterSections } from "@/lib/config";
+import { COLORS, FILTER_SECTIONS } from "@/lib/config"; // ✅ Import filterSections
 import { cn } from "@/lib/utils";
 
-// ✅ Import du nouveau store unifié
-import { useFiltersState, useFiltersActions } from "@/lib/store/migratedStore";
-
-// ✅ Import des constantes depuis le bon chemin
-
-
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useFiltersStoreActions, useFiltersStoreState } from "@/lib/store"; // ✅ Noms corrects
+import type { FilterState } from "@/lib/store"; // ✅ Import du type FilterState
 
 /**
  * Interface pour les props de la modale
@@ -23,26 +19,23 @@ interface FiltersModalProps {
 }
 
 /**
- * Interface pour les filtres (définie localement pour éviter les conflits)
- */
-interface LocalFilterState {
-  [key: string]: string[];
-}
-
-/**
- * Interface pour les sections de filtres
+ * Interface pour les sections de filtres (compatible avec FILTER_SECTIONS)
  */
 interface FilterSection {
+  id: string;
   title: string;
-  key: string;
-  items: string[];
+  options: Array<{
+    id: string;
+    label: string;
+    value: string;
+    count?: number;
+  }>;
 }
 
 /**
  * Construit un objet vide de filtres selon la forme du store
  */
-const makeEmptyFilters = () => {
-  // ✅ Créer un objet avec toutes les propriétés requises par FilterState
+const makeEmptyFilters = (): FilterState => {
   return {
     product_type: [],
     certifications: [],
@@ -59,7 +52,7 @@ const makeEmptyFilters = () => {
  */
 const buildUrlSearch = (
   searchParams: URLSearchParams,
-  filters: any
+  filters: FilterState
 ): string => {
   const qs = new URLSearchParams();
 
@@ -94,15 +87,17 @@ export default function FiltersModal({
   open = false,
   onClose,
 }: FiltersModalProps): JSX.Element | null {
-  const storeFilters = useFiltersState();
-  const { setFilters, resetFilters } = useFiltersActions();
+  // ✅ Correction: récupérer les filtres depuis le nouvel état du store avec les bons noms
+  const filtersState = useFiltersStoreState();
+  const storeFilters = filtersState.filters; // ✅ Extraire les filtres du state
+  const { setFilters, resetFilters } = useFiltersStoreActions();
 
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
 
   // ✅ On édite une copie locale, puis on applique via "Voir les résultats"
-  const [draft, setDraft] = useState(storeFilters);
+  const [draft, setDraft] = useState<FilterState>(storeFilters);
 
   /**
    * Synchronisation du draft avec le store quand la modale s'ouvre
@@ -165,11 +160,13 @@ export default function FiltersModal({
    */
   const toggleDraft = (key: string, value: string): void => {
     setDraft((prevDraft) => {
-      const arr = Array.isArray(prevDraft[key]) ? prevDraft[key] : [];
+      const arr = Array.isArray(prevDraft[key as keyof FilterState])
+        ? (prevDraft[key as keyof FilterState] as string[])
+        : [];
       const exists = arr.includes(value);
       const next = exists ? arr.filter((x) => x !== value) : [...arr, value];
 
-      return { ...prevDraft, [key]: next };
+      return { ...prevDraft, [key]: next } as FilterState;
     });
   };
 
@@ -291,9 +288,9 @@ export default function FiltersModal({
 
         {/* ✅ Body scrollable */}
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-8">
-          {filterSections.map(({ title, key, items }: FilterSection) => (
+          {FILTER_SECTIONS.map((section: FilterSection) => (
             <section
-              key={key}
+              key={section.id}
               className={cn("rounded-xl border p-4 shadow-sm backdrop-blur-sm")}
               style={{
                 backgroundColor: `${COLORS.BG_WHITE}B3`,
@@ -305,11 +302,11 @@ export default function FiltersModal({
                   className="text-base font-semibold"
                   style={{ color: COLORS.TEXT_PRIMARY }}
                 >
-                  {title}
+                  {section.title}
                 </h3>
-                {!!draft[key]?.length && (
+                {!!draft[section.id as keyof FilterState]?.length && (
                   <button
-                    onClick={() => clearSection(key)}
+                    onClick={() => clearSection(section.id)}
                     className={cn(
                       "text-xs transition-colors duration-200",
                       "hover:underline focus:outline-none focus:ring-1 focus:ring-green-500 rounded"
@@ -331,13 +328,15 @@ export default function FiltersModal({
               </div>
 
               <div className="flex flex-wrap gap-2">
-                {items.map((item: string) => {
-                  const checked = (draft[key] || []).includes(item);
+                {section.options.map((option) => {
+                  const checked = (
+                    draft[section.id as keyof FilterState] || []
+                  ).includes(option.value);
                   return (
                     <button
-                      key={`${key}-${item}`}
+                      key={`${section.id}-${option.value}`}
                       type="button"
-                      onClick={() => toggleDraft(key, item)}
+                      onClick={() => toggleDraft(section.id, option.value)}
                       className={cn(
                         "group flex items-center gap-1.5 px-3.5 py-2 rounded-full",
                         "text-sm border font-medium transition-all duration-200",
@@ -381,7 +380,7 @@ export default function FiltersModal({
                           ✓
                         </span>
                       )}
-                      {item}
+                      {option.label}
                     </button>
                   );
                 })}

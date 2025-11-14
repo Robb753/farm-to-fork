@@ -5,13 +5,9 @@ import React, { useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAllListingsWithImages } from "@/app/hooks/useAllListingsWithImages";
-import {
-  useListingsActions,
-  useMapActions,
-  useMapState,
-} from "@/lib/store/migratedStore";
 import { MAPBOX_CONFIG } from "@/lib/config";
-import type { LatLng } from "@/lib/types";
+import type { LatLng } from "@/lib/store"; // ✅ Import depuis le nouveau store
+import { useListingsActions, useMapActions, useMapState } from "@/lib/store";
 
 /**
  * Chargement dynamique du composant de carte
@@ -111,15 +107,13 @@ export default function Explore(): JSX.Element {
     if (needZoom) {
       setZoom(targetZoom);
     }
-
-    // ⚠️ IMPORTANT :
-    // - Pas de mapInstance.easeTo ici, MapboxSection le fera déjà
-    // - Pas de fetchListings ici non plus (évite les boucles infinies)
   }, [paramsKey, curCoords, curZoom, setCoordinates, setZoom]);
 
   /**
    * Injecte les listings préchargés si disponibles
    * Ne déclenche pas de nouveau fetch
+   *
+   * ✅ CORRECTION: Conversion de type pour compatibilité
    */
   useEffect(() => {
     if (
@@ -128,7 +122,14 @@ export default function Explore(): JSX.Element {
       Array.isArray(listings) &&
       listings.length > 0
     ) {
-      setAllListings(listings);
+      // ✅ Conversion des listings avec les champs requis par le nouveau type
+      const normalizedListings = listings.map((listing) => ({
+        ...listing,
+        active: listing.active ?? true, // ✅ Assurer que active est défini
+        created_at: listing.created_at ?? new Date().toISOString(), // ✅ Assurer que created_at est défini
+      }));
+
+      setAllListings(normalizedListings);
     }
   }, [listings, isLoading, error, setAllListings]);
 

@@ -2,13 +2,7 @@
 
 import { useCallback } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-
-// ✅ Import du nouveau store unifié
-import {
-  useMapState,
-  useMapActions,
-  useListingsActions,
-} from "@/lib/store/migratedStore";
+import { useListingsActions, useMapActions, useMapState } from "@/lib/store";
 
 /**
  * Interfaces TypeScript pour le contrôle de recherche de ville

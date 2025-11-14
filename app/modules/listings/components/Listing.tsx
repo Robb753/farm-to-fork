@@ -13,16 +13,14 @@ import { supabase } from "@/utils/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-// ✅ Zustand stores - nouveau store unifié
+// ✅ IMPORTS CORRECTS : Store avec pagination corrigée
 import {
-  useListingsState,
-  useListingsActions,
-  useMapState,
-  useMapActions,
   useInteractionsState,
-  useInteractionsActions,
-} from "@/lib/store/migratedStore";
-
+  useListingsActions,
+  useListingsState,
+  useMapActions,
+  useMapState,
+} from "@/lib/store";
 import { useUserFavorites, useUserActions } from "@/lib/store/userStore";
 
 import { useListingsWithImages } from "@/app/hooks/useListingsWithImages";
@@ -74,35 +72,32 @@ interface ListItemProps {
   onShowOnMap?: (item: ListingItem) => void;
 }
 
-// ✅ FONCTION UTILITAIRE : Transformation sécurisée des données Supabase vers Listing
+// ✅ TRANSFORMATION SÉCURISÉE
 const transformSupabaseToListing = (item: any): any => {
   return {
     ...item,
-    // Convertir lat/lng number → string
-    lat: String(item.lat),
-    lng: String(item.lng),
-
-    // Gérer availability: forcer undefined si pas "open" ou "closed"
+    lat: typeof item.lat === "number" ? item.lat : parseFloat(item.lat || 0),
+    lng: typeof item.lng === "number" ? item.lng : parseFloat(item.lng || 0),
     availability:
       item.availability === "open" || item.availability === "closed"
         ? item.availability
         : undefined,
-
-    // S'assurer que les arrays sont bien des arrays
     product_type: Array.isArray(item.product_type) ? item.product_type : [],
     certifications: Array.isArray(item.certifications)
       ? item.certifications
       : [],
+    active: item.active ?? true,
+    created_at: item.created_at ?? new Date().toISOString(),
   };
 };
 
 /* ------------------------------
-   UI: Loader & Empty state
+   UI Components - Beaux et Fonctionnels
 ------------------------------ */
 const BookingStyleLoader = (): JSX.Element => (
   <div
     className="absolute inset-0 flex items-center justify-center z-30 backdrop-blur-sm"
-    style={{ backgroundColor: `${COLORS.BG_WHITE}CC` }} // 80% opacity
+    style={{ backgroundColor: `${COLORS.BG_WHITE}CC` }}
   >
     <div
       className={cn(
@@ -151,25 +146,8 @@ const EmptyState = ({ onRetry }: { onRetry: () => void }): JSX.Element => (
     }}
   >
     <div className="relative mb-8">
-      <OptimizedImage
-        src="/empty-state.svg"
-        alt="Aucun résultat"
-        fill={false}
-        width={140}
-        height={140}
-        className="opacity-60"
-        sizes="140px"
-        quality={90}
-        showSkeleton={false}
-        blurDataURL=""
-        onError={() => {}}
-        onLoad={() => {}}
-      />
-      <div
-        className="absolute -top-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center"
-        style={{ backgroundColor: COLORS.PRIMARY }}
-      >
-        <MapPin className="w-3 h-3" style={{ color: COLORS.BG_WHITE }} />
+      <div className="w-32 h-32 rounded-full bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center">
+        <MapPin className="w-12 h-12 text-green-600" />
       </div>
     </div>
 
@@ -177,15 +155,24 @@ const EmptyState = ({ onRetry }: { onRetry: () => void }): JSX.Element => (
       className="text-2xl font-bold mb-3"
       style={{ color: COLORS.TEXT_PRIMARY }}
     >
-      Aucune ferme trouvée dans cette zone
+      Aucune ferme trouvée
     </h3>
     <p
       className="text-center mb-8 max-w-md leading-relaxed"
       style={{ color: COLORS.TEXT_SECONDARY }}
     >
-      Élargissez votre recherche ou explorez d'autres zones pour découvrir des
-      fermes locales exceptionnelles.
+      Il semble qu'il n'y ait pas de fermes disponibles pour le moment.
     </p>
+    <button
+      onClick={onRetry}
+      className="px-6 py-3 rounded-lg font-medium transition-all duration-200 hover:scale-105"
+      style={{
+        backgroundColor: COLORS.PRIMARY,
+        color: COLORS.BG_WHITE,
+      }}
+    >
+      Réessayer
+    </button>
   </div>
 );
 
@@ -240,9 +227,7 @@ const CertificationBadge = ({
   </div>
 );
 
-/* ------------------------------
-   List item
------------------------------- */
+/* ListItem Component - Version Complète et Belle */
 const ListItem = React.memo<ListItemProps>(
   ({
     item,
@@ -258,17 +243,6 @@ const ListItem = React.memo<ListItemProps>(
     const getImageUrl = useCallback((): string => {
       if (Array.isArray(item.listingImages) && item.listingImages.length > 0) {
         return item.listingImages[0]?.url || "/default-farm-image.jpg";
-      }
-      if (
-        item.listingImages &&
-        typeof item.listingImages === "object" &&
-        "url" in item.listingImages
-      ) {
-        return (item.listingImages as { url: string }).url;
-      }
-      if (item.image_url) return item.image_url;
-      if (Array.isArray(item.images) && item.images.length > 0) {
-        return item.images[0];
       }
       return "/default-farm-image.jpg";
     }, [item]);
@@ -299,14 +273,15 @@ const ListItem = React.memo<ListItemProps>(
         className={cn(
           "group relative flex border rounded-xl overflow-hidden shadow-sm",
           "transition-all duration-300 hover:shadow-lg mb-4",
-          isHovered && "ring-2 ring-green-400 shadow-md"
+          "hover:border-green-200 hover:-translate-y-1",
+          isHovered && "ring-2 ring-green-400 shadow-md border-green-300"
         )}
         style={{ backgroundColor: COLORS.BG_WHITE }}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
       >
         <Link href={`/view-listing/${item.id}`} className="flex w-full">
-          {/* ✅ Image */}
+          {/* Image Section */}
           <div className="relative w-32 sm:w-40 md:w-48 h-32 sm:h-36 flex-shrink-0">
             {!imageError ? (
               <OptimizedImage
@@ -359,11 +334,10 @@ const ListItem = React.memo<ListItemProps>(
               item.listingImages.length > 1 && (
                 <div
                   className={cn(
-                    "absolute bottom-2 right-2 px-2 py-1 rounded-full text-xs",
-                    "flex items-center gap-1"
+                    "absolute bottom-2 right-2 px-2 py-1 rounded-full text-xs flex items-center gap-1"
                   )}
                   style={{
-                    backgroundColor: `${COLORS.TEXT_PRIMARY}B3`, // 70% opacity
+                    backgroundColor: `${COLORS.TEXT_PRIMARY}B3`,
                     color: COLORS.BG_WHITE,
                   }}
                 >
@@ -383,7 +357,7 @@ const ListItem = React.memo<ListItemProps>(
               )}
           </div>
 
-          {/* ✅ Contenu */}
+          {/* Content Section */}
           <div className="flex-1 p-4 flex flex-col justify-between min-w-0">
             <div>
               <div className="flex items-start justify-between mb-2">
@@ -402,8 +376,8 @@ const ListItem = React.memo<ListItemProps>(
                     <button
                       onClick={handleShowOnMapClick}
                       className={cn(
-                        "p-1.5 rounded-full shadow-sm hover:shadow-md border",
-                        "transition-all duration-200"
+                        "p-2 rounded-full shadow-sm hover:shadow-md border",
+                        "transition-all duration-200 hover:scale-110"
                       )}
                       style={{
                         backgroundColor: `${COLORS.PRIMARY}10`,
@@ -411,9 +385,11 @@ const ListItem = React.memo<ListItemProps>(
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.backgroundColor = `${COLORS.PRIMARY}20`;
+                        e.currentTarget.style.borderColor = COLORS.PRIMARY;
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.backgroundColor = `${COLORS.PRIMARY}10`;
+                        e.currentTarget.style.borderColor = `${COLORS.PRIMARY}30`;
                       }}
                       aria-label="Voir sur la carte"
                       title="Voir sur la carte"
@@ -429,8 +405,8 @@ const ListItem = React.memo<ListItemProps>(
                   <button
                     onClick={handleFavoriteClick}
                     className={cn(
-                      "p-1.5 rounded-full shadow-sm hover:shadow-md border",
-                      "transition-all duration-200"
+                      "p-2 rounded-full shadow-sm hover:shadow-md border",
+                      "transition-all duration-200 hover:scale-110"
                     )}
                     style={{
                       backgroundColor: COLORS.BG_GRAY,
@@ -438,9 +414,11 @@ const ListItem = React.memo<ListItemProps>(
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.backgroundColor = COLORS.BG_WHITE;
+                      e.currentTarget.style.borderColor = COLORS.ERROR;
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.backgroundColor = COLORS.BG_GRAY;
+                      e.currentTarget.style.borderColor = COLORS.BORDER;
                     }}
                     aria-label={
                       isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"
@@ -480,8 +458,8 @@ const ListItem = React.memo<ListItemProps>(
                       <span
                         key={index}
                         className={cn(
-                          "inline-flex items-center gap-1 text-xs px-2 py-1",
-                          "rounded-full border font-medium"
+                          "inline-flex items-center gap-1 text-xs px-2.5 py-1",
+                          "rounded-full border font-medium transition-colors duration-200"
                         )}
                         style={{
                           backgroundColor: `${COLORS.PRIMARY}10`,
@@ -495,7 +473,9 @@ const ListItem = React.memo<ListItemProps>(
                     ))}
                     {item.product_type.length > 4 && (
                       <span
-                        className={cn("text-xs px-2 py-1 rounded-full border")}
+                        className={cn(
+                          "text-xs px-2.5 py-1 rounded-full border"
+                        )}
                         style={{
                           backgroundColor: COLORS.BG_GRAY,
                           color: COLORS.TEXT_MUTED,
@@ -551,22 +531,22 @@ const ListItem = React.memo<ListItemProps>(
 );
 ListItem.displayName = "ListItem";
 
-/* ------------------------------
-   Main component
-   → ajoute "Load more"
------------------------------- */
+/* Main Component - Version avec Fetch Simplifié */
 export default function Listing({
   onLoadMore,
   hasMore = false,
   isLoading = false,
 }: ListingProps): JSX.Element {
-  // ✅ Zustand state - nouveau store unifié
+  // Store hooks
   const { visible: visibleListings = [] } = useListingsState();
   const { setAllListings } = useListingsActions();
   const { bounds: mapBounds } = useMapState();
+  const { setCoordinates, setZoom } = useMapActions();
 
+  // Interactions
   const { hoveredListingId } = useInteractionsState();
-  const { setHoveredListingId } = useInteractionsActions();
+  const { setHoveredListingId, setOpenInfoWindowId, clearSelection } =
+    useListingsActions();
 
   // Favoris
   const favorites = useUserFavorites();
@@ -581,161 +561,81 @@ export default function Listing({
     if (user?.id) loadFavorites(user.id);
   }, [user?.id, loadFavorites]);
 
-  // IDs visibles (pilotés par la carte + filtres via store)
+  // IDs visibles pour les images
   const visibleIds = useMemo(
     () => visibleListings?.map((item) => item.id) || [],
     [visibleListings]
   );
 
-  // Enrichissement images des listings visibles
   const { listings, isLoading: isLoadingImages } =
     useListingsWithImages(visibleIds);
 
-  // ✅ CORRECTION 1 : Transformation des coordonnées (listings → transformedItems)
+  // Transformation des coordonnées
   const transformedItems = useMemo(() => {
-    return listings.map((listing) => ({
-      // ✅ 'listings' au lieu de 'listing'
-      ...listing,
-      lat:
-        typeof listing.lat === "string" ? parseFloat(listing.lat) : listing.lat,
-      lng:
-        typeof listing.lng === "string" ? parseFloat(listing.lng) : listing.lng,
-    }));
-  }, [listings]); // ✅ Dépendance cohérente
+    return (listings.length > 0 ? listings : visibleListings).map(
+      (listing) => ({
+        ...listing,
+        lat:
+          typeof listing.lat === "string"
+            ? parseFloat(listing.lat)
+            : listing.lat,
+        lng:
+          typeof listing.lng === "string"
+            ? parseFloat(listing.lng)
+            : listing.lng,
+      })
+    );
+  }, [listings, visibleListings]);
 
-  // ---------------------------
-  // FETCH SUPABASE PAR BOUNDS (initial + on bounds change)
-  // ---------------------------
-  const [isFetching, setIsFetching] = useState<boolean>(false);
-
-  // Requête initiale (France) si aucun bounds encore émis
+  // ✅ FETCH INITIAL SIMPLIFIÉ sans pagination
   useEffect(() => {
-    if (mapBounds) return;
-    let cancelled = false;
+    if (visibleListings.length === 0 && !isLoading) {
+      (async () => {
+        try {
+          console.log("🚀 [Listing] Fetch initial simple...");
 
-    (async () => {
-      try {
-        setIsFetching(true);
-        const south = 41.0,
-          north = 51.5,
-          west = -5.5,
-          east = 9.8;
-
-        const { data, error } = await supabase
-          .from("listing")
-          .select(
+          // ✅ REQUÊTE SIMPLE sans range() pour éviter PGRST103
+          const { data, error } = await supabase
+            .from("listing")
+            .select(
+              `
+              id, name, address, lat, lng,
+              description, product_type, certifications,
+              availability, created_at, active
             `
-    id, name, address, lat, lng,
-    description, product_type, certifications,
-    availability, created_at, updated_at
-  `
-          )
-          .gte("lat", south)
-          .lte("lat", north)
-          .gte("lng", west)
-          .lte("lng", east)
-          .limit(500);
+            )
+            .eq("active", true)
+            .order("created_at", { ascending: false })
+            .limit(50); // Limite simple
 
-        if (error) throw error;
-        if (!cancelled) {
-          // ✅ CORRECTION FINALE : Utiliser la fonction de transformation
-          const transformedData = (data ?? []).map(transformSupabaseToListing);
+          if (error) {
+            console.error("❌ [Listing] Erreur fetch:", error);
+            throw error;
+          }
+
+          const validData = (data || []).filter(
+            (item) =>
+              item &&
+              typeof item.id === "number" &&
+              typeof item.name === "string"
+          );
+
+          const transformedData = validData.map(transformSupabaseToListing);
+          console.log(
+            "✅ [Listing] Données transformées:",
+            transformedData.length
+          );
+
           setAllListings(transformedData);
+        } catch (e) {
+          console.error("❌ [Listing] Erreur fetch initial:", e);
+          toast.error("Erreur lors du chargement des fermes");
         }
-      } catch (e) {
-        console.error(e);
-        toast.error("Impossible de charger les fermes (zone France).");
-      } finally {
-        if (!cancelled) setIsFetching(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [mapBounds, setAllListings]);
-
-  // Requête à chaque changement de bounds de la carte
-  useEffect(() => {
-    if (!mapBounds || !Array.isArray(mapBounds) || mapBounds.length !== 2)
-      return;
-
-    // ✅ Utilisation directe sans conversion de type
-    const bounds = mapBounds as any;
-    const [[west, south], [east, north]] = bounds;
-    let cancelled = false;
-
-    (async () => {
-      try {
-        setIsFetching(true);
-
-        const { data, error } = await supabase
-          .from("listing")
-          .select(
-            `
-    id, name, address, lat, lng,
-    description, product_type, certifications,
-    availability, created_at, updated_at
-  `
-          )
-          .gte("lat", south)
-          .lte("lat", north)
-          .gte("lng", west)
-          .lte("lng", east)
-          .limit(500);
-
-        if (error) throw error;
-        if (!cancelled) {
-          // ✅ CORRECTION FINALE : Utiliser la fonction de transformation
-          const transformedData = (data ?? []).map(transformSupabaseToListing);
-          setAllListings(transformedData);
-        }
-      } catch (e) {
-        console.error(e);
-        toast.error("Erreur lors du chargement des fermes.");
-      } finally {
-        if (!cancelled) setIsFetching(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [mapBounds, setAllListings]);
-
-  // Loader combiné (fetch + images) avec délai anti-clignotement
-  const [delayedLoading, setDelayedLoading] = useState<boolean>(true);
-  const loadingTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  const effectiveLoading = isFetching || isLoadingImages || isLoading;
-
-  useEffect(() => {
-    if (loadingTimerRef.current) {
-      clearTimeout(loadingTimerRef.current);
-      loadingTimerRef.current = null;
+      })();
     }
-
-    if (effectiveLoading) {
-      setDelayedLoading(true);
-    } else {
-      loadingTimerRef.current = setTimeout(() => {
-        if (!loadingTimerRef.current) return;
-        setDelayedLoading(false);
-      }, 600);
-    }
-
-    return () => {
-      if (loadingTimerRef.current) {
-        clearTimeout(loadingTimerRef.current);
-        loadingTimerRef.current = null;
-      }
-    };
-  }, [effectiveLoading]);
+  }, [visibleListings.length, isLoading, setAllListings]);
 
   // Handlers
-  const { setOpenInfoWindowId } = useInteractionsActions();
-  const { setCoordinates, setZoom } = useMapActions();
-
   const handleShowOnMap = useCallback(
     (listing: ListingItem) => {
       if (!listing?.lat || !listing?.lng) {
@@ -743,7 +643,6 @@ export default function Listing({
         return;
       }
 
-      // ✅ Conversion sécurisée des coordonnées
       const lat =
         typeof listing.lat === "number"
           ? listing.lat
@@ -758,14 +657,11 @@ export default function Listing({
         return;
       }
 
-      // ✅ Conversion sécurisée de l'ID si nécessaire
       const id = listing.id;
       const numericId = typeof id === "number" ? id : parseInt(String(id), 10);
 
       if (!isNaN(numericId)) {
         setOpenInfoWindowId?.(numericId);
-      } else {
-        setOpenInfoWindowId?.(id as any); // Fallback si la conversion échoue
       }
 
       setCoordinates?.({ lng, lat });
@@ -776,7 +672,6 @@ export default function Listing({
     [setOpenInfoWindowId, setCoordinates, setZoom]
   );
 
-  // Handlers avec conversion de type sécurisée
   const handleToggleFavorite = useCallback(
     (id: string | number) => {
       if (!user) {
@@ -789,15 +684,12 @@ export default function Listing({
         return;
       }
 
-      // ✅ Conversion sécurisée de l'ID
       const numericId = typeof id === "number" ? id : parseInt(String(id), 10);
-
       if (isNaN(numericId)) {
         toast.error("Identifiant de ferme invalide");
         return;
       }
 
-      // ✅ Appel du store avec un nombre garanti
       toggleFavoriteStore(numericId, user.id);
     },
     [user, toggleFavoriteStore, openSignUp]
@@ -805,7 +697,6 @@ export default function Listing({
 
   const handleMouseEnter = useCallback(
     (id: string | number) => {
-      // ✅ Conversion sécurisée pour setHoveredListingId qui attend un number
       const numericId = typeof id === "number" ? id : parseInt(String(id), 10);
       if (!isNaN(numericId)) {
         setHoveredListingId?.(numericId);
@@ -820,30 +711,13 @@ export default function Listing({
   );
 
   const handleRetry = useCallback(() => {
-    if (!mapBounds) {
-      window.location.reload();
-    } else {
-      // ✅ Accès sécurisé aux bounds
-      const bounds = mapBounds as any;
-      if (Array.isArray(bounds) && bounds.length >= 2) {
-        const [[west, south], [east, north]] = bounds;
-        toast.info(
-          `Nouvel essai (${south.toFixed(2)}–${north.toFixed(
-            2
-          )} ; ${west.toFixed(2)}–${east.toFixed(2)})`
-        );
-      } else {
-        window.location.reload();
-      }
-    }
-  }, [mapBounds]);
+    clearSelection();
+    window.location.reload();
+  }, [clearSelection]);
 
-  // ------------------------------
-  // Load more (auto + bouton)
-  // ------------------------------
+  // Load more avec IntersectionObserver
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
-  // Auto-load au scroll (IntersectionObserver)
   useEffect(() => {
     if (!hasMore || !onLoadMore) return;
     const el = loadMoreRef.current;
@@ -866,8 +740,8 @@ export default function Listing({
     return () => io.disconnect();
   }, [hasMore, onLoadMore, isLoading]);
 
-  // État vide (pas d'IDs visibles ET pas en cours de chargement)
-  if (visibleIds.length === 0 && !effectiveLoading) {
+  // État vide
+  if (transformedItems.length === 0 && !isLoading && !isLoadingImages) {
     return (
       <div
         className="p-6 min-h-screen"
@@ -883,51 +757,47 @@ export default function Listing({
       className="p-6 min-h-screen relative"
       style={{ backgroundColor: COLORS.BG_GRAY }}
     >
-      {delayedLoading && <BookingStyleLoader />}
+      {(isLoading || isLoadingImages) && <BookingStyleLoader />}
 
       <div
         className={cn(
           "flex flex-col gap-4 transition-all duration-300 max-w-4xl mx-auto",
-          delayedLoading && "opacity-50 pointer-events-none"
+          (isLoading || isLoadingImages) && "opacity-50 pointer-events-none"
         )}
       >
-        {/* ✅ CORRECTION 2 : Utiliser transformedItems au lieu de listings */}
-        {transformedItems.length > 0
-          ? transformedItems.map((item) => {
-              // ✅ Conversion pour comparaison sécurisée
-              const itemNumericId =
-                typeof item.id === "number"
-                  ? item.id
-                  : parseInt(String(item.id), 10);
-              const isHovered =
-                !isNaN(itemNumericId) && hoveredListingId === itemNumericId;
+        {transformedItems.map((item) => {
+          const itemNumericId =
+            typeof item.id === "number"
+              ? item.id
+              : parseInt(String(item.id), 10);
+          const isHovered =
+            !isNaN(itemNumericId) && hoveredListingId === itemNumericId;
 
-              return (
-                <ListItem
-                  key={item.id}
-                  item={item} // ✅ Maintenant 'item' a les bonnes coordonnées (number)
-                  isHovered={isHovered}
-                  isFavorite={favorites.includes(item.id)}
-                  onMouseEnter={() => handleMouseEnter(item.id)}
-                  onMouseLeave={handleMouseLeave}
-                  onToggleFavorite={() => handleToggleFavorite(item.id)}
-                  onShowOnMap={handleShowOnMap}
-                />
-              );
-            })
-          : !delayedLoading && <EmptyState onRetry={handleRetry} />}
+          return (
+            <ListItem
+              key={item.id}
+              item={item}
+              isHovered={isHovered}
+              isFavorite={favorites.includes(item.id)}
+              onMouseEnter={() => handleMouseEnter(item.id)}
+              onMouseLeave={handleMouseLeave}
+              onToggleFavorite={() => handleToggleFavorite(item.id)}
+              onShowOnMap={handleShowOnMap}
+            />
+          );
+        })}
 
-        {/* ✅ LOAD MORE */}
+        {/* Load More */}
         {hasMore && (
-          <div className="mt-2 flex flex-col items-center gap-3">
+          <div className="mt-6 flex flex-col items-center gap-4">
             <button
               type="button"
               onClick={onLoadMore}
               disabled={isLoading}
               className={cn(
-                "inline-flex items-center gap-2 rounded-lg px-4 py-2",
-                "text-sm font-medium transition-all duration-200",
-                "hover:shadow-md disabled:opacity-50"
+                "inline-flex items-center gap-3 rounded-lg px-6 py-3",
+                "text-base font-medium transition-all duration-200",
+                "hover:shadow-lg hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
               )}
               style={{
                 backgroundColor: COLORS.PRIMARY,
@@ -944,9 +814,18 @@ export default function Listing({
                 }
               }}
             >
-              {isLoading ? "Chargement..." : "Charger plus"}
+              {isLoading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Chargement...
+                </>
+              ) : (
+                <>
+                  <span>Charger plus</span>
+                  <span>↓</span>
+                </>
+              )}
             </button>
-            {/* Sentinelle pour auto-load */}
             <div ref={loadMoreRef} className="h-8 w-8 opacity-0" />
           </div>
         )}

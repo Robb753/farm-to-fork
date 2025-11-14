@@ -3,15 +3,14 @@
 import React, { useEffect, useRef, useCallback } from "react";
 import mapboxgl from "mapbox-gl";
 
-// ✅ Store unifié
+// ✅ IMPORTS CORRECTS : Store modulaire équilibré
 import {
   useMapState,
   useMapActions,
-  MAPBOX_CONFIG,
-} from "@/lib/store/migratedStore";
+} from "@/lib/store";
 
-// ✅ Types centraux du projet
-import type { MapBounds, LatLng } from "@/lib/types";
+// ✅ Types du projet
+import type { MapBounds, LatLng } from "@/lib/store/shared/types";
 
 import MapboxMarkers from "./MapboxMarkers";
 import { COLORS } from "@/lib/config";
@@ -19,16 +18,23 @@ import { COLORS } from "@/lib/config";
 // Token Mapbox
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || "";
 
+// ✅ Configuration Mapbox centralisée
+const MAPBOX_CONFIG = {
+  style: "mapbox://styles/mapbox/streets-v12",
+  center: [2.3522, 48.8566] as [number, number], // Paris
+  zoom: 4.6,
+  minZoom: 3,
+  maxZoom: 18,
+};
+
 /** Props du composant carte */
 interface MapboxSectionProps {
   isMapExpanded?: boolean;
   className?: string;
   onMapReady?: (map: mapboxgl.Map) => void;
-  onViewChange?: (center: Coordinates, zoom: number, bounds: MapBounds) => void;
+  onViewChange?: (center: LatLng, zoom: number, bounds: MapBounds) => void;
 }
 
-/** Réutilise le type central LatLng */
-type Coordinates = LatLng;
 type MapboxCoordinates = [number, number]; // [lng, lat]
 
 /* ---------------- Helpers ---------------- */
@@ -37,7 +43,7 @@ const isFiniteNumber = (n: unknown): n is number => Number.isFinite(n);
 
 /** Convertit {lat,lng} ou [lng,lat] → [lng,lat] */
 const coordsToMapbox = (
-  coords: Coordinates | MapboxCoordinates | null | undefined
+  coords: LatLng | MapboxCoordinates | null | undefined
 ): MapboxCoordinates | null => {
   if (!coords) return null;
 
@@ -53,7 +59,7 @@ const coordsToMapbox = (
 /** Convertit LngLat ou [lng,lat] → {lat,lng} */
 const mapboxToStoreCoords = (
   lngLat: mapboxgl.LngLat | MapboxCoordinates | null | undefined
-): Coordinates | null => {
+): LatLng | null => {
   if (!lngLat) return null;
 
   if (typeof lngLat === "object" && "lng" in lngLat && "lat" in lngLat) {
@@ -67,7 +73,7 @@ const mapboxToStoreCoords = (
 
 /** Valide des coordonnées géographiques */
 const isValidCoords = (
-  coords: Coordinates | MapboxCoordinates | null | undefined
+  coords: LatLng | MapboxCoordinates | null | undefined
 ): boolean => {
   const m = coordsToMapbox(coords);
   if (!m) return false;
@@ -86,14 +92,14 @@ const isValidCoords = (
 /* --------------- Composant principal --------------- */
 
 /**
- * Composant section Mapbox principal avec gestion des couleurs centralisée
+ * Composant section Mapbox principal avec gestion des événements pour marqueurs
  *
  * Features:
+ * - Écoute les événements du store pour afficher les marqueurs
  * - Configuration des couleurs via COLORS
  * - Types MapBounds compatibles avec le store
  * - Gestion d'erreurs robuste
  * - Synchronisation bidirectionnelle avec le store
- * - Loading state stylé avec le design system
  */
 export default function MapboxSection({
   isMapExpanded = false,
@@ -105,8 +111,9 @@ export default function MapboxSection({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const userInteractingRef = useRef<boolean>(false);
+  const markersRef = useRef<mapboxgl.Marker[]>([]);
 
-  const { coordinates, zoom, isApiLoaded, isApiLoading } = useMapState();
+  const { coordinates, zoom, isApiLoaded, isApiLoading, bounds } = useMapState();
   const {
     setMapInstance,
     setMapBounds,
@@ -129,12 +136,11 @@ export default function MapboxSection({
     }
   }, []);
 
-  /** Met à jour les bounds dans le store (typés MapBounds) */
+  /** Met à jour les bounds dans le store */
   const updateStoreBounds = useCallback(
     (map: mapboxgl.Map): void => {
       try {
         const b = map.getBounds();
-        // ✅ Format objet {sw, ne} comme attendu par MapBounds
         const storeBounds: MapBounds = {
           sw: { lat: b.getSouth(), lng: b.getWest() },
           ne: { lat: b.getNorth(), lng: b.getEast() },
@@ -147,7 +153,7 @@ export default function MapboxSection({
     [setMapBounds]
   );
 
-  /** Met à jour centre/zoom + notifie onViewChange avec MapBounds */
+  /** Met à jour centre/zoom + notifie onViewChange */
   const updateStorePosition = useCallback(
     (map: mapboxgl.Map): void => {
       try {
@@ -162,7 +168,6 @@ export default function MapboxSection({
 
         if (onViewChange && centerCoords) {
           const b = map.getBounds();
-          // ✅ Format objet {sw, ne} comme attendu par MapBounds
           const changedBounds: MapBounds = {
             sw: { lat: b.getSouth(), lng: b.getWest() },
             ne: { lat: b.getNorth(), lng: b.getEast() },
@@ -187,6 +192,136 @@ export default function MapboxSection({
     }
   }, []);
 
+  // ✅ FONCTIONS POUR LES MARQUEURS
+  const clearMarkers = useCallback(() => {
+    markersRef.current.forEach(marker => {
+      try {
+        marker.remove();
+      } catch (e) {
+        console.warn("Erreur suppression marqueur:", e);
+      }
+    });
+    markersRef.current = [];
+  }, []);
+
+  const addMarkersToMap = useCallback((listings: any[]) => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    clearMarkers(); // Nettoyer les anciens marqueurs
+
+    listings.forEach(listing => {
+      if (listing.lat && listing.lng && 
+          typeof listing.lat === "number" && typeof listing.lng === "number") {
+        try {
+          // Créer un élément DOM personnalisé pour le marqueur
+          const markerEl = document.createElement('div');
+          markerEl.className = 'custom-marker';
+          markerEl.style.cssText = `
+            width: 24px;
+            height: 24px;
+            background-color: ${COLORS.PRIMARY};
+            border: 2px solid ${COLORS.BG_WHITE};
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+          `;
+
+          // Hover effects
+          markerEl.addEventListener('mouseenter', () => {
+            markerEl.style.transform = 'scale(1.2)';
+            markerEl.style.backgroundColor = COLORS.PRIMARY_DARK;
+            markerEl.style.boxShadow = '0 4px 8px rgba(0,0,0,0.3)';
+          });
+
+          markerEl.addEventListener('mouseleave', () => {
+            markerEl.style.transform = 'scale(1)';
+            markerEl.style.backgroundColor = COLORS.PRIMARY;
+            markerEl.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+          });
+
+          // Click handler
+          markerEl.addEventListener('click', () => {
+            // Trigger listing selection
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(
+                new CustomEvent("listingSelected", { 
+                  detail: { id: listing.id, fromMap: true }
+                })
+              );
+            }
+          });
+
+          const marker = new mapboxgl.Marker(markerEl)
+            .setLngLat([listing.lng, listing.lat])
+            .addTo(map);
+
+          markersRef.current.push(marker);
+        } catch (error) {
+          console.warn("Erreur création marqueur pour", listing.id, error);
+        }
+      }
+    });
+
+    console.log('🗺️ [MapboxSection] Marqueurs ajoutés:', markersRef.current.length);
+  }, [clearMarkers]);
+
+  const highlightMarker = useCallback((id: number | null) => {
+    // TODO: Implémenter highlight des marqueurs
+    console.log('🎯 [MapboxSection] Highlight marker:', id);
+  }, []);
+
+  const selectMarker = useCallback((id: number | null) => {
+    // TODO: Implémenter sélection des marqueurs
+    console.log('✅ [MapboxSection] Select marker:', id);
+  }, []);
+
+  const openInfoWindow = useCallback((id: number | null) => {
+    // TODO: Implémenter InfoWindow
+    console.log('💬 [MapboxSection] Open info window:', id);
+  }, []);
+
+  // ✅ ÉCOUTE DES ÉVÉNEMENTS DU STORE
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    const handleListingsUpdated = (event: CustomEvent) => {
+      const { listings, source } = event.detail;
+      console.log('🗺️ [MapboxSection] Listings updated:', listings.length, source);
+      addMarkersToMap(listings);
+    };
+
+    const handleListingHovered = (event: CustomEvent) => {
+      const { id } = event.detail;
+      highlightMarker(id);
+    };
+
+    const handleListingSelected = (event: CustomEvent) => {
+      const { id } = event.detail;
+      selectMarker(id);
+    };
+
+    const handleInfoWindowRequested = (event: CustomEvent) => {
+      const { id } = event.detail;
+      openInfoWindow(id);
+    };
+
+    // Attacher les listeners
+    window.addEventListener('listingsUpdated', handleListingsUpdated as EventListener);
+    window.addEventListener('listingHovered', handleListingHovered as EventListener);
+    window.addEventListener('listingSelected', handleListingSelected as EventListener);
+    window.addEventListener('infoWindowRequested', handleInfoWindowRequested as EventListener);
+
+    return () => {
+      // Nettoyer
+      window.removeEventListener('listingsUpdated', handleListingsUpdated as EventListener);
+      window.removeEventListener('listingHovered', handleListingHovered as EventListener);
+      window.removeEventListener('listingSelected', handleListingSelected as EventListener);
+      window.removeEventListener('infoWindowRequested', handleInfoWindowRequested as EventListener);
+    };
+  }, [addMarkersToMap, highlightMarker, selectMarker, openInfoWindow]);
+
   /** Init carte (une seule fois) */
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -197,7 +332,7 @@ export default function MapboxSection({
     try {
       const initCenter: MapboxCoordinates = isValidCoords(coordinates)
         ? coordsToMapbox(coordinates)!
-        : (MAPBOX_CONFIG.center as MapboxCoordinates);
+        : MAPBOX_CONFIG.center;
 
       const initZoom: number =
         typeof zoom === "number" && zoom >= MAPBOX_CONFIG.minZoom
@@ -244,9 +379,7 @@ export default function MapboxSection({
           enforceFlatView(map);
 
           if (!isValidCoords(coordinates)) {
-            const fb = mapboxToStoreCoords(
-              MAPBOX_CONFIG.center as MapboxCoordinates
-            );
+            const fb = mapboxToStoreCoords(MAPBOX_CONFIG.center);
             if (fb) {
               setCoordinates(fb);
               setZoom(MAPBOX_CONFIG.zoom);
@@ -293,6 +426,8 @@ export default function MapboxSection({
       map.on("error", handleMapError);
 
       return () => {
+        clearMarkers(); // Nettoyer les marqueurs
+        
         if (mapRef.current) {
           map.off("style.load", handleStyleLoad);
           map.off("load", handleMapLoad);
@@ -320,8 +455,7 @@ export default function MapboxSection({
       console.error("Erreur init carte:", error);
       setApiLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // Pas de dépendances pour éviter les re-créations
 
   /** Suit les changements externes coords/zoom → met à jour la vue */
   useEffect(() => {
@@ -404,7 +538,7 @@ export default function MapboxSection({
         style={{ contain: "layout paint size" }}
       />
 
-      {/* Markers + popups contrôlés */}
+      {/* Markers contrôlés par événements (pas par MapboxMarkers) */}
       <MapboxMarkers />
 
       {/* ✅ Loading state avec couleurs du design system */}
