@@ -1,7 +1,7 @@
 // app/_components/layout/Explore.tsx
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAllListingsWithImages } from "@/app/hooks/useAllListingsWithImages";
@@ -13,7 +13,7 @@ import {
   useMapActions,
   useMapState,
   useFiltersActions,
-  useCurrentFilters
+  useCurrentFilters,
 } from "@/lib/store";
 
 /**
@@ -41,7 +41,7 @@ const approx = (a: number, b: number, eps: number = 1e-6): boolean =>
  * - Gestion des coordonnées et zoom depuis l'URL
  * - Intégration avec le hook de listings
  * - Configuration Mapbox centralisée
- * - Évite les boucles de re-fetch infinies
+ * - Filtrage auto en fonction de la carte
  */
 export default function Explore(): JSX.Element {
   const router = useRouter();
@@ -56,12 +56,19 @@ export default function Explore(): JSX.Element {
   const { all } = useListingsState();
 
   // ✅ Store carte
-  const { coordinates: curCoords, zoom: curZoom, bounds } = useMapState();
+  const { bounds } = useMapState();
   const { setCoordinates, setZoom } = useMapActions();
 
   // ✅ Store filtres
   const filters = useCurrentFilters();
   const { filterListings } = useFiltersActions();
+
+  // ✅ Mémoire de la dernière vue issue de l'URL
+  const lastUrlViewRef = useRef<{
+    lat: number;
+    lng: number;
+    zoom: number;
+  } | null>(null);
 
   /**
    * Normalise l'URL si elle n'a pas les paramètres requis (lat/lng/zoom)
@@ -86,7 +93,8 @@ export default function Explore(): JSX.Element {
 
   /**
    * Synchronise les paramètres d'URL avec le store
-   * Évite les appels inutiles à map.easeTo et fetch
+   * 👉 Ne se déclenche QUE quand l'URL change,
+   *    pas quand l'utilisateur bouge la carte.
    */
   useEffect(() => {
     const lat = Number(searchParams.get("lat"));
@@ -101,29 +109,34 @@ export default function Explore(): JSX.Element {
       ? zoomFromUrl
       : MAPBOX_CONFIG.zoom;
 
-    // ✅ Ne met à jour le store que si les valeurs changent vraiment
-    const needCenter =
-      !curCoords ||
-      !approx(curCoords.lat, targetLat, 1e-6) ||
-      !approx(curCoords.lng, targetLng, 1e-6);
+    const prev = lastUrlViewRef.current;
 
-    const needZoom = curZoom == null || !approx(curZoom, targetZoom, 1e-3);
-
-    if (needCenter) {
-      const newCoords: LatLng = { lat: targetLat, lng: targetLng };
-      setCoordinates(newCoords);
+    // Si l'URL n'a pas vraiment changé, on ne fait rien
+    if (
+      prev &&
+      approx(prev.lat, targetLat, 1e-6) &&
+      approx(prev.lng, targetLng, 1e-6) &&
+      approx(prev.zoom, targetZoom, 1e-3)
+    ) {
+      return;
     }
 
-    if (needZoom) {
-      setZoom(targetZoom);
-    }
-  }, [paramsKey, curCoords, curZoom, setCoordinates, setZoom]);
+    // On mémorise la nouvelle vue issue de l'URL
+    lastUrlViewRef.current = {
+      lat: targetLat,
+      lng: targetLng,
+      zoom: targetZoom,
+    };
+
+    // On pousse dans le store → la carte suivra
+    const newCoords: LatLng = { lat: targetLat, lng: targetLng };
+    setCoordinates(newCoords);
+    setZoom(targetZoom);
+  }, [paramsKey, searchParams, setCoordinates, setZoom]);
 
   /**
    * Injecte les listings préchargés si disponibles
    * Ne déclenche pas de nouveau fetch
-   *
-   * ✅ CORRECTION: Conversion de type pour compatibilité
    */
   useEffect(() => {
     if (
@@ -149,23 +162,13 @@ export default function Explore(): JSX.Element {
    * Applique automatiquement les filtres quand :
    * - Les bounds de la carte changent (déplacement/zoom)
    * - Les filtres métier changent (produits, certifications, etc.)
-   *
-   * UX simple et minimaliste : filtrage instantané sans bouton
    */
   useEffect(() => {
-    // Attendre que les données soient chargées
     if (!all || all.length === 0) return;
 
-    // Appliquer les filtres (métier + géographique)
     const filtered = filterListings(all, bounds);
-
-    // Mettre à jour les listings visibles
     setFilteredListings(filtered);
-
-    console.log(`🔍 [Explore] Filtrage: ${all.length} → ${filtered.length} fermes`, {
-      hasFilters: Object.values(filters).some(arr => Array.isArray(arr) && arr.length > 0),
-      hasBounds: !!bounds
-    });
+    
   }, [all, bounds, filters, filterListings, setFilteredListings]);
 
   return <ListingMapView />;

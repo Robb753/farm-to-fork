@@ -300,9 +300,6 @@ export default function MapboxMarkers(): null {
       }
     });
 
-    console.info(
-      `🎯 Marqueurs mis à jour: ${successCount} succès, ${errorCount} erreurs`
-    );
   }, [
     mapInstance,
     visibleListings,
