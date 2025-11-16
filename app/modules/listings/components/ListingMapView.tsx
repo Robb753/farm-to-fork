@@ -104,8 +104,9 @@ const DesktopListingMapView = (): JSX.Element => {
   const [isMapMoving, setIsMapMoving] = useState<boolean>(false);
   const moveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Mode de recherche manuel : la FilterSection affichera le CTA "Rechercher…"
-  const MANUAL_SEARCH = true;
+  // ✅ UX simple et minimaliste : filtrage automatique activé dans Explore.tsx
+  // Plus besoin de bouton "Rechercher dans cette zone"
+  const MANUAL_SEARCH = false;
 
   /**
    * Debounced setter pour l'état de mouvement de carte
@@ -127,6 +128,7 @@ const DesktopListingMapView = (): JSX.Element => {
 
   /**
    * Écoute des événements de déplacement de carte Mapbox
+   * ✅ Simplifié pour UX minimaliste - pas d'événements inutiles
    */
   useEffect(() => {
     if (!mapInstance) return;
@@ -134,11 +136,6 @@ const DesktopListingMapView = (): JSX.Element => {
     const handleMapMoveStart = (e: any): void => {
       if (e?.originalEvent) {
         setMovingDebounced(true);
-        if (MANUAL_SEARCH) {
-          window.dispatchEvent(
-            new CustomEvent("areaDirtyChange", { detail: true })
-          );
-        }
       }
     };
 
@@ -187,63 +184,14 @@ const DesktopListingMapView = (): JSX.Element => {
    */
   const handleLoadMoreListings = useCallback((): void => {
     if (isLoading || !hasMore) return;
-    
+
     const newPage = page + 1;
     setPage(newPage);
     fetchListings({ page: newPage, append: true } as FetchListingsOptions);
   }, [page, hasMore, isLoading, fetchListings, setPage]);
 
-  /**
-   * Handler pour la recherche dans la zone (exposé via événement)
-   */
-  useEffect(() => {
-    const handleAreaSearch = async (): Promise<void> => {
-      if (!mapInstance) return;
-
-      try {
-        const bounds = mapInstance.getBounds?.();
-        if (!bounds) return;
-
-        const boundsObj: MapBounds = {
-          ne: { 
-            lat: bounds.getNorthEast().lat(), 
-            lng: bounds.getNorthEast().lng() 
-          },
-          sw: { 
-            lat: bounds.getSouthWest().lat(), 
-            lng: bounds.getSouthWest().lng() 
-          },
-        };
-
-        setPage(1);
-        const data = await fetchListings({
-          page: 1,
-          forceRefresh: true,
-          bounds: boundsObj,
-        } as FetchListingsOptions);
-
-        // ✅ Zone traitée → informer FilterSection
-        window.dispatchEvent(
-          new CustomEvent("areaDirtyChange", { detail: false })
-        );
-
-        if (Array.isArray(data) && data.length > 0) {
-          toast.success(`${data.length} fermes trouvées`);
-        } else {
-          toast.info("Aucune ferme trouvée dans cette zone");
-        }
-      } catch (error) {
-        console.error("Erreur lors de la recherche:", error);
-        toast.error("Erreur lors de la recherche");
-      }
-    };
-
-    window.addEventListener("areaSearchRequested", handleAreaSearch);
-    
-    return () => {
-      window.removeEventListener("areaSearchRequested", handleAreaSearch);
-    };
-  }, [fetchListings, mapInstance, setPage]);
+  // ✅ Recherche manuelle supprimée - Le filtrage est maintenant automatique dans Explore.tsx
+  // L'affichage se met à jour instantanément quand on déplace la carte
 
   /**
    * Toggle de la taille de carte
