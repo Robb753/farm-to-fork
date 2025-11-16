@@ -1,5 +1,4 @@
 // app/api/admin/validate-farmer-request/route.ts
-"use server";
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
@@ -61,13 +60,6 @@ interface ValidationResult {
   errors: string[];
   sanitizedData?: ValidateFarmerRequestBody;
 }
-
-/**
- * Configuration pour Next.js 14.2 - Export obligatoire
- */
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
-
 /**
  * Constantes de validation
  */

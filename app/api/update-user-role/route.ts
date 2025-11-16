@@ -1,5 +1,4 @@
 // app/api/update-user-role/route.ts
-"use server";
 
 import { NextRequest, NextResponse } from "next/server";
 import { clerkClient, auth } from "@clerk/nextjs/server";
@@ -42,12 +41,6 @@ interface ValidationResult {
   errors: string[];
   sanitizedData?: UpdateUserRoleRequestBody;
 }
-
-/**
- * Configuration pour Next.js 14.2 - Export obligatoire
- */
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 /**
  * Constantes de validation
