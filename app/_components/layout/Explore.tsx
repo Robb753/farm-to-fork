@@ -7,7 +7,14 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAllListingsWithImages } from "@/app/hooks/useAllListingsWithImages";
 import { MAPBOX_CONFIG } from "@/lib/config";
 import type { LatLng } from "@/lib/store"; // ✅ Import depuis le nouveau store
-import { useListingsActions, useMapActions, useMapState } from "@/lib/store";
+import {
+  useListingsActions,
+  useListingsState,
+  useMapActions,
+  useMapState,
+  useFiltersActions,
+  useCurrentFilters
+} from "@/lib/store";
 
 /**
  * Chargement dynamique du composant de carte
@@ -44,14 +51,17 @@ export default function Explore(): JSX.Element {
   // ✅ Hook pour les listings avec images
   const { listings, isLoading, error } = useAllListingsWithImages();
 
-  // ✅ Actions du store unifié
-  const { setAllListings } = useListingsActions();
+  // ✅ Store listings
+  const { setAllListings, setFilteredListings } = useListingsActions();
+  const { all } = useListingsState();
 
-  // ✅ État de la carte depuis le store unifié
-  const { coordinates: curCoords, zoom: curZoom, mapInstance } = useMapState();
-
-  // ✅ Actions de la carte
+  // ✅ Store carte
+  const { coordinates: curCoords, zoom: curZoom, bounds } = useMapState();
   const { setCoordinates, setZoom } = useMapActions();
+
+  // ✅ Store filtres
+  const filters = useCurrentFilters();
+  const { filterListings } = useFiltersActions();
 
   /**
    * Normalise l'URL si elle n'a pas les paramètres requis (lat/lng/zoom)
@@ -132,6 +142,31 @@ export default function Explore(): JSX.Element {
       setAllListings(normalizedListings);
     }
   }, [listings, isLoading, error, setAllListings]);
+
+  /**
+   * 🎯 FILTRAGE AUTOMATIQUE - Carte dynamique
+   *
+   * Applique automatiquement les filtres quand :
+   * - Les bounds de la carte changent (déplacement/zoom)
+   * - Les filtres métier changent (produits, certifications, etc.)
+   *
+   * UX simple et minimaliste : filtrage instantané sans bouton
+   */
+  useEffect(() => {
+    // Attendre que les données soient chargées
+    if (!all || all.length === 0) return;
+
+    // Appliquer les filtres (métier + géographique)
+    const filtered = filterListings(all, bounds);
+
+    // Mettre à jour les listings visibles
+    setFilteredListings(filtered);
+
+    console.log(`🔍 [Explore] Filtrage: ${all.length} → ${filtered.length} fermes`, {
+      hasFilters: Object.values(filters).some(arr => Array.isArray(arr) && arr.length > 0),
+      hasBounds: !!bounds
+    });
+  }, [all, bounds, filters, filterListings, setFilteredListings]);
 
   return <ListingMapView />;
 }

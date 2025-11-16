@@ -587,53 +587,8 @@ export default function Listing({
     );
   }, [listings, visibleListings]);
 
-  // ✅ FETCH INITIAL SIMPLIFIÉ sans pagination
-  useEffect(() => {
-    if (visibleListings.length === 0 && !isLoading) {
-      (async () => {
-        try {
-          console.log("🚀 [Listing] Fetch initial simple...");
-
-          // ✅ REQUÊTE SIMPLE sans range() pour éviter PGRST103
-          const { data, error } = await supabase
-            .from("listing")
-            .select(
-              `
-              id, name, address, lat, lng,
-              description, product_type, certifications,
-              availability, created_at, active
-            `
-            )
-            .eq("active", true)
-            .order("created_at", { ascending: false })
-            .limit(50); // Limite simple
-
-          if (error) {
-            console.error("❌ [Listing] Erreur fetch:", error);
-            throw error;
-          }
-
-          const validData = (data || []).filter(
-            (item) =>
-              item &&
-              typeof item.id === "number" &&
-              typeof item.name === "string"
-          );
-
-          const transformedData = validData.map(transformSupabaseToListing);
-          console.log(
-            "✅ [Listing] Données transformées:",
-            transformedData.length
-          );
-
-          setAllListings(transformedData);
-        } catch (e) {
-          console.error("❌ [Listing] Erreur fetch initial:", e);
-          toast.error("Erreur lors du chargement des fermes");
-        }
-      })();
-    }
-  }, [visibleListings.length, isLoading, setAllListings]);
+  // ✅ Fetch supprimé - Les données viennent maintenant d'Explore.tsx
+  // Le composant Listing est maintenant purement présentationnel
 
   // Handlers
   const handleShowOnMap = useCallback(
