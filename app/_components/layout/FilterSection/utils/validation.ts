@@ -1,6 +1,6 @@
 // FilterSection/utils/validation.ts
 
-import type { FilterState } from "@/lib/store/types";
+import { FilterState } from "@/lib/store/shared/types";
 import { FILTER_KEYS, type FilterKey } from "./constants";
 
 /**

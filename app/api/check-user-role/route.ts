@@ -89,7 +89,8 @@ export async function GET(req: NextRequest): Promise<NextResponse<GetUserInfoRes
     // Récupération de l'utilisateur depuis Clerk
     let user;
     try {
-      user = await clerkClient.users.getUser(userId);
+      const client = await clerkClient(); 
+      user = await client.users.getUser(userId);
     } catch (clerkError) {
       console.error("[GET USER INFO] Erreur Clerk:", clerkError);
       

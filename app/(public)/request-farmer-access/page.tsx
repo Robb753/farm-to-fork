@@ -18,7 +18,12 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Loader2 } from "@/utils/icons";
-import { COLORS, PATHS, FARMER_REQUESTS_COLUMNS, FARMER_REQUEST_STATUS } from "@/lib/config";
+import {
+  COLORS,
+  PATHS,
+  FARMER_REQUESTS_COLUMNS,
+  FARMER_REQUEST_STATUS,
+} from "@/lib/config";
 import { cn } from "@/lib/utils";
 
 /**
@@ -35,7 +40,7 @@ interface FarmerRequestFormData {
 
 /**
  * Page de demande d'accès producteur
- * 
+ *
  * Features:
  * - Formulaire complet avec validation
  * - Vérification des doublons
@@ -99,7 +104,9 @@ export default function RequestFarmerAccessPage(): JSX.Element {
   /**
    * Gérer les changements dans le formulaire
    */
-  const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>): void => {
+  const handleChange = (
+    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ): void => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
@@ -112,13 +119,13 @@ export default function RequestFarmerAccessPage(): JSX.Element {
    */
   const normalizePhoneNumber = (input: string): string | null => {
     if (!input) return null;
-    
+
     const raw = input.replace(/\s|-/g, "");
-    
+
     if (raw.startsWith("+")) return raw;
     if (raw.startsWith("00")) return "+" + raw.slice(2);
     if (raw.startsWith("0")) return "+33" + raw.slice(1);
-    
+
     return null;
   };
 
@@ -127,9 +134,9 @@ export default function RequestFarmerAccessPage(): JSX.Element {
    */
   const isFormValid = (): boolean => {
     return Boolean(
-      formData.farm_name.trim() && 
-      formData.location.trim() && 
-      formData.description.trim()
+      formData.farm_name.trim() &&
+        formData.location.trim() &&
+        formData.description.trim()
     );
   };
 
@@ -155,9 +162,15 @@ export default function RequestFarmerAccessPage(): JSX.Element {
     }
 
     // Validation du téléphone si fourni
-    const cleanedPhone = formData.phone ? normalizePhoneNumber(formData.phone) : null;
+    const cleanedPhone = formData.phone
+      ? normalizePhoneNumber(formData.phone)
+      : null;
 
-    if (formData.phone && cleanedPhone && !/^\+?[1-9][0-9]{6,14}$/.test(cleanedPhone)) {
+    if (
+      formData.phone &&
+      cleanedPhone &&
+      !/^\+?[1-9][0-9]{6,14}$/.test(cleanedPhone)
+    ) {
       toast.error("Numéro de téléphone invalide (format attendu : +XX...).");
       return;
     }
@@ -170,7 +183,7 @@ export default function RequestFarmerAccessPage(): JSX.Element {
       if (token) {
         await supabase.auth.setSession({
           access_token: token,
-          refresh_token: null,
+          refresh_token: "", // ✅ Utiliser une chaîne vide au lieu de null
         });
       }
 
@@ -214,7 +227,10 @@ export default function RequestFarmerAccessPage(): JSX.Element {
           body: JSON.stringify(requestData),
         });
       } catch (notificationError) {
-        console.warn("Erreur lors de l'envoi de la notification admin:", notificationError);
+        console.warn(
+          "Erreur lors de l'envoi de la notification admin:",
+          notificationError
+        );
         // Ne pas faire échouer la demande si la notification échoue
       }
 
@@ -223,7 +239,8 @@ export default function RequestFarmerAccessPage(): JSX.Element {
       router.push(PATHS.REQUEST_CONFIRMATION || "/request-confirmation");
     } catch (err) {
       console.error("Erreur lors de l'envoi:", err);
-      const errorMessage = err instanceof Error ? err.message : "Erreur inconnue";
+      const errorMessage =
+        err instanceof Error ? err.message : "Erreur inconnue";
       toast.error(`Erreur : ${errorMessage}`);
     } finally {
       setLoading(false);
@@ -232,7 +249,7 @@ export default function RequestFarmerAccessPage(): JSX.Element {
 
   return (
     <div className="container max-w-2xl mx-auto py-12 px-4">
-      <Card 
+      <Card
         className={cn(
           "border-t-4 shadow-sm transition-shadow duration-300",
           "hover:shadow-md"
@@ -240,7 +257,7 @@ export default function RequestFarmerAccessPage(): JSX.Element {
         style={{ borderTopColor: COLORS.PRIMARY }}
       >
         <CardHeader>
-          <CardTitle 
+          <CardTitle
             className="text-2xl font-bold"
             style={{ color: COLORS.PRIMARY }}
           >
@@ -251,15 +268,12 @@ export default function RequestFarmerAccessPage(): JSX.Element {
             producteurs
           </CardDescription>
         </CardHeader>
-        
+
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Nom de la ferme */}
             <div className="space-y-2">
-              <Label 
-                htmlFor="farm_name"
-                style={{ color: COLORS.TEXT_PRIMARY }}
-              >
+              <Label htmlFor="farm_name" style={{ color: COLORS.TEXT_PRIMARY }}>
                 Nom de votre ferme *
               </Label>
               <Input
@@ -275,10 +289,7 @@ export default function RequestFarmerAccessPage(): JSX.Element {
 
             {/* Localisation */}
             <div className="space-y-2">
-              <Label 
-                htmlFor="location"
-                style={{ color: COLORS.TEXT_PRIMARY }}
-              >
+              <Label htmlFor="location" style={{ color: COLORS.TEXT_PRIMARY }}>
                 Localisation *
               </Label>
               <Input
@@ -294,10 +305,7 @@ export default function RequestFarmerAccessPage(): JSX.Element {
 
             {/* Téléphone */}
             <div className="space-y-2">
-              <Label 
-                htmlFor="phone"
-                style={{ color: COLORS.TEXT_PRIMARY }}
-              >
+              <Label htmlFor="phone" style={{ color: COLORS.TEXT_PRIMARY }}>
                 Téléphone
               </Label>
               <Input
@@ -309,17 +317,14 @@ export default function RequestFarmerAccessPage(): JSX.Element {
                 className="transition-colors duration-200"
                 placeholder="Ex: +33 6 12 34 56 78"
               />
-              <p 
-                className="text-sm"
-                style={{ color: COLORS.TEXT_MUTED }}
-              >
+              <p className="text-sm" style={{ color: COLORS.TEXT_MUTED }}>
                 Format international recommandé (+33...)
               </p>
             </div>
 
             {/* Description */}
             <div className="space-y-2">
-              <Label 
+              <Label
                 htmlFor="description"
                 style={{ color: COLORS.TEXT_PRIMARY }}
               >
@@ -338,10 +343,7 @@ export default function RequestFarmerAccessPage(): JSX.Element {
 
             {/* Produits */}
             <div className="space-y-2">
-              <Label 
-                htmlFor="products"
-                style={{ color: COLORS.TEXT_PRIMARY }}
-              >
+              <Label htmlFor="products" style={{ color: COLORS.TEXT_PRIMARY }}>
                 Produits proposés
               </Label>
               <Textarea
@@ -356,10 +358,7 @@ export default function RequestFarmerAccessPage(): JSX.Element {
 
             {/* Site web */}
             <div className="space-y-2">
-              <Label 
-                htmlFor="website"
-                style={{ color: COLORS.TEXT_PRIMARY }}
-              >
+              <Label htmlFor="website" style={{ color: COLORS.TEXT_PRIMARY }}>
                 Site web / page sociale
               </Label>
               <Input
@@ -374,7 +373,7 @@ export default function RequestFarmerAccessPage(): JSX.Element {
             </div>
 
             {/* Message d'information */}
-            <div 
+            <div
               className="p-4 rounded-lg border text-sm"
               style={{
                 backgroundColor: COLORS.PRIMARY_BG,
@@ -384,8 +383,8 @@ export default function RequestFarmerAccessPage(): JSX.Element {
             >
               <p className="font-medium mb-1">📋 Processus de validation</p>
               <p>
-                Notre équipe examinera votre demande sous 1-2 jours ouvrés. 
-                Vous recevrez un email de confirmation une fois approuvée.
+                Notre équipe examinera votre demande sous 1-2 jours ouvrés. Vous
+                recevrez un email de confirmation une fois approuvée.
               </p>
             </div>
           </form>
@@ -400,9 +399,7 @@ export default function RequestFarmerAccessPage(): JSX.Element {
               "hover:shadow-md focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
             )}
             style={{
-              backgroundColor: isDuplicate 
-                ? COLORS.TEXT_MUTED 
-                : COLORS.PRIMARY,
+              backgroundColor: isDuplicate ? COLORS.TEXT_MUTED : COLORS.PRIMARY,
               color: COLORS.BG_WHITE,
             }}
             onClick={handleSubmit as any}
@@ -424,13 +421,10 @@ export default function RequestFarmerAccessPage(): JSX.Element {
       {/* Section aide */}
       {!isDuplicate && (
         <div className="mt-6 text-center">
-          <p 
-            className="text-sm mb-2"
-            style={{ color: COLORS.TEXT_SECONDARY }}
-          >
+          <p className="text-sm mb-2" style={{ color: COLORS.TEXT_SECONDARY }}>
             Des questions avant de commencer ?
           </p>
-          <a 
+          <a
             href="/contact"
             className={cn(
               "text-sm font-medium underline transition-colors duration-200",

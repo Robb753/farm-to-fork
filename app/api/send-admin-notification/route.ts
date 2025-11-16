@@ -8,8 +8,8 @@ import { sendAdminNotificationEmail } from "@/lib/config/email-notifications";
 interface AdminNotificationRequestBody {
   farm_name: string;
   email: string;
-  location: string; // Required pour FarmerRequest
-  description: string; // Required pour FarmerRequest
+  location: string;
+  description: string;
   user_id?: string;
   phone?: string;
   website?: string;

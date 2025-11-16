@@ -119,8 +119,16 @@ export default function Details({
   /**
    * Caractéristiques clés avec configuration avancée
    */
-  const keyFeatures: KeyFeature[] = useMemo(
-    () => [
+  const keyFeatures: KeyFeature[] = useMemo(() => {
+    // ✅ On prépare proprement la valeur de certifications
+    const certificationsValue = formatList(listingDetail.certifications);
+
+    const hasCertifications =
+      !!listingDetail.certifications &&
+      certificationsValue !== "Non spécifié" &&
+      certificationsValue !== "Aucune certification";
+
+    return [
       {
         icon: <Leaf className="h-5 w-5" />,
         label: "Type de produits",
@@ -137,13 +145,10 @@ export default function Details({
       {
         icon: <Award className="h-5 w-5" />,
         label: "Certifications",
-        value:
-          formatList(listingDetail.certifications) || "Aucune certification",
+        value: certificationsValue || "Aucune certification",
         color: "purple",
-        isHighlight:
-          listingDetail.certifications &&
-          Array.isArray(listingDetail.certifications) &&
-          listingDetail.certifications.length > 0,
+        // ✅ Ici c’est **toujours** un boolean
+        isHighlight: hasCertifications,
       },
       {
         icon: <Clock className="h-5 w-5" />,
@@ -165,9 +170,9 @@ export default function Details({
           "Aucun service additionnel",
         color: "teal",
       },
-    ],
-    [listingDetail, formatList]
-  );
+    ];
+  }, [listingDetail, formatList]);
+
 
   /**
    * Extrait les coordonnées de manière robuste

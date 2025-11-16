@@ -2,8 +2,8 @@
 
 import React from "react";
 import { X } from "lucide-react";
-import type { FilterState } from "@/lib/store/types";
 import { CSS_CLASSES, A11Y_MESSAGES, type FilterKey } from "../utils/constants";
+import { FilterState } from "@/lib/store/shared/types";
 
 interface ActiveFiltersProps {
   filters: FilterState;
@@ -49,7 +49,7 @@ const ActiveFilters: React.FC<ActiveFiltersProps> = ({
         ([key, values]) =>
           (values || []).map((value) => (
             <FilterChip
-              key={`${key}-${value}`}
+              key={`${String(key)}-${value}`}
               value={value}
               onRemove={() => onFilterToggle(key, value)}
             />

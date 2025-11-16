@@ -37,13 +37,16 @@ interface GetAllUsersResponse {
 
 /**
  * Type pour les paramètres de requête
+ *
+ * ➜ role, sortBy et sortOrder ne sont plus optionnels ici
+ *    car on leur donne toujours une valeur par défaut.
  */
 interface GetAllUsersParams {
-  role?: "user" | "farmer" | "admin" | "all";
+  role: "user" | "farmer" | "admin" | "all";
   limit?: number;
   offset?: number;
-  sortBy?: "created_at" | "updated_at" | "email" | "role";
-  sortOrder?: "asc" | "desc";
+  sortBy: "created_at" | "updated_at" | "email" | "role";
+  sortOrder: "asc" | "desc";
   search?: string;
 }
 
@@ -52,10 +55,15 @@ if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.SUPABASE_URL) {
   throw new Error("Les variables d'environnement Supabase sont manquantes.");
 }
 
+// On stocke dans des constantes typées string pour éviter le `string | undefined`
+const SUPABASE_URL: string = process.env.SUPABASE_URL!;
+const SUPABASE_SERVICE_ROLE_KEY: string =
+  process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
 // Initialisation du client Supabase côté serveur
 const supabase = createClient<Database>(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
+  SUPABASE_URL,
+  SUPABASE_SERVICE_ROLE_KEY
 );
 
 /**
@@ -68,16 +76,22 @@ export async function GET(
     // Extraction des paramètres de query
     const { searchParams } = new URL(req.url);
 
+    // Rôle depuis la query (ou null si non fourni)
+    const roleParam = searchParams.get("role") as
+      | "user"
+      | "farmer"
+      | "admin"
+      | "all"
+      | null;
+
     // Parse des paramètres avec valeurs par défaut
     const params: GetAllUsersParams = {
-      role:
-        (searchParams.get("role") as "user" | "farmer" | "admin" | "all") ||
-        "all",
+      role: roleParam ?? "all",
       limit: searchParams.get("limit")
-        ? parseInt(searchParams.get("limit")!)
+        ? parseInt(searchParams.get("limit") as string, 10)
         : undefined,
       offset: searchParams.get("offset")
-        ? parseInt(searchParams.get("offset")!)
+        ? parseInt(searchParams.get("offset") as string, 10)
         : undefined,
       sortBy:
         (searchParams.get("sortBy") as
@@ -90,7 +104,7 @@ export async function GET(
     };
 
     // Validation des paramètres
-    const validRoles = ["user", "farmer", "admin", "all"];
+    const validRoles = ["user", "farmer", "admin", "all"] as const;
     if (!validRoles.includes(params.role)) {
       return NextResponse.json(
         {
@@ -101,7 +115,12 @@ export async function GET(
       );
     }
 
-    const validSortFields = ["created_at", "updated_at", "email", "role"];
+    const validSortFields = [
+      "created_at",
+      "updated_at",
+      "email",
+      "role",
+    ] as const;
     if (!validSortFields.includes(params.sortBy)) {
       return NextResponse.json(
         {
@@ -174,7 +193,7 @@ export async function GET(
       )
       .order(params.sortBy, { ascending: params.sortOrder === "asc" });
 
-    // Application du filtre de rôle
+    // Application du filtre de rôle (on ne filtre pas si "all")
     if (params.role !== "all") {
       query = query.eq("role", params.role);
     }
@@ -225,7 +244,9 @@ export async function GET(
     const response: GetAllUsersResponse = {
       users: data as UserProfile[],
       count: data.length,
-      message: `${data.length} utilisateur(s) ${params.role === "all" ? "" : `avec le rôle ${params.role} `}récupéré(s)`,
+      message: `${data.length} utilisateur(s) ${
+        params.role === "all" ? "" : `avec le rôle ${params.role} `
+      }récupéré(s)`,
     };
 
     // Ajout des informations de pagination si utilisée

@@ -4,10 +4,7 @@ import React, { useEffect, useRef, useCallback } from "react";
 import mapboxgl from "mapbox-gl";
 
 // ✅ IMPORTS CORRECTS : Store modulaire équilibré
-import {
-  useMapState,
-  useMapActions,
-} from "@/lib/store";
+import { useMapState, useMapActions } from "@/lib/store";
 
 // ✅ Types du projet
 import type { MapBounds, LatLng } from "@/lib/store/shared/types";
@@ -91,16 +88,6 @@ const isValidCoords = (
 
 /* --------------- Composant principal --------------- */
 
-/**
- * Composant section Mapbox principal avec gestion des événements pour marqueurs
- *
- * Features:
- * - Écoute les événements du store pour afficher les marqueurs
- * - Configuration des couleurs via COLORS
- * - Types MapBounds compatibles avec le store
- * - Gestion d'erreurs robuste
- * - Synchronisation bidirectionnelle avec le store
- */
 export default function MapboxSection({
   isMapExpanded = false,
   className = "",
@@ -113,7 +100,8 @@ export default function MapboxSection({
   const userInteractingRef = useRef<boolean>(false);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
 
-  const { coordinates, zoom, isApiLoaded, isApiLoading, bounds } = useMapState();
+  const { coordinates, zoom, isApiLoaded, isApiLoading, bounds } =
+    useMapState();
   const {
     setMapInstance,
     setMapBounds,
@@ -141,6 +129,12 @@ export default function MapboxSection({
     (map: mapboxgl.Map): void => {
       try {
         const b = map.getBounds();
+        // 👇 garde pour satisfaire TS ("b is possibly null")
+        if (!b) {
+          console.warn("Bounds Mapbox indisponibles");
+          return;
+        }
+
         const storeBounds: MapBounds = {
           sw: { lat: b.getSouth(), lng: b.getWest() },
           ne: { lat: b.getNorth(), lng: b.getEast() },
@@ -168,6 +162,12 @@ export default function MapboxSection({
 
         if (onViewChange && centerCoords) {
           const b = map.getBounds();
+          // 👇 même garde ici
+          if (!b) {
+            console.warn("Bounds Mapbox indisponibles pour onViewChange");
+            return;
+          }
+
           const changedBounds: MapBounds = {
             sw: { lat: b.getSouth(), lng: b.getWest() },
             ne: { lat: b.getNorth(), lng: b.getEast() },
@@ -194,7 +194,7 @@ export default function MapboxSection({
 
   // ✅ FONCTIONS POUR LES MARQUEURS
   const clearMarkers = useCallback(() => {
-    markersRef.current.forEach(marker => {
+    markersRef.current.forEach((marker) => {
       try {
         marker.remove();
       } catch (e) {
@@ -204,20 +204,24 @@ export default function MapboxSection({
     markersRef.current = [];
   }, []);
 
-  const addMarkersToMap = useCallback((listings: any[]) => {
-    const map = mapRef.current;
-    if (!map) return;
+  const addMarkersToMap = useCallback(
+    (listings: any[]) => {
+      const map = mapRef.current;
+      if (!map) return;
 
-    clearMarkers(); // Nettoyer les anciens marqueurs
+      clearMarkers(); // Nettoyer les anciens marqueurs
 
-    listings.forEach(listing => {
-      if (listing.lat && listing.lng && 
-          typeof listing.lat === "number" && typeof listing.lng === "number") {
-        try {
-          // Créer un élément DOM personnalisé pour le marqueur
-          const markerEl = document.createElement('div');
-          markerEl.className = 'custom-marker';
-          markerEl.style.cssText = `
+      listings.forEach((listing) => {
+        if (
+          listing.lat &&
+          listing.lng &&
+          typeof listing.lat === "number" &&
+          typeof listing.lng === "number"
+        ) {
+          try {
+            const markerEl = document.createElement("div");
+            markerEl.className = "custom-marker";
+            markerEl.style.cssText = `
             width: 24px;
             height: 24px;
             background-color: ${COLORS.PRIMARY};
@@ -228,58 +232,57 @@ export default function MapboxSection({
             box-shadow: 0 2px 4px rgba(0,0,0,0.2);
           `;
 
-          // Hover effects
-          markerEl.addEventListener('mouseenter', () => {
-            markerEl.style.transform = 'scale(1.2)';
-            markerEl.style.backgroundColor = COLORS.PRIMARY_DARK;
-            markerEl.style.boxShadow = '0 4px 8px rgba(0,0,0,0.3)';
-          });
+            markerEl.addEventListener("mouseenter", () => {
+              markerEl.style.transform = "scale(1.2)";
+              markerEl.style.backgroundColor = COLORS.PRIMARY_DARK;
+              markerEl.style.boxShadow = "0 4px 8px rgba(0,0,0,0.3)";
+            });
 
-          markerEl.addEventListener('mouseleave', () => {
-            markerEl.style.transform = 'scale(1)';
-            markerEl.style.backgroundColor = COLORS.PRIMARY;
-            markerEl.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
-          });
+            markerEl.addEventListener("mouseleave", () => {
+              markerEl.style.transform = "scale(1)";
+              markerEl.style.backgroundColor = COLORS.PRIMARY;
+              markerEl.style.boxShadow = "0 2px 4px rgba(0,0,0,0.2)";
+            });
 
-          // Click handler
-          markerEl.addEventListener('click', () => {
-            // Trigger listing selection
-            if (typeof window !== "undefined") {
-              window.dispatchEvent(
-                new CustomEvent("listingSelected", { 
-                  detail: { id: listing.id, fromMap: true }
-                })
-              );
-            }
-          });
+            markerEl.addEventListener("click", () => {
+              if (typeof window !== "undefined") {
+                window.dispatchEvent(
+                  new CustomEvent("listingSelected", {
+                    detail: { id: listing.id, fromMap: true },
+                  })
+                );
+              }
+            });
 
-          const marker = new mapboxgl.Marker(markerEl)
-            .setLngLat([listing.lng, listing.lat])
-            .addTo(map);
+            const marker = new mapboxgl.Marker(markerEl)
+              .setLngLat([listing.lng, listing.lat])
+              .addTo(map);
 
-          markersRef.current.push(marker);
-        } catch (error) {
-          console.warn("Erreur création marqueur pour", listing.id, error);
+            markersRef.current.push(marker);
+          } catch (error) {
+            console.warn("Erreur création marqueur pour", listing.id, error);
+          }
         }
-      }
-    });
+      });
 
-    console.log('🗺️ [MapboxSection] Marqueurs ajoutés:', markersRef.current.length);
-  }, [clearMarkers]);
+      console.log(
+        "🗺️ [MapboxSection] Marqueurs ajoutés:",
+        markersRef.current.length
+      );
+    },
+    [clearMarkers]
+  );
 
   const highlightMarker = useCallback((id: number | null) => {
-    // TODO: Implémenter highlight des marqueurs
-    console.log('🎯 [MapboxSection] Highlight marker:', id);
+    console.log("🎯 [MapboxSection] Highlight marker:", id);
   }, []);
 
   const selectMarker = useCallback((id: number | null) => {
-    // TODO: Implémenter sélection des marqueurs
-    console.log('✅ [MapboxSection] Select marker:', id);
+    console.log("✅ [MapboxSection] Select marker:", id);
   }, []);
 
   const openInfoWindow = useCallback((id: number | null) => {
-    // TODO: Implémenter InfoWindow
-    console.log('💬 [MapboxSection] Open info window:', id);
+    console.log("💬 [MapboxSection] Open info window:", id);
   }, []);
 
   // ✅ ÉCOUTE DES ÉVÉNEMENTS DU STORE
@@ -288,7 +291,11 @@ export default function MapboxSection({
 
     const handleListingsUpdated = (event: CustomEvent) => {
       const { listings, source } = event.detail;
-      console.log('🗺️ [MapboxSection] Listings updated:', listings.length, source);
+      console.log(
+        "🗺️ [MapboxSection] Listings updated:",
+        listings.length,
+        source
+      );
       addMarkersToMap(listings);
     };
 
@@ -307,18 +314,40 @@ export default function MapboxSection({
       openInfoWindow(id);
     };
 
-    // Attacher les listeners
-    window.addEventListener('listingsUpdated', handleListingsUpdated as EventListener);
-    window.addEventListener('listingHovered', handleListingHovered as EventListener);
-    window.addEventListener('listingSelected', handleListingSelected as EventListener);
-    window.addEventListener('infoWindowRequested', handleInfoWindowRequested as EventListener);
+    window.addEventListener(
+      "listingsUpdated",
+      handleListingsUpdated as EventListener
+    );
+    window.addEventListener(
+      "listingHovered",
+      handleListingHovered as EventListener
+    );
+    window.addEventListener(
+      "listingSelected",
+      handleListingSelected as EventListener
+    );
+    window.addEventListener(
+      "infoWindowRequested",
+      handleInfoWindowRequested as EventListener
+    );
 
     return () => {
-      // Nettoyer
-      window.removeEventListener('listingsUpdated', handleListingsUpdated as EventListener);
-      window.removeEventListener('listingHovered', handleListingHovered as EventListener);
-      window.removeEventListener('listingSelected', handleListingSelected as EventListener);
-      window.removeEventListener('infoWindowRequested', handleInfoWindowRequested as EventListener);
+      window.removeEventListener(
+        "listingsUpdated",
+        handleListingsUpdated as EventListener
+      );
+      window.removeEventListener(
+        "listingHovered",
+        handleListingHovered as EventListener
+      );
+      window.removeEventListener(
+        "listingSelected",
+        handleListingSelected as EventListener
+      );
+      window.removeEventListener(
+        "infoWindowRequested",
+        handleInfoWindowRequested as EventListener
+      );
     };
   }, [addMarkersToMap, highlightMarker, selectMarker, openInfoWindow]);
 
@@ -426,8 +455,8 @@ export default function MapboxSection({
       map.on("error", handleMapError);
 
       return () => {
-        clearMarkers(); // Nettoyer les marqueurs
-        
+        clearMarkers();
+
         if (mapRef.current) {
           map.off("style.load", handleStyleLoad);
           map.off("load", handleMapLoad);
@@ -455,9 +484,9 @@ export default function MapboxSection({
       console.error("Erreur init carte:", error);
       setApiLoading(false);
     }
-  }, []); // Pas de dépendances pour éviter les re-créations
+  }, []); // on garde ton choix ici
 
-  /** Suit les changements externes coords/zoom → met à jour la vue */
+  /** Suit les changements coords/zoom → met à jour la vue */
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !isApiLoaded) return;
@@ -531,22 +560,19 @@ export default function MapboxSection({
 
   return (
     <div ref={wrapperRef} className={`h-full w-full relative ${className}`}>
-      {/* ⚠️ Mapbox injecte son canvas ici */}
       <div
         ref={containerRef}
         className="h-full w-full"
         style={{ contain: "layout paint size" }}
       />
 
-      {/* Markers contrôlés par événements (pas par MapboxMarkers) */}
       <MapboxMarkers />
 
-      {/* ✅ Loading state avec couleurs du design system */}
       {isApiLoading && (
         <div
           className="absolute inset-0 flex items-center justify-center"
           style={{
-            backgroundColor: `${COLORS.BG_WHITE}BF`, // 75% opacity
+            backgroundColor: `${COLORS.BG_WHITE}BF`,
           }}
         >
           <div className="text-center">

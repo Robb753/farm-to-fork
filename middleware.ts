@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
 /**
- * Middleware TypeScript sécurisé pour Farm2Fork
+ * Middleware TypeScript sécurisé pour Farm2Fork - Next.js 15 compatible
  *
  * Features:
  * - Sécurité maximale avec vérification des rôles
@@ -17,11 +17,13 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 const isPublicRoute = createRouteMatcher([
   "/", // Page d'accueil
   "/explore(.*)", // Exploration des producteurs (lecture seule)
+  // "/view-listing(.*)", // ✅ RETIRÉ: Maintenant privé (utilisateurs connectés uniquement)
   "/legal(.*)", // Pages légales
   "/sign-in(.*)", // Pages de connexion
   "/sign-up(.*)", // Pages d'inscription
   "/api/public(.*)", // APIs publiques
   "/api/webhooks(.*)", // Webhooks (Clerk, Stripe, etc.)
+  "/api/auth(.*)", // ✅ AJOUT: APIs d'authentification (éviter les boucles)
 ]);
 
 const isAdminRoute = createRouteMatcher(["/admin(.*)"]);
@@ -30,7 +32,7 @@ const isProfileRoute = createRouteMatcher(["/profile(.*)"]);
 
 // ==================== CONFIGURATION SÉCURITÉ RENFORCÉE ====================
 export default clerkMiddleware(async (auth, req) => {
-  const { userId } = auth();
+  const { userId, sessionClaims } = await auth();
   const { pathname } = req.nextUrl;
 
   // ==================== ROUTES PUBLIQUES ====================
@@ -50,19 +52,16 @@ export default clerkMiddleware(async (auth, req) => {
   // ==================== PROTECTION ROUTES ADMIN ====================
   if (isAdminRoute(req)) {
     try {
-      // Vérifier le rôle admin dans les métadonnées Clerk
-      const response = await fetch(
-        `${req.nextUrl.origin}/api/auth/check-admin`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${userId}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      // ✅ CORRIGÉ: Vérifier le rôle admin directement depuis sessionClaims avec typage correct
+      const metadata = sessionClaims as any; // Cast temporaire pour éviter les erreurs TypeScript
+      const userRole =
+        metadata?.metadata?.role || metadata?.publicMetadata?.role;
+      const isAdmin =
+        userRole === "admin" ||
+        metadata?.metadata?.isAdmin ||
+        metadata?.publicMetadata?.isAdmin;
 
-      if (!response.ok) {
+      if (!isAdmin) {
         console.log(`🚫 Accès admin refusé pour userId: ${userId}`);
 
         // Rediriger vers dashboard avec message d'erreur

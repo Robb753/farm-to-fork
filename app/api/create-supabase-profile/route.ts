@@ -169,7 +169,8 @@ export async function POST(
     // Récupérer l'utilisateur depuis Clerk
     let user;
     try {
-      user = await clerkClient.users.getUser(userId);
+      const client = await clerkClient();
+      user = await client.users.getUser(userId);
     } catch (clerkError) {
       console.error(
         "[CREATE PROFILE] Erreur récupération utilisateur Clerk:",

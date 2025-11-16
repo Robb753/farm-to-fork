@@ -7,9 +7,6 @@ import { useRouter } from "next/navigation";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
   CardContent,
@@ -17,46 +14,42 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Loader2,
   Save,
-  Globe,
-  Send,
   ArrowLeft,
   Users,
   Camera,
   Check,
-  ChevronRight,
   TractorIcon,
-  Mail,
-  Phone,
+  ChevronRight,
   ChevronLeft,
 } from "@/utils/icons";
 import { supabase } from "@/utils/supabase/client";
-import {
-  editListingSchema,
-  EditListingSchemaType,
-} from "@/app/schemas/editListingSchema";
+import { editListingSchema } from "@/app/schemas/editListingSchema";
+import type { z } from "zod";
 import ProductSelector from "./ProductSelector";
 import FileUpload from "./FileUpload";
 import { cn } from "@/lib/utils";
 import { COLORS } from "@/lib/config";
 
+// ✅ Types Supabase
+import type {
+  Listing as DbListing,
+  ListingImage as DbListingImage,
+  ProductInsert,
+} from "@/lib/types/database";
+
 /**
- * Types spécifiques pour chaque catégorie (définis avant les interfaces)
+ * ✅ Type du formulaire directement inféré depuis le schéma
+ */
+type EditListingFormValues = z.input<typeof editListingSchema>;
+
+/**
+ * Types spécifiques pour chaque catégorie (form / UI)
  */
 type ProductTypeId =
   | "Fruits"
@@ -84,7 +77,8 @@ type CertificationId =
   | "Label Rouge"
   | "AOC/AOP"
   | "IGP"
-  | "Demeter";
+  | "Demeter"
+  | "HVE";
 
 type AdditionalServiceId =
   | "Visite de la ferme"
@@ -101,26 +95,28 @@ type AvailabilityId =
   | "Événements spéciaux";
 
 /**
- * Interfaces TypeScript pour EditListing
+ * Props du composant
  */
 interface EditListingProps {
-  /** Paramètres de route contenant l'ID du listing */
   params: {
     id: string;
   };
-  /** Classe CSS personnalisée */
   className?: string;
 }
 
-interface Product {
+interface ProductUI {
   name: string;
   category: string;
   type: string;
   labels: string[];
 }
 
-interface ListingData {
-  id: number;
+/**
+ * 🔗 Type de données utilisées dans l'UI
+ * (normalisées à partir du Row Supabase)
+ */
+type ListingData = {
+  id: DbListing["id"];
   name: string;
   email: string;
   phoneNumber: string;
@@ -133,9 +129,9 @@ interface ListingData {
   availability: AvailabilityId[];
   additional_services: AdditionalServiceId[];
   products: string[];
-  active: boolean;
-  listingImages: { url: string }[];
-}
+  active: DbListing["active"];
+  listingImages: Pick<DbListingImage, "url">[];
+};
 
 interface StepItem {
   id: number;
@@ -150,7 +146,7 @@ interface CheckboxItem {
 }
 
 /**
- * Utilitaires de validation des types
+ * Utilitaires de validation des types pour l'UI
  */
 const isValidProductType = (value: string): value is ProductTypeId => {
   return [
@@ -185,9 +181,14 @@ const isValidPurchaseMode = (value: string): value is PurchaseModeId => {
 };
 
 const isValidCertification = (value: string): value is CertificationId => {
-  return ["Label AB", "Label Rouge", "AOC/AOP", "IGP", "Demeter"].includes(
-    value
-  );
+  return [
+    "Label AB",
+    "Label Rouge",
+    "AOC/AOP",
+    "IGP",
+    "Demeter",
+    "HVE",
+  ].includes(value);
 };
 
 const isValidAdditionalService = (
@@ -213,35 +214,8 @@ const isValidAvailability = (value: string): value is AvailabilityId => {
 };
 
 /**
- * Fonction pour nettoyer et valider les données du listing
+ * Stepper
  */
-const sanitizeListingData = (data: any) => {
-  return {
-    name: data.name || "",
-    email: data.email || "",
-    phoneNumber: data.phoneNumber || "",
-    description: data.description || "",
-    website: data.website || "",
-    product_type: (data.product_type || []).filter(
-      isValidProductType
-    ) as ProductTypeId[],
-    production_method: (data.production_method || []).filter(
-      isValidProductionMethod
-    ) as ProductionMethodId[],
-    purchase_mode: (data.purchase_mode || []).filter(
-      isValidPurchaseMode
-    ) as PurchaseModeId[],
-    certifications: (data.certifications || []).filter(
-      isValidCertification
-    ) as CertificationId[],
-    availability: data.availability || [],
-    additional_services: (data.additional_services || []).filter(
-      isValidAdditionalService
-    ) as AdditionalServiceId[],
-    products: data.products || [],
-    images: [],
-  };
-};
 const STEPS: StepItem[] = [
   { id: 1, title: "Informations générales", icon: Users },
   { id: 2, title: "Produits & Services", icon: TractorIcon },
@@ -250,15 +224,190 @@ const STEPS: StepItem[] = [
 ];
 
 /**
- * Service pour les opérations Supabase avec gestion des images typée
+ * Options UI (checkboxes)
+ */
+const PRODUCT_TYPE_OPTIONS: CheckboxItem[] = [
+  { id: "Fruits", label: "Fruits" },
+  { id: "Légumes", label: "Légumes" },
+  { id: "Produits laitiers", label: "Produits laitiers" },
+  { id: "Viande", label: "Viande" },
+  { id: "Œufs", label: "Œufs" },
+  { id: "Produits transformés", label: "Produits transformés" },
+];
+
+const PRODUCTION_METHOD_OPTIONS: CheckboxItem[] = [
+  { id: "Agriculture conventionnelle", label: "Conventionnelle" },
+  { id: "Agriculture biologique", label: "Biologique" },
+  { id: "Agriculture durable", label: "Durable" },
+  { id: "Agriculture raisonnée", label: "Raisonnée" },
+];
+
+const PURCHASE_MODE_OPTIONS: CheckboxItem[] = [
+  { id: "Vente directe à la ferme", label: "Vente directe à la ferme" },
+  { id: "Marché local", label: "Marché local" },
+  { id: "Livraison à domicile", label: "Livraison à domicile" },
+  { id: "Point de vente collectif", label: "Point de vente collectif" },
+  { id: "Click & Collect", label: "Click & Collect" },
+];
+
+const CERTIFICATION_OPTIONS: CheckboxItem[] = [
+  { id: "Label AB", label: "Label AB" },
+  { id: "Label Rouge", label: "Label Rouge" },
+  { id: "AOC/AOP", label: "AOC / AOP" },
+  { id: "IGP", label: "IGP" },
+  { id: "Demeter", label: "Demeter" },
+  { id: "HVE", label: "HVE" },
+];
+
+const AVAILABILITY_OPTIONS_UI: CheckboxItem[] = [
+  { id: "Saisonnière", label: "Saisonnière" },
+  { id: "Toute l'année", label: "Toute l'année" },
+  { id: "Pré-commande", label: "Pré-commande" },
+  { id: "Sur abonnement", label: "Sur abonnement" },
+  { id: "Événements spéciaux", label: "Événements spéciaux" },
+];
+
+const ADDITIONAL_SERVICE_OPTIONS: CheckboxItem[] = [
+  { id: "Visite de la ferme", label: "Visite de la ferme" },
+  { id: "Ateliers de cuisine", label: "Ateliers de cuisine" },
+  { id: "Dégustation", label: "Dégustation" },
+  { id: "Activités pour enfants", label: "Activités pour enfants" },
+  { id: "Événements pour professionnels", label: "Événements pro" },
+];
+
+/**
+ * Service Supabase typé avec Database
  */
 class ListingService {
+  /**
+   * Récupère un listing + images, typé avec Database
+   */
+  static async fetchListing(
+    id: number,
+    userEmail: string
+  ): Promise<ListingData> {
+    try {
+      type RawListing = DbListing & {
+        listingImages: { url: string }[];
+      };
+
+      const { data, error } = await supabase
+        .from("listing")
+        .select("*, listingImages(url)")
+        .eq("createdBy", userEmail)
+        .eq("id", id)
+        .single();
+
+      if (error) throw error;
+      if (!data) throw new Error("Aucun listing trouvé");
+
+      const raw = data as RawListing;
+
+      const toArray = (val: any): any[] => (Array.isArray(val) ? val : []);
+
+      const listing: ListingData = {
+        id: raw.id,
+        name: raw.name ?? "",
+        email: raw.email ?? "",
+        phoneNumber: raw.phoneNumber ?? "",
+        description: raw.description ?? "",
+        website: raw.website ?? "",
+        product_type: toArray(raw.product_type).filter(isValidProductType),
+        production_method: toArray(raw.production_method).filter(
+          isValidProductionMethod
+        ),
+        purchase_mode: toArray(raw.purchase_mode).filter(isValidPurchaseMode),
+        certifications: toArray(raw.certifications).filter(
+          isValidCertification
+        ),
+        availability: toArray(raw.availability).filter(isValidAvailability),
+        additional_services: toArray(raw.additional_services).filter(
+          isValidAdditionalService
+        ),
+        products: [], // ⚠️ tu peux plus tard charger les produits depuis la table products
+        active: raw.active ?? false,
+        listingImages: toArray(raw.listingImages),
+      };
+
+      return listing;
+    } catch (error) {
+      console.error("Erreur lors de la récupération du listing:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Mise à jour du listing (on laisse la conversion form → DB comme avant)
+   */
+  static async updateListing(
+    id: number,
+    values: EditListingFormValues,
+    isPublishing: boolean,
+    currentActive: boolean
+  ): Promise<void> {
+    try {
+      const updateData = {
+        ...values,
+        active: isPublishing || currentActive || false,
+        updated_at: new Date().toISOString(),
+        ...(isPublishing &&
+          !currentActive && {
+            // si tu as bien une colonne published_at dans ta table
+            published_at: new Date().toISOString(),
+          }),
+      };
+
+      const { error } = await supabase
+        .from("listing")
+        .update(updateData as any) // conversion explicite, car form ≠ DB
+        .eq("id", id);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour du listing:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Mise à jour des produits associés (table products)
+   */
+  static async updateProducts(
+    listingId: number,
+    products: string[] | undefined
+  ): Promise<void> {
+    try {
+      const safeProducts = products ?? [];
+
+      await supabase.from("products").delete().eq("listing_id", listingId);
+
+      if (safeProducts.length > 0) {
+        const formattedProducts: ProductInsert[] = safeProducts.map((name) => ({
+          listing_id: listingId,
+          name,
+          available: true,
+        }));
+
+        const { error: insertError } = await supabase
+          .from("products")
+          .insert(formattedProducts);
+
+        if (insertError) throw insertError;
+      }
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour des produits:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Upload des images via le bucket + insertion dans listingImages
+   */
   static async uploadImages(
     listingId: number,
     images: (string | File)[]
   ): Promise<void> {
     try {
-      // ✅ Filtrer et typer correctement les images
       const imageFiles = images.filter(
         (img): img is File => img instanceof File
       );
@@ -272,7 +421,7 @@ class ListingService {
         const fileName = `${Date.now()}-${image.name}`;
         const fileExt = fileName.split(".").pop();
 
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const { error: uploadError } = await supabase.storage
           .from("listingImages")
           .upload(fileName, image, {
             contentType: `image/${fileExt}`,
@@ -299,127 +448,10 @@ class ListingService {
       throw error;
     }
   }
-
-  static async fetchListing(
-    id: number,
-    userEmail: string
-  ): Promise<ListingData> {
-    try {
-      const { data, error } = await supabase
-        .from("listing")
-        .select("*, listingImages(url)")
-        .eq("createdBy", userEmail)
-        .eq("id", id)
-        .single();
-
-      if (error) throw error;
-      if (!data) throw new Error("Aucun listing trouvé");
-
-      // ✅ Sanitisation des données au niveau du service pour garantir les types corrects
-      const toArray = (val: any): any[] => Array.isArray(val) ? val : [];
-
-      const sanitizedData: ListingData = {
-        id: data.id,
-        name: data.name || "",
-        email: data.email || "",
-        phoneNumber: data.phoneNumber || "",
-        description: data.description || "",
-        website: data.website || "",
-        product_type: toArray(data.product_type).filter(isValidProductType),
-        production_method: toArray(data.production_method).filter(
-          isValidProductionMethod
-        ),
-        purchase_mode: toArray(data.purchase_mode).filter(isValidPurchaseMode),
-        certifications: toArray(data.certifications).filter(
-          isValidCertification
-        ),
-        availability: toArray(data.availability).filter(isValidAvailability),
-        additional_services: toArray(data.additional_services).filter(
-          isValidAdditionalService
-        ),
-        products: toArray((data as any).products),
-        active: data.active || false,
-        listingImages: toArray(data.listingImages),
-      };
-
-      return sanitizedData;
-    } catch (error) {
-      console.error("Erreur lors de la récupération du listing:", error);
-      throw error;
-    }
-  }
-
-  static async updateListing(
-    id: number,
-    values: EditListingSchemaType,
-    isPublishing: boolean,
-    currentActive: boolean
-  ): Promise<void> {
-    try {
-      const updateData = {
-        ...values,
-        active: isPublishing || currentActive || false,
-        modified_at: new Date().toISOString(),
-        ...(isPublishing &&
-          !currentActive && {
-            published_at: new Date().toISOString(),
-          }),
-      };
-
-      const { error } = await supabase
-        .from("listing")
-        .update(updateData as any)
-        .eq("id", id);
-
-      if (error) throw error;
-    } catch (error) {
-      console.error("Erreur lors de la mise à jour du listing:", error);
-      throw error;
-    }
-  }
-
-  static async updateProducts(
-    listingId: number,
-    products: string[]
-  ): Promise<void> {
-    try {
-      // Supprimer les anciens produits
-      await supabase.from("products").delete().eq("listing_id", listingId);
-
-      // Insérer les nouveaux produits
-      if (products.length > 0) {
-        const formattedProducts = products.map((name) => ({
-          listing_id: listingId,
-          name,
-          available: true,
-        }));
-
-        const { error: insertError } = await supabase
-          .from("products")
-          .insert(formattedProducts);
-
-        if (insertError) throw insertError;
-      }
-    } catch (error) {
-      console.error("Erreur lors de la mise à jour des produits:", error);
-      throw error;
-    }
-  }
 }
 
 /**
- * Composant EditListing principal avec correction de la gestion des images
- *
- * Features:
- * - ✅ Gestion correcte des types File vs string pour les images
- * - Formulaire multi-étapes avec validation TypeScript stricte
- * - Service Layer robuste pour les opérations Supabase
- * - Design system cohérent intégré
- * - Gestion d'erreurs contextualisée
- * - Performance optimisée avec hooks TypeScript
- *
- * @param props - Configuration du composant
- * @returns Composant d'édition de listing
+ * Composant EditListing principal
  */
 const EditListing: React.FC<EditListingProps> = ({
   params,
@@ -435,14 +467,14 @@ const EditListing: React.FC<EditListingProps> = ({
   const { user, isLoaded } = useUser();
   const router = useRouter();
 
-  const form = useForm<EditListingSchemaType>({
+  const form = useForm<EditListingFormValues>({
     resolver: zodResolver(editListingSchema),
     mode: "onChange",
     defaultValues: {
       name: "",
       email: "",
       phoneNumber: "",
-      description: "",
+      description: undefined,
       website: "",
       product_type: [],
       production_method: [],
@@ -465,8 +497,30 @@ const EditListing: React.FC<EditListingProps> = ({
     formState: { errors },
   } = form;
 
+  const handleImagesChange = useCallback(
+    (files: File[]) => {
+      // on stocke les File[] dans ton champ RHF "images"
+      setValue("images", files, {
+        shouldDirty: true,
+        shouldTouch: true,
+      });
+    },
+    [setValue]
+  );
+
+  const productTypeValues = watch("product_type") ?? [];
+  const productionMethodValues = watch("production_method") ?? [];
+  const purchaseModeValues = watch("purchase_mode") ?? [];
+  const certificationsValues = watch("certifications") ?? [];
+  const availabilityValues = watch("availability") ?? [];
+  const additionalServicesValues = watch("additional_services") ?? [];
+  const selectedProducts = watch("products") ?? [];
+  const imagesValues = watch("images") ?? [];
+
+  const progressValue = (currentStep / STEPS.length) * 100;
+
   /**
-   * Chargement initial des données
+   * Chargement initial
    */
   useEffect(() => {
     if (!isLoaded || !user) return;
@@ -495,7 +549,6 @@ const EditListing: React.FC<EditListingProps> = ({
 
         setListing(data);
 
-        // ✅ Les données sont déjà sanitisées par le service, on peut les utiliser directement
         reset({
           name: data.name,
           email: data.email,
@@ -531,13 +584,10 @@ const EditListing: React.FC<EditListingProps> = ({
   }, [isLoaded, user, params.id, reset, router]);
 
   /**
-   * Soumission du formulaire avec gestion correcte des images
+   * Soumission
    */
   const onSubmit = useCallback(
-    async (
-      values: EditListingSchemaType,
-      isPublishing: boolean = false
-    ): Promise<void> => {
+    async (values: EditListingFormValues, isPublishing: boolean = false) => {
       if (!listing) return;
 
       setIsSubmitting(true);
@@ -548,7 +598,6 @@ const EditListing: React.FC<EditListingProps> = ({
           throw new Error("ID de listing invalide");
         }
 
-        // Mise à jour du listing principal
         await ListingService.updateListing(
           listingId,
           values,
@@ -556,15 +605,12 @@ const EditListing: React.FC<EditListingProps> = ({
           listing.active
         );
 
-        // Mise à jour des produits
         await ListingService.updateProducts(listingId, values.products);
 
-        // ✅ Upload des images avec types corrects
-        if (values.images.length > 0) {
+        if (values.images && values.images.length > 0) {
           await ListingService.uploadImages(listingId, values.images);
         }
 
-        // Messages de succès et navigation
         if (isPublishing) {
           toast.success("Fiche publiée avec succès !");
           setTimeout(() => {
@@ -582,21 +628,23 @@ const EditListing: React.FC<EditListingProps> = ({
         setIsSubmitting(false);
       }
     },
-    [listing, params.id, router, setIsSubmitting]
+    [listing, params.id, router]
   );
 
   /**
-   * Fonction générique pour gérer les toggles de tableau
+   * Gestion des valeurs tableaux (checkboxes)
    */
   const toggleArrayValue = useCallback(
-    (fieldName: keyof EditListingSchemaType, value: string): void => {
-      const currentValues = getValues(fieldName as any) as string[];
+    (fieldName: keyof EditListingFormValues, value: string): void => {
+      // On force TS à considérer ça comme un string[]
+      const currentValues = (getValues(fieldName as any) as string[]) ?? [];
 
       const newValues = currentValues.includes(value)
         ? currentValues.filter((v) => v !== value)
         : [...currentValues, value];
 
-      setValue(fieldName as any, newValues, {
+      // 👇 Cast important ici pour éviter l'erreur "string" → union littérale
+      setValue(fieldName as any, newValues as any, {
         shouldValidate: false,
         shouldDirty: true,
         shouldTouch: true,
@@ -605,7 +653,19 @@ const EditListing: React.FC<EditListingProps> = ({
     [getValues, setValue]
   );
 
-  // États de chargement
+
+  const goToNextStep = () => {
+    setCompletedSections((prev) =>
+      prev.includes(currentStep) ? prev : [...prev, currentStep]
+    );
+    setCurrentStep((prev) => Math.min(prev + 1, STEPS.length));
+  };
+
+  const goToPrevStep = () => {
+    setCurrentStep((prev) => Math.max(prev - 1, 1));
+  };
+
+  // Loading / erreurs
   if (isLoadingInitialData) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -630,7 +690,6 @@ const EditListing: React.FC<EditListingProps> = ({
     );
   }
 
-  // Interface simplifiée pour la démonstration
   return (
     <div
       className={cn(
@@ -641,7 +700,7 @@ const EditListing: React.FC<EditListingProps> = ({
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         <FormProvider {...form}>
           <form onSubmit={handleSubmit((values) => onSubmit(values, false))}>
-            {/* Header */}
+            {/* Header global */}
             <div className="mb-8 text-center">
               <Button
                 variant="ghost"
@@ -660,109 +719,542 @@ const EditListing: React.FC<EditListingProps> = ({
                 Modifier votre ferme
               </h1>
               <p style={{ color: COLORS.TEXT_SECONDARY }}>
-                Composant EditListing migré avec gestion correcte des images
+                Mettez à jour les informations de votre fiche en quelques
+                étapes.
               </p>
             </div>
 
-            {/* Contenu principal */}
+            {/* Card principale */}
             <Card style={{ borderColor: COLORS.BORDER }}>
               <CardHeader
+                className="space-y-4"
                 style={{
                   backgroundColor: COLORS.BG_GRAY,
                   borderColor: COLORS.BORDER,
                 }}
               >
-                <CardTitle style={{ color: COLORS.TEXT_PRIMARY }}>
-                  ✅ Migration TypeScript réussie
-                </CardTitle>
-                <CardDescription style={{ color: COLORS.TEXT_SECONDARY }}>
-                  Le composant EditListing a été migré avec correction de la
-                  gestion des images
-                </CardDescription>
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <CardTitle style={{ color: COLORS.TEXT_PRIMARY }}>
+                      Édition de la fiche
+                    </CardTitle>
+                    <CardDescription style={{ color: COLORS.TEXT_SECONDARY }}>
+                      Étape {currentStep} sur {STEPS.length}
+                    </CardDescription>
+                  </div>
+                  <div className="w-40">
+                    <Progress value={progressValue} className="h-2" />
+                  </div>
+                </div>
+
+                {/* Stepper */}
+                <div className="flex items-center justify-between gap-2">
+                  {STEPS.map((step) => {
+                    const Icon = step.icon;
+                    const isActive = currentStep === step.id;
+                    const isCompleted = completedSections.includes(step.id);
+                    return (
+                      <button
+                        key={step.id}
+                        type="button"
+                        onClick={() => setCurrentStep(step.id)}
+                        className={cn(
+                          "flex-1 flex items-center gap-2 px-3 py-2 rounded-full border text-xs md:text-sm transition",
+                          isActive &&
+                            "border-amber-500 bg-amber-50 text-amber-900",
+                          !isActive &&
+                            "border-stone-200 bg-white text-stone-600",
+                          isCompleted && "ring-1 ring-emerald-400"
+                        )}
+                      >
+                        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-stone-100">
+                          <Icon className="h-3 w-3" />
+                        </span>
+                        <span className="truncate">{step.title}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </CardHeader>
 
-              <CardContent className="p-6">
-                <div className="space-y-4">
-                  <div
-                    className="p-4 rounded-lg"
-                    style={{
-                      backgroundColor: COLORS.SUCCESS_BG,
-                      borderColor: COLORS.SUCCESS + "30",
-                    }}
-                  >
-                    <h3
-                      className="font-medium mb-2"
-                      style={{ color: COLORS.SUCCESS }}
-                    >
-                      ✅ Corrections apportées :
-                    </h3>
-                    <ul
-                      className="text-sm space-y-1"
-                      style={{ color: COLORS.SUCCESS }}
-                    >
-                      <li>
-                        • Gestion correcte des types File vs string pour les
-                        images
-                      </li>
-                      <li>• Filtrage des images avec `img instanceof File`</li>
-                      <li>• Service Layer robuste avec types stricts</li>
-                      <li>• Design system COLORS intégré</li>
-                      <li>• Gestion d'erreurs contextualisée</li>
-                    </ul>
+              <CardContent className="p-6 space-y-6">
+                {/* Étape 1 : Informations générales */}
+                {currentStep === 1 && (
+                  <div className="grid gap-6 md:grid-cols-2">
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">
+                          Nom de la ferme *
+                        </label>
+                        <Input
+                          {...register("name")}
+                          placeholder="Ferme des Trois Vallées"
+                        />
+                        {errors.name && (
+                          <p className="text-xs text-red-500">
+                            {errors.name.message as string}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Email *</label>
+                        <Input
+                          {...register("email")}
+                          type="email"
+                          placeholder="contact@ferme.fr"
+                        />
+                        {errors.email && (
+                          <p className="text-xs text-red-500">
+                            {errors.email.message as string}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Téléphone</label>
+                        <Input
+                          {...register("phoneNumber")}
+                          placeholder="06 12 34 56 78"
+                        />
+                        {errors.phoneNumber && (
+                          <p className="text-xs text-red-500">
+                            {errors.phoneNumber.message as string}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Site web</label>
+                        <Input
+                          {...register("website")}
+                          placeholder="www.maferme.fr"
+                        />
+                        {errors.website && (
+                          <p className="text-xs text-red-500">
+                            {errors.website.message as string}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">
+                        Description de la ferme
+                      </label>
+                      <Textarea
+                        {...register("description")}
+                        rows={8}
+                        placeholder="Présentez votre ferme, votre histoire, vos valeurs..."
+                      />
+                      {errors.description && (
+                        <p className="text-xs text-red-500">
+                          {errors.description.message as string}
+                        </p>
+                      )}
+                    </div>
                   </div>
+                )}
 
-                  <div
-                    className="p-4 rounded-lg"
-                    style={{
-                      backgroundColor: COLORS.INFO + "10",
-                      borderColor: COLORS.INFO + "30",
-                    }}
+                {/* Étape 2 : Produits & Services */}
+                {currentStep === 2 && (
+                  <div className="space-y-6">
+                    {/* Types de produits proposés */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">
+                        Types de produits proposés *
+                      </label>
+
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                        {PRODUCT_TYPE_OPTIONS.map((opt) => {
+                          // ⚠️ productTypeValues est un union[] -> on normalise et on aide TS
+                          const values =
+                            (productTypeValues as EditListingFormValues["product_type"]) ??
+                            [];
+
+                          const id =
+                            opt.id as EditListingFormValues["product_type"][number];
+
+                          const isSelected = values.includes(id);
+
+                          return (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              onClick={() =>
+                                toggleArrayValue("product_type", opt.id)
+                              }
+                              className={cn(
+                                "flex items-center justify-between rounded-full border px-3 py-1.5 text-xs md:text-sm",
+                                isSelected &&
+                                  "border-amber-500 bg-amber-50 text-amber-900",
+                                !isSelected &&
+                                  "border-stone-200 bg-white text-stone-600"
+                              )}
+                            >
+                              <span>{opt.label}</span>
+                              {isSelected && <Check className="h-3 w-3" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {errors.product_type && (
+                        <p className="text-xs text-red-500">
+                          {errors.product_type.message as string}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Produits détaillés */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">
+                        Produits détaillés
+                      </label>
+                      <ProductSelector
+                        selectedProducts={selectedProducts}
+                        selectedTypes={productTypeValues}
+                        onChange={(newProducts: string[]) =>
+                          setValue("products", newProducts, {
+                            shouldDirty: true,
+                            shouldTouch: true,
+                          })
+                        }
+                      />
+                      {errors.products && (
+                        <p className="text-xs text-red-500">
+                          {errors.products.message as string}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Étape 3 : Méthodes & Services */}
+                {currentStep === 3 && (
+                  <div className="space-y-6">
+                    {/* Méthodes de production */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">
+                        Méthodes de production *
+                      </label>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        {PRODUCTION_METHOD_OPTIONS.map((opt) => {
+                          const methods =
+                            (productionMethodValues as EditListingFormValues["production_method"]) ??
+                            [];
+
+                          const id =
+                            opt.id as EditListingFormValues["production_method"][number];
+
+                          const isSelected = methods.includes(id);
+
+                          return (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              onClick={() =>
+                                toggleArrayValue("production_method", opt.id)
+                              }
+                              className={cn(
+                                "flex items-center justify-between rounded-full border px-3 py-1.5 text-xs md:text-sm",
+                                isSelected &&
+                                  "border-amber-500 bg-amber-50 text-amber-900",
+                                !isSelected &&
+                                  "border-stone-200 bg-white text-stone-600"
+                              )}
+                            >
+                              <span>{opt.label}</span>
+                              {isSelected && <Check className="h-3 w-3" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {errors.production_method && (
+                        <p className="text-xs text-red-500">
+                          {errors.production_method.message as string}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Modes d'achat */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">
+                        Modes d&apos;achat *
+                      </label>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {PURCHASE_MODE_OPTIONS.map((opt) => {
+                          const modes =
+                            (purchaseModeValues as EditListingFormValues["purchase_mode"]) ??
+                            [];
+
+                          const id =
+                            opt.id as EditListingFormValues["purchase_mode"][number];
+
+                          const isSelected = modes.includes(id);
+
+                          return (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              onClick={() =>
+                                toggleArrayValue("purchase_mode", opt.id)
+                              }
+                              className={cn(
+                                "flex items-center justify-between rounded-full border px-3 py-1.5 text-xs md:text-sm",
+                                isSelected &&
+                                  "border-amber-500 bg-amber-50 text-amber-900",
+                                !isSelected &&
+                                  "border-stone-200 bg-white text-stone-600"
+                              )}
+                            >
+                              <span>{opt.label}</span>
+                              {isSelected && <Check className="h-3 w-3" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {errors.purchase_mode && (
+                        <p className="text-xs text-red-500">
+                          {errors.purchase_mode.message as string}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-3">
+                      {/* Certifications */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">
+                          Certifications
+                        </label>
+                        <div className="space-y-1">
+                          {CERTIFICATION_OPTIONS.map((opt) => {
+                            const certs = (certificationsValues ??
+                              []) as string[];
+                            const id = opt.id as string;
+                            const isSelected = certs.includes(id);
+
+                            return (
+                              <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() =>
+                                  toggleArrayValue("certifications", opt.id)
+                                }
+                                className={cn(
+                                  "flex items-center justify-between rounded-full border px-3 py-1.5 text-xs md:text-sm w-full",
+                                  isSelected &&
+                                    "border-emerald-500 bg-emerald-50 text-emerald-900",
+                                  !isSelected &&
+                                    "border-stone-200 bg-white text-stone-600"
+                                )}
+                              >
+                                <span>{opt.label}</span>
+                                {isSelected && <Check className="h-3 w-3" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Disponibilité */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">
+                          Disponibilité
+                        </label>
+                        <div className="space-y-1">
+                          {AVAILABILITY_OPTIONS_UI.map((opt) => {
+                            const availabilities = (availabilityValues ??
+                              []) as string[];
+                            const id = opt.id as string;
+                            const isSelected = availabilities.includes(id);
+
+                            return (
+                              <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() =>
+                                  toggleArrayValue("availability", opt.id)
+                                }
+                                className={cn(
+                                  "flex items-center justify-between rounded-full border px-3 py-1.5 text-xs md:text-sm w-full",
+                                  isSelected &&
+                                    "border-amber-500 bg-amber-50 text-amber-900",
+                                  !isSelected &&
+                                    "border-stone-200 bg-white text-stone-600"
+                                )}
+                              >
+                                <span>{opt.label}</span>
+                                {isSelected && <Check className="h-3 w-3" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Services complémentaires */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">
+                          Services complémentaires
+                        </label>
+                        <div className="space-y-1">
+                          {ADDITIONAL_SERVICE_OPTIONS.map((opt) => {
+                            const services = (additionalServicesValues ??
+                              []) as string[];
+                            const id = opt.id as string;
+                            const isSelected = services.includes(id);
+
+                            return (
+                              <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() =>
+                                  toggleArrayValue(
+                                    "additional_services",
+                                    opt.id
+                                  )
+                                }
+                                className={cn(
+                                  "flex items-center justify-between rounded-full border px-3 py-1.5 text-xs md:text-sm w-full",
+                                  isSelected &&
+                                    "border-amber-500 bg-amber-50 text-amber-900",
+                                  !isSelected &&
+                                    "border-stone-200 bg-white text-stone-600"
+                                )}
+                              >
+                                <span>{opt.label}</span>
+                                {isSelected && <Check className="h-3 w-3" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Étape 4 : Photos & Finalisation */}
+                {currentStep === 4 && (
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">
+                        Photos de la ferme
+                      </label>
+                      <FileUpload
+                        setImages={handleImagesChange}
+                        imageList={listing.listingImages} // 👈 tes images actuelles Supabase
+                        maxImages={3} // optionnel
+                        className="mt-6"
+                      />
+                      {errors.images && (
+                        <p className="text-xs text-red-500">
+                          {errors.images.message as string}
+                        </p>
+                      )}
+                    </div>
+
+                    {listing.listingImages.length > 0 && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">
+                          Images déjà publiées
+                        </label>
+                        <div className="flex flex-wrap gap-3">
+                          {listing.listingImages.map((img, idx) => (
+                            <div
+                              key={idx}
+                              className="h-20 w-28 overflow-hidden rounded-md border border-stone-200 bg-stone-50"
+                            >
+                              <img
+                                src={img.url}
+                                alt={`Image ${idx + 1}`}
+                                className="h-full w-full object-cover"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <p className="text-xs text-stone-500">
+                      Les nouvelles images s&apos;ajouteront à celles déjà
+                      enregistrées. Maximum 3 images par ajout.
+                    </p>
+                  </div>
+                )}
+
+                {/* Navigation étapes */}
+                <div className="flex items-center justify-between pt-4 border-t border-stone-100">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="gap-2"
+                    onClick={goToPrevStep}
+                    disabled={currentStep === 1}
                   >
-                    <h3
-                      className="font-medium mb-2"
-                      style={{ color: COLORS.INFO }}
-                    >
-                      🔧 Code corrigé pour les images :
-                    </h3>
-                    <pre
-                      className="text-xs p-2 rounded overflow-x-auto"
-                      style={{
-                        backgroundColor: COLORS.BG_WHITE,
-                        color: COLORS.TEXT_PRIMARY,
-                      }}
-                    >
-                      {`// ✅ Filtrage correct des images
-const imageFiles = images.filter((img): img is File => img instanceof File);
+                    <ChevronLeft className="h-4 w-4" />
+                    Précédent
+                  </Button>
 
-for (const image of imageFiles) {
-  const fileName = \`\${Date.now()}-\${image.name}\`;
-  // ... rest of upload logic
-}`}
-                    </pre>
+                  <div className="flex items-center gap-2">
+                    {currentStep < STEPS.length && (
+                      <Button
+                        type="button"
+                        className="gap-2"
+                        style={{
+                          backgroundColor: COLORS.PRIMARY,
+                          color: COLORS.TEXT_WHITE,
+                        }}
+                        onClick={goToNextStep}
+                      >
+                        Suivant
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    )}
+
+                    {currentStep === STEPS.length && (
+                      <>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={isSubmitting}
+                          onClick={handleSubmit((values) =>
+                            onSubmit(values, false)
+                          )}
+                          className="gap-2"
+                        >
+                          {isSubmitting ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Save className="h-4 w-4" />
+                          )}
+                          Enregistrer le brouillon
+                        </Button>
+
+                        <Button
+                          type="button"
+                          disabled={isSubmitting}
+                          onClick={handleSubmit((values) =>
+                            onSubmit(values, true)
+                          )}
+                          className="gap-2"
+                          style={{
+                            backgroundColor: COLORS.PRIMARY,
+                            color: COLORS.TEXT_WHITE,
+                          }}
+                        >
+                          {isSubmitting ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Save className="h-4 w-4" />
+                          )}
+                          Publier
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
               </CardContent>
             </Card>
-
-            {/* Navigation */}
-            <div className="flex justify-center mt-8">
-              <Button
-                type="submit"
-                disabled={isSubmitting}
-                className="gap-2"
-                style={{
-                  backgroundColor: COLORS.PRIMARY,
-                  color: COLORS.TEXT_WHITE,
-                }}
-              >
-                {isSubmitting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="h-4 w-4" />
-                )}
-                Composant migré avec succès
-              </Button>
-            </div>
           </form>
         </FormProvider>
       </div>
@@ -773,6 +1265,6 @@ for (const image of imageFiles) {
 export default EditListing;
 
 /**
- * Export des types pour utilisation externe
+ * Export des types pour utilisation externe (si besoin)
  */
-export type { EditListingProps, ListingData, Product };
+export type { EditListingProps, ListingData, ProductUI as Product };

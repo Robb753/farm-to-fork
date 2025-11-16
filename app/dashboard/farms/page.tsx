@@ -435,8 +435,7 @@ export default function FarmerDashboard(): JSX.Element {
           {/* Informations complémentaires */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             {/* Types de produits */}
-            {listing.product_type &&
-              Array.isArray(listing.product_type) &&
+            {Array.isArray(listing.product_type) &&
               listing.product_type.length > 0 && (
                 <div>
                   <h3
@@ -446,9 +445,9 @@ export default function FarmerDashboard(): JSX.Element {
                     Types de produits
                   </h3>
                   <div className="flex flex-wrap gap-2">
-                    {listing.product_type.map((type, index) => (
+                    {listing.product_type.map((type: string, index: number) => (
                       <span
-                        key={index}
+                        key={`${type}-${index}`}
                         className="px-2 py-1 text-xs rounded-md border"
                         style={{
                           backgroundColor: `${COLORS.PRIMARY}10`,

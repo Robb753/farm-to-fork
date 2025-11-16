@@ -4,14 +4,14 @@ import { Resend } from "resend";
 import { EMAIL_CONFIG, EMAIL_SUBJECTS, EMAIL_BUILDERS } from "./email.config";
 
 // Types TypeScript
-interface FarmerRequest {
+export interface FarmerRequest {
   farm_name: string;
   email: string;
   location: string;
-  phone?: string;
-  website?: string;
-  description: string;
-  products?: string;
+  phone?: string | null;
+  website?: string | null;
+  description?: string | null;
+  products?: string | null;
 }
 
 interface EmailResponse {
@@ -52,7 +52,10 @@ export async function sendAdminNotificationEmail(
       { label: "Nom de la ferme", value: farmerRequest.farm_name },
       { label: "Localisation", value: farmerRequest.location },
       { label: "Email", value: farmerRequest.email },
-      { label: "Téléphone", value: farmerRequest.phone || "Non renseigné" },
+      {
+        label: "Téléphone",
+        value: farmerRequest.phone || "Non renseigné",
+      },
     ];
 
     if (farmerRequest.website) {
@@ -80,7 +83,7 @@ export async function sendAdminNotificationEmail(
         `<div style="margin-bottom: 20px;">
           <h3 style="color: #16a34a; font-size: 16px; margin-bottom: 10px;">Description</h3>
           <p style="margin: 0; padding: 10px; background-color: #f9fafb; border-radius: 4px;">
-            ${farmerRequest.description}
+            ${farmerRequest.description || "Aucune description fournie."}
           </p>
         </div>` +
         (farmerRequest.products

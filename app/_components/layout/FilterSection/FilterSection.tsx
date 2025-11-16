@@ -14,15 +14,15 @@ import ActiveFilters from "./components/ActiveFilters";
 import ViewToggle from "./components/ViewToggle";
 import MobileFilters from "./components/MobileFilters";
 
-// ✅ Store unifié - NOUVEAU IMPORT
-import { useFiltersStoreState } from "@/lib/store"; // ✅ Nouveau store modulaire
+// ✅ Store unifié
+import { useFiltersStoreState } from "@/lib/store";
+import type { FilterState } from "@/lib/store";
 
 // ✅ Configuration et utils
 import { AGRICULTURE_TYPES } from "./utils/constants";
-import { isFilterKey } from "./utils/validation";
 
 /* ------------------------------------------------------------------ */
-/* ------------------- Types et interfaces -------------------------- */
+/* ------------------- Types simples -------------------------------- */
 /* ------------------------------------------------------------------ */
 
 export interface FilterSectionProps {
@@ -47,9 +47,6 @@ const FiltersModal = dynamic<FiltersModalProps>(
 /* ------------------- Event handler global ------------------------ */
 /* ------------------------------------------------------------------ */
 
-/**
- * Fonction pour ouvrir les filtres mobiles depuis l'extérieur
- */
 export const openMobileFilters = (): void => {
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent("openMobileFilters"));
@@ -60,33 +57,13 @@ export const openMobileFilters = (): void => {
 /* -------------------- Composant principal ------------------------- */
 /* ------------------------------------------------------------------ */
 
-/**
- * FilterSection - Composant principal refactorisé
- *
- * ✅ MIGRÉ VERS STORES MODULAIRES
- *
- * Architecture modulaire :
- * - Hooks personnalisés pour la logique métier
- * - Composants atomiques réutilisables
- * - Séparation claire des responsabilités
- * - Performance optimisée avec memoization
- *
- * Features :
- * - ✅ Synchronisation URL automatique
- * - ✅ Support mobile/desktop responsive
- * - ✅ Accessibilité WCAG 2.1 AA
- * - ✅ Performance optimisée
- * - ✅ Type safety complet
- * - ✅ Nouveau store modulaire (filtersStore)
- */
 const FilterSection: React.FC<FilterSectionProps> = ({ className = "" }) => {
   // ═══ État local ═══
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isMobileModalOpen, setIsMobileModalOpen] = useState(false);
 
-  // ═══ Store state - MIGRATION VERS NOUVEAU STORE ═══
-  const filtersState = useFiltersStoreState(); // ✅ Nouveau hook
-  const filters = filtersState.filters; // ✅ Extraction des filtres
+  // ═══ Store state ═══
+  const { filters } = useFiltersStoreState();
 
   // ═══ Hooks personnalisés ═══
   const {
@@ -99,6 +76,12 @@ const FilterSection: React.FC<FilterSectionProps> = ({ className = "" }) => {
   } = useFilterSync();
 
   const { isMobile } = useMobileDetection();
+
+  // ✅ Wrapper functions pour éviter les répétitions
+  const clearSectionSafe = (key: string) =>
+    clearSection(key as keyof FilterState);
+  const handleFilterChangeSafe = (key: string, value: string) =>
+    handleFilterChange(key as keyof FilterState, value);
 
   // ═══ Gestion des événements mobiles ═══
   useEffect(() => {
@@ -133,6 +116,12 @@ const FilterSection: React.FC<FilterSectionProps> = ({ className = "" }) => {
     closeMobileModal();
   };
 
+  // ✅ Helper pour obtenir les valeurs d'un filtre
+  const getFilterValues = (key: string): string[] => {
+    const value = (filters as any)?.[key];
+    return Array.isArray(value) ? value : [];
+  };
+
   // ═══ Rendu modal mobile ═══
   if (isMobile && isMobileModalOpen) {
     return (
@@ -152,41 +141,44 @@ const FilterSection: React.FC<FilterSectionProps> = ({ className = "" }) => {
         <div className="mx-auto max-w-6xl px-3">
           <div className="no-scrollbar flex h-12 items-center gap-2 overflow-x-auto py-2 [scrollbar-width:none] [-ms-overflow-style:none]">
             {/* ═══ Filtres dynamiques depuis la config ═══ */}
-            {memoizedFilterSections.map((section) => {
+            {memoizedFilterSections.map((section: any, index: number) => {
               const { title, key, items } = section;
 
-              // Type guard pour s'assurer que key est valide
-              if (!isFilterKey(key)) {
-                console.warn(`[FilterSection] Invalid filter key: ${key}`);
-                return null;
-              }
+              // ✅ Conversion simple - pas de types compliqués
+              const keyStr = String(key);
 
-              const values = filters[key];
+              // ✅ Mapping simple vers les vraies clés
+              let actualKey = keyStr;
+              if (keyStr === "productTypes") actualKey = "product_type";
+              if (keyStr === "purchaseModes") actualKey = "purchase_mode";
+
+              const values = getFilterValues(actualKey);
 
               return (
                 <DropdownPill
-                  key={key}
+                  key={`${actualKey}-${index}`}
                   label={title}
                   values={values}
-                  onClear={() => clearSection(key)}
+                  onClear={() => clearSectionSafe(actualKey)}
                 >
                   <div className="space-y-2">
                     <p className="text-sm font-medium text-gray-700">{title}</p>
                     <div className="grid grid-cols-1 gap-2">
                       {Array.isArray(items) &&
-                        items.map((item) => {
-                          const checked =
-                            Array.isArray(values) && values.includes(item);
+                        items.map((item: string) => {
+                          const checked = values.includes(item);
                           return (
                             <button
-                              key={`${key}-${item}`}
+                              key={`${actualKey}-${item}`}
                               type="button"
                               role="checkbox"
                               aria-checked={checked}
-                              aria-label={`${checked ? "Désélectionner" : "Sélectionner"} ${item}`}
+                              aria-label={`${
+                                checked ? "Désélectionner" : "Sélectionner"
+                              } ${item}`}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleFilterChange(key, item);
+                                handleFilterChangeSafe(actualKey, item);
                               }}
                               className="flex w-full cursor-pointer items-center gap-3 text-left focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-1 rounded p-1"
                             >
@@ -208,10 +200,10 @@ const FilterSection: React.FC<FilterSectionProps> = ({ className = "" }) => {
                     </div>
 
                     {/* Reset section */}
-                    {Array.isArray(values) && values.length > 0 && (
+                    {values.length > 0 && (
                       <div className="pt-1">
                         <button
-                          onClick={() => clearSection(key)}
+                          onClick={() => clearSectionSafe(actualKey)}
                           className="text-xs text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 rounded"
                           aria-label={`Réinitialiser les filtres ${title}`}
                         >
@@ -227,7 +219,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({ className = "" }) => {
             {/* ═══ Filtre spécial Type d'agriculture ═══ */}
             <DropdownPill
               label="Type d'agriculture"
-              values={filters.mapType}
+              values={getFilterValues("mapType")}
               onClear={resetMapFilters}
             >
               <div className="space-y-2">
@@ -236,19 +228,20 @@ const FilterSection: React.FC<FilterSectionProps> = ({ className = "" }) => {
                 </p>
                 <div className="grid grid-cols-1 gap-2">
                   {AGRICULTURE_TYPES.map((type) => {
-                    const checked =
-                      Array.isArray(filters.mapType) &&
-                      filters.mapType.includes(type.id);
+                    const mapTypeValues = getFilterValues("mapType");
+                    const checked = mapTypeValues.includes(type.id);
                     return (
                       <button
                         key={`map-${type.id}`}
                         type="button"
                         role="checkbox"
                         aria-checked={checked}
-                        aria-label={`${checked ? "Désélectionner" : "Sélectionner"} ${type.label}`}
+                        aria-label={`${
+                          checked ? "Désélectionner" : "Sélectionner"
+                        } ${type.label}`}
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleFilterChange("mapType", type.id);
+                          handleFilterChangeSafe("mapType", type.id);
                         }}
                         className="flex w-full cursor-pointer items-center gap-3 text-left focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-1 rounded p-1"
                       >
@@ -270,18 +263,17 @@ const FilterSection: React.FC<FilterSectionProps> = ({ className = "" }) => {
                 </div>
 
                 {/* Reset agriculture */}
-                {Array.isArray(filters.mapType) &&
-                  filters.mapType.length > 0 && (
-                    <div className="pt-1">
-                      <button
-                        onClick={resetMapFilters}
-                        className="text-xs text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 rounded"
-                        aria-label="Réinitialiser les filtres de type d'agriculture"
-                      >
-                        Réinitialiser
-                      </button>
-                    </div>
-                  )}
+                {getFilterValues("mapType").length > 0 && (
+                  <div className="pt-1">
+                    <button
+                      onClick={resetMapFilters}
+                      className="text-xs text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 rounded"
+                      aria-label="Réinitialiser les filtres de type d'agriculture"
+                    >
+                      Réinitialiser
+                    </button>
+                  </div>
+                )}
               </div>
             </DropdownPill>
 
@@ -307,19 +299,20 @@ const FilterSection: React.FC<FilterSectionProps> = ({ className = "" }) => {
         </div>
       </div>
 
-      {/* ═══ Modal filtres avancés - NOUVEAU FILTERSMODAL MIGRÉ ═══ */}
+      {/* ═══ Modal filtres avancés ═══ */}
       <FiltersModal open={isModalOpen} onClose={() => setIsModalOpen(false)} />
 
       {/* ═══ Filtres actifs ═══ */}
       <ActiveFilters
         filters={filters}
         activeFilterCount={activeFilterCount}
-        onFilterToggle={handleFilterChange}
+        onFilterToggle={(key: any, value: any) =>
+          handleFilterChangeSafe(key, value)
+        }
         onResetAll={resetAllFilters}
       />
     </div>
   );
 };
 
-// ═══ Memoization pour éviter les re-renders ═══
 export default React.memo(FilterSection);

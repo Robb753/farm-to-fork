@@ -1,16 +1,21 @@
 // app/api/admin/validate-farmer-request/route.ts
+"use server";
+
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { clerkClient } from "@clerk/nextjs/server";
-import { auth } from "@clerk/nextjs/server";
+import { clerkClient, auth } from "@clerk/nextjs/server";
 import { sendFarmerRequestStatusEmail } from "@/lib/config/email-notifications";
 import type { Database } from "@/lib/types/database";
+
+// Si tu as exporté ce type dans email-notifications, tu peux l'importer.
+// Sinon, tu peux supprimer cette ligne et laisser le `as any` plus bas.
+import type { FarmerRequest as EmailFarmerRequest } from "@/lib/config/email-notifications";
 
 /**
  * Types pour la requête de validation
  */
 interface ValidateFarmerRequestBody {
-  requestId: string | number;
+  requestId: number; // ✅ on force number après sanitisation
   userId: string;
   role: "farmer" | "admin" | "user";
   status: "approved" | "rejected";
@@ -106,11 +111,11 @@ function validateFarmerRequestData(data: any): ValidationResult {
   }
 
   // Validation du requestId
-  const requestId = data.requestId;
-  if (!requestId) {
+  const requestIdRaw = data.requestId;
+  if (!requestIdRaw) {
     errors.push("L'ID de la demande est requis");
   } else {
-    const numericRequestId = Number(requestId);
+    const numericRequestId = Number(requestIdRaw);
     if (isNaN(numericRequestId) || numericRequestId <= 0) {
       errors.push("L'ID de la demande doit être un nombre positif");
     }
@@ -158,7 +163,7 @@ function validateFarmerRequestData(data: any): ValidationResult {
   // Si pas d'erreurs, retourner les données sanitisées
   if (errors.length === 0) {
     const sanitizedData: ValidateFarmerRequestBody = {
-      requestId: Number(requestId),
+      requestId: Number(requestIdRaw), // ✅ number garanti ici
       userId,
       role: role as any,
       status: status as any,
@@ -186,7 +191,9 @@ async function checkAdminPermissions(requestingUserId: string): Promise<{
   error?: string;
 }> {
   try {
-    const requestingUser = await clerkClient.users.getUser(requestingUserId);
+    // ✅ clerkClient est maintenant une fonction asynchrone
+    const client = await clerkClient();
+    const requestingUser = await client.users.getUser(requestingUserId);
     const userRole = requestingUser.publicMetadata?.role as string;
 
     if (userRole !== "admin") {
@@ -292,16 +299,6 @@ async function createListingForApprovedFarmer(
 
 /**
  * API Route pour valider une demande de producteur
- *
- * Cette route permet aux admins de :
- * - Approuver ou rejeter une demande de producteur
- * - Mettre à jour le rôle utilisateur dans Clerk et Supabase
- * - Créer automatiquement un listing si approuvé
- * - Envoyer un email de notification
- * - Enregistrer la raison de la décision
- *
- * @param req - Requête contenant requestId, userId, role, status, reason
- * @returns Réponse JSON avec succès/erreur
  */
 export async function POST(
   req: NextRequest
@@ -309,8 +306,8 @@ export async function POST(
   const timestamp = new Date().toISOString();
 
   try {
-    // Vérification de l'authentification
-    const { userId: requestingUserId } = auth();
+    // ✅ auth() est maintenant asynchrone
+    const { userId: requestingUserId } = await auth();
     if (!requestingUserId) {
       return NextResponse.json(
         {
@@ -402,7 +399,7 @@ export async function POST(
     const { data: farmerRequestData, error: requestError } = await supabase
       .from("farmer_requests")
       .select("*")
-      .eq("id", requestId)
+      .eq("id", requestId) // ✅ requestId est bien un number
       .single();
 
     if (requestError || !farmerRequestData) {
@@ -435,7 +432,8 @@ export async function POST(
 
     // 2. Mise à jour du rôle Clerk
     try {
-      await clerkClient.users.updateUser(userId, {
+      const client = await clerkClient(); // ✅ client Clerk
+      await client.users.updateUser(userId, {
         publicMetadata: {
           role,
           roleUpdatedAt: timestamp,
@@ -550,7 +548,13 @@ export async function POST(
 
     // 6. Envoi de l'email de statut au producteur
     try {
-      await sendFarmerRequestStatusEmail(farmerRequest, status);
+      // ✅ Adaptation du type phone: string | null -> string | undefined
+      const emailPayload: EmailFarmerRequest = {
+        ...(farmerRequest as any),
+        phone: farmerRequest.phone ?? undefined,
+      };
+
+      await sendFarmerRequestStatusEmail(emailPayload, status);
       console.log("📧 [VALIDATE] Email de statut envoyé avec succès");
     } catch (emailError) {
       console.warn("[VALIDATE] Email non envoyé:", emailError);
@@ -560,7 +564,9 @@ export async function POST(
     // Réponse de succès
     const successMessage =
       status === "approved"
-        ? `Demande approuvée avec succès${createdListingId ? `. Listing créé (ID: ${createdListingId})` : ""}.`
+        ? `Demande approuvée avec succès${
+            createdListingId ? `. Listing créé (ID: ${createdListingId})` : ""
+          }.`
         : "Demande rejetée avec succès.";
 
     return NextResponse.json(

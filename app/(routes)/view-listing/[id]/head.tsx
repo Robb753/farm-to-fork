@@ -1,7 +1,6 @@
 // lib/seo/generateListingMetadata.ts
 import type { Metadata } from "next";
 import { supabase } from "@/utils/supabase/client";
-import type { Database } from "@/lib/types/database";
 
 /**
  * Type pour les paramètres de la route
@@ -25,19 +24,6 @@ type ListingForMetadata = {
 
 /**
  * Génère les métadonnées SEO optimisées pour un listing
- *
- * Cette fonction récupère les données d'un listing depuis Supabase
- * et génère des métadonnées complètes pour le SEO, Open Graph, et Twitter Cards.
- *
- * Features:
- * - SEO optimisé avec titre et description dynamiques
- * - Open Graph pour partage social
- * - Twitter Cards pour Twitter
- * - Images optimisées avec fallback
- * - Gestion des erreurs avec métadonnées par défaut
- *
- * @param params - Paramètres de la route avec ID du listing
- * @returns Promise<Metadata> - Métadonnées complètes pour Next.js
  */
 export async function generateListingMetadata({
   params,
@@ -51,7 +37,6 @@ export async function generateListingMetadata({
   }
 
   try {
-    // Récupération optimisée du listing avec gestion d'erreurs
     const { data: listing, error } = await supabase
       .from("listing")
       .select(
@@ -75,7 +60,7 @@ export async function generateListingMetadata({
       return getDefaultErrorMetadata();
     }
 
-    return buildListingMetadata(listing);
+    return buildListingMetadata(listing as ListingForMetadata);
   } catch (error) {
     console.error("[SEO] Error generating metadata:", error);
     return getDefaultErrorMetadata();
@@ -86,28 +71,24 @@ export async function generateListingMetadata({
  * Construit les métadonnées complètes à partir d'un listing
  */
 function buildListingMetadata(listing: ListingForMetadata): Metadata {
-  // Construction du titre optimisé
   const title = buildTitle(listing.name, listing.address);
-
-  // Construction de la description optimisée
   const description = buildDescription(listing);
-
-  // URL de l'image principale avec fallback
   const imageUrl = getImageUrl(listing.listingImages);
-
-  // Keywords SEO basés sur le contenu
   const keywords = buildKeywords(listing);
+
+  // ✅ On coalesce les valeurs nullables pour respecter le type de `other`
+  const city = extractCity(listing.address) ?? "";
+  const region = extractRegion(listing.address) ?? "";
 
   return {
     title,
     description,
     keywords: keywords.join(", "),
 
-    // ✅ Open Graph pour réseaux sociaux
     openGraph: {
       title,
       description,
-      type: "website", // ✅ Type valide pour Next.js
+      type: "website",
       locale: "fr_FR",
       siteName: "Farm To Fork",
       images: imageUrl
@@ -123,7 +104,6 @@ function buildListingMetadata(listing: ListingForMetadata): Metadata {
         : [],
     },
 
-    // ✅ Twitter Cards
     twitter: {
       card: "summary_large_image",
       title: title.length > 70 ? `${title.substring(0, 67)}...` : title,
@@ -135,15 +115,14 @@ function buildListingMetadata(listing: ListingForMetadata): Metadata {
       creator: "@FarmToForkFR",
     },
 
-    // ✅ Métadonnées supplémentaires pour le SEO
+    // ✅ Ici, plus de `string | null`, seulement `string`
     other: {
-      "og:business:contact_data:locality": extractCity(listing.address),
-      "og:business:contact_data:region": extractRegion(listing.address),
+      "og:business:contact_data:locality": city,
+      "og:business:contact_data:region": region,
       "og:business:contact_data:country_name": "France",
       "business:contact_data:website": "https://farmtofork.fr",
     },
 
-    // ✅ Robots et canonique
     robots: {
       index: true,
       follow: true,
@@ -178,7 +157,6 @@ function buildDescription(listing: ListingForMetadata): string {
   const name = listing.name?.trim() || "Cette ferme";
   const city = extractCity(listing.address);
 
-  // Utiliser la description existante ou en générer une
   if (listing.description && listing.description.length > 20) {
     const cleanDesc = listing.description.trim();
     const truncated =
@@ -186,7 +164,6 @@ function buildDescription(listing: ListingForMetadata): string {
     return truncated;
   }
 
-  // Description générée basée sur les données
   const locationText = city ? ` située à ${city}` : " dans votre région";
   return `Découvrez ${name}, ferme locale${locationText}. Produits frais, locaux et de qualité directement du producteur.`;
 }
@@ -200,7 +177,6 @@ function getImageUrl(images: { url: string }[]): string | null {
   const imageUrl = images[0]?.url;
   if (!imageUrl || imageUrl.trim() === "") return null;
 
-  // Vérifier que l'URL est valide
   try {
     new URL(imageUrl);
     return imageUrl;
@@ -222,14 +198,10 @@ function buildKeywords(listing: ListingForMetadata): string[] {
     "Farm To Fork",
   ];
 
-  // Ajouter la ville si disponible
   const city = extractCity(listing.address);
   if (city) {
     keywords.push(city, `ferme ${city}`, `producteur ${city}`);
   }
-
-  // Ajouter le type de produits si disponible (from listing)
-  // Note: Ces champs ne sont pas dans le select actuel, mais pourraient être ajoutés
 
   return keywords.filter(Boolean);
 }
@@ -239,11 +211,8 @@ function buildKeywords(listing: ListingForMetadata): string[] {
  */
 function extractCity(address: string): string | null {
   if (!address) return null;
-
-  // Supposer que la ville est le premier élément avant la virgule
   const parts = address.split(",");
   const city = parts[0]?.trim();
-
   return city && city.length > 1 ? city : null;
 }
 
@@ -252,11 +221,8 @@ function extractCity(address: string): string | null {
  */
 function extractRegion(address: string): string | null {
   if (!address) return null;
-
-  // Supposer que la région est le second élément après la virgule
   const parts = address.split(",");
   const region = parts[1]?.trim();
-
   return region && region.length > 1 ? region : null;
 }
 
@@ -282,7 +248,4 @@ function getDefaultErrorMetadata(): Metadata {
   };
 }
 
-/**
- * Export de types pour utilisation externe
- */
 export type { MetadataParams, ListingForMetadata };

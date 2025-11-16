@@ -1,7 +1,8 @@
 // app/api/update-user-role/route.ts
+"use server";
+
 import { NextRequest, NextResponse } from "next/server";
-import { clerkClient } from "@clerk/nextjs/server";
-import { auth } from "@clerk/nextjs/server";
+import { clerkClient, auth } from "@clerk/nextjs/server";
 
 /**
  * Types pour la gestion des rôles utilisateurs
@@ -129,8 +130,9 @@ async function checkUserPermissions(
   error?: string;
 }> {
   try {
-    // Récupérer les informations de l'utilisateur qui fait la requête
-    const requestingUser = await clerkClient.users.getUser(requestingUserId);
+    // ⚠️ clerkClient est maintenant une fonction asynchrone
+    const client = await clerkClient();
+    const requestingUser = await client.users.getUser(requestingUserId);
     const requestingUserRole =
       (requestingUser.publicMetadata?.role as UserRole) || "user";
 
@@ -190,8 +192,6 @@ async function logRoleChange(data: {
   reason?: string;
   timestamp: string;
 }): Promise<void> {
-  // Dans un vrai projet, vous pourriez enregistrer ceci dans une base de données
-  // ou un service de logging comme Winston, Datadog, etc.
   console.log("[AUDIT] Changement de rôle:", {
     action: "role_change",
     userId: data.userId,
@@ -205,35 +205,6 @@ async function logRoleChange(data: {
 
 /**
  * API Route pour mettre à jour le rôle d'un utilisateur
- *
- * Cette route permet de :
- * - Mettre à jour le rôle d'un utilisateur dans Clerk
- * - Valider les permissions (seuls les admins ou auto-promotion user->farmer)
- * - Enregistrer les changements pour audit
- * - Gérer les erreurs de manière robuste
- * - Fournir un feedback détaillé
- *
- * @param req - Requête contenant userId et role
- * @returns Réponse JSON avec succès/erreur
- *
- * @example
- * ```typescript
- * // Promotion d'un utilisateur vers farmer
- * const response = await fetch("/api/update-user-role", {
- *   method: "POST",
- *   headers: { "Content-Type": "application/json" },
- *   body: JSON.stringify({
- *     userId: "user_abc123",
- *     role: "farmer",
- *     reason: "Demande d'inscription comme producteur"
- *   })
- * });
- *
- * const result = await response.json();
- * if (result.success) {
- *   console.log("Rôle mis à jour:", result.updatedUser);
- * }
- * ```
  */
 export async function POST(
   req: NextRequest
@@ -241,8 +212,9 @@ export async function POST(
   const timestamp = new Date().toISOString();
 
   try {
-    // Vérification de l'authentification
-    const { userId: requestingUserId } = auth();
+    // ⚠️ auth() est maintenant asynchrone
+    const { userId: requestingUserId } = await auth();
+
     if (!requestingUserId) {
       return NextResponse.json(
         {
@@ -307,12 +279,15 @@ export async function POST(
       `[UPDATE-ROLE] Demande de changement de rôle: ${userId} -> ${role} par ${requestingUserId}`
     );
 
+    // ⚠️ Récupération du client Clerk
+    const client = await clerkClient();
+
     // Récupération de l'utilisateur cible pour vérifier son rôle actuel
     let targetUser;
     let currentRole: UserRole = "user";
 
     try {
-      targetUser = await clerkClient.users.getUser(userId);
+      targetUser = await client.users.getUser(userId);
       currentRole = (targetUser.publicMetadata?.role as UserRole) || "user";
     } catch (clerkError: any) {
       console.error(
@@ -383,7 +358,7 @@ export async function POST(
 
     // Mise à jour du rôle dans Clerk
     try {
-      await clerkClient.users.updateUser(userId, {
+      await client.users.updateUser(userId, {
         publicMetadata: {
           ...targetUser.publicMetadata,
           role,

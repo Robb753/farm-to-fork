@@ -17,13 +17,10 @@ import { cn } from "@/lib/utils";
  * - Design responsive avec image de fond
  * - Configuration centralisée des couleurs et chemins
  */
-export default function SignUpFarmerPage(): JSX.Element {
+export default function SignUpFarmerPage(): JSX.Element | null {
   const { isSignedIn, isLoaded } = useUser();
   const router = useRouter();
 
-  /**
-   * Redirige vers la demande d'accès producteur après inscription
-   */
   useEffect(() => {
     if (isLoaded && isSignedIn) {
       router.push("/request-farmer-access");
@@ -37,7 +34,7 @@ export default function SignUpFarmerPage(): JSX.Element {
     <section style={{ backgroundColor: COLORS.BG_WHITE }}>
       <div className="grid grid-cols-1 lg:grid-cols-12 lg:min-h-screen">
         {/* ✅ Section image avec design amélioré */}
-        <section 
+        <section
           className={cn(
             "relative flex h-32 sm:h-48 md:h-64 lg:h-full items-end",
             "lg:col-span-5 xl:col-span-6"
@@ -51,17 +48,17 @@ export default function SignUpFarmerPage(): JSX.Element {
             className="absolute inset-0 object-cover opacity-70"
             priority
           />
-          
+
           {/* Overlay gradient pour améliorer la lisibilité */}
-          <div 
+          <div
             className="absolute inset-0"
             style={{
               background: `linear-gradient(135deg, ${COLORS.PRIMARY}40 0%, transparent 50%)`,
             }}
           />
-          
+
           <div className="hidden lg:block lg:relative lg:p-12 z-10">
-            <Link 
+            <Link
               className={cn(
                 "block transition-opacity duration-200 hover:opacity-80",
                 "focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-gray-900 rounded"
@@ -84,22 +81,22 @@ export default function SignUpFarmerPage(): JSX.Element {
                 />
               </svg>
             </Link>
-            
-            <h2 
+
+            <h2
               className="mt-6 text-3xl font-bold"
               style={{ color: COLORS.BG_WHITE }}
             >
               Rejoignez Farm To Fork ! 🌱
             </h2>
-            
-            <p 
+
+            <p
               className="mt-4 leading-relaxed"
               style={{ color: `${COLORS.BG_WHITE}E6` }} // 90% opacity
             >
-              Créez un compte pour enregistrer votre ferme, vendre vos produits locaux
-              et connecter avec une communauté de consommateurs engagés.
+              Créez un compte pour enregistrer votre ferme, vendre vos produits
+              locaux et connecter avec une communauté de consommateurs engagés.
             </p>
-            
+
             {/* ✅ Bénéfices pour les producteurs */}
             <div className="mt-8 space-y-3">
               {[
@@ -107,7 +104,7 @@ export default function SignUpFarmerPage(): JSX.Element {
                 "🛒 Vente directe aux consommateurs",
                 "📈 Développement de votre clientèle locale",
               ].map((benefit, index) => (
-                <div 
+                <div
                   key={index}
                   className="flex items-center space-x-2 text-sm"
                   style={{ color: `${COLORS.BG_WHITE}E6` }}
@@ -120,7 +117,7 @@ export default function SignUpFarmerPage(): JSX.Element {
         </section>
 
         {/* ✅ Section formulaire */}
-        <main 
+        <main
           className={cn(
             "flex items-center justify-center px-4 py-8",
             "sm:px-8 sm:py-12 md:px-12",
@@ -130,19 +127,16 @@ export default function SignUpFarmerPage(): JSX.Element {
           <div className="max-w-lg w-full">
             {/* ✅ En-tête mobile */}
             <div className="lg:hidden mb-6 text-center">
-              <h1 
+              <h1
                 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3"
                 style={{ color: COLORS.TEXT_PRIMARY }}
               >
                 Rejoignez Farm To Fork ! 🌱
               </h1>
-              <p 
-                className="text-lg"
-                style={{ color: COLORS.TEXT_SECONDARY }}
-              >
+              <p className="text-lg" style={{ color: COLORS.TEXT_SECONDARY }}>
                 Créez un compte pour commencer votre aventure agricole.
               </p>
-              
+
               {/* Bénéfices version mobile */}
               <div className="mt-4 text-sm space-y-2">
                 {[
@@ -150,10 +144,7 @@ export default function SignUpFarmerPage(): JSX.Element {
                   "🛒 Vente directe",
                   "📈 Croissance locale",
                 ].map((benefit, index) => (
-                  <div 
-                    key={index}
-                    style={{ color: COLORS.TEXT_MUTED }}
-                  >
+                  <div key={index} style={{ color: COLORS.TEXT_MUTED }}>
                     {benefit}
                   </div>
                 ))}
@@ -181,13 +172,10 @@ export default function SignUpFarmerPage(): JSX.Element {
                   },
                 }}
               />
-              
+
               {/* ✅ Lien vers connexion */}
               <div className="text-center mt-6">
-                <p 
-                  className="text-sm"
-                  style={{ color: COLORS.TEXT_SECONDARY }}
-                >
+                <p className="text-sm" style={{ color: COLORS.TEXT_SECONDARY }}>
                   Vous avez déjà un compte ?{" "}
                   <Link
                     href="/sign-in"
@@ -205,9 +193,9 @@ export default function SignUpFarmerPage(): JSX.Element {
           </div>
         </main>
       </div>
-      
+
       {/* ✅ Section informative en bas */}
-      <div 
+      <div
         className="border-t py-8 px-4"
         style={{
           backgroundColor: COLORS.BG_GRAY,
@@ -215,10 +203,7 @@ export default function SignUpFarmerPage(): JSX.Element {
         }}
       >
         <div className="max-w-4xl mx-auto text-center">
-          <h3 
-            className="font-semibold mb-4"
-            style={{ color: COLORS.PRIMARY }}
-          >
+          <h3 className="font-semibold mb-4" style={{ color: COLORS.PRIMARY }}>
             🚜 Processus d'inscription producteur
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -226,33 +211,33 @@ export default function SignUpFarmerPage(): JSX.Element {
               {
                 step: "1",
                 title: "Créer un compte",
-                desc: "Inscription gratuite en quelques clics"
+                desc: "Inscription gratuite en quelques clics",
               },
               {
-                step: "2", 
+                step: "2",
                 title: "Demande d'accès",
-                desc: "Remplissez le formulaire de demande producteur"
+                desc: "Remplissez le formulaire de demande producteur",
               },
               {
                 step: "3",
                 title: "Validation",
-                desc: "Notre équipe valide votre profil sous 48h"
+                desc: "Notre équipe valide votre profil sous 48h",
               },
             ].map((step, index) => (
               <div key={index} className="text-center">
-                <div 
+                <div
                   className="w-8 h-8 rounded-full mx-auto mb-3 flex items-center justify-center text-white font-bold"
                   style={{ backgroundColor: COLORS.PRIMARY }}
                 >
                   {step.step}
                 </div>
-                <div 
+                <div
                   className="font-medium mb-1"
                   style={{ color: COLORS.TEXT_PRIMARY }}
                 >
                   {step.title}
                 </div>
-                <div 
+                <div
                   className="text-sm"
                   style={{ color: COLORS.TEXT_SECONDARY }}
                 >

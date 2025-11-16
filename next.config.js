@@ -27,7 +27,7 @@ const baseConfig = {
   // ✅ NOUVEAU : Rewrites pour gérer les routes Clerk
   async rewrites() {
     return [
-      {
+      /** @type {import('next').NextConfig}  {
         source: "/sign-in/:path*",
         destination: "/",
       },
@@ -43,7 +43,7 @@ const baseConfig = {
       {
         source: "/verify",
         destination: "/",
-      },
+      },*/
     ];
   },
 

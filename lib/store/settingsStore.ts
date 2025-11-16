@@ -2,7 +2,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-// Translations (on garde la même structure)
+// 🔤 Translations
 const translations = {
   fr: {
     welcome: "Bienvenue sur Farm To Fork",
@@ -29,12 +29,16 @@ const translations = {
     tradition: "Tradition & Innovation",
     tradition_desc: "Respecting traditions while embracing innovation.",
   },
-};
+} as const;
+
+// ✅ Types dérivés automatiquement
+type LanguageCode = keyof typeof translations; // "fr" | "en"
+type TranslationKey = keyof (typeof translations)[LanguageCode];
 
 interface SettingsState {
-  currentLanguage: "fr" | "en";
-  setLanguage: (lang: "fr" | "en" | { code: "fr" | "en" }) => void;
-  t: (key: string) => string;
+  currentLanguage: LanguageCode;
+  setLanguage: (lang: LanguageCode | { code: LanguageCode }) => void;
+  t: (key: TranslationKey) => string;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -43,22 +47,26 @@ export const useSettingsStore = create<SettingsState>()(
       currentLanguage: "fr",
 
       setLanguage: (lang) => {
-        let newLang: "fr" | "en";
+        let newLang: LanguageCode;
 
         if (typeof lang === "string") {
           newLang = lang;
         } else if (typeof lang === "object" && lang?.code) {
           newLang = lang.code;
         } else {
-          return; // Ignore invalid input
+          return; // input invalide, on ignore
         }
 
         set({ currentLanguage: newLang });
       },
 
-      t: (key: string) => {
+      t: (key) => {
         const { currentLanguage } = get();
-        return translations[currentLanguage]?.[key] || key;
+        const langTranslations = translations[currentLanguage] as Record<
+          TranslationKey,
+          string
+        >;
+        return langTranslations[key] ?? key;
       },
     }),
     {
@@ -68,10 +76,12 @@ export const useSettingsStore = create<SettingsState>()(
   )
 );
 
-// Selectors pour optimiser les re-renders
+// ✅ Selectors
 export const useCurrentLanguage = () =>
   useSettingsStore((state) => state.currentLanguage);
+
 export const useTranslation = () => useSettingsStore((state) => state.t);
+
 export const useLanguageActions = () =>
   useSettingsStore((state) => ({
     setLanguage: state.setLanguage,

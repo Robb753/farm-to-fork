@@ -1,10 +1,11 @@
 // FilterSection/utils/constants.ts
 
+import { FilterState } from "@/lib/store/shared/types";
+
 /**
  * Constantes pour éviter les re-créations à chaque render
  */
 
-import type { FilterState } from "@/lib/store/types";
 
 // ✅ Types d'agriculture constants
 export const AGRICULTURE_TYPES = [

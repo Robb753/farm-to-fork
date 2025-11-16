@@ -5,7 +5,7 @@
 export * from "./enums";
 
 // Types de store et d'état
-export * from "../store/types";
+export * from "../store/shared/types";
 
 // Types UI
 export * from "./ui";
@@ -31,7 +31,7 @@ export type {
   // Types de store (legacy)
   AppState,
   AppActions,
-} from "../store/types";
+} from "../store/shared/types";
 
 export type {
   // Types UI

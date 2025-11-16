@@ -294,13 +294,13 @@ const DesktopListingMapView = (): JSX.Element => {
       {/* ✅ Section filtres avec sticky positioning */}
       <div
         className={cn(
-          "sticky top-0 isolate border-b shadow-sm",
-          isModalOpen ? "z-40" : "z-[5]"
+          "sticky top-0 border-b shadow-sm",
+          // 🔹 Quand la modale est ouverte on garde un z-index élevé
+          isModalOpen && "z-40"
         )}
         style={{
           backgroundColor: COLORS.BG_WHITE,
           borderColor: COLORS.BORDER,
-          isolation: "auto",
         }}
       >
         <div className="px-2 lg:px-4">
