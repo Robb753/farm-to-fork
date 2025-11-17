@@ -376,14 +376,6 @@ export async function POST(
     const { requestId, userId, role, status, reason } =
       validation.sanitizedData!;
 
-    console.log("✅ [VALIDATE] Validation demande producteur:", {
-      requestId,
-      userId,
-      role,
-      status,
-      validatedBy: requestingUserId,
-    });
-
     // Création du client Supabase
     const supabase = createSupabaseClient();
 
@@ -433,7 +425,6 @@ export async function POST(
           ...(reason && { roleChangeReason: reason }),
         },
       });
-      console.log("✅ [VALIDATE] Rôle Clerk mis à jour avec succès");
     } catch (clerkError: any) {
       console.error("[VALIDATE] Erreur Clerk update:", clerkError);
       const errorMessage = (clerkError as any)?.message || String(clerkError);
@@ -488,8 +479,6 @@ export async function POST(
       );
     }
 
-    console.log("✅ [VALIDATE] Profil Supabase mis à jour avec succès");
-
     // 4. Mise à jour de la demande (statut + timestamp)
     const updateData = {
       status,
@@ -517,8 +506,6 @@ export async function POST(
       );
     }
 
-    console.log("✅ [VALIDATE] Demande mise à jour avec succès");
-
     let createdListingId: number | undefined;
 
     // 5. Création automatique du listing si approuvé
@@ -534,7 +521,6 @@ export async function POST(
         console.warn("[VALIDATE] Échec création listing:", listingResult.error);
       } else {
         createdListingId = listingResult.listingId;
-        console.log("✅ [VALIDATE] Listing créé avec ID:", createdListingId);
       }
     }
 
@@ -547,7 +533,6 @@ export async function POST(
       };
 
       await sendFarmerRequestStatusEmail(emailPayload, status);
-      console.log("📧 [VALIDATE] Email de statut envoyé avec succès");
     } catch (emailError) {
       console.warn("[VALIDATE] Email non envoyé:", emailError);
       // Non bloquant - on continue même si l'email échoue

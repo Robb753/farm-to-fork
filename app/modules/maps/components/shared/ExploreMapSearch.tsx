@@ -79,13 +79,6 @@ const ExploreMapSearch: React.FC<ExploreMapSearchProps> = ({
    */
   const handleCitySelect = (cityData: CitySearchResult): void => {
     try {
-      // Log pour debugging/analytics
-      console.log("🌍 Ville sélectionnée depuis Explore:", {
-        place_name: cityData?.place_name,
-        center: cityData?.center,
-        id: cityData?.id,
-      });
-
       // Callback optionnel pour analytics ou autres traitements
       onCitySelect?.(cityData);
     } catch (error) {

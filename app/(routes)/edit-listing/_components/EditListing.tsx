@@ -413,7 +413,6 @@ class ListingService {
       );
 
       if (imageFiles.length === 0) {
-        console.log("Aucun nouveau fichier à uploader");
         return;
       }
 

@@ -25,11 +25,7 @@ interface FarmerApprovalEmailParams {
  *   to: "farmer@example.com",
  *   farmName: "Ferme du Bonheur"
  * });
- * 
- * if (success) {
- *   console.log("Email envoyé avec succès");
- * }
- * ```
+
  */
 export async function sendFarmerApprovalEmail(
   params: FarmerApprovalEmailParams
@@ -118,7 +114,6 @@ export async function sendFarmerApprovalEmail(
       `,
     });
 
-    console.log(`[EMAIL] Email d'approbation envoyé avec succès à ${to} pour ${farmName}`);
     return true;
 
   } catch (error) {

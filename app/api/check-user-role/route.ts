@@ -38,13 +38,6 @@ interface GetUserInfoResponse {
  * // Récupération des infos utilisateur
  * const response = await fetch("/api/get-user-info?userId=user_123456");
  * const userInfo = await response.json();
- * 
- * if (userInfo.success) {
- *   console.log("Rôle:", userInfo.role);
- *   console.log("Email:", userInfo.email);
- *   console.log("Rôle valide:", userInfo.isValidRole);
- * }
- * ```
  */
 export async function GET(req: NextRequest): Promise<NextResponse<GetUserInfoResponse>> {
   try {
@@ -83,8 +76,6 @@ export async function GET(req: NextRequest): Promise<NextResponse<GetUserInfoRes
         { status: 400 }
       );
     }
-
-    console.log(`[GET USER INFO] Récupération infos pour userId: ${userId}`);
 
     // Récupération de l'utilisateur depuis Clerk
     let user;
@@ -152,8 +143,6 @@ export async function GET(req: NextRequest): Promise<NextResponse<GetUserInfoRes
     // Validation du rôle
     const hasRole = !!userRole;
     const isValidRole = userRole ? VALID_ROLES.includes(userRole as ValidRole) : false;
-
-    console.log(`✅ [GET USER INFO] Infos récupérées pour ${userId}: role=${userRole}, email=${email}`);
 
     // Construction de la réponse
     const response: GetUserInfoResponse = {

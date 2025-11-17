@@ -184,17 +184,7 @@ async function logRoleChange(data: {
   changedBy: string;
   reason?: string;
   timestamp: string;
-}): Promise<void> {
-  console.log("[AUDIT] Changement de rôle:", {
-    action: "role_change",
-    userId: data.userId,
-    previousRole: data.previousRole,
-    newRole: data.newRole,
-    changedBy: data.changedBy,
-    reason: data.reason,
-    timestamp: data.timestamp,
-  });
-}
+}): Promise<void> {}
 
 /**
  * API Route pour mettre à jour le rôle d'un utilisateur
@@ -268,9 +258,6 @@ export async function POST(
     }
 
     const { userId, role, reason } = validation.sanitizedData!;
-    console.log(
-      `[UPDATE-ROLE] Demande de changement de rôle: ${userId} -> ${role} par ${requestingUserId}`
-    );
 
     // ⚠️ Récupération du client Clerk
     const client = await clerkClient();
@@ -360,10 +347,6 @@ export async function POST(
           ...(reason && { roleChangeReason: reason }),
         },
       });
-
-      console.log(
-        `✅ [UPDATE-ROLE] Rôle mis à jour avec succès: ${userId} ${currentRole} -> ${role}`
-      );
 
       // Enregistrement pour audit
       await logRoleChange({

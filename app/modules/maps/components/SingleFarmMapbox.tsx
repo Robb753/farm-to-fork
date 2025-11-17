@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { COLORS } from "@/lib/config";
+import { escapeHTML } from "@/lib/utils/sanitize";
 
 // Configuration du token Mapbox
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || "";
@@ -37,18 +38,6 @@ interface Coordinates {
 
 /**
  * Composant carte Mapbox pour afficher une ferme unique
- * 
- * Features:
- * - Marqueur personnalisé avec design cohérent
- * - Popup informatif avec nom de la ferme
- * - Contrôles de navigation et d'échelle
- * - Gestion d'erreurs robuste
- * - Configuration centralisée des couleurs
- * - Loading state élégant
- * - Validation des coordonnées
- * 
- * @param props - Configuration du composant carte
- * @returns Composant carte Mapbox
  */
 const SingleFarmMapbox: React.FC<SingleFarmMapboxProps> = ({
   lat,
@@ -64,7 +53,7 @@ const SingleFarmMapbox: React.FC<SingleFarmMapboxProps> = ({
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markerRef = useRef<mapboxgl.Marker | null>(null);
-  
+
   // États locaux
   const [isLoaded, setIsLoaded] = useState<boolean>(false);
   const [hasError, setHasError] = useState<boolean>(false);
@@ -73,31 +62,40 @@ const SingleFarmMapbox: React.FC<SingleFarmMapboxProps> = ({
   /**
    * Valide et convertit les coordonnées
    */
-  const validateCoordinates = useCallback((lat: string | number, lng: string | number): Coordinates | null => {
-    try {
-      const latitude = typeof lat === 'string' ? parseFloat(lat) : lat;
-      const longitude = typeof lng === 'string' ? parseFloat(lng) : lng;
+  const validateCoordinates = useCallback(
+    (lat: string | number, lng: string | number): Coordinates | null => {
+      try {
+        const latitude = typeof lat === "string" ? parseFloat(lat) : lat;
+        const longitude = typeof lng === "string" ? parseFloat(lng) : lng;
 
-      if (isNaN(latitude) || isNaN(longitude)) {
-        throw new Error(`Coordonnées invalides: lat=${lat}, lng=${lng}`);
+        if (isNaN(latitude) || isNaN(longitude)) {
+          throw new Error(`Coordonnées invalides: lat=${lat}, lng=${lng}`);
+        }
+
+        if (latitude < -90 || latitude > 90) {
+          throw new Error(
+            `Latitude hors limites: ${latitude} (doit être entre -90 et 90)`
+          );
+        }
+
+        if (longitude < -180 || longitude > 180) {
+          throw new Error(
+            `Longitude hors limites: ${longitude} (doit être entre -180 et 180)`
+          );
+        }
+
+        return { latitude, longitude };
+      } catch (error) {
+        console.error("Erreur de validation des coordonnées:", error);
+        setHasError(true);
+        setErrorMessage(
+          error instanceof Error ? error.message : "Coordonnées invalides"
+        );
+        return null;
       }
-
-      if (latitude < -90 || latitude > 90) {
-        throw new Error(`Latitude hors limites: ${latitude} (doit être entre -90 et 90)`);
-      }
-
-      if (longitude < -180 || longitude > 180) {
-        throw new Error(`Longitude hors limites: ${longitude} (doit être entre -180 et 180)`);
-      }
-
-      return { latitude, longitude };
-    } catch (error) {
-      console.error("Erreur de validation des coordonnées:", error);
-      setHasError(true);
-      setErrorMessage(error instanceof Error ? error.message : "Coordonnées invalides");
-      return null;
-    }
-  }, []);
+    },
+    []
+  );
 
   /**
    * Crée un marqueur personnalisé avec le design du système
@@ -131,18 +129,18 @@ const SingleFarmMapbox: React.FC<SingleFarmMapboxProps> = ({
     `;
 
     // Ajouter les effets hover
-    markerElement.addEventListener('mouseenter', () => {
-      const div = markerElement.querySelector('div') as HTMLDivElement;
+    markerElement.addEventListener("mouseenter", () => {
+      const div = markerElement.querySelector("div") as HTMLDivElement;
       if (div) {
-        div.style.transform = 'rotate(-45deg) scale(1.1)';
+        div.style.transform = "rotate(-45deg) scale(1.1)";
         div.style.backgroundColor = COLORS.PRIMARY_DARK;
       }
     });
 
-    markerElement.addEventListener('mouseleave', () => {
-      const div = markerElement.querySelector('div') as HTMLDivElement;
+    markerElement.addEventListener("mouseleave", () => {
+      const div = markerElement.querySelector("div") as HTMLDivElement;
       if (div) {
-        div.style.transform = 'rotate(-45deg) scale(1)';
+        div.style.transform = "rotate(-45deg) scale(1)";
         div.style.backgroundColor = COLORS.PRIMARY;
       }
     });
@@ -151,14 +149,16 @@ const SingleFarmMapbox: React.FC<SingleFarmMapboxProps> = ({
   }, []);
 
   /**
-   * Crée un popup personnalisé
+   * Crée un popup personnalisé (avec échappement XSS)
    */
   const createCustomPopup = useCallback((farmName: string): mapboxgl.Popup => {
+    const safeName = escapeHTML(farmName);
+
     return new mapboxgl.Popup({
       offset: 25,
       closeButton: false,
       closeOnClick: false,
-      className: 'custom-popup',
+      className: "custom-popup",
     }).setHTML(`
       <div style="
         padding: 12px;
@@ -172,7 +172,7 @@ const SingleFarmMapbox: React.FC<SingleFarmMapboxProps> = ({
           font-size: 14px;
           margin: 0;
           color: ${COLORS.TEXT_PRIMARY};
-        ">${farmName}</p>
+        ">${safeName}</p>
       </div>
     `);
   }, []);
@@ -243,11 +243,14 @@ const SingleFarmMapbox: React.FC<SingleFarmMapboxProps> = ({
       // Ajouter les contrôles si demandé
       if (showControls) {
         // Contrôles de navigation
-        map.addControl(new mapboxgl.NavigationControl({
-          showCompass: true,
-          showZoom: true,
-          visualizePitch: true,
-        }), "top-right");
+        map.addControl(
+          new mapboxgl.NavigationControl({
+            showCompass: true,
+            showZoom: true,
+            visualizePitch: true,
+          }),
+          "top-right"
+        );
 
         // Contrôle d'échelle
         map.addControl(
@@ -266,7 +269,6 @@ const SingleFarmMapbox: React.FC<SingleFarmMapboxProps> = ({
           "bottom-right"
         );
       }
-
     } catch (error) {
       console.error("Erreur lors de l'initialisation de la carte:", error);
       setHasError(true);
@@ -288,32 +290,40 @@ const SingleFarmMapbox: React.FC<SingleFarmMapboxProps> = ({
         console.error("Erreur lors du nettoyage de la carte:", error);
       }
     };
-  }, [lat, lng, name, mapStyle, initialZoom, showControls, validateCoordinates, createCustomMarker, createCustomPopup, onMapLoad]);
+  }, [
+    lat,
+    lng,
+    name,
+    mapStyle,
+    initialZoom,
+    showControls,
+    validateCoordinates,
+    createCustomMarker,
+    createCustomPopup,
+    onMapLoad,
+  ]);
 
   /**
    * Vérification du token Mapbox
    */
   if (!process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN) {
     return (
-      <div 
+      <div
         className={`flex items-center justify-center h-full text-center p-6 ${className}`}
-        style={{ 
+        style={{
           backgroundColor: COLORS.BG_GRAY,
           color: COLORS.TEXT_SECONDARY,
-          minHeight: "300px"
+          minHeight: "300px",
         }}
       >
         <div>
-          <div 
+          <div
             className="text-lg font-semibold mb-2"
             style={{ color: COLORS.ERROR }}
           >
             Token Mapbox manquant
           </div>
-          <p 
-            className="text-sm"
-            style={{ color: COLORS.TEXT_MUTED }}
-          >
+          <p className="text-sm" style={{ color: COLORS.TEXT_MUTED }}>
             Ajoutez NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN à votre .env.local
           </p>
         </div>
@@ -326,25 +336,22 @@ const SingleFarmMapbox: React.FC<SingleFarmMapboxProps> = ({
    */
   if (hasError) {
     return (
-      <div 
+      <div
         className={`flex items-center justify-center h-full text-center p-6 ${className}`}
-        style={{ 
+        style={{
           backgroundColor: COLORS.BG_GRAY,
           color: COLORS.TEXT_SECONDARY,
-          minHeight: "300px"
+          minHeight: "300px",
         }}
       >
         <div>
-          <div 
+          <div
             className="text-lg font-semibold mb-2"
             style={{ color: COLORS.ERROR }}
           >
             Erreur de carte
           </div>
-          <p 
-            className="text-sm"
-            style={{ color: COLORS.TEXT_MUTED }}
-          >
+          <p className="text-sm" style={{ color: COLORS.TEXT_MUTED }}>
             {errorMessage || "Impossible de charger la carte"}
           </p>
         </div>
@@ -362,20 +369,20 @@ const SingleFarmMapbox: React.FC<SingleFarmMapboxProps> = ({
 
       {/* Loading state */}
       {!isLoaded && !hasError && (
-        <div 
+        <div
           className="absolute inset-0 flex items-center justify-center"
-          style={{ 
-            backgroundColor: `${COLORS.BG_WHITE}BF` // 75% opacity
+          style={{
+            backgroundColor: `${COLORS.BG_WHITE}BF`, // 75% opacity
           }}
         >
           <div className="text-center">
-            <div 
+            <div
               className="w-8 h-8 border-4 border-t-transparent rounded-full animate-spin mx-auto mb-3"
-              style={{ 
-                borderColor: `${COLORS.PRIMARY} transparent transparent transparent`
+              style={{
+                borderColor: `${COLORS.PRIMARY} transparent transparent transparent`,
               }}
             />
-            <p 
+            <p
               className="text-sm font-medium"
               style={{ color: COLORS.TEXT_SECONDARY }}
             >
@@ -386,6 +393,6 @@ const SingleFarmMapbox: React.FC<SingleFarmMapboxProps> = ({
       )}
     </div>
   );
-};
+}; 
 
 export default SingleFarmMapbox;

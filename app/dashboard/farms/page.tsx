@@ -73,15 +73,11 @@ export default function FarmerDashboard(): JSX.Element {
           return;
         }
 
-        console.log("Tentative de récupération des données pour:", email);
-
         const { data, error: supabaseError } = await supabase
           .from(TABLES.LISTING)
           .select("*")
           .eq("createdBy", email)
           .maybeSingle();
-
-        console.log("Résultat Supabase:", { data, error: supabaseError });
 
         if (supabaseError) {
           console.error("Erreur Supabase détaillée:", supabaseError);
@@ -89,7 +85,6 @@ export default function FarmerDashboard(): JSX.Element {
             `Erreur Supabase: ${supabaseError.message || "Erreur inconnue"}`
           );
         } else {
-          console.log("Données récupérées avec succès:", data);
           setListing(data as any as Listing);
         }
       } catch (err) {

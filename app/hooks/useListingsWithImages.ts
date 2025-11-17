@@ -95,10 +95,6 @@ export function useListingsWithImages(
       // ✅ TRANSFORMATION des coordonnées avant setState
       const transformedListings = (data || []).map(parseListingCoords);
 
-      console.log(
-        `[useListingsWithImages] Fetched ${transformedListings.length} listings for ${memoizedIds.length} IDs`
-      );
-
       setListings(transformedListings); // ✅ Données transformées
     } catch (err) {
       const errorMessage =

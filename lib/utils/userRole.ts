@@ -19,13 +19,7 @@ export type ValidRole = typeof VALID_ROLES[number];
  * Fonction utilitaire pour valider un rôle utilisateur
  *
  * @param role - Rôle à valider
- * @returns true si le rôle est valide
- *
- * @example
- * ```typescript
- * if (isValidUserRole("admin")) {
- *   console.log("Rôle admin valide");
- * }
+ * @returns true si le rôle est valid
  * ```
  */
 export function isValidUserRole(role: string | undefined): role is ValidRole {
@@ -38,13 +32,6 @@ export function isValidUserRole(role: string | undefined): role is ValidRole {
  *
  * @param metadata - Métadonnées publiques Clerk
  * @returns Rôle extrait et validation
- *
- * @example
- * ```typescript
- * const { role, hasRole, isValid } = extractUserRole(user.publicMetadata);
- * if (isValid) {
- *   console.log(`Rôle valide: ${role}`);
- * }
  * ```
  */
 export function extractUserRole(metadata: ClerkPublicMetadata | null | undefined): {

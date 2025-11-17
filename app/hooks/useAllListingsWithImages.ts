@@ -94,11 +94,6 @@ export function useAllListingsWithImages(
             .lte("lat", activeBounds.ne.lat)
             .gte("lng", activeBounds.sw.lng)
             .lte("lng", activeBounds.ne.lng);
-
-          console.log(
-            "[useAllListingsWithImages] Applied geographic filter:",
-            activeBounds
-          );
         }
 
         // ✅ Limite et ordre
@@ -114,12 +109,6 @@ export function useAllListingsWithImages(
 
         // ✅ TRANSFORMATION des coordonnées avant setState
         const transformedListings = (data || []).map(parseListingCoords);
-
-        console.log(
-          `[useAllListingsWithImages] Fetched ${transformedListings.length} listings${
-            activeBounds ? " with geographic filter" : ""
-          }`
-        );
 
         setListings(transformedListings); // ✅ Données transformées
       } catch (err) {
@@ -195,7 +184,6 @@ export function useListingsWithAutoSync(
     if (!bounds) return;
 
     const syncInterval = setInterval(() => {
-      console.log("[useListingsWithAutoSync] Auto-refresh triggered");
       result.refetch(bounds);
     }, interval);
 

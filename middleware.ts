@@ -42,7 +42,6 @@ export default clerkMiddleware(async (auth, req) => {
 
   // ==================== GESTION UTILISATEUR NON CONNECTÉ ====================
   if (!userId) {
-    console.log(`🔒 Accès refusé - Utilisateur non connecté: ${pathname}`);
 
     const signInUrl = new URL("/sign-in", req.url);
     signInUrl.searchParams.set("redirect_url", pathname);
@@ -62,7 +61,6 @@ export default clerkMiddleware(async (auth, req) => {
         metadata?.publicMetadata?.isAdmin;
 
       if (!isAdmin) {
-        console.log(`🚫 Accès admin refusé pour userId: ${userId}`);
 
         // Rediriger vers dashboard avec message d'erreur
         const dashboardUrl = new URL("/dashboard", req.url);
@@ -70,7 +68,6 @@ export default clerkMiddleware(async (auth, req) => {
         return NextResponse.redirect(dashboardUrl);
       }
 
-      console.log(`✅ Accès admin autorisé pour userId: ${userId}`);
       return NextResponse.next();
     } catch (error) {
       console.error("Erreur vérification admin:", error);
@@ -88,31 +85,23 @@ export default clerkMiddleware(async (auth, req) => {
     const profileUserId = pathname.split("/profile/")[1]?.split("/")[0];
 
     if (profileUserId && profileUserId !== userId) {
-      console.log(
-        `🚫 Tentative d'accès au profil d'un autre utilisateur: ${userId} -> ${profileUserId}`
-      );
 
       // Rediriger vers son propre profil
       const ownProfileUrl = new URL(`/profile/${userId}`, req.url);
       return NextResponse.redirect(ownProfileUrl);
     }
 
-    console.log(`✅ Accès profile autorisé pour userId: ${userId}`);
     return NextResponse.next();
   }
 
   // ==================== PROTECTION ROUTES DASHBOARD ====================
   if (isDashboardRoute(req)) {
     // Dashboard accessible à tous les utilisateurs connectés
-    console.log(`✅ Accès dashboard autorisé pour userId: ${userId}`);
     return NextResponse.next();
   }
 
   // ==================== ROUTES PRIVÉES GÉNÉRALES ====================
   // Toute autre route privée nécessite une authentification
-  console.log(
-    `✅ Accès autorisé pour utilisateur connecté: ${userId} -> ${pathname}`
-  );
   return NextResponse.next();
 });
 

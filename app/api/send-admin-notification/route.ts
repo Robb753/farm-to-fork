@@ -206,10 +206,6 @@ async function handleEmailSending(
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      console.log(
-        `[NOTIFICATION] Tentative d'envoi ${attempt}/${MAX_RETRIES} pour: ${data.farm_name}`
-      );
-
       const result = await sendAdminNotificationEmail(data);
 
       if (result.success) {
@@ -280,11 +276,6 @@ async function handleEmailSending(
  * });
  *
  * const result = await response.json();
- * if (result.success) {
- *   console.log("Notification envoyée avec succès");
- * } else {
- *   console.error("Erreur:", result.error);
- * }
  * ```
  */
 export async function POST(
@@ -341,10 +332,6 @@ export async function POST(
     }
 
     const sanitizedData = validation.sanitizedData!;
-    console.log(
-      `[NOTIFICATION] Validation réussie pour: ${sanitizedData.farm_name} (${sanitizedData.email})`
-    );
-
     // Envoi de la notification avec retry automatique
     let emailResult: EmailServiceResponse;
 
@@ -395,9 +382,6 @@ export async function POST(
       );
     }
 
-    console.log(
-      `✅ [NOTIFICATION] Notification envoyée avec succès pour: ${sanitizedData.farm_name}`
-    );
 
     // Retour avec headers appropriés
     return NextResponse.json(

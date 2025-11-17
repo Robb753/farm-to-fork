@@ -264,25 +264,17 @@ export default function MapboxSection({
           }
         }
       });
-
-      console.log(
-        "🗺️ [MapboxSection] Marqueurs ajoutés:",
-        markersRef.current.length
-      );
     },
     [clearMarkers]
   );
 
   const highlightMarker = useCallback((id: number | null) => {
-    console.log("🎯 [MapboxSection] Highlight marker:", id);
   }, []);
 
   const selectMarker = useCallback((id: number | null) => {
-    console.log("✅ [MapboxSection] Select marker:", id);
   }, []);
 
   const openInfoWindow = useCallback((id: number | null) => {
-    console.log("💬 [MapboxSection] Open info window:", id);
   }, []);
 
   // ✅ ÉCOUTE DES ÉVÉNEMENTS DU STORE
@@ -291,11 +283,6 @@ export default function MapboxSection({
 
     const handleListingsUpdated = (event: CustomEvent) => {
       const { listings, source } = event.detail;
-      console.log(
-        "🗺️ [MapboxSection] Listings updated:",
-        listings.length,
-        source
-      );
       addMarkersToMap(listings);
     };
 

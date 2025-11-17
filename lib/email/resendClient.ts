@@ -126,10 +126,6 @@ export async function sendFarmerApprovalEmail(
         </div>
       `,
     });
-
-    console.log(
-      `[EMAIL] Email d'approbation envoyé à ${params.to} pour ${params.farmName}`
-    );
     return true;
   } catch (error) {
     console.error("[EMAIL] Erreur envoi email d'approbation:", error);
@@ -183,8 +179,6 @@ export async function sendAdminNotificationEmail(
         </div>
       `,
     });
-
-    console.log(`[EMAIL] Notification admin envoyée pour ${params.farmName}`);
     return true;
   } catch (error) {
     console.error("[EMAIL] Erreur envoi notification admin:", error);
@@ -238,8 +232,6 @@ export async function sendFarmerRejectionEmail(
         </div>
       `,
     });
-
-    console.log(`[EMAIL] Email de rejet envoyé à ${to} pour ${farmName}`);
     return true;
   } catch (error) {
     console.error("[EMAIL] Erreur envoi email de rejet:", error);

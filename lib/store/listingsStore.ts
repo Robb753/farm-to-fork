@@ -145,7 +145,6 @@ export const useListingsStore = create<ListingsStore>()(
     ...INITIAL_INTERACTIONS_STATE,
 
     setAllListings: (listings) => {
-      console.log("🔄 [ListingsStore] setAllListings:", listings.length);
       const normalized = listings.map(normalizeListing);
       set({
         all: normalized,
@@ -276,12 +275,6 @@ export const useListingsStore = create<ListingsStore>()(
         if (bbox && Array.isArray(bbox) && bbox.length === 4) {
           // Format bbox: [west, south, east, north]
           const [west, south, east, north] = bbox;
-          console.log("🗺️ [ListingsStore] Filtrage par bbox:", {
-            west,
-            south,
-            east,
-            north,
-          });
 
           query = query
             .gte("lat", south)
@@ -295,7 +288,6 @@ export const useListingsStore = create<ListingsStore>()(
           "sw" in bounds
         ) {
           // Format bounds: { ne: {lat, lng}, sw: {lat, lng} }
-          console.log("🗺️ [ListingsStore] Filtrage par bounds:", bounds);
 
           query = query
             .gte("lat", bounds.sw.lat)
@@ -316,9 +308,6 @@ export const useListingsStore = create<ListingsStore>()(
         // ✅ Gestion propre de PGRST103 (offset trop grand = fin de pagination)
         if (error) {
           if (error.code === "PGRST103") {
-            console.log(
-              "🟢 [ListingsStore] Fin de pagination (PGRST103, plus de résultats)."
-            );
             set({
               isLoading: false,
               hasMore: false,

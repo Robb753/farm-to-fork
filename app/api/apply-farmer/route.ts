@@ -170,10 +170,6 @@ export async function POST(
       );
     }
 
-    console.log(
-      `[APPLY FARMER] Nouvelle candidature de ${farmName} (${email})`
-    );
-
     // Vérifier s'il y a déjà une candidature en cours pour cet utilisateur
     const { data: existingRequest, error: checkError } = await supabase
       .from("farmer_requests")
@@ -258,7 +254,6 @@ export async function POST(
     }
 
     const requestId = insertedRequest?.id;
-    console.log(`✅ [APPLY FARMER] Candidature créée avec ID: ${requestId}`);
 
     // Optionnel: Envoyer une notification aux administrateurs
     try {
@@ -269,8 +264,6 @@ export async function POST(
 
       // Utiliser directement farmerRequestData qui correspond au type attendu
       await sendAdminNotificationEmail(farmerRequestData as any);
-
-      console.log("📧 [APPLY FARMER] Notification admin envoyée");
     } catch (emailError) {
       console.warn(
         "[APPLY FARMER] ⚠️ Erreur envoi notification admin:",

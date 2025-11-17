@@ -179,8 +179,6 @@ export default async function ViewListingPage({ params }: PageParams): Promise<J
     notFound();
   }
 
-  console.log(`✅ [VIEW-LISTING] Successfully loaded listing: ${listing.name} (ID: ${numericId})`);
-
   // ✅ Rendu du composant client avec données SSR
   return <ViewListing listing={listing} />;
 }

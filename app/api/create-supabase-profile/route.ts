@@ -128,10 +128,6 @@ export async function POST(
       );
     }
 
-    console.log(
-      `[CREATE PROFILE] Création profil pour userId: ${userId}, rôle: ${role}`
-    );
-
     // Vérifier si le profil existe déjà
     const { data: existingProfile, error: checkError } = await supabase
       .from("profiles")
@@ -217,8 +213,6 @@ export async function POST(
       );
     }
 
-    console.log(`[CREATE PROFILE] Email récupéré: ${email}`);
-
     // Création du profil dans Supabase
     const profileData = {
       user_id: userId,
@@ -261,8 +255,6 @@ export async function POST(
         { status: 500 }
       );
     }
-
-    console.log(`✅ [CREATE PROFILE] Profil créé avec succès pour ${userId}`);
 
     const responseData: CreateProfileResponse["data"] = {
       profileId: profileResult.user_id,
@@ -324,9 +316,6 @@ export async function POST(
         }
 
         responseData.listingId = listingResult.id;
-        console.log(
-          `✅ [CREATE PROFILE] Listing créé avec ID: ${listingResult.id}`
-        );
       }
     }
 

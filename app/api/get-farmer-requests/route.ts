@@ -201,7 +201,6 @@ export async function GET(
     }
 
     const params = validation.params;
-    console.log(`[API] Récupération des demandes farmer avec params:`, params);
 
     // Création du client Supabase
     const supabase = createSupabaseClient();
@@ -249,10 +248,6 @@ export async function GET(
         { status: 500 }
       );
     }
-
-    console.log(
-      `✅ [API] ${data.length} demandes récupérées avec succès (total: ${count})`
-    );
 
     // Construction de la réponse avec métadonnées
     const response: GetFarmerRequestsResponse = {

@@ -127,10 +127,7 @@ export default function HeroSection({
   /**
    * Gestion des favoris
    */
-  const handleFavorite = (): void => {
-    // Ici tu intégreras avec ton système de favoris
-    console.log("Toggle favorite:", listing.id);
-  };
+  const handleFavorite = (): void => {};
 
   /**
    * Actions de contact

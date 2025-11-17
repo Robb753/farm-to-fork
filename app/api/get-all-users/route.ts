@@ -179,11 +179,6 @@ export async function GET(
       );
     }
 
-    console.log(
-      `[GET USERS] Récupération des utilisateurs avec params:`,
-      params
-    );
-
     // Construction de la requête de base
     let query = supabase
       .from("profiles")
@@ -235,10 +230,6 @@ export async function GET(
         { status: 500 }
       );
     }
-
-    console.log(
-      `✅ [GET USERS] ${data.length} utilisateurs récupérés avec succès (total: ${count})`
-    );
 
     // Construction de la réponse avec métadonnées
     const response: GetAllUsersResponse = {
