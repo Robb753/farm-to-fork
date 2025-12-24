@@ -11,7 +11,7 @@ import type { Database } from "@/lib/types/database";
 // Import des composants enfants
 import HeroSection from "../_components/HeroSection";
 import PresentationTab from "../_components/PresentationTab";
-import ProductsTab from "../_components/ProductsTab";
+import BoutiqueTab from "../_components/BoutiqueTab";
 import ServicesTab from "../_components/ServicesTab";
 import ReviewsTab from "../_components/ReviewsTab";
 import ContactCard from "../_components/ContactCard";
@@ -35,7 +35,7 @@ interface ViewListingProps {
 /**
  * Types des onglets disponibles
  */
-type TabValue = "presentation" | "produits" | "services" | "avis";
+type TabValue = "presentation" | "boutique" | "services" | "avis";
 
 /**
  * Configuration des onglets avec métadonnées
@@ -53,10 +53,10 @@ const TABS_CONFIG: Array<{
     icon: "🏪",
   },
   {
-    value: "produits",
-    label: "Produits",
-    description: "Explorez les produits disponibles",
-    icon: "🥕",
+    value: "boutique",
+    label: "Boutique",
+    description: "Achetez les produits de cette ferme",
+    icon: "🛒",
   },
   {
     value: "services",
@@ -239,9 +239,9 @@ export default function ViewListing({
                   </Suspense>
                 </TabsContent>
 
-                <TabsContent value="produits" className="space-y-6">
+                <TabsContent value="boutique" className="space-y-6">
                   <Suspense fallback={<TabContentSkeleton />}>
-                    <ProductsTab listing={listing} />
+                    <BoutiqueTab listing={listing} />
                   </Suspense>
                 </TabsContent>
 
