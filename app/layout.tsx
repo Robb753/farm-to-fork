@@ -2,11 +2,17 @@ import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
 import ClientLayout from "./ClientLayout";
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 
 /** Props du layout */
 interface RootLayoutProps {
   children: React.ReactNode;
 }
+
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: {
@@ -99,22 +105,13 @@ export default function RootLayout({ children }: RootLayoutProps): JSX.Element {
       }}
       localization={{ locale: "fr-FR" }}
     >
-      <html lang="fr" suppressHydrationWarning>
+      <html lang="fr" data-scroll-behavior="smooth" suppressHydrationWarning>
         <head>
-          <link
-            rel="preload"
-            href="/fonts/inter-var.woff2"
-            as="font"
-            type="font/woff2"
-            crossOrigin="anonymous"
-          />
-
           <link rel="icon" href="/favicon.ico" sizes="any" />
-          <link rel="icon" href="/icon.svg" type="image/svg+xml" />
           <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
           <link rel="manifest" href="/manifest.json" />
 
-          {/* Google Analytics (safe encoding) */}
+          {/* Google Analytics */}
           {process.env.NODE_ENV === "production" &&
             process.env.NEXT_PUBLIC_GA_ID && (
               <>
@@ -127,13 +124,11 @@ export default function RootLayout({ children }: RootLayoutProps): JSX.Element {
                 <script
                   dangerouslySetInnerHTML={{
                     __html: `
-                      window.dataLayer = window.dataLayer || [];
-                      function gtag(){dataLayer.push(arguments);}
-                      gtag('js', new Date());
-                      gtag('config', '${encodeURIComponent(
-                        process.env.NEXT_PUBLIC_GA_ID
-                      )}');
-                    `,
+                    window.dataLayer = window.dataLayer || [];
+                    function gtag(){dataLayer.push(arguments);}
+                    gtag('js', new Date());
+                    gtag('config', '${encodeURIComponent(process.env.NEXT_PUBLIC_GA_ID)}');
+                  `,
                   }}
                 />
               </>
@@ -141,7 +136,7 @@ export default function RootLayout({ children }: RootLayoutProps): JSX.Element {
         </head>
 
         <body
-          className="min-h-screen bg-white text-gray-900 antialiased"
+          className={`${inter.className} min-h-screen bg-white text-gray-900 antialiased`}
           suppressHydrationWarning
         >
           <a

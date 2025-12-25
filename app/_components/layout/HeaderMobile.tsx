@@ -457,13 +457,13 @@ export default function HeaderMobile({
         <div className="flex items-center gap-2 px-3 py-2 max-w-screen-sm mx-auto w-full">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 pl-1 shrink-0">
-            <Image
+            <img
               src="/logof2f.svg"
               alt="Farm To Fork"
               width={120}
               height={32}
-              priority
               className="h-8 w-auto"
+              style={{ width: "auto" }}
             />
             <span
               className="hidden xs:block text-base font-bold"

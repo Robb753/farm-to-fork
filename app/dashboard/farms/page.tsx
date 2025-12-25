@@ -572,7 +572,7 @@ export default function FarmerDashboard(): JSX.Element {
                   color: COLORS.INFO,
                 }}
               >
-                <Link href={`/view-listing/${listing.id}`}>
+                <Link href={`/farm/${listing.id}`}>
                   <Eye className="h-4 w-4" />
                   Voir la fiche publique
                 </Link>

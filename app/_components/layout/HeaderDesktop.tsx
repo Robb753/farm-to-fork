@@ -530,13 +530,13 @@ export default function HeaderDesktop({
         {/* Logo + Navigation */}
         <div className="flex items-center gap-8">
           <Link href="/" className="flex items-center space-x-2">
-            <Image
+            <img
               src="/logof2f.svg"
               alt="Farm To Fork"
               width={120}
               height={32}
-              priority
               className="h-8 w-auto"
+              style={{ width: "auto" }}
             />
             <span
               className="text-xl font-bold hidden sm:block"

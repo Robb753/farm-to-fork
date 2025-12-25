@@ -194,6 +194,7 @@ export default function RequestFarmerAccessPage(): JSX.Element {
         [FARMER_REQUESTS_COLUMNS.FARM_NAME]: formData.farm_name.trim(),
         [FARMER_REQUESTS_COLUMNS.LOCATION]: formData.location.trim(),
         [FARMER_REQUESTS_COLUMNS.PHONE]: cleanedPhone,
+        // nosec: description is a form field, not a cryptographic descriptor
         [FARMER_REQUESTS_COLUMNS.DESCRIPTION]: formData.description.trim(),
         [FARMER_REQUESTS_COLUMNS.PRODUCTS]: formData.products.trim() || null,
         [FARMER_REQUESTS_COLUMNS.WEBSITE]: formData.website.trim() || null,

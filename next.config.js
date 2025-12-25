@@ -47,10 +47,69 @@ const baseConfig = {
     ];
   },
 
-  // ✅ NOUVEAU : Redirections pour nettoyer les URLs
+  // ✅ NOUVEAU : Redirections pour nettoyer les URLs et migration /farm
   async redirects() {
     return [
-      // Redirection des anciennes routes avec hash vers les nouvelles
+      // ============================================
+      // Redirections view-listing → farm
+      // ============================================
+      {
+        source: "/view-listing/:id",
+        destination: "/farm/:id",
+        permanent: true,
+      },
+      {
+        source: "/view-listing/:id/boutique",
+        destination: "/farm/:id/shop",
+        permanent: true,
+      },
+      {
+        source: "/view-listing/:id/panier",
+        destination: "/farm/:id/cart",
+        permanent: true,
+      },
+
+      // ============================================
+      // Redirections shop → farm
+      // ============================================
+      {
+        source: "/shop/:farmId",
+        destination: "/farm/:farmId",
+        permanent: true,
+      },
+      {
+        source: "/shop/:farmId/boutique",
+        destination: "/farm/:farmId/shop",
+        permanent: true,
+      },
+      {
+        source: "/shop/:farmId/panier",
+        destination: "/farm/:farmId/cart",
+        permanent: true,
+      },
+
+      // ============================================
+      // Redirections commandes
+      // ============================================
+      {
+        source: "/shop/commande/:orderId",
+        destination: "/order/:orderId/confirmation",
+        permanent: true,
+      },
+      {
+        source: "/shop/ma-commande/:orderId",
+        destination: "/order/:orderId",
+        permanent: true,
+      },
+
+      // ============================================
+      // Autres redirections
+      // ============================================
+      {
+        source: "/producteurs",
+        destination: "/discover/producteurs",
+        permanent: true,
+      },
       {
         source: "/factor-one",
         destination: "/sign-in",
@@ -83,7 +142,6 @@ const baseConfig = {
   compress: true,
   poweredByHeader: false,
   reactStrictMode: true,
-  // 🔧 SUPPRIMÉ : swcMinify est activé par défaut en Next.js 15
   productionBrowserSourceMaps: false,
   trailingSlash: false,
   onDemandEntries: {

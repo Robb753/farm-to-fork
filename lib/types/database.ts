@@ -1,5 +1,5 @@
 // lib/types/database.ts
-// Types générés pour la base de données Farm-to-Fork (schéma réel Supabase)
+// Types pour la base de données Farm-to-Fork (schéma Supabase) — aligné avec tes tables + ajout orders
 
 export type Json =
   | string
@@ -20,7 +20,7 @@ export interface Database {
           email: string;
           role: "user" | "farmer" | "admin";
           farm_id: number | null;
-          favorites: string; // Type text dans Supabase
+          favorites: Json | null; // jsonb
           updated_at: string;
         };
         Insert: {
@@ -30,7 +30,7 @@ export interface Database {
           email: string;
           role?: "user" | "farmer" | "admin";
           farm_id?: number | null;
-          favorites?: string;
+          favorites?: Json | null;
           updated_at?: string;
         };
         Update: {
@@ -40,37 +40,44 @@ export interface Database {
           email?: string;
           role?: "user" | "farmer" | "admin";
           farm_id?: number | null;
-          favorites?: string;
+          favorites?: Json | null;
           updated_at?: string;
         };
         Relationships: [];
       };
+
       listing: {
         Row: {
           id: number;
           created_at: string;
-          coordinates: Json | null; // Type json dans Supabase
+          coordinates: Json | null;
           createdBy: string;
           active: boolean;
           typeferme: string | null;
           phoneNumber: string | null;
           email: string | null;
           website: string | null;
-          certifications: string | null; // Type certification_enum
+          certifications: string | null;
           description: string | null;
           name: string;
           profileImage: string | null;
           fullName: string | null;
-          product_type: string | null; // Type product_type_enum
-          purchase_mode: string | null; // Type purchase_mode_enum
-          production_method: string | null; // Type production_method_enum
-          availability: string | null; // Type availability_enum
-          additional_services: string | null; // Type additional_services_enum
+          product_type: string | null;
+          purchase_mode: string | null;
+          production_method: string | null;
+          availability: string | null;
+          additional_services: string | null;
           address: string;
           updated_at: string | null;
-          lat: number; // Type float8
-          lng: number; // Type float8
+          lat: number;
+          lng: number;
           opening_hours: Json | null;
+
+          published_at: string | null;
+          modified_at: string | null;
+
+          pickup_days: string | null;
+          delivery_available: boolean | null;
         };
         Insert: {
           id?: number;
@@ -97,6 +104,12 @@ export interface Database {
           lat: number;
           lng: number;
           opening_hours?: Json | null;
+
+          published_at?: string | null;
+          modified_at?: string | null;
+
+          pickup_days?: string | null;
+          delivery_available?: boolean | null;
         };
         Update: {
           id?: number;
@@ -123,9 +136,16 @@ export interface Database {
           lat?: number;
           lng?: number;
           opening_hours?: Json | null;
+
+          published_at?: string | null;
+          modified_at?: string | null;
+
+          pickup_days?: string | null;
+          delivery_available?: boolean | null;
         };
         Relationships: [];
       };
+
       listingImages: {
         Row: {
           id: number;
@@ -154,6 +174,7 @@ export interface Database {
           },
         ];
       };
+
       farmer_requests: {
         Row: {
           id: number;
@@ -166,7 +187,7 @@ export interface Database {
           description: string;
           products: string | null;
           website: string | null;
-          status: string; // Type varchar
+          status: string;
         };
         Insert: {
           id?: number;
@@ -196,36 +217,64 @@ export interface Database {
         };
         Relationships: [];
       };
+
       products: {
         Row: {
           id: number;
           listing_id: number;
+
+          // Champs utilisés dans ton code BoutiqueTab
+          farm_id: number;
+          active: boolean;
+
           name: string;
           description: string | null;
           price: number | null;
           unit: string | null;
-          available: boolean | null;
+
+          image_url: string | null;
+
+          // tu m’as confirmé l’avoir
+          stock_status: string | null;
+
           created_at: string;
+          updated_at: string | null;
         };
         Insert: {
           id?: number;
           listing_id: number;
+
+          farm_id: number;
+          active?: boolean;
+
           name: string;
           description?: string | null;
           price?: number | null;
           unit?: string | null;
-          available?: boolean | null;
+
+          image_url?: string | null;
+          stock_status?: string | null;
+
           created_at?: string;
+          updated_at?: string | null;
         };
         Update: {
           id?: number;
           listing_id?: number;
+
+          farm_id?: number;
+          active?: boolean;
+
           name?: string;
           description?: string | null;
           price?: number | null;
           unit?: string | null;
-          available?: boolean | null;
+
+          image_url?: string | null;
+          stock_status?: string | null;
+
           created_at?: string;
+          updated_at?: string | null;
         };
         Relationships: [
           {
@@ -234,8 +283,82 @@ export interface Database {
             referencedRelation: "listing";
             referencedColumns: ["id"];
           },
+          {
+            foreignKeyName: "products_farm_id_fkey";
+            columns: ["farm_id"];
+            referencedRelation: "listing";
+            referencedColumns: ["id"];
+          },
         ];
       };
+
+      // ✅ NOUVELLE TABLE
+      orders: {
+        Row: {
+          id: number;
+          user_id: string; // uuid renvoyé par supabase-js peut arriver en string côté TS
+          farm_id: number;
+
+          delivery_mode: "pickup" | "delivery";
+          delivery_day: string | null;
+
+          total_price: number;
+          status: "pending" | "confirmed" | "ready" | "delivered" | "cancelled";
+
+          items: Json; // jsonb
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: number;
+          user_id: string; // uuid string
+          farm_id: number;
+
+          delivery_mode: "pickup" | "delivery";
+          delivery_day?: string | null;
+
+          total_price?: number;
+          status?:
+            | "pending"
+            | "confirmed"
+            | "ready"
+            | "delivered"
+            | "cancelled";
+
+          items?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: number;
+          user_id?: string;
+          farm_id?: number;
+
+          delivery_mode?: "pickup" | "delivery";
+          delivery_day?: string | null;
+
+          total_price?: number;
+          status?:
+            | "pending"
+            | "confirmed"
+            | "ready"
+            | "delivered"
+            | "cancelled";
+
+          items?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "orders_farm_id_fkey";
+            columns: ["farm_id"];
+            referencedRelation: "listing";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+
       reviews: {
         Row: {
           id: number;
@@ -324,6 +447,7 @@ export interface Database {
           },
         ];
       };
+
       review_votes: {
         Row: {
           id: number;
@@ -355,6 +479,7 @@ export interface Database {
           },
         ];
       };
+
       review_reports: {
         Row: {
           id: number;
@@ -393,6 +518,7 @@ export interface Database {
         ];
       };
     };
+
     Views: {
       [_ in never]: never;
     };
@@ -423,19 +549,20 @@ export interface Database {
   };
 }
 
-// Types helpers pour faciliter l'usage
+// Helpers
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 export type Listing = Database["public"]["Tables"]["listing"]["Row"];
 export type ListingImage = Database["public"]["Tables"]["listingImages"]["Row"];
 export type FarmerRequest =
   Database["public"]["Tables"]["farmer_requests"]["Row"];
 export type Product = Database["public"]["Tables"]["products"]["Row"];
+export type Order = Database["public"]["Tables"]["orders"]["Row"];
 export type Review = Database["public"]["Tables"]["reviews"]["Row"];
 export type ReviewVote = Database["public"]["Tables"]["review_votes"]["Row"];
 export type ReviewReport =
   Database["public"]["Tables"]["review_reports"]["Row"];
 
-// Types pour les insertions (sans les champs auto-générés)
+// Inserts
 export type ProfileInsert = Database["public"]["Tables"]["profiles"]["Insert"];
 export type ListingInsert = Database["public"]["Tables"]["listing"]["Insert"];
 export type ListingImageInsert =
@@ -443,13 +570,14 @@ export type ListingImageInsert =
 export type FarmerRequestInsert =
   Database["public"]["Tables"]["farmer_requests"]["Insert"];
 export type ProductInsert = Database["public"]["Tables"]["products"]["Insert"];
+export type OrderInsert = Database["public"]["Tables"]["orders"]["Insert"];
 export type ReviewInsert = Database["public"]["Tables"]["reviews"]["Insert"];
 export type ReviewVoteInsert =
   Database["public"]["Tables"]["review_votes"]["Insert"];
 export type ReviewReportInsert =
   Database["public"]["Tables"]["review_reports"]["Insert"];
 
-// Types pour les mises à jour
+// Updates
 export type ProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"];
 export type ListingUpdate = Database["public"]["Tables"]["listing"]["Update"];
 export type ListingImageUpdate =
@@ -457,13 +585,14 @@ export type ListingImageUpdate =
 export type FarmerRequestUpdate =
   Database["public"]["Tables"]["farmer_requests"]["Update"];
 export type ProductUpdate = Database["public"]["Tables"]["products"]["Update"];
+export type OrderUpdate = Database["public"]["Tables"]["orders"]["Update"];
 export type ReviewUpdate = Database["public"]["Tables"]["reviews"]["Update"];
 export type ReviewVoteUpdate =
   Database["public"]["Tables"]["review_votes"]["Update"];
 export type ReviewReportUpdate =
   Database["public"]["Tables"]["review_reports"]["Update"];
 
-// Types pour les énumérations
+// Enum helpers
 export type UserRole = Database["public"]["Enums"]["user_role"];
 export type AvailabilityStatus =
   Database["public"]["Enums"]["availability_enum"];

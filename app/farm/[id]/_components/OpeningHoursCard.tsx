@@ -1,9 +1,14 @@
-// app/(routes)/view-listing/_components/OpeningHoursCard.tsx
 "use client";
 
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, CheckCircle, XCircle, AlertCircle } from "@/utils/icons";
+import {
+  Calendar,
+  Clock,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+} from "@/utils/icons";
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/lib/types/database";
@@ -82,7 +87,7 @@ const DAY_LABELS: Record<string, string> = {
  */
 const DAY_ORDER = [
   "Monday",
-  "Tuesday", 
+  "Tuesday",
   "Wednesday",
   "Thursday",
   "Friday",
@@ -92,7 +97,7 @@ const DAY_ORDER = [
 
 /**
  * Composant d'affichage des horaires d'ouverture d'une ferme
- * 
+ *
  * Features:
  * - Affichage des horaires avec jour actuel mis en évidence
  * - Calcul du statut d'ouverture en temps réel
@@ -100,13 +105,15 @@ const DAY_ORDER = [
  * - Gestion des horaires spéciaux et exceptions
  * - Design moderne avec badges de statut
  * - Support de formats d'horaires multiples
- * 
+ *
  * @param listing - Données du listing avec horaires
  * @param className - Classes CSS additionnelles
  * @returns JSX.Element - Card des horaires d'ouverture
  */
-export default function OpeningHoursCard({ listing, className }: OpeningHoursCardProps): JSX.Element {
-
+export default function OpeningHoursCard({
+  listing,
+  className,
+}: OpeningHoursCardProps): JSX.Element {
   /**
    * Parse et normalise les horaires d'ouverture
    */
@@ -116,7 +123,10 @@ export default function OpeningHoursCard({ listing, className }: OpeningHoursCar
     }
 
     // Si c'est déjà un objet
-    if (typeof listing.opening_hours === "object" && listing.opening_hours !== null) {
+    if (
+      typeof listing.opening_hours === "object" &&
+      listing.opening_hours !== null
+    ) {
       return { ...DEFAULT_HOURS, ...listing.opening_hours };
     }
 
@@ -149,7 +159,9 @@ export default function OpeningHoursCard({ listing, className }: OpeningHoursCar
   /**
    * Parse les horaires pour déterminer si c'est ouvert maintenant
    */
-  const parseHours = (hoursString: string): { start: number; end: number } | null => {
+  const parseHours = (
+    hoursString: string
+  ): { start: number; end: number } | null => {
     if (!hoursString || hoursString.toLowerCase().includes("fermé")) {
       return null;
     }
@@ -178,7 +190,7 @@ export default function OpeningHoursCard({ listing, className }: OpeningHoursCar
     const now = new Date();
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
     const todayHours = openingHours[today];
-    
+
     const parsedToday = parseHours(todayHours);
 
     if (!parsedToday) {
@@ -188,7 +200,7 @@ export default function OpeningHoursCard({ listing, className }: OpeningHoursCar
         const nextDayIndex = (DAY_ORDER.indexOf(today) + i) % 7;
         const nextDay = DAY_ORDER[nextDayIndex];
         const nextDayHours = openingHours[nextDay];
-        
+
         if (parseHours(nextDayHours)) {
           nextOpenDay = DAY_LABELS[nextDay];
           break;
@@ -204,10 +216,13 @@ export default function OpeningHoursCard({ listing, className }: OpeningHoursCar
     }
 
     // Ouvert aujourd'hui, vérifier l'heure actuelle
-    if (currentMinutes >= parsedToday.start && currentMinutes <= parsedToday.end) {
+    if (
+      currentMinutes >= parsedToday.start &&
+      currentMinutes <= parsedToday.end
+    ) {
       const closingHour = Math.floor(parsedToday.end / 60);
       const closingMin = parsedToday.end % 60;
-      
+
       return {
         isCurrentlyOpen: true,
         nextChange: `Ferme à ${closingHour}h${closingMin.toString().padStart(2, "0")}`,
@@ -217,11 +232,11 @@ export default function OpeningHoursCard({ listing, className }: OpeningHoursCar
     } else if (currentMinutes < parsedToday.start) {
       const openingHour = Math.floor(parsedToday.start / 60);
       const openingMin = parsedToday.start % 60;
-      
+
       return {
         isCurrentlyOpen: false,
         nextChange: `Ouvre à ${openingHour}h${openingMin.toString().padStart(2, "0")}`,
-        statusText: "Fermé actuellement", 
+        statusText: "Fermé actuellement",
         statusColor: "orange",
       };
     } else {
@@ -229,7 +244,7 @@ export default function OpeningHoursCard({ listing, className }: OpeningHoursCar
       const tomorrowIndex = (DAY_ORDER.indexOf(today) + 1) % 7;
       const tomorrow = DAY_ORDER[tomorrowIndex];
       const tomorrowLabel = DAY_LABELS[tomorrow];
-      
+
       return {
         isCurrentlyOpen: false,
         nextChange: `Ouvre ${tomorrowLabel}`,
@@ -294,18 +309,22 @@ export default function OpeningHoursCard({ listing, className }: OpeningHoursCar
   };
 
   return (
-    <Card className={cn("overflow-hidden border-gray-100 shadow-sm hover:shadow-md transition-shadow", className)}>
-      
+    <Card
+      className={cn(
+        "overflow-hidden border-gray-100 shadow-sm hover:shadow-md transition-shadow",
+        className
+      )}
+    >
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center text-green-700 text-lg">
             <Calendar className="h-5 w-5 mr-2" />
             Horaires d'ouverture
           </CardTitle>
-          
+
           {/* Badge de statut actuel */}
-          <Badge 
-            variant="outline" 
+          <Badge
+            variant="outline"
             className={cn(
               "flex items-center gap-1 font-medium",
               getStatusClasses(openStatus.statusColor)
@@ -315,7 +334,7 @@ export default function OpeningHoursCard({ listing, className }: OpeningHoursCar
             <span className="text-xs">{openStatus.statusText}</span>
           </Badge>
         </div>
-        
+
         {/* Prochaine ouverture/fermeture */}
         {openStatus.nextChange && (
           <p className="text-sm text-gray-600 mt-1 flex items-center gap-1">
@@ -324,52 +343,53 @@ export default function OpeningHoursCard({ listing, className }: OpeningHoursCar
           </p>
         )}
       </CardHeader>
-      
+
       <CardContent className="space-y-3 pt-0">
-        
         {/* Liste des jours */}
         {daysInfo.map((day) => (
           <div
             key={day.key}
             className={cn(
               "flex items-center justify-between py-2 px-3 rounded-lg transition-colors",
-              day.isToday 
-                ? "bg-green-50 border border-green-200" 
+              day.isToday
+                ? "bg-green-50 border border-green-200"
                 : "hover:bg-gray-50"
             )}
           >
             <div className="flex items-center gap-2">
-              <span className={cn(
-                "font-medium",
-                day.isToday 
-                  ? "text-green-800" 
-                  : "text-gray-700"
-              )}>
+              <span
+                className={cn(
+                  "font-medium",
+                  day.isToday ? "text-green-800" : "text-gray-700"
+                )}
+              >
                 {day.label}
               </span>
-              
+
               {day.isToday && (
-                <Badge 
-                  variant="outline" 
+                <Badge
+                  variant="outline"
                   className="bg-green-100 text-green-700 text-xs px-2 py-0 h-5"
                 >
                   Aujourd'hui
                 </Badge>
               )}
             </div>
-            
+
             <div className="flex items-center gap-2">
-              <span className={cn(
-                "text-sm",
-                day.isToday 
-                  ? "text-green-700 font-medium" 
-                  : day.isClosed 
-                    ? "text-red-600" 
-                    : "text-gray-600"
-              )}>
+              <span
+                className={cn(
+                  "text-sm",
+                  day.isToday
+                    ? "text-green-700 font-medium"
+                    : day.isClosed
+                      ? "text-red-600"
+                      : "text-gray-600"
+                )}
+              >
                 {day.hours}
               </span>
-              
+
               {/* Indicateur visuel */}
               {!day.isClosed && (
                 <div className="h-2 w-2 bg-green-400 rounded-full"></div>
@@ -387,8 +407,8 @@ export default function OpeningHoursCard({ listing, className }: OpeningHoursCar
         {/* Message informatif */}
         <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 mt-4">
           <p className="text-blue-800 text-xs text-center">
-            💡 <strong>Conseil :</strong> Contactez la ferme pour confirmer les horaires, 
-            ils peuvent varier selon les saisons
+            💡 <strong>Conseil :</strong> Contactez la ferme pour confirmer les
+            horaires, ils peuvent varier selon les saisons
           </p>
         </div>
       </CardContent>

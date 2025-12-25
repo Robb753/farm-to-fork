@@ -280,7 +280,7 @@ const ListItem = React.memo<ListItemProps>(
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
       >
-        <Link href={`/view-listing/${item.id}`} className="flex w-full">
+        <Link href={`/farm/${item.id}`} className="flex w-full">
           {/* Image Section */}
           <div className="relative w-32 sm:w-40 md:w-48 h-32 sm:h-36 flex-shrink-0">
             {!imageError ? (

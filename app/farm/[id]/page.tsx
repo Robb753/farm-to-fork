@@ -1,22 +1,23 @@
-// app/(routes)/view-listing/[id]/ViewListing.tsx
 "use client";
 
 import Link from "next/link";
 import { ChevronRight, Loader2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Suspense, useState, useEffect } from "react";
+import { useParams, notFound } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/utils/supabase/client";
 import type { Database } from "@/lib/types/database";
 
 // Import des composants enfants
-import HeroSection from "../_components/HeroSection";
-import PresentationTab from "../_components/PresentationTab";
-import BoutiqueTab from "../_components/BoutiqueTab";
-import ServicesTab from "../_components/ServicesTab";
-import ReviewsTab from "../_components/ReviewsTab";
-import ContactCard from "../_components/ContactCard";
-import OpeningHoursCard from "../_components/OpeningHoursCard";
-import MapCard from "../_components/MapCard";
+import HeroSection from "./_components/HeroSection";
+import PresentationTab from "./_components/PresentationTab";
+import BoutiqueTab from "@/app/modules/shop/BoutiqueTab";
+import ServicesTab from "./_components/ServicesTab";
+import ReviewsTab from "./_components/ReviewsTab";
+import ContactCard from "./_components/ContactCard";
+import OpeningHoursCard from "./_components/OpeningHoursCard";
+import MapCard from "./_components/MapCard";
 
 /**
  * Type pour un listing avec ses images et relations
@@ -24,13 +25,6 @@ import MapCard from "../_components/MapCard";
 type ListingWithImages = Database["public"]["Tables"]["listing"]["Row"] & {
   listingImages: Database["public"]["Tables"]["listingImages"]["Row"][];
 };
-
-/**
- * Props du composant ViewListing
- */
-interface ViewListingProps {
-  listing: ListingWithImages;
-}
 
 /**
  * Types des onglets disponibles
@@ -74,36 +68,82 @@ const TABS_CONFIG: Array<{
 
 /**
  * Composant principal d'affichage d'un listing de ferme
- *
- * Features:
- * - Interface responsive avec sidebar mobile
- * - Système d'onglets avec navigation fluide
- * - Fil d'Ariane pour la navigation
- * - Design moderne avec gradient de fond
- * - Composants modulaires pour chaque section
- * - Gestion d'états de chargement
- * - Analytics et tracking intégrés
- *
- * @param listing - Données complètes du listing avec images
- * @returns JSX.Element - Interface détaillée du listing
  */
-export default function ViewListing({
-  listing,
-}: ViewListingProps): JSX.Element {
+export default function FarmPage(): JSX.Element {
+  const params = useParams();
+  const idParam = params?.id;
+
+  const [listing, setListing] = useState<ListingWithImages | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabValue>("presentation");
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  /**
+   * Charger les données du listing
+   */
+  useEffect(() => {
+    async function loadListing() {
+      // Vérifier que le paramètre existe
+      if (!idParam || typeof idParam !== "string") {
+        console.log("No valid ID param");
+        setIsLoading(false);
+        setListing(null);
+        return;
+      }
+
+      const parsedId = parseInt(idParam, 10);
+
+      // Vérifier que c'est un nombre valide
+      if (isNaN(parsedId)) {
+        console.log("Invalid ID:", idParam);
+        setIsLoading(false);
+        setListing(null);
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        console.log("Loading listing with ID:", parsedId);
+
+        // Charger le listing avec ses images
+        const { data: listingData, error: listingError } = await supabase
+          .from("listing")
+          .select(
+            `
+            *,
+            listingImages (*)
+          `
+          )
+          .eq("id", parsedId)
+          .eq("active", true)
+          .single();
+
+        if (listingError) {
+          console.error("Supabase error:", listingError);
+          throw listingError;
+        }
+
+        console.log("Listing loaded:", listingData);
+        setListing(listingData as ListingWithImages);
+      } catch (error) {
+        console.error("Erreur chargement ferme:", error);
+        setListing(null);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadListing();
+  }, [idParam]);
 
   /**
    * Analytics: Track tab switches
    */
   const handleTabChange = (value: string): void => {
-    if (isLoading) return;
-
     const tabValue = value as TabValue;
     setActiveTab(tabValue);
 
     // Analytics tracking
-    if (typeof window !== "undefined" && window.gtag) {
+    if (listing && typeof window !== "undefined" && window.gtag) {
       window.gtag("event", "tab_switch", {
         event_category: "listing_interaction",
         event_label: tabValue,
@@ -117,7 +157,7 @@ export default function ViewListing({
    * Analytics: Track page view
    */
   useEffect(() => {
-    if (typeof window !== "undefined" && window.gtag) {
+    if (listing && typeof window !== "undefined" && window.gtag) {
       window.gtag("event", "listing_view", {
         event_category: "listing",
         event_label: listing.name,
@@ -125,7 +165,7 @@ export default function ViewListing({
         value: 1,
       });
     }
-  }, [listing.id, listing.name]);
+  }, [listing]);
 
   /**
    * Génère le breadcrumb dynamique
@@ -133,12 +173,13 @@ export default function ViewListing({
   const breadcrumbItems = [
     { href: "/", label: "Accueil" },
     { href: "/explore", label: "Explorer" },
-    { href: null, label: listing.name || "Ferme" },
+    { href: null, label: listing?.name || "Ferme" },
   ];
 
-  if (!listing) {
+  // État de chargement
+  if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 via-emerald-50 to-blue-50">
         <div className="text-center space-y-4">
           <Loader2 className="h-8 w-8 animate-spin mx-auto text-green-600" />
           <p className="text-gray-500">
@@ -147,6 +188,11 @@ export default function ViewListing({
         </div>
       </div>
     );
+  }
+
+  // Ferme non trouvée
+  if (!listing) {
+    notFound();
   }
 
   return (

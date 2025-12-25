@@ -1,8 +1,6 @@
-// app/(routes)/view-listing/_components/PresentationTab.tsx
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import {
   Leaf,
@@ -16,7 +14,7 @@ import {
   Eye,
   Share2,
 } from "@/utils/icons";
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, type ReactNode } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/lib/types/database";
@@ -26,27 +24,18 @@ import type { Database } from "@/lib/types/database";
  */
 type ListingWithDetails = Database["public"]["Tables"]["listing"]["Row"];
 
-/**
- * Props du composant PresentationTab
- */
 interface PresentationTabProps {
   listing: ListingWithDetails | null;
   className?: string;
 }
 
-/**
- * Interface pour une certification enrichie
- */
 interface CertificationInfo {
   name: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
   color: string;
   description: string;
 }
 
-/**
- * Interface pour les statistiques de la ferme
- */
 interface FarmStats {
   foundedYear?: number;
   farmSize?: string;
@@ -55,62 +44,48 @@ interface FarmStats {
 }
 
 /**
- * Composant d'onglet de présentation d'une ferme
- *
- * Features:
- * - Affichage riche de la description avec formatage
- * - Certifications avec icônes et descriptions
- * - Méthodes de production avec codes couleur
- * - Statistiques et métriques de la ferme
- * - Actions sociales (partage, favoris)
- * - Design responsive et moderne
- * - Analytics et tracking intégrés
- *
- * @param listing - Données complètes du listing
- * @param className - Classes CSS additionnelles
- * @returns JSX.Element - Onglet de présentation enrichi
+ * Helpers parsing robustes (enum[] / string / json string)
  */
+function normalizeToStringArray(value: unknown): string[] {
+  if (!value) return [];
+
+  if (Array.isArray(value)) {
+    return value.map((v) => String(v)).filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    // tenter JSON array
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed))
+        return parsed.map((v) => String(v)).filter(Boolean);
+    } catch {
+      // ignore
+    }
+    return [value].filter(Boolean);
+  }
+
+  // enum simple / autre
+  return [String(value)].filter(Boolean);
+}
+
 export default function PresentationTab({
   listing,
   className,
 }: PresentationTabProps): JSX.Element | null {
-  const [expandedDescription, setExpandedDescription] =
-    useState<boolean>(false);
-  const [shareCount, setShareCount] = useState<number>(0);
+  const [expandedDescription, setExpandedDescription] = useState(false);
+  const [shareCount, setShareCount] = useState(0); // tu peux l'afficher plus tard si tu veux
 
-  // Early return si pas de listing
-  if (!listing) {
-    return null;
-  }
+  if (!listing) return null;
 
   /**
-   * Parse les certifications avec informations enrichies
-   * Maintenant certifications est de type certification_enum[] (array d'enums)
+   * Certifications enrichies (certification_enum[])
    */
-  const certifications = useMemo(() => {
-    if (!listing.certifications) return [];
+  const certifications = useMemo<CertificationInfo[]>(() => {
+    const certs = normalizeToStringArray(listing.certifications)
+      .map((s) => s.trim())
+      .filter(Boolean);
 
-    // Certifications est maintenant un array d'enums certification_enum[]
-    let certs: string[] = [];
-
-    if (Array.isArray(listing.certifications)) {
-      // C'est déjà un array d'enums
-      certs = listing.certifications.map((cert) => String(cert));
-    } else {
-      // Fallback pour compatibilité (si c'était encore une string)
-      if (typeof listing.certifications === "string") {
-        try {
-          certs = JSON.parse(listing.certifications);
-        } catch {
-          certs = [listing.certifications];
-        }
-      } else {
-        // Si c'est un enum simple, convertir en array
-        certs = [String(listing.certifications)];
-      }
-    }
-
-    // Enrichir avec métadonnées (utiliser les vraies valeurs de l'enum)
     const certificationMap: Record<string, CertificationInfo> = {
       bio: {
         name: "Agriculture Biologique",
@@ -138,136 +113,133 @@ export default function PresentationTab({
       },
     };
 
-    return certs
-      .filter((cert) => cert && cert.trim()) // Filtrer les valeurs vides
-      .map((cert) => {
-        const cleanCert = cert.trim().toLowerCase();
-        return (
-          certificationMap[cleanCert] || {
-            name: cert.trim(),
-            icon: <Award className="h-3 w-3" />,
-            color: "gray",
-            description: "Certification spécialisée",
-          }
-        );
-      });
+    return certs.map((cert) => {
+      const key = cert.toLowerCase();
+      return (
+        certificationMap[key] || {
+          name: cert,
+          icon: <Award className="h-3 w-3" />,
+          color: "gray",
+          description: "Certification spécialisée",
+        }
+      );
+    });
   }, [listing.certifications]);
 
   /**
-   * Parse les méthodes de production
+   * Méthodes de production
    */
   const productionMethods = useMemo(() => {
-    if (!listing.production_method) return [];
+    const methods = normalizeToStringArray(listing.production_method)
+      .map((s) => s.trim())
+      .filter(Boolean);
 
-    let methods: string[] = [];
+    const methodMap: Record<string, { color: string; icon: ReactNode }> = {
+      organic: { color: "green", icon: <Leaf className="h-3 w-3" /> },
+      conventional: { color: "blue", icon: <Factory className="h-3 w-3" /> },
+      sustainable: {
+        color: "orange",
+        icon: <TrendingUp className="h-3 w-3" />,
+      },
+    };
 
-    // Production method est aussi probablement un enum ou array
-    if (Array.isArray(listing.production_method)) {
-      methods = listing.production_method.map((method) => String(method));
-    } else if (typeof listing.production_method === "string") {
-      try {
-        methods = JSON.parse(listing.production_method);
-      } catch {
-        methods = [listing.production_method];
-      }
-    } else {
-      methods = [String(listing.production_method)];
-    }
-
-    const methodMap: Record<string, { color: string; icon: React.ReactNode }> =
-      {
-        organic: { color: "green", icon: <Leaf className="h-3 w-3" /> },
-        conventional: { color: "blue", icon: <Factory className="h-3 w-3" /> },
-        sustainable: {
-          color: "orange",
-          icon: <TrendingUp className="h-3 w-3" />,
-        },
+    return methods.map((method) => {
+      const key = method.toLowerCase();
+      return {
+        name: method,
+        ...(methodMap[key] || {
+          color: "gray",
+          icon: <Factory className="h-3 w-3" />,
+        }),
       };
-
-    return methods.map((method) => ({
-      name: method.trim(),
-      ...(methodMap[method.trim().toLowerCase()] || {
-        color: "gray",
-        icon: <Factory className="h-3 w-3" />,
-      }),
-    }));
+    });
   }, [listing.production_method]);
 
   /**
-   * Génère les statistiques de la ferme (simulées pour l'exemple)
+   * ✅ Stats: 100% déterministes (plus de Math.random)
+   * - foundedYear: listing.founded_year, sinon created_at (année), sinon undefined
+   * - le reste: uniquement si tu as des champs réels (sinon on ne "fake" pas)
    */
-  const farmStats: FarmStats = useMemo(() => {
-    return {
-      foundedYear: 1980 + Math.floor(Math.random() * 40), // 1980-2020
-      farmSize: `${5 + Math.floor(Math.random() * 50)} hectares`, // 5-55 ha
-      employeeCount: 2 + Math.floor(Math.random() * 8), // 2-10 employés
-      productCount: 10 + Math.floor(Math.random() * 40), // 10-50 produits
-    };
-  }, []);
+  const farmStats = useMemo<FarmStats>(() => {
+    const foundedFromDb =
+      typeof (listing as any).founded_year === "number"
+        ? (listing as any).founded_year
+        : undefined;
 
-  /**
-   * Détermine si la description doit être tronquée
-   */
+    const foundedFromCreatedAt = (() => {
+      const raw = (listing as any).created_at;
+      if (!raw) return undefined;
+      const d = new Date(raw);
+      if (Number.isNaN(d.getTime())) return undefined;
+      return d.getFullYear();
+    })();
+
+    // IMPORTANT: pas d'invention de stats => pas de mismatch, et plus crédible.
+    return {
+      foundedYear: foundedFromDb ?? foundedFromCreatedAt,
+      // farmSize: listing.farm_size ?? undefined,
+      // employeeCount: listing.employee_count ?? undefined,
+      // productCount: listing.product_count ?? undefined,
+    };
+  }, [listing]);
+
   const shouldTruncateDescription = useMemo(() => {
-    return listing.description && listing.description.length > 300;
+    return !!listing.description && listing.description.length > 300;
   }, [listing.description]);
 
-  /**
-   * Obtient la description affichée (tronquée ou complète)
-   */
   const displayedDescription = useMemo(() => {
     if (!listing.description) return "";
-
-    if (!shouldTruncateDescription || expandedDescription) {
+    if (!shouldTruncateDescription || expandedDescription)
       return listing.description;
-    }
-
     return listing.description.substring(0, 300) + "...";
   }, [listing.description, shouldTruncateDescription, expandedDescription]);
 
-  /**
-   * Gère l'expansion de la description
-   */
-  const toggleDescription = useCallback((): void => {
-    setExpandedDescription((prev) => !prev);
+  const toggleDescription = useCallback(() => {
+    setExpandedDescription((prev) => {
+      const next = !prev;
 
-    // Analytics tracking
-    if (typeof window !== "undefined" && window.gtag) {
-      window.gtag("event", "toggle_description", {
-        event_category: "presentation_interaction",
-        event_label: expandedDescription ? "collapse" : "expand",
-        listing_id: listing.id,
-      });
-    }
-  }, [expandedDescription, listing.id]);
+      // Analytics (safe)
+      const gtag = (globalThis as any)?.gtag;
+      if (typeof gtag === "function") {
+        gtag("event", "toggle_description", {
+          event_category: "presentation_interaction",
+          event_label: next ? "expand" : "collapse",
+          listing_id: listing.id,
+        });
+      }
 
-  /**
-   * Gère le partage de la présentation
-   */
-  const handleShare = useCallback(async (): Promise<void> => {
+      return next;
+    });
+  }, [listing.id]);
+
+  const handleShare = useCallback(async () => {
     try {
+      // globalThis est safe SSR, mais la callback ne sera appelée que côté client.
+      const url = typeof window !== "undefined" ? window.location.href : "";
+
       const shareData = {
         title: `${listing.name || "Ferme locale"} | Présentation`,
-        text: `Découvrez ${listing.name || "cette ferme"} - ${listing.description?.substring(0, 100)}...`,
-        url: window.location.href,
+        text: `Découvrez ${listing.name || "cette ferme"} - ${listing.description?.substring(0, 100) || ""}...`,
+        url,
       };
 
-      if (
-        navigator.share &&
-        navigator.canShare &&
-        navigator.canShare(shareData)
-      ) {
-        await navigator.share(shareData);
-      } else {
-        await navigator.clipboard.writeText(window.location.href);
+      const nav = typeof navigator !== "undefined" ? navigator : null;
+
+      if (nav?.share && nav?.canShare && nav.canShare(shareData as any)) {
+        await nav.share(shareData as any);
+      } else if (nav?.clipboard?.writeText) {
+        await nav.clipboard.writeText(url);
         toast.success("Lien copié dans le presse-papier !");
+      } else {
+        toast.success("Partage non supporté sur cet appareil.");
       }
 
       setShareCount((prev) => prev + 1);
 
-      // Analytics tracking
-      if (typeof window !== "undefined" && window.gtag) {
-        window.gtag("event", "share_presentation", {
+      // Analytics
+      const gtag = (globalThis as any)?.gtag;
+      if (typeof gtag === "function") {
+        gtag("event", "share_presentation", {
           event_category: "presentation_interaction",
           listing_id: listing.id,
         });
@@ -278,9 +250,6 @@ export default function PresentationTab({
     }
   }, [listing.id, listing.name, listing.description]);
 
-  /**
-   * Obtient les classes de couleur pour les badges
-   */
   const getBadgeClasses = useCallback((color: string) => {
     const colorMap: Record<string, string> = {
       emerald:
@@ -298,7 +267,6 @@ export default function PresentationTab({
     return colorMap[color] || colorMap.gray;
   }, []);
 
-  // Si aucune donnée à afficher
   if (
     !listing.description &&
     certifications.length === 0 &&
@@ -337,7 +305,7 @@ export default function PresentationTab({
         </div>
       </div>
 
-      {/* Description de la ferme */}
+      {/* Description */}
       {listing.description && (
         <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm">
           <div className="flex items-center gap-2 mb-4">
@@ -355,7 +323,6 @@ export default function PresentationTab({
             </p>
           </div>
 
-          {/* Bouton pour expand/collapse */}
           {shouldTruncateDescription && (
             <Button
               variant="ghost"
@@ -369,7 +336,7 @@ export default function PresentationTab({
         </div>
       )}
 
-      {/* Statistiques rapides */}
+      {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {farmStats.foundedYear && (
           <div className="bg-white rounded-lg p-4 border border-gray-100 text-center">
@@ -427,7 +394,7 @@ export default function PresentationTab({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {certifications.map((cert, index) => (
               <div
-                key={index}
+                key={`${cert.name}-${index}`}
                 className={cn(
                   "flex items-center gap-3 p-3 rounded-lg border transition-all duration-200 hover:shadow-md cursor-pointer",
                   getBadgeClasses(cert.color)
@@ -462,7 +429,7 @@ export default function PresentationTab({
           <div className="flex flex-wrap gap-3">
             {productionMethods.map((method, index) => (
               <Badge
-                key={index}
+                key={`${method.name}-${index}`}
                 className={cn(
                   "flex items-center gap-2 py-2 px-4 text-sm transition-all duration-200 hover:shadow-md",
                   getBadgeClasses(method.color)

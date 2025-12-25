@@ -224,7 +224,7 @@ const FarmCard = memo<FarmCardProps>(function FarmCard({
       }}
     >
       <Link
-        href={`/view-listing/${item.id}`}
+        href={`/farm/${item.id}`}
         prefetch={false}
         className="block"
       >

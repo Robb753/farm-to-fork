@@ -1,4 +1,3 @@
-// app/(routes)/view-listing/_components/ReviewsTab.tsx
 "use client";
 
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";

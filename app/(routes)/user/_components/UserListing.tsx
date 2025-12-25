@@ -270,7 +270,7 @@ export default function UserListing(): JSX.Element {
 
                 {/* Actions */}
                 <div className="flex gap-2 pt-2">
-                  <Link href={`/view-listing/${listing.id}`} className="flex-1">
+                  <Link href={`/farm/${listing.id}`} className="flex-1">
                     <Button size="sm" variant="outline" className="w-full">
                       Voir
                     </Button>

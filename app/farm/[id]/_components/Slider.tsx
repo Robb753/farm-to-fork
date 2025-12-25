@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Carousel,
   CarouselContent,
@@ -11,26 +11,41 @@ import {
 import { ChevronLeft, ChevronRight, X, ZoomIn } from "@/utils/icons";
 import OptimizedImage from "@/components/ui/OptimizedImage";
 
-function Slider({ imageList }) {
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+export type SliderImage = {
+  url?: string | null;
+  // tu peux étendre plus tard (id, alt, etc.)
+};
+
+interface SliderProps {
+  imageList?: SliderImage[] | null;
+}
+
+export default function Slider({ imageList }: SliderProps): JSX.Element {
+  const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
 
   const defaultImage = "/placeholder-farm.jpg";
-  const hasImages = imageList && imageList.length > 0;
 
-  const handlePrevious = () => {
+  const safeImages = useMemo<SliderImage[]>(
+    () => (Array.isArray(imageList) ? imageList.filter(Boolean) : []),
+    [imageList]
+  );
+
+  const hasImages = safeImages.length > 0;
+
+  const handlePrevious = (): void => {
     setCurrentImageIndex((prev) =>
-      prev === 0 ? (hasImages ? imageList.length - 1 : 0) : prev - 1
+      prev === 0 ? (hasImages ? safeImages.length - 1 : 0) : prev - 1
     );
   };
 
-  const handleNext = () => {
+  const handleNext = (): void => {
     setCurrentImageIndex((prev) =>
-      hasImages ? (prev + 1) % imageList.length : 0
+      hasImages ? (prev + 1) % safeImages.length : 0
     );
   };
 
-  const handleImageClick = (index) => {
+  const handleImageClick = (index: number): void => {
     setCurrentImageIndex(index);
     setIsModalOpen(true);
   };
@@ -46,7 +61,15 @@ function Slider({ imageList }) {
     );
   }
 
-  const currentImage = imageList[currentImageIndex];
+  // sécurise l’index si l’array change
+  const clampedIndex =
+    currentImageIndex < 0
+      ? 0
+      : currentImageIndex >= safeImages.length
+        ? safeImages.length - 1
+        : currentImageIndex;
+
+  const currentImage = safeImages[clampedIndex];
 
   if (isModalOpen && currentImage) {
     return (
@@ -57,7 +80,7 @@ function Slider({ imageList }) {
               src={currentImage.url || defaultImage}
               fill
               sizes="90vw"
-              alt={`Agrandissement image ${currentImageIndex + 1}`}
+              alt={`Agrandissement image ${clampedIndex + 1}`}
               objectFit="contain"
               className="bg-black"
               fallbackSrc={defaultImage}
@@ -66,6 +89,7 @@ function Slider({ imageList }) {
           </div>
 
           <button
+            type="button"
             className="absolute top-4 right-4 bg-black/60 text-white p-2 rounded-full hover:bg-black/80"
             onClick={() => setIsModalOpen(false)}
           >
@@ -73,6 +97,7 @@ function Slider({ imageList }) {
           </button>
 
           <button
+            type="button"
             className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/60 text-white p-2 rounded-full hover:bg-black/80"
             onClick={handlePrevious}
           >
@@ -80,6 +105,7 @@ function Slider({ imageList }) {
           </button>
 
           <button
+            type="button"
             className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/60 text-white p-2 rounded-full hover:bg-black/80"
             onClick={handleNext}
           >
@@ -87,7 +113,7 @@ function Slider({ imageList }) {
           </button>
 
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white py-1 px-3 rounded-full text-sm">
-            {currentImageIndex + 1} / {imageList.length}
+            {clampedIndex + 1} / {safeImages.length}
           </div>
         </div>
       </div>
@@ -98,11 +124,17 @@ function Slider({ imageList }) {
     <div className="relative group">
       <Carousel className="w-full">
         <CarouselContent>
-          {imageList.map((item, index) => (
+          {safeImages.map((item, index) => (
             <CarouselItem key={index}>
               <div
                 className="relative aspect-[4/3] h-auto max-h-[400px] rounded-lg overflow-hidden cursor-pointer"
                 onClick={() => handleImageClick(index)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ")
+                    handleImageClick(index);
+                }}
               >
                 <OptimizedImage
                   src={item.url || defaultImage}
@@ -126,17 +158,22 @@ function Slider({ imageList }) {
         <CarouselNext className="opacity-0 group-hover:opacity-100 transition-opacity" />
       </Carousel>
 
-      {imageList.length > 1 && (
+      {safeImages.length > 1 && (
         <div className="mt-4 flex space-x-2 overflow-x-auto pb-2 justify-center">
-          {imageList.map((item, index) => (
+          {safeImages.map((item, index) => (
             <div
               key={index}
               className={`relative h-16 w-16 flex-shrink-0 rounded-md overflow-hidden border-2 cursor-pointer ${
-                currentImageIndex === index
+                clampedIndex === index
                   ? "border-green-500"
                   : "border-transparent"
               }`}
               onClick={() => handleImageClick(index)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") handleImageClick(index);
+              }}
             >
               <OptimizedImage
                 src={item.url || defaultImage}
@@ -156,5 +193,3 @@ function Slider({ imageList }) {
     </div>
   );
 }
-
-export default Slider;

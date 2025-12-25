@@ -1,4 +1,3 @@
-// app/(routes)/view-listing/[id]/loading.tsx
 "use client";
 
 import React from "react";

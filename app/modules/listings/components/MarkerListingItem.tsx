@@ -96,7 +96,7 @@ function MarkerListingItem({
     if (onNavigate) {
       onNavigate(id);
     } else if (typeof window !== "undefined") {
-      window.location.href = `/view-listing/${id}`;
+      window.location.href = `/farm/${id}`;
     }
   }, [id, onNavigate]);
 

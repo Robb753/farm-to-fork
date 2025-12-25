@@ -1,4 +1,4 @@
-// lib/store/userStore.ts - Version corrigée
+// lib/store/userStore.ts - Version corrigée (jsonb favorites + TS safe)
 import { create } from "zustand";
 import { persist, subscribeWithSelector } from "zustand/middleware";
 import {
@@ -8,12 +8,18 @@ import {
 } from "@/lib/syncUserUtils";
 import { toast } from "sonner";
 import { supabase } from "@/utils/supabase/client";
-// Type Clerk
 import type { UserResource } from "@clerk/types";
+import type { Json } from "@/lib/types/database";
 
-// Types locaux pour éviter les imports problématiques
+// ==================== TYPES ====================
+
+// ⚠️ Chez toi, la table profiles a:
+// - id: number
+// - user_id: string (Clerk)
+// Ici, ton store utilise "id" comme identifiant Clerk (string).
+// (On garde ton choix pour éviter de casser le reste de ton app.)
 export interface UserProfile {
-  id: string;
+  id: string; // Clerk user id
   email: string;
   role: "user" | "farmer" | "admin";
   favorites: number[];
@@ -22,17 +28,14 @@ export interface UserProfile {
 export type Role = "user" | "farmer" | "admin" | null;
 
 interface UserState {
-  // État utilisateur
   profile: UserProfile | null;
   role: Role;
 
-  // États de synchronisation
   isSyncing: boolean;
   isReady: boolean;
   isWaitingForProfile: boolean;
   syncError: string | null;
 
-  // Actions
   setProfile: (profile: UserProfile | null) => void;
   setRole: (role: Role) => void;
   setSyncing: (syncing: boolean) => void;
@@ -40,32 +43,43 @@ interface UserState {
   setWaitingForProfile: (waiting: boolean) => void;
   setSyncError: (error: string | null) => void;
 
-  // Actions métier
   syncUser: (user: UserResource | null) => Promise<void>;
   resyncRole: (user: UserResource | null) => Promise<void>;
 
-  // Actions favorites (optimisées avec Supabase sync)
   loadFavorites: (userId: string) => Promise<void>;
   toggleFavorite: (listingId: number, userId: string) => Promise<void>;
   addFavorite: (listingId: number) => void;
   removeFavorite: (listingId: number) => void;
   isFavorite: (listingId: number) => boolean;
 
-  // Utils
   reset: () => void;
   logoutReset: () => Promise<void>;
 }
 
-const parseFavorites = (favorites: string | null): string[] => {
-  if (!favorites) return [];
+// ==================== HELPERS ====================
 
-  try {
-    const parsed = JSON.parse(favorites);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (error) {
-    console.warn("Erreur parsing favorites:", error);
-    return [];
+// Robust jsonb -> number[]
+const toNumberArray = (value: unknown): number[] => {
+  if (!value) return [];
+
+  // Supabase jsonb renvoie souvent déjà un array
+  if (Array.isArray(value)) {
+    return value
+      .map((v) => (typeof v === "number" ? v : Number(v)))
+      .filter((n) => Number.isFinite(n));
   }
+
+  // Compat avec ancien stockage stringifié
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return toNumberArray(parsed);
+    } catch {
+      return [];
+    }
+  }
+
+  return [];
 };
 
 const INITIAL_STATE: Omit<
@@ -94,6 +108,8 @@ const INITIAL_STATE: Omit<
   syncError: null,
 };
 
+// ==================== STORE ====================
+
 export const useUserStore = create<UserState>()(
   subscribeWithSelector(
     persist(
@@ -109,8 +125,7 @@ export const useUserStore = create<UserState>()(
           set({ isWaitingForProfile }),
         setSyncError: (syncError) => set({ syncError }),
 
-        // ==================== ACTIONS FAVORITES ====================
-        // Charger les favoris depuis Supabase
+        // ==================== FAVORITES ====================
         loadFavorites: async (userId) => {
           try {
             const { data, error } = await supabase
@@ -121,19 +136,7 @@ export const useUserStore = create<UserState>()(
 
             if (error) throw error;
 
-            // Parser le JSON string en array
-            let favoritesArray: number[] = [];
-            if (data?.favorites) {
-              try {
-                favoritesArray = JSON.parse(data.favorites);
-              } catch (parseError) {
-                console.warn(
-                  "[UserStore] Erreur parsing favorites:",
-                  parseError
-                );
-                favoritesArray = [];
-              }
-            }
+            const favoritesArray = toNumberArray(data?.favorites);
 
             set((state) => {
               if (!state.profile) return state;
@@ -150,7 +153,6 @@ export const useUserStore = create<UserState>()(
           }
         },
 
-        // Toggle favorite avec optimistic update et sync Supabase
         toggleFavorite: async (listingId, userId) => {
           const state = get();
           if (!state.profile) {
@@ -164,8 +166,9 @@ export const useUserStore = create<UserState>()(
             ? state.profile.favorites.filter((id) => id !== listingId)
             : [...state.profile.favorites, listingId];
 
-          // Optimistic update (mise à jour immédiate de l'UI)
           const previousFavorites = state.profile.favorites;
+
+          // Optimistic update
           set((s) => {
             if (!s.profile) return s;
             return {
@@ -177,10 +180,10 @@ export const useUserStore = create<UserState>()(
           });
 
           try {
-            // Synchronisation avec Supabase (stringify pour le champ text)
+            // ✅ colonne = jsonb => on envoie directement un array (pas stringify)
             const { error } = await supabase
               .from("profiles")
-              .update({ favorites: JSON.stringify(updatedFavorites) })
+              .update({ favorites: updatedFavorites as unknown as Json })
               .eq("user_id", userId);
 
             if (error) throw error;
@@ -190,7 +193,8 @@ export const useUserStore = create<UserState>()(
             );
           } catch (error) {
             console.error("[UserStore] Error toggling favorite:", error);
-            // Rollback en cas d'erreur
+
+            // Rollback
             set((s) => {
               if (!s.profile) return s;
               return {
@@ -200,11 +204,11 @@ export const useUserStore = create<UserState>()(
                 },
               };
             });
+
             toast.error("Erreur lors de la mise à jour des favoris");
           }
         },
 
-        // Actions simples pour l'état local (utilisées par loadFavorites)
         addFavorite: (listingId) =>
           set((state) => {
             if (!state.profile) return state;
@@ -231,7 +235,6 @@ export const useUserStore = create<UserState>()(
             };
           }),
 
-        // Helper pour vérifier si un listing est favori
         isFavorite: (listingId) => {
           const state = get();
           return state.profile?.favorites.includes(listingId) ?? false;
@@ -247,7 +250,6 @@ export const useUserStore = create<UserState>()(
             setReady,
           } = get();
 
-          // cas déconnecté : on réinitialise proprement l'app
           if (!user) {
             setSyncing(false);
             setWaitingForProfile(false);
@@ -262,16 +264,13 @@ export const useUserStore = create<UserState>()(
           setSyncError(null);
 
           try {
-            // 1) Résoudre le rôle (Clerk+Supabase)
             const resolvedRole = await determineUserRole(user);
             setRole(resolvedRole);
 
-            // 2) Répercuter côté Clerk si besoin
             if ((user.publicMetadata as any)?.role !== resolvedRole) {
               await updateClerkRole(user.id, resolvedRole);
             }
 
-            // 3) Synchroniser/mettre à jour le profil Supabase
             await syncProfileToSupabase(user, resolvedRole, {
               createListing: resolvedRole === "farmer",
             });
@@ -282,10 +281,11 @@ export const useUserStore = create<UserState>()(
               e instanceof Error ? e.message : "Erreur de synchronisation";
             console.error("[UserStore] Erreur de synchronisation:", e);
             setSyncError(errMsg);
+
             toast.error(
               "Erreur de synchronisation du profil. Certaines fonctionnalités peuvent être limitées."
             );
-            // Fallback raisonnable
+
             setRole("user");
             setReady(true);
           } finally {
@@ -297,6 +297,7 @@ export const useUserStore = create<UserState>()(
         resyncRole: async (user) => {
           const { isSyncing, setSyncing, setSyncError, setRole, setReady } =
             get();
+
           if (!user) {
             console.warn("[UserStore] Aucun utilisateur pour la re-sync");
             return;
@@ -311,6 +312,7 @@ export const useUserStore = create<UserState>()(
             setRole(resolvedRole);
             await updateClerkRole(user.id, resolvedRole);
             await syncProfileToSupabase(user, resolvedRole);
+
             toast.success("Profil synchronisé avec succès");
             setReady(true);
           } catch (e: unknown) {
@@ -326,18 +328,17 @@ export const useUserStore = create<UserState>()(
 
         // ==================== UTILS ====================
         reset: () => set({ ...INITIAL_STATE }),
+
         logoutReset: async () => {
           set({ ...INITIAL_STATE });
-          // Efface aussi le storage persisté
-          const persist = (useUserStore as any).persist;
-          if (persist?.clearStorage) {
-            await persist.clearStorage();
+          const persistApi = (useUserStore as any).persist;
+          if (persistApi?.clearStorage) {
+            await persistApi.clearStorage();
           }
         },
       }),
       {
         name: "farm2fork-user",
-        // On ne persiste que ce qui est utile à la reprise
         partialize: (state) => ({
           profile: state.profile,
           role: state.role,
@@ -379,6 +380,5 @@ export const useUserActions = () =>
     logoutReset: s.logoutReset,
   }));
 
-// Helper selector pour vérifier si un listing est favori
 export const useIsFavorite = (listingId: number) =>
   useUserStore((s) => s.profile?.favorites.includes(listingId) ?? false);

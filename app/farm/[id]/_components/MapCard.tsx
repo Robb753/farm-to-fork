@@ -1,4 +1,3 @@
-// app/(routes)/view-listing/_components/MapCard.tsx
 "use client";
 
 import SingleFarmMapbox from "@/app/modules/maps/components/SingleFarmMapbox";
@@ -34,7 +33,7 @@ interface Coordinates {
 
 /**
  * Composant de carte de localisation pour un listing
- * 
+ *
  * Features:
  * - Affichage de carte interactive avec Mapbox
  * - Actions rapides (directions, partage de localisation)
@@ -42,13 +41,17 @@ interface Coordinates {
  * - Fallback élégant si pas de coordonnées
  * - Intégration avec services externes (Google Maps, Apple Plans)
  * - Analytics et tracking des interactions
- * 
+ *
  * @param listing - Données du listing avec localisation
  * @param className - Classes CSS additionnelles
  * @returns JSX.Element - Card de carte interactive
  */
-export default function MapCard({ listing, className }: MapCardProps): JSX.Element | null {
-  const [isLoadingDirections, setIsLoadingDirections] = useState<boolean>(false);
+export default function MapCard({
+  listing,
+  className,
+}: MapCardProps): JSX.Element | null {
+  const [isLoadingDirections, setIsLoadingDirections] =
+    useState<boolean>(false);
 
   // Early return si pas de listing
   if (!listing) {
@@ -71,14 +74,17 @@ export default function MapCard({ listing, className }: MapCardProps): JSX.Eleme
     else if (listing.coordinates) {
       if (typeof listing.coordinates === "object") {
         const coords = listing.coordinates as any;
-        
+
         // Format objet {lat, lng}
         if (typeof coords.lat === "number" && typeof coords.lng === "number") {
           lat = coords.lat;
           lng = coords.lng;
         }
         // Format objet {latitude, longitude}
-        else if (typeof coords.latitude === "number" && typeof coords.longitude === "number") {
+        else if (
+          typeof coords.latitude === "number" &&
+          typeof coords.longitude === "number"
+        ) {
           lat = coords.latitude;
           lng = coords.longitude;
         }
@@ -174,7 +180,13 @@ export default function MapCard({ listing, className }: MapCardProps): JSX.Eleme
     } finally {
       setIsLoadingDirections(false);
     }
-  }, [coordinates, listing.id, listing.name, getAppleMapsUrl, getGoogleMapsUrl]);
+  }, [
+    coordinates,
+    listing.id,
+    listing.name,
+    getAppleMapsUrl,
+    getGoogleMapsUrl,
+  ]);
 
   /**
    * Copie les coordonnées dans le presse-papier
@@ -188,7 +200,7 @@ export default function MapCard({ listing, className }: MapCardProps): JSX.Eleme
     try {
       const coordsText = `${coordinates.lat}, ${coordinates.lng}`;
       await navigator.clipboard.writeText(coordsText);
-      
+
       toast.success("Coordonnées copiées dans le presse-papier");
 
       // Analytics tracking
@@ -219,7 +231,11 @@ export default function MapCard({ listing, className }: MapCardProps): JSX.Eleme
         url: getGoogleMapsUrl(coordinates),
       };
 
-      if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+      if (
+        navigator.share &&
+        navigator.canShare &&
+        navigator.canShare(shareData)
+      ) {
         await navigator.share(shareData);
         toast.success("Localisation partagée avec succès");
       } else {
@@ -239,7 +255,13 @@ export default function MapCard({ listing, className }: MapCardProps): JSX.Eleme
       console.error("Erreur lors du partage de localisation:", error);
       toast.error("Impossible de partager la localisation");
     }
-  }, [coordinates, listing.id, listing.name, listing.address, getGoogleMapsUrl]);
+  }, [
+    coordinates,
+    listing.id,
+    listing.name,
+    listing.address,
+    getGoogleMapsUrl,
+  ]);
 
   // Ne pas afficher si pas de coordonnées valides
   if (!coordinates.isValid) {
@@ -249,41 +271,42 @@ export default function MapCard({ listing, className }: MapCardProps): JSX.Eleme
   const name = listing.name || "Ferme locale";
 
   return (
-    <Card className={cn("overflow-hidden border-gray-100 shadow-sm hover:shadow-md transition-shadow", className)}>
-      
+    <Card
+      className={cn(
+        "overflow-hidden border-gray-100 shadow-sm hover:shadow-md transition-shadow",
+        className
+      )}
+    >
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center text-green-700 text-lg">
             <MapPin className="h-5 w-5 mr-2" />
             Localisation
           </CardTitle>
-          
+
           {/* Coordonnées en petit */}
           <div className="text-xs text-gray-500 font-mono">
             {coordinates.lat.toFixed(4)}, {coordinates.lng.toFixed(4)}
           </div>
         </div>
-        
+
         {/* Adresse si disponible */}
         {listing.address && (
-          <p className="text-sm text-gray-600 mt-1">
-            {listing.address}
-          </p>
+          <p className="text-sm text-gray-600 mt-1">{listing.address}</p>
         )}
       </CardHeader>
-      
+
       <CardContent className="space-y-4 pt-0">
-        
         {/* Carte interactive */}
         <div className="relative group">
           <div className="aspect-[4/3] rounded-lg overflow-hidden border border-gray-200 bg-gray-100">
-            <SingleFarmMapbox 
-              lat={coordinates.lat} 
-              lng={coordinates.lng} 
+            <SingleFarmMapbox
+              lat={coordinates.lat}
+              lng={coordinates.lng}
               name={name}
             />
           </div>
-          
+
           {/* Overlay avec actions au hover */}
           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg pointer-events-none">
             <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-auto">
@@ -301,7 +324,6 @@ export default function MapCard({ listing, className }: MapCardProps): JSX.Eleme
 
         {/* Actions rapides */}
         <div className="flex flex-col gap-2">
-          
           {/* Bouton directions */}
           <Button
             onClick={handleGetDirections}
@@ -332,7 +354,7 @@ export default function MapCard({ listing, className }: MapCardProps): JSX.Eleme
               <ExternalLink className="h-3 w-3 mr-1" />
               Partager
             </Button>
-            
+
             <Button
               variant="outline"
               size="sm"
@@ -351,7 +373,8 @@ export default function MapCard({ listing, className }: MapCardProps): JSX.Eleme
         {/* Info utile */}
         <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
           <p className="text-blue-800 text-xs text-center">
-            💡 <strong>Astuce :</strong> Cliquez sur "Obtenir l'itinéraire" pour ouvrir votre app de navigation préférée
+            💡 <strong>Astuce :</strong> Cliquez sur "Obtenir l'itinéraire" pour
+            ouvrir votre app de navigation préférée
           </p>
         </div>
       </CardContent>

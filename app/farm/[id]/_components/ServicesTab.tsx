@@ -1,13 +1,12 @@
-// app/(routes)/view-listing/_components/ServicesTab.tsx
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { 
-  Calendar, 
-  Clock, 
-  Users, 
+import {
+  Calendar,
+  Clock,
+  Users,
   MapPin,
   Phone,
   Euro,
@@ -22,7 +21,7 @@ import {
   Utensils,
   ShoppingCart,
   Heart,
-  Award
+  Award,
 } from "@/utils/icons";
 import { useState, useMemo, useCallback } from "react";
 import { useUser } from "@clerk/nextjs";
@@ -50,7 +49,13 @@ interface Service {
   id: string;
   name: string;
   description?: string;
-  category: "visit" | "workshop" | "delivery" | "tasting" | "accommodation" | "other";
+  category:
+    | "visit"
+    | "workshop"
+    | "delivery"
+    | "tasting"
+    | "accommodation"
+    | "other";
   icon: React.ReactNode;
   color: string;
   price?: number;
@@ -78,7 +83,7 @@ interface ServiceCategory {
 
 /**
  * Composant d'affichage des services d'une ferme
- * 
+ *
  * Features:
  * - Affichage des services par catégories avec icônes
  * - Système de réservation pour les activités
@@ -88,12 +93,15 @@ interface ServiceCategory {
  * - Design responsive avec grid adaptatif
  * - Services mis en avant (featured)
  * - Gestion des capacités et restrictions d'âge
- * 
+ *
  * @param listing - Données du listing avec services
  * @param className - Classes CSS additionnelles
  * @returns JSX.Element - Onglet des services enrichi
  */
-export default function ServicesTab({ listing, className }: ServicesTabProps): JSX.Element {
+export default function ServicesTab({
+  listing,
+  className,
+}: ServicesTabProps): JSX.Element {
   const { user } = useUser();
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [showBookingForm, setShowBookingForm] = useState<string | null>(null);
@@ -103,7 +111,7 @@ export default function ServicesTab({ listing, className }: ServicesTabProps): J
    */
   const serviceCategories: ServiceCategory[] = useMemo(() => {
     const rawServices = listing?.additional_services;
-    
+
     if (!rawServices) {
       // Générer des services par défaut basés sur le type de ferme
       return generateDefaultServices(listing);
@@ -125,7 +133,7 @@ export default function ServicesTab({ listing, className }: ServicesTabProps): J
     }
 
     // Convertir en services enrichis
-    const enrichedServices = parsedServices.map(serviceType => 
+    const enrichedServices = parsedServices.map((serviceType) =>
       createServiceFromType(serviceType)
     );
 
@@ -136,7 +144,9 @@ export default function ServicesTab({ listing, className }: ServicesTabProps): J
   /**
    * Génère des services par défaut selon le type de ferme
    */
-  function generateDefaultServices(listing: ListingWithServices | null): ServiceCategory[] {
+  function generateDefaultServices(
+    listing: ListingWithServices | null
+  ): ServiceCategory[] {
     if (!listing) return [];
 
     const farmType = listing.typeferme?.toLowerCase() || "";
@@ -148,7 +158,8 @@ export default function ServicesTab({ listing, className }: ServicesTabProps): J
         {
           id: "farm-visit",
           name: "Visite de l'exploitation",
-          description: "Découvrez nos techniques de culture et nos légumes de saison",
+          description:
+            "Découvrez nos techniques de culture et nos légumes de saison",
           category: "visit",
           icon: <MapPin className="h-4 w-4" />,
           color: "green",
@@ -157,7 +168,11 @@ export default function ServicesTab({ listing, className }: ServicesTabProps): J
           capacity: 20,
           featured: true,
           bookingRequired: true,
-          includes: ["Visite guidée", "Dégustation", "Explication des techniques"]
+          includes: [
+            "Visite guidée",
+            "Dégustation",
+            "Explication des techniques",
+          ],
         },
         {
           id: "basket-delivery",
@@ -168,29 +183,27 @@ export default function ServicesTab({ listing, className }: ServicesTabProps): J
           color: "blue",
           price: 25,
           availability: ["Mardi", "Jeudi", "Samedi"],
-          includes: ["Légumes de saison", "Recettes", "Conservation"]
+          includes: ["Légumes de saison", "Recettes", "Conservation"],
         }
       );
     }
 
     if (farmType.includes("élevage") || farmType.includes("laitier")) {
-      defaultServices.push(
-        {
-          id: "dairy-workshop",
-          name: "Atelier fabrication fromage",
-          description: "Apprenez à fabriquer votre propre fromage",
-          category: "workshop",
-          icon: <BookOpen className="h-4 w-4" />,
-          color: "orange",
-          price: 35,
-          duration: "3h",
-          capacity: 12,
-          featured: true,
-          bookingRequired: true,
-          ageRestriction: "8 ans minimum",
-          includes: ["Matériel", "Ingrédients", "Fromage à emporter", "Recettes"]
-        }
-      );
+      defaultServices.push({
+        id: "dairy-workshop",
+        name: "Atelier fabrication fromage",
+        description: "Apprenez à fabriquer votre propre fromage",
+        category: "workshop",
+        icon: <BookOpen className="h-4 w-4" />,
+        color: "orange",
+        price: 35,
+        duration: "3h",
+        capacity: 12,
+        featured: true,
+        bookingRequired: true,
+        ageRestriction: "8 ans minimum",
+        includes: ["Matériel", "Ingrédients", "Fromage à emporter", "Recettes"],
+      });
     }
 
     if (farmType.includes("fruit") || farmType.includes("arboricult")) {
@@ -205,7 +218,7 @@ export default function ServicesTab({ listing, className }: ServicesTabProps): J
           price: 8,
           duration: "2h",
           seasons: ["Printemps", "Été", "Automne"],
-          includes: ["Panier de cueillette", "Pesée", "Conseils"]
+          includes: ["Panier de cueillette", "Pesée", "Conseils"],
         },
         {
           id: "jam-tasting",
@@ -217,7 +230,7 @@ export default function ServicesTab({ listing, className }: ServicesTabProps): J
           price: 12,
           duration: "45min",
           capacity: 15,
-          includes: ["6 confitures", "Pain artisanal", "Café/Thé"]
+          includes: ["6 confitures", "Pain artisanal", "Café/Thé"],
         }
       );
     }
@@ -230,41 +243,41 @@ export default function ServicesTab({ listing, className }: ServicesTabProps): J
    */
   function createServiceFromType(serviceType: string): Service {
     const serviceMap: Record<string, Partial<Service>> = {
-      "farm_visits": {
+      farm_visits: {
         name: "Visites de ferme",
         description: "Découvrez notre exploitation agricole",
         category: "visit",
         icon: <MapPin className="h-4 w-4" />,
         color: "green",
         price: 8,
-        duration: "1h30"
+        duration: "1h30",
       },
-      "workshops": {
+      workshops: {
         name: "Ateliers pratiques",
         description: "Apprenez les techniques agricoles",
         category: "workshop",
         icon: <BookOpen className="h-4 w-4" />,
         color: "orange",
         price: 25,
-        duration: "2h"
+        duration: "2h",
       },
-      "tasting": {
+      tasting: {
         name: "Dégustations",
         description: "Goûtez nos produits de la ferme",
         category: "tasting",
         icon: <Utensils className="h-4 w-4" />,
         color: "purple",
         price: 15,
-        duration: "1h"
+        duration: "1h",
       },
-      "delivery": {
+      delivery: {
         name: "Service de livraison",
         description: "Livraison à domicile de nos produits",
         category: "delivery",
         icon: <Truck className="h-4 w-4" />,
         color: "blue",
-        price: 5
-      }
+        price: 5,
+      },
     };
 
     const baseService = serviceMap[serviceType] || {
@@ -272,7 +285,7 @@ export default function ServicesTab({ listing, className }: ServicesTabProps): J
       description: `Service ${serviceType}`,
       category: "other" as const,
       icon: <Star className="h-4 w-4" />,
-      color: "gray"
+      color: "gray",
     };
 
     return {
@@ -281,7 +294,7 @@ export default function ServicesTab({ listing, className }: ServicesTabProps): J
       featured: false,
       capacity: 15,
       includes: ["Service inclus"],
-      ...baseService
+      ...baseService,
     } as Service;
   }
 
@@ -291,9 +304,9 @@ export default function ServicesTab({ listing, className }: ServicesTabProps): J
   function groupServicesByCategory(services: Service[]): ServiceCategory[] {
     const categoryMap: Record<string, ServiceCategory> = {};
 
-    services.forEach(service => {
+    services.forEach((service) => {
       const categoryId = service.category;
-      
+
       if (!categoryMap[categoryId]) {
         categoryMap[categoryId] = {
           id: categoryId,
@@ -301,10 +314,10 @@ export default function ServicesTab({ listing, className }: ServicesTabProps): J
           description: getCategoryDescription(categoryId),
           icon: getCategoryIcon(categoryId),
           color: getCategoryColor(categoryId),
-          services: []
+          services: [],
         };
       }
-      
+
       categoryMap[categoryId].services.push(service);
     });
 
@@ -321,7 +334,7 @@ export default function ServicesTab({ listing, className }: ServicesTabProps): J
       delivery: "Livraison & Services",
       tasting: "Dégustations",
       accommodation: "Hébergement",
-      other: "Autres Services"
+      other: "Autres Services",
     };
     return names[categoryId as keyof typeof names] || "Services";
   }
@@ -336,7 +349,7 @@ export default function ServicesTab({ listing, className }: ServicesTabProps): J
       delivery: "Recevez nos produits frais directement chez vous",
       tasting: "Savourez nos produits dans un cadre authentique",
       accommodation: "Séjournez à la ferme pour une expérience complète",
-      other: "Services additionnels proposés par notre exploitation"
+      other: "Services additionnels proposés par notre exploitation",
     };
     return descriptions[categoryId as keyof typeof descriptions] || "";
   }
@@ -351,9 +364,11 @@ export default function ServicesTab({ listing, className }: ServicesTabProps): J
       delivery: <Truck className="h-5 w-5" />,
       tasting: <Utensils className="h-5 w-5" />,
       accommodation: <Heart className="h-5 w-5" />,
-      other: <Star className="h-5 w-5" />
+      other: <Star className="h-5 w-5" />,
     };
-    return icons[categoryId as keyof typeof icons] || <Star className="h-5 w-5" />;
+    return (
+      icons[categoryId as keyof typeof icons] || <Star className="h-5 w-5" />
+    );
   }
 
   /**
@@ -362,11 +377,11 @@ export default function ServicesTab({ listing, className }: ServicesTabProps): J
   function getCategoryColor(categoryId: string): string {
     const colors = {
       visit: "green",
-      workshop: "orange", 
+      workshop: "orange",
       delivery: "blue",
       tasting: "purple",
       accommodation: "pink",
-      other: "gray"
+      other: "gray",
     };
     return colors[categoryId as keyof typeof colors] || "gray";
   }
@@ -378,14 +393,17 @@ export default function ServicesTab({ listing, className }: ServicesTabProps): J
     if (selectedCategory === "all") {
       return serviceCategories;
     }
-    return serviceCategories.filter(cat => cat.id === selectedCategory);
+    return serviceCategories.filter((cat) => cat.id === selectedCategory);
   }, [serviceCategories, selectedCategory]);
 
   /**
    * Compte le nombre total de services
    */
   const totalServices = useMemo(() => {
-    return serviceCategories.reduce((total, category) => total + category.services.length, 0);
+    return serviceCategories.reduce(
+      (total, category) => total + category.services.length,
+      0
+    );
   }, [serviceCategories]);
 
   /**
@@ -399,7 +417,7 @@ export default function ServicesTab({ listing, className }: ServicesTabProps): J
       purple: "bg-purple-100 text-purple-700 border-purple-200",
       red: "bg-red-100 text-red-700 border-red-200",
       pink: "bg-pink-100 text-pink-700 border-pink-200",
-      gray: "bg-gray-100 text-gray-700 border-gray-200"
+      gray: "bg-gray-100 text-gray-700 border-gray-200",
     };
     return colorMap[color] || colorMap.gray;
   }, []);
@@ -407,45 +425,51 @@ export default function ServicesTab({ listing, className }: ServicesTabProps): J
   /**
    * Gère la réservation d'un service
    */
-  const handleBooking = useCallback((serviceId: string): void => {
-    if (!user) {
-      toast.error("Connectez-vous pour réserver un service");
-      return;
-    }
+  const handleBooking = useCallback(
+    (serviceId: string): void => {
+      if (!user) {
+        toast.error("Connectez-vous pour réserver un service");
+        return;
+      }
 
-    setShowBookingForm(serviceId);
-    
-    // Analytics tracking
-    if (typeof window !== "undefined" && window.gtag) {
-      window.gtag("event", "service_booking_intent", {
-        event_category: "services_interaction",
-        event_label: serviceId,
-        listing_id: listing?.id,
-      });
-    }
-  }, [user, listing?.id]);
+      setShowBookingForm(serviceId);
+
+      // Analytics tracking
+      if (typeof window !== "undefined" && window.gtag) {
+        window.gtag("event", "service_booking_intent", {
+          event_category: "services_interaction",
+          event_label: serviceId,
+          listing_id: listing?.id,
+        });
+      }
+    },
+    [user, listing?.id]
+  );
 
   /**
    * Gère le contact pour un service
    */
-  const handleContact = useCallback((serviceId: string): void => {
-    // Ouvrir le contact ou rediriger vers WhatsApp/téléphone
-    const phone = listing?.phoneNumber;
-    if (phone) {
-      window.open(`tel:${phone}`, "_self");
-    } else {
-      toast.info("Contactez la ferme pour plus d'informations");
-    }
+  const handleContact = useCallback(
+    (serviceId: string): void => {
+      // Ouvrir le contact ou rediriger vers WhatsApp/téléphone
+      const phone = listing?.phoneNumber;
+      if (phone) {
+        window.open(`tel:${phone}`, "_self");
+      } else {
+        toast.info("Contactez la ferme pour plus d'informations");
+      }
 
-    // Analytics tracking
-    if (typeof window !== "undefined" && window.gtag) {
-      window.gtag("event", "service_contact", {
-        event_category: "services_interaction", 
-        event_label: serviceId,
-        listing_id: listing?.id,
-      });
-    }
-  }, [listing?.phoneNumber, listing?.id]);
+      // Analytics tracking
+      if (typeof window !== "undefined" && window.gtag) {
+        window.gtag("event", "service_contact", {
+          event_category: "services_interaction",
+          event_label: serviceId,
+          listing_id: listing?.id,
+        });
+      }
+    },
+    [listing?.phoneNumber, listing?.id]
+  );
 
   // Empty state si aucun service
   if (serviceCategories.length === 0) {
@@ -454,9 +478,17 @@ export default function ServicesTab({ listing, className }: ServicesTabProps): J
         <div className="bg-gray-200 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
           <Star className="h-8 w-8 text-gray-400" />
         </div>
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Services en développement</h3>
-        <p className="text-gray-500 mb-4">Cette ferme développe actuellement son offre de services.</p>
-        <Button variant="outline" size="sm" onClick={() => handleContact("general")}>
+        <h3 className="text-lg font-medium text-gray-900 mb-2">
+          Services en développement
+        </h3>
+        <p className="text-gray-500 mb-4">
+          Cette ferme développe actuellement son offre de services.
+        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => handleContact("general")}
+        >
           Contactez la ferme pour plus d'informations
         </Button>
       </div>
@@ -465,20 +497,24 @@ export default function ServicesTab({ listing, className }: ServicesTabProps): J
 
   return (
     <div className={cn("space-y-6", className)}>
-      
       {/* Header avec statistiques */}
       <div className="bg-white rounded-xl p-6 border border-gray-100">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Nos Services</h2>
             <p className="text-gray-600 text-sm mt-1">
-              {totalServices} service{totalServices > 1 ? "s" : ""} proposé{totalServices > 1 ? "s" : ""} 
-              dans {serviceCategories.length} catégorie{serviceCategories.length > 1 ? "s" : ""}
+              {totalServices} service{totalServices > 1 ? "s" : ""} proposé
+              {totalServices > 1 ? "s" : ""}
+              dans {serviceCategories.length} catégorie
+              {serviceCategories.length > 1 ? "s" : ""}
             </p>
           </div>
 
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+            <Badge
+              variant="outline"
+              className="bg-green-50 text-green-700 border-green-200"
+            >
               <Award className="h-3 w-3 mr-1" />
               Services locaux
             </Badge>
@@ -496,8 +532,8 @@ export default function ServicesTab({ listing, className }: ServicesTabProps): J
         >
           Tous les services
         </Button>
-        
-        {serviceCategories.map(category => (
+
+        {serviceCategories.map((category) => (
           <Button
             key={category.id}
             variant={selectedCategory === category.id ? "default" : "outline"}
@@ -515,29 +551,28 @@ export default function ServicesTab({ listing, className }: ServicesTabProps): J
       <div className="space-y-8">
         {filteredCategories.map((category) => (
           <div key={category.id} className="space-y-4">
-            
             {/* Header de la catégorie */}
             <div className="flex items-center gap-3 pb-2 border-b border-gray-100">
-              <div className={cn(
-                "p-2 rounded-lg",
-                `bg-${category.color}-100`
-              )}>
+              <div className={cn("p-2 rounded-lg", `bg-${category.color}-100`)}>
                 {category.icon}
               </div>
               <div className="flex-1">
-                <h3 className="text-xl font-semibold text-gray-900">{category.name}</h3>
+                <h3 className="text-xl font-semibold text-gray-900">
+                  {category.name}
+                </h3>
                 <p className="text-gray-600 text-sm">{category.description}</p>
               </div>
               <Badge variant="outline" className="text-xs">
-                {category.services.length} service{category.services.length > 1 ? "s" : ""}
+                {category.services.length} service
+                {category.services.length > 1 ? "s" : ""}
               </Badge>
             </div>
 
             {/* Services de la catégorie */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {category.services.map((service) => (
-                <Card 
-                  key={service.id} 
+                <Card
+                  key={service.id}
                   className={cn(
                     "border border-gray-200 hover:shadow-md transition-all duration-200",
                     service.featured && "ring-2 ring-green-200 bg-green-50/30"
@@ -546,23 +581,30 @@ export default function ServicesTab({ listing, className }: ServicesTabProps): J
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3 flex-1">
-                        <div className={cn(
-                          "p-2 rounded-lg flex-shrink-0",
-                          `bg-${service.color}-100`
-                        )}>
+                        <div
+                          className={cn(
+                            "p-2 rounded-lg flex-shrink-0",
+                            `bg-${service.color}-100`
+                          )}
+                        >
                           {service.icon}
                         </div>
                         <div className="flex-1 min-w-0">
                           <CardTitle className="text-lg font-semibold text-gray-900 mb-1">
                             {service.name}
                             {service.featured && (
-                              <Badge variant="outline" className="ml-2 bg-yellow-100 text-yellow-700 border-yellow-200 text-xs">
+                              <Badge
+                                variant="outline"
+                                className="ml-2 bg-yellow-100 text-yellow-700 border-yellow-200 text-xs"
+                              >
                                 ⭐ Recommandé
                               </Badge>
                             )}
                           </CardTitle>
                           {service.description && (
-                            <p className="text-gray-600 text-sm">{service.description}</p>
+                            <p className="text-gray-600 text-sm">
+                              {service.description}
+                            </p>
                           )}
                         </div>
                       </div>
@@ -573,7 +615,10 @@ export default function ServicesTab({ listing, className }: ServicesTabProps): J
                       {service.price && (
                         <div className="flex items-center gap-1 text-sm text-gray-600">
                           <Euro className="h-3 w-3" />
-                          {service.price}€{service.category === "delivery" ? " (frais de port)" : "/pers"}
+                          {service.price}€
+                          {service.category === "delivery"
+                            ? " (frais de port)"
+                            : "/pers"}
                         </div>
                       )}
                       {service.duration && (
@@ -601,7 +646,11 @@ export default function ServicesTab({ listing, className }: ServicesTabProps): J
                         </h4>
                         <div className="flex flex-wrap gap-1">
                           {service.includes.map((item, idx) => (
-                            <Badge key={idx} variant="outline" className="text-xs bg-gray-50">
+                            <Badge
+                              key={idx}
+                              variant="outline"
+                              className="text-xs bg-gray-50"
+                            >
                               {item}
                             </Badge>
                           ))}
@@ -610,21 +659,26 @@ export default function ServicesTab({ listing, className }: ServicesTabProps): J
                     )}
 
                     {/* Disponibilités */}
-                    {service.availability && service.availability.length > 0 && (
-                      <div>
-                        <h4 className="text-sm font-medium text-gray-900 mb-2 flex items-center gap-1">
-                          <Calendar className="h-3 w-3 text-blue-600" />
-                          Disponibilités
-                        </h4>
-                        <div className="flex flex-wrap gap-1">
-                          {service.availability.map((day, idx) => (
-                            <Badge key={idx} variant="outline" className={getColorClasses("blue")}>
-                              {day}
-                            </Badge>
-                          ))}
+                    {service.availability &&
+                      service.availability.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-900 mb-2 flex items-center gap-1">
+                            <Calendar className="h-3 w-3 text-blue-600" />
+                            Disponibilités
+                          </h4>
+                          <div className="flex flex-wrap gap-1">
+                            {service.availability.map((day, idx) => (
+                              <Badge
+                                key={idx}
+                                variant="outline"
+                                className={getColorClasses("blue")}
+                              >
+                                {day}
+                              </Badge>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
                     {/* Restrictions */}
                     {service.ageRestriction && (
@@ -637,7 +691,7 @@ export default function ServicesTab({ listing, className }: ServicesTabProps): J
                     {/* Actions */}
                     <div className="flex gap-2 pt-2 border-t border-gray-100">
                       {service.bookingRequired ? (
-                        <Button 
+                        <Button
                           onClick={() => handleBooking(service.id)}
                           className="flex-1 bg-green-600 hover:bg-green-700"
                           size="sm"
@@ -646,7 +700,7 @@ export default function ServicesTab({ listing, className }: ServicesTabProps): J
                           Réserver
                         </Button>
                       ) : (
-                        <Button 
+                        <Button
                           onClick={() => handleContact(service.id)}
                           className="flex-1 bg-blue-600 hover:bg-blue-700"
                           size="sm"
@@ -676,8 +730,9 @@ export default function ServicesTab({ listing, className }: ServicesTabProps): J
       {/* Message d'information */}
       <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
         <p className="text-blue-800 text-sm text-center">
-          💡 <strong>Information :</strong> Les services peuvent varier selon la saison. 
-          Contactez directement la ferme pour confirmer la disponibilité et réserver.
+          💡 <strong>Information :</strong> Les services peuvent varier selon la
+          saison. Contactez directement la ferme pour confirmer la disponibilité
+          et réserver.
         </p>
       </div>
     </div>

@@ -1,4 +1,3 @@
-// app/(routes)/view-listing/_components/HeroSection.tsx
 "use client";
 
 import { useState, useEffect } from "react";

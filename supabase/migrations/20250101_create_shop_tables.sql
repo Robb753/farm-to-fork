@@ -154,12 +154,12 @@ END $$;
 
 -- Vous pouvez décommenter cette section pour ajouter des produits de test
 
--- INSERT INTO public.products (farm_id, name, description, price, unit, stock_status) VALUES
--- (1, 'Pommes de terre', 'Pommes de terre fraîches de notre ferme', 2.00, 'kg', 'in_stock'),
--- (1, 'Œufs plein air', 'Œufs frais de nos poules élevées en plein air', 4.50, 'douzaine', 'in_stock'),
--- (1, 'Tomates', 'Tomates bio de saison', 3.50, 'kg', 'in_stock'),
--- (1, 'Salade', 'Salade verte fraîche', 1.50, 'pièce', 'in_stock'),
--- (1, 'Carottes', 'Carottes bio', 2.50, 'kg', 'in_stock');
+INSERT INTO public.products (farm_id, name, description, price, unit, stock_status) VALUES
+(1, 'Pommes de terre', 'Pommes de terre fraîches de notre ferme', 2.00, 'kg', 'in_stock'),
+(1, 'Œufs plein air', 'Œufs frais de nos poules élevées en plein air', 4.50, 'douzaine', 'in_stock'),
+(1, 'Tomates', 'Tomates bio de saison', 3.50, 'kg', 'in_stock'),
+(1, 'Salade', 'Salade verte fraîche', 1.50, 'pièce', 'in_stock'),
+(1, 'Carottes', 'Carottes bio', 2.50, 'kg', 'in_stock');
 
 COMMENT ON TABLE public.products IS 'Table des produits proposés par les fermes';
 COMMENT ON TABLE public.orders IS 'Table des commandes passées par les utilisateurs';

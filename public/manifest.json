@@ -1,0 +1,9 @@
+{
+  "name": "Farm2Fork",
+  "short_name": "F2F",
+  "description": "Plateforme connectant producteurs locaux et consommateurs",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#22c55e"
+}
