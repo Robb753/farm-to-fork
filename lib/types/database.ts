@@ -232,6 +232,8 @@ export interface Database {
           price: number | null;
           unit: string | null;
 
+          available: boolean | null;
+
           image_url: string | null;
 
           // tu m’as confirmé l’avoir
@@ -252,6 +254,8 @@ export interface Database {
           price?: number | null;
           unit?: string | null;
 
+          available: boolean | null;
+
           image_url?: string | null;
           stock_status?: string | null;
 
@@ -269,6 +273,8 @@ export interface Database {
           description?: string | null;
           price?: number | null;
           unit?: string | null;
+
+          available: boolean | null;
 
           image_url?: string | null;
           stock_status?: string | null;

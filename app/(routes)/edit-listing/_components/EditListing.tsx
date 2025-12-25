@@ -40,7 +40,6 @@ import { COLORS } from "@/lib/config";
 import type {
   Listing as DbListing,
   ListingImage as DbListingImage,
-  ProductInsert,
 } from "@/lib/types/database";
 
 /**
@@ -128,7 +127,7 @@ type ListingData = {
   certifications: CertificationId[];
   availability: AvailabilityId[];
   additional_services: AdditionalServiceId[];
-  products: string[];
+  products: string[]; // ✅ UI only (ProductSelector). Pas stocké dans la table "products" (boutique)
   active: DbListing["active"];
   listingImages: Pick<DbListingImage, "url">[];
 };
@@ -148,8 +147,8 @@ interface CheckboxItem {
 /**
  * Utilitaires de validation des types pour l'UI
  */
-const isValidProductType = (value: string): value is ProductTypeId => {
-  return [
+const isValidProductType = (value: string): value is ProductTypeId =>
+  [
     "Fruits",
     "Légumes",
     "Produits laitiers",
@@ -157,60 +156,79 @@ const isValidProductType = (value: string): value is ProductTypeId => {
     "Œufs",
     "Produits transformés",
   ].includes(value);
-};
 
-const isValidProductionMethod = (
-  value: string
-): value is ProductionMethodId => {
-  return [
+const isValidProductionMethod = (value: string): value is ProductionMethodId =>
+  [
     "Agriculture conventionnelle",
     "Agriculture biologique",
     "Agriculture durable",
     "Agriculture raisonnée",
   ].includes(value);
-};
 
-const isValidPurchaseMode = (value: string): value is PurchaseModeId => {
-  return [
+const isValidPurchaseMode = (value: string): value is PurchaseModeId =>
+  [
     "Vente directe à la ferme",
     "Marché local",
     "Livraison à domicile",
     "Point de vente collectif",
     "Click & Collect",
   ].includes(value);
-};
 
-const isValidCertification = (value: string): value is CertificationId => {
-  return [
-    "Label AB",
-    "Label Rouge",
-    "AOC/AOP",
-    "IGP",
-    "Demeter",
-    "HVE",
-  ].includes(value);
-};
+const isValidCertification = (value: string): value is CertificationId =>
+  ["Label AB", "Label Rouge", "AOC/AOP", "IGP", "Demeter", "HVE"].includes(
+    value
+  );
 
 const isValidAdditionalService = (
   value: string
-): value is AdditionalServiceId => {
-  return [
+): value is AdditionalServiceId =>
+  [
     "Visite de la ferme",
     "Ateliers de cuisine",
     "Dégustation",
     "Activités pour enfants",
     "Événements pour professionnels",
   ].includes(value);
-};
 
-const isValidAvailability = (value: string): value is AvailabilityId => {
-  return [
+const isValidAvailability = (value: string): value is AvailabilityId =>
+  [
     "Saisonnière",
     "Toute l'année",
     "Pré-commande",
     "Sur abonnement",
     "Événements spéciaux",
   ].includes(value);
+
+/**
+ * Helper: convertit en string[]
+ * - supporte: array, json string '["a","b"]', string "a,b;c|d"
+ */
+const toStringArray = (val: unknown): string[] => {
+  if (Array.isArray(val))
+    return val.filter((v): v is string => typeof v === "string");
+
+  if (typeof val === "string") {
+    const trimmed = val.trim();
+    if (!trimmed) return [];
+
+    // JSON array ?
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((v): v is string => typeof v === "string");
+      }
+    } catch {
+      // ignore
+    }
+
+    // fallback CSV-like
+    return trimmed
+      .split(/[,;|]/g)
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
+  return [];
 };
 
 /**
@@ -275,12 +293,45 @@ const ADDITIONAL_SERVICE_OPTIONS: CheckboxItem[] = [
   { id: "Événements pour professionnels", label: "Événements pro" },
 ];
 
+const arrayToDbString = (val: unknown): string | null => {
+  if (!val) return null;
+  if (Array.isArray(val)) {
+    const cleaned = val
+      .filter((v): v is string => typeof v === "string")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    return cleaned.length ? cleaned.join(",") : null; // CSV
+  }
+  if (typeof val === "string") {
+    const t = val.trim();
+    return t ? t : null;
+  }
+  return null;
+};
+
+const dbStringToArray = (val: unknown): string[] => {
+  if (!val) return [];
+  if (Array.isArray(val))
+    return val.filter((v): v is string => typeof v === "string");
+  if (typeof val === "string") {
+    const t = val.trim();
+    if (!t) return [];
+    // support csv "a,b;c|d"
+    return t
+      .split(/[,;|]/g)
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  return [];
+};
+
+
 /**
- * Service Supabase typé avec Database
+ * Service Supabase typé
  */
 class ListingService {
   /**
-   * Récupère un listing + images, typé avec Database
+   * Récupère un listing + images
    */
   static async fetchListing(
     id: number,
@@ -288,7 +339,7 @@ class ListingService {
   ): Promise<ListingData> {
     try {
       type RawListing = DbListing & {
-        listingImages: { url: string }[];
+        listingImages: { url: string }[] | null;
       };
 
       const { data, error } = await supabase
@@ -303,8 +354,6 @@ class ListingService {
 
       const raw = data as RawListing;
 
-      const toArray = (val: any): any[] => (Array.isArray(val) ? val : []);
-
       const listing: ListingData = {
         id: raw.id,
         name: raw.name ?? "",
@@ -312,21 +361,32 @@ class ListingService {
         phoneNumber: raw.phoneNumber ?? "",
         description: raw.description ?? "",
         website: raw.website ?? "",
-        product_type: toArray(raw.product_type).filter(isValidProductType),
-        production_method: toArray(raw.production_method).filter(
+        product_type: toStringArray(raw.product_type).filter(
+          isValidProductType
+        ),
+        production_method: toStringArray(raw.production_method).filter(
           isValidProductionMethod
         ),
-        purchase_mode: toArray(raw.purchase_mode).filter(isValidPurchaseMode),
-        certifications: toArray(raw.certifications).filter(
+        purchase_mode: toStringArray(raw.purchase_mode).filter(
+          isValidPurchaseMode
+        ),
+        certifications: toStringArray(raw.certifications).filter(
           isValidCertification
         ),
-        availability: toArray(raw.availability).filter(isValidAvailability),
-        additional_services: toArray(raw.additional_services).filter(
+        availability: toStringArray(raw.availability).filter(
+          isValidAvailability
+        ),
+        additional_services: toStringArray(raw.additional_services).filter(
           isValidAdditionalService
         ),
-        products: [], // ⚠️ tu peux plus tard charger les produits depuis la table products
+
+        // ✅ UI only : si tu veux persister ça, fais une colonne dédiée (jsonb) ou table pivot
+        products: [],
+
         active: raw.active ?? false,
-        listingImages: toArray(raw.listingImages),
+        listingImages: Array.isArray(raw.listingImages)
+          ? raw.listingImages
+          : [],
       };
 
       return listing;
@@ -337,7 +397,7 @@ class ListingService {
   }
 
   /**
-   * Mise à jour du listing (on laisse la conversion form → DB comme avant)
+   * Mise à jour du listing (exclut products/images du form)
    */
   static async updateListing(
     id: number,
@@ -346,22 +406,32 @@ class ListingService {
     currentActive: boolean
   ): Promise<void> {
     try {
-      const updateData = {
-        ...values,
+      // on enlève ce qui n'existe pas dans listing
+      const { products: _products, images: _images, ...rest } = values;
+
+      // ✅ mapping form -> DB (DB attend string|null sur ces champs)
+      const updateData: Partial<DbListing> = {
+        ...rest,
+        product_type: arrayToDbString(rest.product_type),
+        production_method: arrayToDbString(rest.production_method),
+        purchase_mode: arrayToDbString(rest.purchase_mode),
+        certifications: arrayToDbString(rest.certifications), // ✅ FIX de ton erreur
+        availability: arrayToDbString(rest.availability),
+        additional_services: arrayToDbString(rest.additional_services),
+
         active: isPublishing || currentActive || false,
         updated_at: new Date().toISOString(),
-        ...(isPublishing &&
-          !currentActive && {
-            // si tu as bien une colonne published_at dans ta table
-            published_at: new Date().toISOString(),
-          }),
+        modified_at: new Date().toISOString(),
+
+        ...(isPublishing && !currentActive
+          ? { published_at: new Date().toISOString() }
+          : {}),
       };
 
       const { error } = await supabase
         .from("listing")
-        .update(updateData as any) // conversion explicite, car form ≠ DB
+        .update(updateData)
         .eq("id", id);
-
       if (error) throw error;
     } catch (error) {
       console.error("Erreur lors de la mise à jour du listing:", error);
@@ -370,34 +440,12 @@ class ListingService {
   }
 
   /**
-   * Mise à jour des produits associés (table products)
+   * ✅ IMPORTANT :
+   * La table "products" = produits boutique (prix, stock, etc.)
+   * On ne doit PAS la modifier depuis EditListing.
    */
-  static async updateProducts(
-    listingId: number,
-    products: string[] | undefined
-  ): Promise<void> {
-    try {
-      const safeProducts = products ?? [];
-
-      await supabase.from("products").delete().eq("listing_id", listingId);
-
-      if (safeProducts.length > 0) {
-        const formattedProducts: ProductInsert[] = safeProducts.map((name) => ({
-          listing_id: listingId,
-          name,
-          available: true,
-        }));
-
-        const { error: insertError } = await supabase
-          .from("products")
-          .insert(formattedProducts);
-
-        if (insertError) throw insertError;
-      }
-    } catch (error) {
-      console.error("Erreur lors de la mise à jour des produits:", error);
-      throw error;
-    }
+  static async updateProducts(): Promise<void> {
+    return;
   }
 
   /**
@@ -412,13 +460,11 @@ class ListingService {
         (img): img is File => img instanceof File
       );
 
-      if (imageFiles.length === 0) {
-        return;
-      }
+      if (imageFiles.length === 0) return;
 
       for (const image of imageFiles) {
         const fileName = `${Date.now()}-${image.name}`;
-        const fileExt = fileName.split(".").pop();
+        const fileExt = fileName.split(".").pop() || "jpg";
 
         const { error: uploadError } = await supabase.storage
           .from("listingImages")
@@ -432,7 +478,9 @@ class ListingService {
           throw new Error(`Erreur lors du téléchargement de ${image.name}`);
         }
 
+        // ⚠️ Assure-toi que NEXT_PUBLIC_IMAGE_URL = URL publique du bucket + "/" à la fin
         const imageUrl = `${process.env.NEXT_PUBLIC_IMAGE_URL}${fileName}`;
+
         const { error: insertError } = await supabase
           .from("listingImages")
           .insert([{ url: imageUrl, listing_id: listingId }]);
@@ -498,11 +546,7 @@ const EditListing: React.FC<EditListingProps> = ({
 
   const handleImagesChange = useCallback(
     (files: File[]) => {
-      // on stocke les File[] dans ton champ RHF "images"
-      setValue("images", files, {
-        shouldDirty: true,
-        shouldTouch: true,
-      });
+      setValue("images", files, { shouldDirty: true, shouldTouch: true });
     },
     [setValue]
   );
@@ -514,7 +558,7 @@ const EditListing: React.FC<EditListingProps> = ({
   const availabilityValues = watch("availability") ?? [];
   const additionalServicesValues = watch("additional_services") ?? [];
   const selectedProducts = watch("products") ?? [];
-  const imagesValues = watch("images") ?? [];
+  // const imagesValues = watch("images") ?? []; // (inutile ici)
 
   const progressValue = (currentStep / STEPS.length) * 100;
 
@@ -535,14 +579,11 @@ const EditListing: React.FC<EditListingProps> = ({
 
       try {
         const userEmail = user.primaryEmailAddress?.emailAddress;
-        if (!userEmail) {
-          throw new Error("Email utilisateur non trouvé");
-        }
+        if (!userEmail) throw new Error("Email utilisateur non trouvé");
 
-        const listingId = parseInt(params.id, 10);
-        if (isNaN(listingId)) {
+        const listingId = Number(params.id);
+        if (!Number.isFinite(listingId))
           throw new Error("ID de listing invalide");
-        }
 
         const data = await ListingService.fetchListing(listingId, userEmail);
 
@@ -568,7 +609,7 @@ const EditListing: React.FC<EditListingProps> = ({
         const errorMessage =
           error instanceof Error ? error.message : "Erreur inconnue";
 
-        if (errorMessage.includes("autorisations")) {
+        if (errorMessage.toLowerCase().includes("autoris")) {
           toast.error("Autorisations insuffisantes");
         } else {
           toast.error("Impossible de charger la fiche.");
@@ -592,10 +633,9 @@ const EditListing: React.FC<EditListingProps> = ({
       setIsSubmitting(true);
 
       try {
-        const listingId = parseInt(params.id, 10);
-        if (isNaN(listingId)) {
+        const listingId = Number(params.id);
+        if (!Number.isFinite(listingId))
           throw new Error("ID de listing invalide");
-        }
 
         await ListingService.updateListing(
           listingId,
@@ -604,7 +644,8 @@ const EditListing: React.FC<EditListingProps> = ({
           listing.active
         );
 
-        await ListingService.updateProducts(listingId, values.products);
+        // ✅ IMPORTANT : pas de modification de la table "products" ici
+        await ListingService.updateProducts();
 
         if (values.images && values.images.length > 0) {
           await ListingService.uploadImages(listingId, values.images);
@@ -612,9 +653,7 @@ const EditListing: React.FC<EditListingProps> = ({
 
         if (isPublishing) {
           toast.success("Fiche publiée avec succès !");
-          setTimeout(() => {
-            router.push("/dashboard/farms");
-          }, 1000);
+          setTimeout(() => router.push("/dashboard/farms"), 1000);
         } else {
           toast.success("Modifications enregistrées");
         }
@@ -635,14 +674,12 @@ const EditListing: React.FC<EditListingProps> = ({
    */
   const toggleArrayValue = useCallback(
     (fieldName: keyof EditListingFormValues, value: string): void => {
-      // On force TS à considérer ça comme un string[]
       const currentValues = (getValues(fieldName as any) as string[]) ?? [];
 
       const newValues = currentValues.includes(value)
         ? currentValues.filter((v) => v !== value)
         : [...currentValues, value];
 
-      // 👇 Cast important ici pour éviter l'erreur "string" → union littérale
       setValue(fieldName as any, newValues as any, {
         shouldValidate: false,
         shouldDirty: true,
@@ -651,7 +688,6 @@ const EditListing: React.FC<EditListingProps> = ({
     },
     [getValues, setValue]
   );
-
 
   const goToNextStep = () => {
     setCompletedSections((prev) =>
@@ -866,14 +902,11 @@ const EditListing: React.FC<EditListingProps> = ({
 
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                         {PRODUCT_TYPE_OPTIONS.map((opt) => {
-                          // ⚠️ productTypeValues est un union[] -> on normalise et on aide TS
                           const values =
                             (productTypeValues as EditListingFormValues["product_type"]) ??
                             [];
-
                           const id =
                             opt.id as EditListingFormValues["product_type"][number];
-
                           const isSelected = values.includes(id);
 
                           return (
@@ -905,7 +938,7 @@ const EditListing: React.FC<EditListingProps> = ({
                       )}
                     </div>
 
-                    {/* Produits détaillés */}
+                    {/* Produits détaillés (UI only) */}
                     <div className="space-y-2">
                       <label className="text-sm font-medium">
                         Produits détaillés
@@ -942,10 +975,8 @@ const EditListing: React.FC<EditListingProps> = ({
                           const methods =
                             (productionMethodValues as EditListingFormValues["production_method"]) ??
                             [];
-
                           const id =
                             opt.id as EditListingFormValues["production_method"][number];
-
                           const isSelected = methods.includes(id);
 
                           return (
@@ -986,10 +1017,8 @@ const EditListing: React.FC<EditListingProps> = ({
                           const modes =
                             (purchaseModeValues as EditListingFormValues["purchase_mode"]) ??
                             [];
-
                           const id =
                             opt.id as EditListingFormValues["purchase_mode"][number];
-
                           const isSelected = modes.includes(id);
 
                           return (
@@ -1030,8 +1059,7 @@ const EditListing: React.FC<EditListingProps> = ({
                           {CERTIFICATION_OPTIONS.map((opt) => {
                             const certs = (certificationsValues ??
                               []) as string[];
-                            const id = opt.id as string;
-                            const isSelected = certs.includes(id);
+                            const isSelected = certs.includes(opt.id);
 
                             return (
                               <button
@@ -1065,8 +1093,7 @@ const EditListing: React.FC<EditListingProps> = ({
                           {AVAILABILITY_OPTIONS_UI.map((opt) => {
                             const availabilities = (availabilityValues ??
                               []) as string[];
-                            const id = opt.id as string;
-                            const isSelected = availabilities.includes(id);
+                            const isSelected = availabilities.includes(opt.id);
 
                             return (
                               <button
@@ -1100,8 +1127,7 @@ const EditListing: React.FC<EditListingProps> = ({
                           {ADDITIONAL_SERVICE_OPTIONS.map((opt) => {
                             const services = (additionalServicesValues ??
                               []) as string[];
-                            const id = opt.id as string;
-                            const isSelected = services.includes(id);
+                            const isSelected = services.includes(opt.id);
 
                             return (
                               <button
@@ -1141,8 +1167,8 @@ const EditListing: React.FC<EditListingProps> = ({
                       </label>
                       <FileUpload
                         setImages={handleImagesChange}
-                        imageList={listing.listingImages} // 👈 tes images actuelles Supabase
-                        maxImages={3} // optionnel
+                        imageList={listing.listingImages}
+                        maxImages={3}
                         className="mt-6"
                       />
                       {errors.images && (
@@ -1163,6 +1189,7 @@ const EditListing: React.FC<EditListingProps> = ({
                               key={idx}
                               className="h-20 w-28 overflow-hidden rounded-md border border-stone-200 bg-stone-50"
                             >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={img.url}
                                 alt={`Image ${idx + 1}`}

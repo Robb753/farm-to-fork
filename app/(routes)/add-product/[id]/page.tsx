@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,17 +29,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { cn } from "@/lib/utils";
 import { COLORS } from "@/lib/config";
 import type { ProductInsert } from "@/lib/types/database";
 
 // ==================== DONNÉES PRODUITS RÉELLES ====================
 
-/**
- * Base de données complète des légumes
- */
 const VEGETABLES_DATA = [
-  // Légumes racines
   { name: "Carotte", category: "racine", type: "légume", labels: [] },
   { name: "Betterave rouge", category: "racine", type: "légume", labels: [] },
   { name: "Radis rose", category: "racine", type: "légume", labels: [] },
@@ -49,21 +44,18 @@ const VEGETABLES_DATA = [
   { name: "Navet", category: "racine", type: "légume", labels: [] },
   { name: "Rutabaga", category: "racine", type: "légume", labels: [] },
 
-  // Légumes bulbes
   { name: "Oignon jaune", category: "bulbe", type: "légume", labels: [] },
   { name: "Oignon rouge", category: "bulbe", type: "légume", labels: [] },
   { name: "Échalote", category: "bulbe", type: "légume", labels: [] },
   { name: "Ail", category: "bulbe", type: "légume", labels: [] },
   { name: "Poireau", category: "bulbe", type: "légume", labels: [] },
 
-  // Légumes feuilles
   { name: "Laitue", category: "feuille", type: "légume", labels: [] },
   { name: "Épinard", category: "feuille", type: "légume", labels: [] },
   { name: "Mâche", category: "feuille", type: "légume", labels: [] },
   { name: "Roquette", category: "feuille", type: "légume", labels: [] },
   { name: "Chou kale", category: "feuille", type: "légume", labels: [] },
 
-  // Légumes fruits
   { name: "Tomate", category: "fruit", type: "légume", labels: [] },
   { name: "Courgette", category: "fruit", type: "légume", labels: [] },
   { name: "Aubergine", category: "fruit", type: "légume", labels: [] },
@@ -71,39 +63,28 @@ const VEGETABLES_DATA = [
   { name: "Concombre", category: "fruit", type: "légume", labels: [] },
 ];
 
-/**
- * Base de données complète des fruits
- */
 const FRUITS_DATA = [
-  // Fruits à pépins
   { name: "Pomme", category: "à pépins", type: "fruit", labels: [] },
   { name: "Poire", category: "à pépins", type: "fruit", labels: [] },
   { name: "Coing", category: "à pépins", type: "fruit", labels: [] },
 
-  // Fruits à noyau
   { name: "Cerise", category: "à noyau", type: "fruit", labels: [] },
   { name: "Prune", category: "à noyau", type: "fruit", labels: [] },
   { name: "Pêche", category: "à noyau", type: "fruit", labels: [] },
   { name: "Abricot", category: "à noyau", type: "fruit", labels: [] },
 
-  // Petits fruits
   { name: "Fraise", category: "petit fruit", type: "fruit", labels: [] },
   { name: "Framboise", category: "petit fruit", type: "fruit", labels: [] },
   { name: "Groseille", category: "petit fruit", type: "fruit", labels: [] },
   { name: "Cassis", category: "petit fruit", type: "fruit", labels: [] },
   { name: "Myrtille", category: "petit fruit", type: "fruit", labels: [] },
 
-  // Fruits secs
   { name: "Noix", category: "fruit sec", type: "fruit", labels: [] },
   { name: "Noisette", category: "fruit sec", type: "fruit", labels: [] },
   { name: "Châtaigne", category: "fruit sec", type: "fruit", labels: [] },
 ];
 
-/**
- * Base de données complète des produits laitiers
- */
 const DAIRY_DATA = [
-  // Laits
   {
     name: "Lait cru de vache",
     category: "lait",
@@ -123,7 +104,6 @@ const DAIRY_DATA = [
     labels: ["fermier"],
   },
 
-  // Yaourts
   {
     name: "Yaourt nature",
     category: "yaourt",
@@ -143,7 +123,6 @@ const DAIRY_DATA = [
     labels: [],
   },
 
-  // Fromages
   {
     name: "Fromage de chèvre frais",
     category: "fromage de chèvre",
@@ -169,7 +148,6 @@ const DAIRY_DATA = [
     labels: ["AOP"],
   },
 
-  // Beurres et crèmes
   {
     name: "Beurre doux",
     category: "beurre",
@@ -190,9 +168,6 @@ const DAIRY_DATA = [
   },
 ];
 
-/**
- * Configuration principale des produits
- */
 const PRODUCT_CATEGORIES = [
   {
     value: "vegetables",
@@ -327,9 +302,6 @@ const PRODUCT_CATEGORIES = [
   },
 ];
 
-/**
- * Unités de mesure adaptées
- */
 const PRODUCT_UNITS = [
   { value: "kg", label: "Kilogramme (kg)" },
   { value: "g", label: "Gramme (g)" },
@@ -342,9 +314,8 @@ const PRODUCT_UNITS = [
   { value: "basket", label: "Panier" },
 ];
 
-// ==================== INTERFACES TYPESCRIPT ====================
+// ==================== TYPES ====================
 
-// ✅ Interface Next.js pour les pages avec paramètres dynamiques
 interface PageProps {
   params: { id: string };
   searchParams?: { [key: string]: string | string[] | undefined };
@@ -373,9 +344,9 @@ type ProductUnit =
   | "bunch"
   | "basket";
 
-// ==================== HOOKS ====================
+// ==================== HOOK ====================
 
-const useProductForm = (listingId: string) => {
+const useProductForm = () => {
   const [formData, setFormData] = useState<ProductFormData>({
     selectedProduct: "",
     customName: "",
@@ -402,9 +373,8 @@ const useProductForm = (listingId: string) => {
   const handleSelectChange = useCallback(
     (name: keyof ProductFormData, value: string) => {
       setFormData((prev) => {
-        const newData = { ...prev, [name]: value };
+        const newData: ProductFormData = { ...prev, [name]: value };
 
-        // Reset des champs dépendants
         if (name === "category") {
           newData.subcategory = "";
           newData.selectedProduct = "";
@@ -424,9 +394,9 @@ const useProductForm = (listingId: string) => {
 
   const getProductName = useCallback((): string => {
     if (formData.selectedProduct === "custom") {
-      return formData.customName;
+      return formData.customName.trim();
     }
-    return formData.selectedProduct;
+    return formData.selectedProduct.trim();
   }, [formData.selectedProduct, formData.customName]);
 
   const isFormValid = useCallback((): boolean => {
@@ -455,37 +425,28 @@ const useProductForm = (listingId: string) => {
   };
 };
 
-// ==================== SERVICES ====================
+// ==================== SERVICE ====================
 
 class ProductService {
   static async createProduct(
     productData: ProductInsert
   ): Promise<{ id: number }> {
-    try {
-      const { data, error } = await supabase
-        .from("products")
-        .insert(productData)
-        .select("id")
-        .single();
+    const { data, error } = await supabase
+      .from("products")
+      .insert(productData)
+      .select("id")
+      .single();
 
-      if (error) throw error;
-      if (!data?.id) {
-        throw new Error("Aucun ID retourné lors de la création du produit");
-      }
+    if (error) throw error;
+    if (!data?.id)
+      throw new Error("Aucun ID retourné lors de la création du produit");
 
-      return data;
-    } catch (error) {
-      console.error("Erreur lors de la création du produit:", error);
-      throw error;
-    }
+    return data;
   }
 }
 
-// ==================== COMPOSANTS ====================
+// ==================== UI ====================
 
-/**
- * Composant de validation visuelle
- */
 interface FormValidationProps {
   isValid: boolean;
   requiredFields: string[];
@@ -516,9 +477,6 @@ const FormValidation: React.FC<FormValidationProps> = ({
   );
 };
 
-/**
- * ✅ Composant Page Next.js conforme - export default direct
- */
 export default function AddProductPage({ params }: PageProps) {
   const router = useRouter();
   const { user, isLoaded, isSignedIn } = useUser();
@@ -533,7 +491,15 @@ export default function AddProductPage({ params }: PageProps) {
     handleSelectChange,
     getProductName,
     isFormValid,
-  } = useProductForm(params?.id || "");
+  } = useProductForm();
+
+  // ✅ Redirect sign-in propre (pas pendant le render)
+  useEffect(() => {
+    if (isLoaded && !isSignedIn) router.push("/sign-in");
+  }, [isLoaded, isSignedIn, router]);
+
+  const listingId = Number(params?.id);
+  const hasValidListingId = Number.isFinite(listingId) && listingId > 0;
 
   // Données dynamiques basées sur la sélection
   const selectedCategoryData = PRODUCT_CATEGORIES.find(
@@ -545,15 +511,17 @@ export default function AddProductPage({ params }: PageProps) {
       (product) => product.category === formData.subcategory
     ) || [];
 
-  /**
-   * Gestion de la soumission
-   */
   const handleSubmit = useCallback(
     async (
-      e: React.FormEvent | React.MouseEvent,
+      e?: React.SyntheticEvent,
       publish: boolean = false
     ): Promise<void> => {
-      e.preventDefault();
+      e?.preventDefault();
+
+      if (!hasValidListingId) {
+        toast.error("ID du listing invalide");
+        return;
+      }
 
       if (!isFormValid()) {
         toast.error("Veuillez remplir tous les champs obligatoires");
@@ -565,26 +533,57 @@ export default function AddProductPage({ params }: PageProps) {
         return;
       }
 
-      if (!params?.id) {
-        toast.error("ID du listing manquant");
-        return;
-      }
-
       setLoading(true);
       setIsPublishing(publish);
 
       try {
         const productName = getProductName();
+        const price = Number(formData.price);
 
+        if (!Number.isFinite(price) || price < 0) {
+          throw new Error("Prix invalide");
+        }
+
+        // ✅ description enrichie (comme tu faisais), mais propre
+        const fullDescription = [
+          formData.description.trim(),
+          "",
+          `Catégorie: ${formData.subcategory}`,
+          `Prix: ${formData.price}€/${formData.unit}`,
+          `Quantité disponible: ${formData.quantity}`,
+          formData.delivery_options
+            ? `Options de livraison: ${formData.delivery_options}`
+            : "",
+        ]
+          .filter(Boolean)
+          .join("\n");
+
+        // ✅ IMPORTANT: ton schema TS indique que farm_id est requis
+        // Dans ton cas, farm_id = listingId (tes FKs pointent vers listing.id)
         const productData: ProductInsert = {
+          listing_id: listingId,
+          farm_id: listingId,
+
           name: productName,
-          description: `${formData.description}\n\nCatégorie: ${formData.subcategory}\nPrix: ${formData.price}€/${formData.unit}\nQuantité disponible: ${formData.quantity}${formData.delivery_options ? `\nOptions de livraison: ${formData.delivery_options}` : ""}`,
-          price: parseFloat(formData.price),
+          description: fullDescription,
+
+          price,
           unit: formData.unit,
+
+          // ✅ requis par ton type ProductInsert
           available: true,
-          listing_id: parseInt(params.id, 10),
+
+          // optionnel mais ok
+          active: publish,
+
+          // ⚠️ seulement si ta DB accepte "draft"
+          // sinon: supprime cette ligne ou mets une valeur autorisée
+          stock_status: publish ? "in_stock" : "draft",
+
           created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         };
+
 
         await ProductService.createProduct(productData);
 
@@ -595,15 +594,15 @@ export default function AddProductPage({ params }: PageProps) {
         );
 
         setTimeout(() => {
-          router.push(`/listing/${params.id}`);
-        }, 1500);
+          // adapte selon ta route réelle (view-listing / shop / dashboard)
+          router.push(`/view-listing/${listingId}`);
+        }, 800);
       } catch (error) {
         console.error("Erreur lors de l'ajout du produit:", error);
-
         const errorMessage =
           error instanceof Error ? error.message : "Erreur inconnue";
 
-        if (errorMessage.includes("permission")) {
+        if (errorMessage.toLowerCase().includes("permission")) {
           toast.error("Erreur de permissions. Vérifiez vos droits d'accès.");
         } else {
           toast.error(`Erreur lors de l'enregistrement: ${errorMessage}`);
@@ -614,13 +613,16 @@ export default function AddProductPage({ params }: PageProps) {
       }
     },
     [
-      isFormValid,
-      isSignedIn,
-      user,
-      params?.id,
       formData,
       getProductName,
+      hasValidListingId,
+      isFormValid,
+      isSignedIn,
       router,
+      setIsPublishing,
+      setLoading,
+      user,
+      listingId,
     ]
   );
 
@@ -639,9 +641,28 @@ export default function AddProductPage({ params }: PageProps) {
     );
   }
 
-  if (!isSignedIn) {
-    router.push("/sign-in");
-    return null;
+  // si pas signed-in, on laisse l’effet rediriger
+  if (!isSignedIn) return null;
+
+  if (!hasValidListingId) {
+    return (
+      <div className="flex items-center justify-center h-[60vh] px-4">
+        <Card className="max-w-lg w-full">
+          <CardHeader>
+            <CardTitle>ID invalide</CardTitle>
+            <CardDescription>
+              Impossible d’ajouter un produit sans un listing valide.
+            </CardDescription>
+          </CardHeader>
+          <CardFooter>
+            <Button variant="outline" onClick={() => router.back()}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Retour
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
   }
 
   const productName = getProductName();
@@ -674,7 +695,7 @@ export default function AddProductPage({ params }: PageProps) {
         </CardHeader>
 
         <CardContent>
-          <form className="space-y-6">
+          <form className="space-y-6" onSubmit={(e) => handleSubmit(e, false)}>
             {/* Catégorie principale */}
             <div className="space-y-2">
               <Label
@@ -877,7 +898,7 @@ export default function AddProductPage({ params }: PageProps) {
                 name="description"
                 value={formData.description}
                 onChange={handleChange}
-                placeholder="Décrivez votre produit en détail (variété, méthode de culture, fraîcheur, etc.)"
+                placeholder="Décrivez votre produit (variété, méthode, fraîcheur, etc.)"
                 className="min-h-[120px]"
                 required
               />
@@ -902,7 +923,6 @@ export default function AddProductPage({ params }: PageProps) {
               />
             </div>
 
-            {/* Validation */}
             <FormValidation
               isValid={isFormValid()}
               requiredFields={requiredFields}
@@ -984,5 +1004,4 @@ export default function AddProductPage({ params }: PageProps) {
   );
 }
 
-// ✅ Export des types pour réutilisation si nécessaire
 export type { ProductFormData, ProductUnit };
