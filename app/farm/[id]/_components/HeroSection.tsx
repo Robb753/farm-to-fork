@@ -21,6 +21,9 @@ import {
 import { cn } from "@/lib/utils";
 import type { Database } from "@/lib/types/database";
 
+// 🔒 SÉCURITÉ: Import des fonctions de sanitisation
+import { escapeHTML, sanitizeHTML } from "@/lib/utils/sanitize";
+
 /**
  * Type pour un listing avec ses images
  */
@@ -38,6 +41,8 @@ interface HeroSectionProps {
 
 /**
  * Composant Hero Section d'un listing de ferme
+ *
+ * 🔒 SÉCURITÉ: Toutes les données utilisateur sont protégées contre XSS
  *
  * Features:
  * - Galerie d'images avec navigation
@@ -97,13 +102,14 @@ export default function HeroSection({
 
   /**
    * Gestion du partage
+   * 🔒 SÉCURITÉ: Données échappées avant partage
    */
   const handleShare = async (): Promise<void> => {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: listing.name,
-          text: `Découvrez ${listing.name} - Ferme locale`,
+          title: escapeHTML(listing.name || "Ferme locale"),
+          text: `Découvrez ${escapeHTML(listing.name || "cette ferme")} - Ferme locale`,
           url: window.location.href,
         });
       } catch (error) {
@@ -130,23 +136,40 @@ export default function HeroSection({
 
   /**
    * Actions de contact
+   * 🔒 SÉCURITÉ: Validation du format téléphone
    */
   const handleContact = (): void => {
     if (listing.phoneNumber) {
-      window.open(`tel:${listing.phoneNumber}`, "_self");
+      // ✅ Nettoyer le numéro (garder uniquement chiffres, +, espaces, tirets, parenthèses)
+      const cleanPhone = listing.phoneNumber.replace(/[^0-9+\s\-()]/g, "");
+      window.open(`tel:${cleanPhone}`, "_self");
     } else if (listing.email) {
+      // Email dans mailto: est relativement safe
       window.open(`mailto:${listing.email}`, "_self");
     }
   };
 
+  /**
+   * Ouverture du site web
+   * 🔒 SÉCURITÉ: Validation stricte de l'URL + noopener/noreferrer
+   */
   const handleWebsite = (): void => {
     if (listing.website) {
-      window.open(listing.website, "_blank");
+      // ✅ VALIDATION: Force HTTPS si protocole absent
+      const safeUrl =
+        listing.website.startsWith("http://") ||
+        listing.website.startsWith("https://")
+          ? listing.website
+          : `https://${listing.website}`;
+
+      // ✅ SÉCURITÉ: noopener et noreferrer obligatoires
+      window.open(safeUrl, "_blank", "noopener,noreferrer");
     }
   };
 
   /**
    * Obtient les badges de certification
+   * 🔒 SÉCURITÉ: Label échappé dans le cas default
    */
   const getCertificationBadges = () => {
     // Si pas de certifications, retourner array vide
@@ -185,8 +208,9 @@ export default function HeroSection({
             icon: "📍",
           };
         default:
+          // 🔒 SÉCURITÉ: Échapper les certifications non-standard
           return {
-            label: String(cert),
+            label: escapeHTML(String(cert)),
             color: "bg-gray-100 text-gray-700 border-gray-200",
             icon: "✓",
           };
@@ -216,9 +240,12 @@ export default function HeroSection({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
         {/* Galerie d'images */}
         <div className="relative aspect-[4/3] lg:aspect-square">
+          {/* 🔒 SÉCURITÉ: Attribut alt échappé */}
           <Image
             src={displayImages[currentImageIndex]}
-            alt={`${listing.name} - Image ${currentImageIndex + 1}`}
+            alt={escapeHTML(
+              `${listing.name || "Ferme"} - Image ${currentImageIndex + 1}`
+            )}
             fill
             className="object-cover"
             priority
@@ -289,14 +316,16 @@ export default function HeroSection({
           {/* Header avec nom et localisation */}
           <div className="space-y-4">
             <div>
+              {/* 🔒 SÉCURITÉ: Nom de ferme échappé */}
               <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">
-                {listing.name}
+                {escapeHTML(listing.name || "Ferme sans nom")}
               </h1>
 
               {listing.address && (
                 <div className="flex items-center gap-2 text-gray-600">
                   <MapPin className="h-4 w-4 flex-shrink-0" />
-                  <span className="text-sm">{listing.address}</span>
+                  {/* 🔒 SÉCURITÉ: Adresse échappée */}
+                  <span className="text-sm">{escapeHTML(listing.address)}</span>
                 </div>
               )}
             </div>
@@ -334,7 +363,8 @@ export default function HeroSection({
                   className="bg-green-50 text-green-700 border-green-200"
                 >
                   <Award className="h-3 w-3 mr-1" />
-                  {listing.typeferme}
+                  {/* 🔒 SÉCURITÉ: Type de ferme échappé */}
+                  {escapeHTML(listing.typeferme)}
                 </Badge>
               </div>
             )}
@@ -349,6 +379,7 @@ export default function HeroSection({
                     className={cn("text-xs", badge.color)}
                   >
                     <span className="mr-1">{badge.icon}</span>
+                    {/* Label déjà échappé dans getCertificationBadges() */}
                     {badge.label}
                   </Badge>
                 ))}
@@ -357,9 +388,13 @@ export default function HeroSection({
 
             {/* Description courte */}
             {listing.description && (
-              <p className="text-gray-600 text-sm leading-relaxed line-clamp-3">
-                {listing.description}
-              </p>
+              /* 🔒 SÉCURITÉ: Description sanitisée (permet formatage basique) */
+              <div
+                className="text-gray-600 text-sm leading-relaxed line-clamp-3 prose prose-sm max-w-none"
+                dangerouslySetInnerHTML={{
+                  __html: sanitizeHTML(listing.description),
+                }}
+              />
             )}
           </div>
 

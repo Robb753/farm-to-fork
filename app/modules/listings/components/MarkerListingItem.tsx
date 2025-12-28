@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Heart } from "@/utils/icons";
 import { cn } from "@/lib/utils";
 import { COLORS } from "@/lib/config";
+import { escapeHTML } from "@/lib/utils/sanitize";
 
 /**
  * Interface pour les images de listing
@@ -56,20 +57,24 @@ function MarkerListingItem({
   onToggleFavorite 
 }: MarkerListingItemProps): JSX.Element {
   const id = item?.id;
+  // ✅ SÉCURISÉ
   const title = item?.name || "Sans nom";
   const address = item?.address || "Adresse non disponible";
+  // Note: Échapper à l'affichage, pas ici
   const imageUrl = item?.listingImages?.[0]?.url || "/default-farm-image.jpg";
 
   /**
    * Formatage intelligent du prix
    */
+  // ✅ SÉCURISÉ
   const formattedPrice = (() => {
     const p = item?.price;
     if (p == null || p === "") return null;
-    
+
     const num = typeof p === "number" ? p : Number(p);
-    if (Number.isNaN(num)) return `${p} €`;
-    
+    // 🔒 SÉCURITÉ: Échapper si string non numérique
+    if (Number.isNaN(num)) return escapeHTML(`${p} €`);
+
     try {
       return new Intl.NumberFormat("fr-FR", {
         style: "currency",
@@ -77,7 +82,7 @@ function MarkerListingItem({
         maximumFractionDigits: 0,
       }).format(num);
     } catch {
-      return `${num} €`;
+      return escapeHTML(`${num} €`);
     }
   })();
 
@@ -92,7 +97,7 @@ function MarkerListingItem({
    */
   const handleNavigation = useCallback(() => {
     if (!id) return;
-    
+
     if (onNavigate) {
       onNavigate(id);
     } else if (typeof window !== "undefined") {
@@ -121,6 +126,7 @@ function MarkerListingItem({
   };
 
   return (
+    // ✅ SÉCURISÉ
     <div
       role="button"
       tabIndex={0}
@@ -133,19 +139,19 @@ function MarkerListingItem({
         "focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
       )}
       style={{ backgroundColor: COLORS.BG_WHITE }}
-      aria-label={`Ouvrir la fiche ${title}`}
+      aria-label={escapeHTML(`Ouvrir la fiche ${title}`)}
     >
       {/* ✅ Section image avec overlays */}
       <div className="relative w-full h-[160px] overflow-hidden">
+        // ✅ SÉCURISÉ
         <Image
           src={imageUrl}
-          alt={`Photo de ${title}`}
+          alt={escapeHTML(`Photo de ${title}`)}
           fill
           sizes="(max-width: 640px) 60vw, 280px"
           className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
           priority={false}
         />
-
         {/* ✅ Bouton favoris */}
         <button
           type="button"
@@ -163,7 +169,9 @@ function MarkerListingItem({
           onMouseLeave={(e) => {
             e.currentTarget.style.backgroundColor = `${COLORS.BG_WHITE}E6`;
           }}
-          aria-label={isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
+          aria-label={
+            isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"
+          }
           aria-pressed={!!isFavorite}
           onClick={handleToggleFavorite}
         >
@@ -174,14 +182,15 @@ function MarkerListingItem({
             )}
           />
         </button>
-
         {/* ✅ Badge de statut */}
         <div
           className={cn(
             "absolute top-2 left-2 px-2.5 py-1 rounded-full text-xs font-medium shadow-sm"
           )}
           style={{
-            backgroundColor: isOpen ? `${COLORS.SUCCESS}20` : `${COLORS.ERROR}20`,
+            backgroundColor: isOpen
+              ? `${COLORS.SUCCESS}20`
+              : `${COLORS.ERROR}20`,
             color: isOpen ? COLORS.SUCCESS : COLORS.ERROR,
             border: `1px solid ${isOpen ? `${COLORS.SUCCESS}40` : `${COLORS.ERROR}40`}`,
           }}
@@ -193,17 +202,17 @@ function MarkerListingItem({
       {/* ✅ Section contenu */}
       <div className="p-3">
         <div className="flex justify-between items-start">
-          <h3 
+          // ✅ SÉCURISÉ
+          <h3
             className="font-medium text-base mb-1 truncate flex-1"
             style={{ color: COLORS.TEXT_PRIMARY }}
           >
-            {title}
+            {escapeHTML(title)} {/* 🔒 Échappé */}
           </h3>
-
           {/* ✅ Note avec étoile */}
           {item?.rating != null && !Number.isNaN(Number(item.rating)) && (
             <div className="flex items-center gap-1 ml-2">
-              <span 
+              <span
                 className={cn(
                   "text-xs font-medium px-1.5 py-0.5 rounded flex items-center gap-0.5"
                 )}
@@ -230,77 +239,69 @@ function MarkerListingItem({
             </div>
           )}
         </div>
-
         {/* ✅ Adresse */}
-        <p 
+        // ✅ SÉCURISÉ
+        <p
           className="text-sm mb-2 truncate"
           style={{ color: COLORS.TEXT_SECONDARY }}
         >
-          📍 {address}
+          📍 {escapeHTML(address)} {/* 🔒 Échappé */}
         </p>
-
         {/* ✅ Prix */}
         {formattedPrice && (
           <div className="mt-1 flex items-baseline gap-1">
-            <span 
+            <span
               className="font-semibold"
               style={{ color: COLORS.TEXT_PRIMARY }}
             >
               {formattedPrice}
             </span>
-            <span 
-              className="text-sm"
-              style={{ color: COLORS.TEXT_SECONDARY }}
-            >
+            <span className="text-sm" style={{ color: COLORS.TEXT_SECONDARY }}>
               / jour
             </span>
           </div>
         )}
-
         {/* ✅ Certifications */}
-        {Array.isArray(item?.certifications) && item.certifications.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-3">
-            {item.certifications.slice(0, 2).map((cert, index) => (
-              <span
-                key={index}
-                className={cn(
-                  "text-xs px-2 py-0.5 rounded-full border"
-                )}
-                style={{
-                  backgroundColor: `${COLORS.PRIMARY}10`,
-                  color: COLORS.PRIMARY,
-                  borderColor: `${COLORS.PRIMARY}30`,
-                }}
-              >
-                {cert}
-              </span>
-            ))}
-            {item.certifications.length > 2 && (
-              <span
-                className={cn(
-                  "text-xs px-2 py-0.5 rounded-full border"
-                )}
-                style={{
-                  backgroundColor: COLORS.BG_GRAY,
-                  color: COLORS.TEXT_MUTED,
-                  borderColor: COLORS.BORDER,
-                }}
-              >
-                +{item.certifications.length - 2}
-              </span>
-            )}
-          </div>
-        )}
-
+        // ✅ SÉCURISÉ
+        {Array.isArray(item?.certifications) &&
+          item.certifications.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-3">
+              {item.certifications.slice(0, 2).map((cert, index) => (
+                <span
+                  key={index}
+                  className={cn("text-xs px-2 py-0.5 rounded-full border")}
+                  style={{
+                    backgroundColor: `${COLORS.PRIMARY}10`,
+                    color: COLORS.PRIMARY,
+                    borderColor: `${COLORS.PRIMARY}30`,
+                  }}
+                >
+                  {escapeHTML(cert)} {/* 🔒 Échappé */}
+                </span>
+              ))}
+              {item.certifications.length > 2 && (
+                <span
+                  className={cn("text-xs px-2 py-0.5 rounded-full border")}
+                  style={{
+                    backgroundColor: COLORS.BG_GRAY,
+                    color: COLORS.TEXT_MUTED,
+                    borderColor: COLORS.BORDER,
+                  }}
+                >
+                  +{item.certifications.length - 2}
+                </span>
+              )}
+            </div>
+          )}
         {/* ✅ Indicateur d'action hover */}
-        <div 
+        <div
           className={cn(
             "mt-3 pt-2 border-t opacity-0 group-hover:opacity-100",
             "transition-opacity duration-200"
           )}
           style={{ borderColor: COLORS.BORDER }}
         >
-          <div 
+          <div
             className="flex items-center justify-center gap-1 text-sm font-medium"
             style={{ color: COLORS.PRIMARY }}
           >

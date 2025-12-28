@@ -43,6 +43,7 @@ import { openMobileFilters } from "@/app/_components/layout/FilterSection/Filter
 import { COLORS } from "@/lib/config";
 import { useInteractionsActions, useListingsActions, useListingsState, useMapActions, useMapState } from "@/lib/store";
 import { useFiltersState } from "@/lib/store/filtersStore";
+import { escapeHTML } from "@/lib/utils/sanitize";
 
 /**
  * Interfaces TypeScript
@@ -119,7 +120,8 @@ const formatDistance = (item: ListingItem): string | null => {
     return `${item.distance_km.toFixed(1)} km`;
   }
   if (typeof item?.distance === "string") {
-    return item.distance;
+    // 🔒 SÉCURITÉ: Distance échappée
+    return escapeHTML(item.distance);
   }
   return null;
 };
@@ -208,7 +210,7 @@ const FarmCard = memo<FarmCardProps>(function FarmCard({
     : [];
 
   return (
-    <Card 
+    <Card
       className={cn(
         "overflow-hidden border transition-all duration-300",
         "hover:shadow-lg hover:scale-[1.02]"
@@ -223,18 +225,14 @@ const FarmCard = memo<FarmCardProps>(function FarmCard({
         e.currentTarget.style.borderColor = `${COLORS.PRIMARY}30`;
       }}
     >
-      <Link
-        href={`/farm/${item.id}`}
-        prefetch={false}
-        className="block"
-      >
-        <div 
+      <Link href={`/farm/${item.id}`} prefetch={false} className="block">
+        <div
           className="relative h-40"
           style={{ backgroundColor: `${COLORS.PRIMARY}10` }}
         >
           <ListingImage
             src={cover}
-            alt={item.name || "Ferme"}
+            alt={escapeHTML(item.name || "Ferme")} // ✅ Échappé
             fallbackSrc="/default-farm-image.jpg"
             className="h-full w-full object-cover"
           />
@@ -261,7 +259,9 @@ const FarmCard = memo<FarmCardProps>(function FarmCard({
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = `${COLORS.BG_WHITE}E6`;
             }}
-            aria-label={isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
+            aria-label={
+              isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"
+            }
             type="button"
           >
             <LucideHeart
@@ -284,7 +284,8 @@ const FarmCard = memo<FarmCardProps>(function FarmCard({
                   "shadow-md transition-colors bg-green-600 text-white hover:bg-green-700"
                 )}
               >
-                {badge}
+                {/* 🔒 SÉCURITÉ: Badge échappé */}
+                {escapeHTML(badge)}
               </Badge>
             ))}
           </div>
@@ -292,11 +293,12 @@ const FarmCard = memo<FarmCardProps>(function FarmCard({
           {/* ✅ Distance */}
           {distance && (
             <div className="absolute bottom-3 left-3">
-              <Badge 
+              <Badge
                 className={cn(
                   "shadow-md bg-white/90 text-green-700 hover:bg-white"
                 )}
               >
+                {/* 🔒 SÉCURITÉ: Distance échappée (déjà fait dans formatDistance si corrigé) */}
                 <MapPin className="mr-1 h-3 w-3" /> {distance}
               </Badge>
             </div>
@@ -305,18 +307,21 @@ const FarmCard = memo<FarmCardProps>(function FarmCard({
 
         <div className="p-4 space-y-2.5">
           <div className="flex items-center justify-between">
-            <h3 
+            <h3
               className="font-bold text-lg leading-tight line-clamp-1"
               style={{ color: COLORS.TEXT_PRIMARY }}
             >
-              {item.name || "Ferme"}
+              {/* 🔒 SÉCURITÉ: Nom de ferme échappé */}
+              {escapeHTML(item.name || "Ferme")}
             </h3>
             {openState && (
               <div className="flex items-center gap-1.5 text-xs">
                 <span
                   className="w-2 h-2 rounded-full"
                   style={{
-                    backgroundColor: openState.isOpen ? COLORS.SUCCESS : COLORS.ERROR,
+                    backgroundColor: openState.isOpen
+                      ? COLORS.SUCCESS
+                      : COLORS.ERROR,
                   }}
                 />
                 <span
@@ -337,7 +342,7 @@ const FarmCard = memo<FarmCardProps>(function FarmCard({
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1">
                   <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                  <span 
+                  <span
                     className="font-semibold"
                     style={{ color: COLORS.TEXT_PRIMARY }}
                   >
@@ -355,27 +360,31 @@ const FarmCard = memo<FarmCardProps>(function FarmCard({
             )}
 
             {item.hours && (
-              <div 
+              <div
                 className="flex items-center gap-1"
                 style={{ color: COLORS.TEXT_SECONDARY }}
               >
                 <Clock className="h-3.5 w-3.5" />
-                <span className="text-xs">{item.hours}</span>
+                {/* 🔒 SÉCURITÉ: Heures échappées */}
+                <span className="text-xs">{escapeHTML(item.hours)}</span>
               </div>
             )}
           </div>
 
           {/* ✅ Address */}
           {address && (
-            <div 
+            <div
               className="flex items-start gap-2 text-sm"
               style={{ color: COLORS.TEXT_SECONDARY }}
             >
-              <MapPin 
-                className="h-4 w-4 mt-0.5 flex-shrink-0" 
+              <MapPin
+                className="h-4 w-4 mt-0.5 flex-shrink-0"
                 style={{ color: COLORS.PRIMARY }}
               />
-              <span className="leading-relaxed line-clamp-2">{address}</span>
+              {/* 🔒 SÉCURITÉ: Adresse échappée */}
+              <span className="leading-relaxed line-clamp-2">
+                {escapeHTML(address)}
+              </span>
             </div>
           )}
 
@@ -388,7 +397,8 @@ const FarmCard = memo<FarmCardProps>(function FarmCard({
                   variant="secondary"
                   className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
                 >
-                  {product}
+                  {/* 🔒 SÉCURITÉ: Type de produit échappé */}
+                  {escapeHTML(product)}
                 </Badge>
               ))}
               {Array.isArray(item?.product_type) &&
@@ -448,9 +458,7 @@ const FarmCard = memo<FarmCardProps>(function FarmCard({
             <Button
               variant="outline"
               size="icon"
-              className={cn(
-                "bg-transparent transition-colors duration-200"
-              )}
+              className={cn("bg-transparent transition-colors duration-200")}
               style={{
                 borderColor: `${COLORS.PRIMARY}30`,
                 color: COLORS.PRIMARY,
@@ -467,7 +475,7 @@ const FarmCard = memo<FarmCardProps>(function FarmCard({
             </Button>
           </div>
 
-          <Button 
+          <Button
             className={cn(
               "w-full font-medium h-10 transition-colors duration-200"
             )}
@@ -763,17 +771,15 @@ export default function MobileListingMapView(): JSX.Element {
   /* ----------------------- LIST VIEW ----------------------- */
 
   const ListView = (
-    <div 
+    <div
       className="relative min-h-[100dvh] w-full pb-32"
       style={{
         background: `linear-gradient(to bottom, ${COLORS.PRIMARY_BG}, ${COLORS.BG_WHITE})`,
       }}
     >
       {/* ✅ Header avec recherche */}
-      <header 
-        className={cn(
-          "sticky top-0 z-50 border-b shadow-sm"
-        )}
+      <header
+        className={cn("sticky top-0 z-50 border-b shadow-sm")}
         style={{
           backgroundColor: COLORS.BG_WHITE,
           borderColor: `${COLORS.PRIMARY}20`,
@@ -784,7 +790,7 @@ export default function MobileListingMapView(): JSX.Element {
             <div className="relative">
               <Suspense
                 fallback={
-                  <div 
+                  <div
                     className="h-10 w-full rounded-full"
                     style={{ backgroundColor: `${COLORS.PRIMARY}10` }}
                   />
@@ -801,7 +807,7 @@ export default function MobileListingMapView(): JSX.Element {
       </header>
 
       {/* ✅ Fil d'Ariane */}
-      <div 
+      <div
         className="border-b"
         style={{
           backgroundColor: COLORS.BG_WHITE,
@@ -810,21 +816,19 @@ export default function MobileListingMapView(): JSX.Element {
       >
         <div className="px-4 py-2">
           <div className="flex items-center gap-2 text-sm">
-            <span 
-              className="font-medium"
-              style={{ color: COLORS.PRIMARY }}
-            >
+            <span className="font-medium" style={{ color: COLORS.PRIMARY }}>
               France
             </span>
-            <ChevronRight 
-              className="h-4 w-4" 
+            <ChevronRight
+              className="h-4 w-4"
               style={{ color: COLORS.TEXT_MUTED }}
             />
-            <span 
+            <span
               className="font-semibold"
               style={{ color: COLORS.TEXT_PRIMARY }}
             >
-              {searchCity || "Sélectionnez une ville"}
+              {/* 🔒 SÉCURITÉ: Ville échappée */}
+              {escapeHTML(searchCity || "Sélectionnez une ville")}
             </span>
           </div>
         </div>
@@ -840,33 +844,31 @@ export default function MobileListingMapView(): JSX.Element {
             {Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
-                className={cn(
-                  "flex gap-3 rounded-2xl border p-3 shadow-sm"
-                )}
+                className={cn("flex gap-3 rounded-2xl border p-3 shadow-sm")}
                 style={{
                   backgroundColor: COLORS.BG_WHITE,
                   borderColor: COLORS.BORDER,
                 }}
               >
-                <div 
+                <div
                   className="h-20 w-20 animate-pulse rounded-xl"
                   style={{ backgroundColor: COLORS.BG_GRAY }}
                 />
                 <div className="flex-1">
-                  <div 
+                  <div
                     className="mb-2 h-4 w-2/3 animate-pulse rounded"
                     style={{ backgroundColor: COLORS.BG_GRAY }}
                   />
-                  <div 
+                  <div
                     className="mb-2 h-3 w-5/6 animate-pulse rounded"
                     style={{ backgroundColor: COLORS.BG_GRAY }}
                   />
                   <div className="flex gap-2">
-                    <div 
+                    <div
                       className="h-5 w-16 animate-pulse rounded-full"
                       style={{ backgroundColor: COLORS.BG_GRAY }}
                     />
-                    <div 
+                    <div
                       className="h-5 w-20 animate-pulse rounded-full"
                       style={{ backgroundColor: COLORS.BG_GRAY }}
                     />
@@ -877,7 +879,7 @@ export default function MobileListingMapView(): JSX.Element {
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div 
+            <div
               className="mb-4 flex h-16 w-16 items-center justify-center rounded-full"
               style={{ backgroundColor: COLORS.BG_GRAY }}
             >
@@ -895,13 +897,13 @@ export default function MobileListingMapView(): JSX.Element {
                 />
               </svg>
             </div>
-            <h3 
+            <h3
               className="mb-1 text-base font-semibold"
               style={{ color: COLORS.TEXT_PRIMARY }}
             >
               Aucune ferme
             </h3>
-            <p 
+            <p
               className="max-w-xs text-sm"
               style={{ color: COLORS.TEXT_SECONDARY }}
             >
@@ -922,21 +924,21 @@ export default function MobileListingMapView(): JSX.Element {
             {hasMore && (
               <div ref={loadMoreRef} className="py-6 text-center">
                 {isLoadingMore ? (
-                  <div 
+                  <div
                     className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm"
                     style={{
                       backgroundColor: COLORS.BG_GRAY,
                       color: COLORS.TEXT_SECONDARY,
                     }}
                   >
-                    <RefreshCw 
-                      className="h-4 w-4 animate-spin" 
+                    <RefreshCw
+                      className="h-4 w-4 animate-spin"
                       style={{ color: COLORS.PRIMARY }}
                     />{" "}
                     Chargement…
                   </div>
                 ) : (
-                  <span 
+                  <span
                     className="text-xs"
                     style={{ color: COLORS.TEXT_MUTED }}
                   >
@@ -950,10 +952,8 @@ export default function MobileListingMapView(): JSX.Element {
       </div>
 
       {/* ✅ CTA bas "Voir sur la carte" */}
-      <div 
-        className={cn(
-          "fixed bottom-0 left-0 right-0 border-t shadow-lg z-40"
-        )}
+      <div
+        className={cn("fixed bottom-0 left-0 right-0 border-t shadow-lg z-40")}
         style={{
           backgroundColor: COLORS.BG_WHITE,
           borderColor: `${COLORS.PRIMARY}20`,

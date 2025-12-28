@@ -12,6 +12,8 @@ import { useUser, useClerk } from "@clerk/nextjs";
 import { supabase } from "@/utils/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+// 🔒 SÉCURITÉ: Import des fonctions de sanitisation
+import { escapeHTML, sanitizeHTML } from "@/lib/utils/sanitize";
 
 // ✅ IMPORTS CORRECTS : Store avec pagination corrigée
 import {
@@ -223,7 +225,8 @@ const CertificationBadge = ({
     }}
   >
     <Award className="w-3 h-3" />
-    <span className="truncate max-w-20">{certification}</span>
+    {/* 🔒 SÉCURITÉ: Certification échappée */}
+    <span className="truncate max-w-20">{escapeHTML(certification)}</span>
   </div>
 );
 
@@ -286,7 +289,7 @@ const ListItem = React.memo<ListItemProps>(
             {!imageError ? (
               <OptimizedImage
                 src={imageUrl}
-                alt={`${item.name} - Ferme locale`}
+                alt={escapeHTML(`${item.name} - Ferme locale`)} // ✅ Échappé
                 fill={true}
                 width={0}
                 height={0}
@@ -368,7 +371,8 @@ const ListItem = React.memo<ListItemProps>(
                   )}
                   style={{ color: COLORS.TEXT_PRIMARY }}
                 >
-                  {item.name}
+                  {/* 🔒 SÉCURITÉ: Nom de ferme échappé */}
+                  {escapeHTML(item.name)}
                 </h2>
 
                 <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -446,8 +450,9 @@ const ListItem = React.memo<ListItemProps>(
                   className="h-4 w-4 mt-0.5 flex-shrink-0"
                   style={{ color: COLORS.PRIMARY }}
                 />
-                <span className="line-clamp-1" title={item.address}>
-                  {item.address}
+                {/* 🔒 SÉCURITÉ: Adresse échappée (texte + attribut) */}
+                <span className="line-clamp-1" title={escapeHTML(item.address)}>
+                  {escapeHTML(item.address)}
                 </span>
               </div>
 
@@ -468,7 +473,8 @@ const ListItem = React.memo<ListItemProps>(
                         }}
                       >
                         <Leaf className="w-3 h-3" />
-                        {product}
+                        {/* 🔒 SÉCURITÉ: Type de produit échappé */}
+                        {escapeHTML(product)}
                       </span>
                     ))}
                     {item.product_type.length > 4 && (
@@ -490,12 +496,14 @@ const ListItem = React.memo<ListItemProps>(
               )}
 
               {item.description && (
-                <p
-                  className="text-sm line-clamp-2 mb-3 leading-relaxed"
+                /* 🔒 SÉCURITÉ: Description sanitisée (permet formatage basique) */
+                <div
+                  className="text-sm line-clamp-2 mb-3 leading-relaxed prose prose-sm max-w-none"
                   style={{ color: COLORS.TEXT_SECONDARY }}
-                >
-                  {item.description}
-                </p>
+                  dangerouslySetInnerHTML={{
+                    __html: sanitizeHTML(item.description),
+                  }}
+                />
               )}
             </div>
 
@@ -622,7 +630,8 @@ export default function Listing({
       setCoordinates?.({ lng, lat });
       setZoom?.(14);
       window.scrollTo({ top: 0, behavior: "smooth" });
-      toast.success(`Centrage sur ${listing.name}`);
+      // 🔒 SÉCURITÉ: Nom de ferme échappé dans toast
+      toast.success(`Centrage sur ${escapeHTML(listing.name)}`);
     },
     [setOpenInfoWindowId, setCoordinates, setZoom]
   );

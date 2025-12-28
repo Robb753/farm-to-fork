@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { Database } from "@/lib/types/database";
+import { escapeHTML, sanitizeHTML } from "@/lib/utils/sanitize";
 
 /**
  * Type pour un listing
@@ -116,8 +117,9 @@ export default function BoutiqueTab({
   // Vérif panier (tunnel fermé)
   useEffect(() => {
     if (cart.farmId && farmId && cart.farmId !== farmId) {
+      // 🔒 SÉCURITÉ: Noms de fermes échappés avec fallback
       toast.error(
-        `Panier déjà lié à ${cart.farmName}. Videz-le pour acheter chez ${farmName}.`,
+        `Panier déjà lié à ${escapeHTML(cart.farmName || "une ferme")}. Videz-le pour acheter chez ${escapeHTML(farmName || "cette ferme")}.`,
         { duration: 3500 }
       );
     }
@@ -149,7 +151,8 @@ export default function BoutiqueTab({
       }
 
       addItem(product, 1);
-      toast.success(`${product.name} ajouté au panier`);
+      // 🔒 SÉCURITÉ: Nom de produit échappé
+      toast.success(`${escapeHTML(product.name)} ajouté au panier`);
     },
     [addItem, canAddToCart, farmId]
   );
@@ -273,7 +276,8 @@ export default function BoutiqueTab({
               }}
             >
               <Sparkles className="h-3.5 w-3.5" />
-              Achat chez {farmName}
+              {/* 🔒 SÉCURITÉ: Nom de ferme échappé */}
+              Achat chez {escapeHTML(farmName)}
             </span>
           </div>
 
@@ -354,8 +358,9 @@ export default function BoutiqueTab({
                   >
                     Retrait à la ferme
                   </div>
+                  {/* 🔒 SÉCURITÉ: Jours de retrait échappés */}
                   <div style={{ color: COLORS.TEXT_SECONDARY }}>
-                    {listing.pickup_days}
+                    {escapeHTML(listing.pickup_days)}
                   </div>
                 </div>
               </div>
@@ -505,7 +510,7 @@ function ProductRow({
             className="truncate text-base font-semibold"
             style={{ color: COLORS.TEXT_PRIMARY }}
           >
-            {product.name}
+            {escapeHTML(product.name)}
           </h3>
 
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
@@ -513,7 +518,9 @@ function ProductRow({
               {hasPrice ? (
                 <>
                   {product.price.toFixed(2)} €{" "}
-                  <span className="font-normal">/ {product.unit}</span>
+                  <span className="font-normal">
+                    / {escapeHTML(product.unit)}
+                  </span>
                 </>
               ) : (
                 <span className="text-gray-500 font-medium">
@@ -536,12 +543,14 @@ function ProductRow({
           </div>
 
           {product.description && (
-            <p
-              className="mt-2 line-clamp-2 text-sm"
+            /* 🔒 SÉCURITÉ: Description sanitisée (permet formatage basique) */
+            <div
+              className="mt-2 line-clamp-2 text-sm prose prose-sm max-w-none"
               style={{ color: COLORS.TEXT_SECONDARY }}
-            >
-              {product.description}
-            </p>
+              dangerouslySetInnerHTML={{
+                __html: sanitizeHTML(product.description),
+              }}
+            />
           )}
         </div>
 

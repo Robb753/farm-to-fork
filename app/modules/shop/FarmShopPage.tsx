@@ -15,6 +15,7 @@ import { COLORS } from "@/lib/config";
 import { supabase } from "@/utils/supabase/client";
 import { useCartStore, type Product } from "@/lib/store/cartStore";
 import { toast } from "sonner";
+import { escapeHTML, sanitizeHTML } from "@/lib/utils/sanitize";
 
 /**
  * Interface pour une ferme
@@ -64,9 +65,10 @@ function guessCategory(productName: string): FilterKey {
   return "other";
 }
 
+// ✅ SÉCURISÉ
 function formatPrice(p: Product) {
   if (!p.price || p.price <= 0) return null;
-  return `${p.price.toFixed(2)} € / ${p.unit || "unité"}`;
+  return `${p.price.toFixed(2)} € / ${escapeHTML(p.unit || "unité")}`;
 }
 
 function productSignal(
@@ -242,8 +244,9 @@ export default function FarmShopPage(): JSX.Element {
     if (Number.isNaN(farmId)) return;
 
     if (cart.farmId && cart.farmId !== farmId) {
+      // ✅ SÉCURISÉ
       toast.error(
-        `Vous avez déjà des produits de ${cart.farmName} dans votre panier. Videz-le pour acheter chez une autre ferme.`,
+        `Vous avez déjà des produits de ${escapeHTML(cart.farmName || "une autre ferme")} dans votre panier. Videz-le pour acheter chez une autre ferme.`,
         { duration: 5000 }
       );
     }
@@ -269,7 +272,10 @@ export default function FarmShopPage(): JSX.Element {
       }
 
       addItem(product, 1);
-      toast.success(`${product.name} ajouté au panier`);
+      // ✅ SÉCURISÉ
+      toast.success(
+        `${escapeHTML(product.name || "Produit")} ajouté au panier`
+      );
       pulseMiniCart();
     },
     [farmId, addItem, canAddToCart, pulseMiniCart]
@@ -400,7 +406,7 @@ export default function FarmShopPage(): JSX.Element {
                   className="font-bold truncate"
                   style={{ color: COLORS.PRIMARY }}
                 >
-                  {farm.name}
+                  {escapeHTML(farm.name)}
                 </p>
               </div>
             </div>
@@ -690,15 +696,12 @@ function ProductCard({
     >
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
-          <h3
-            className="font-bold text-lg mb-1 truncate"
-            style={{ color: COLORS.TEXT_PRIMARY }}
-          >
-            {product.name}
+          // ✅ SÉCURISÉ
+          <h3 className="font-bold text-lg mb-1 truncate">
+            {escapeHTML(product.name)}
           </h3>
           {signal && <Badge label={signal.label} tone={signal.tone} />}
         </div>
-
         {priceLabel ? (
           <p
             className="text-lg font-semibold mb-2"
@@ -714,16 +717,15 @@ function ProductCard({
             Prix à définir
           </p>
         )}
-
+        // ✅ SÉCURISÉ
         {product.description && (
-          <p
-            className="text-sm mb-2 line-clamp-2"
-            style={{ color: COLORS.TEXT_SECONDARY }}
-          >
-            {product.description}
-          </p>
+          <div
+            className="text-sm mb-2 line-clamp-2 prose prose-sm max-w-none"
+            dangerouslySetInnerHTML={{
+              __html: sanitizeHTML(product.description),
+            }}
+          />
         )}
-
         <div className="flex items-center gap-2 text-sm">
           <span>{stockIcon}</span>
           <span style={{ color: COLORS.TEXT_SECONDARY }}>{stockText}</span>
@@ -847,7 +849,8 @@ function MiniCart({
     const out = products.some((p) => p.stock_status === "out_of_stock");
     if (out) return "ℹ️ Certains produits sont indisponibles";
 
-    return `🛒 Achat chez ${cartFarmName}`;
+    // ✅ SÉCURISÉ
+    return `🛒 Achat chez ${escapeHTML(cartFarmName)}`;
   }, [cart.items, products, cartFarmName]);
 
   return (

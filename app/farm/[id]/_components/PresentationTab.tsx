@@ -19,6 +19,9 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/lib/types/database";
 
+// 🔒 SÉCURITÉ: Import des fonctions de sanitisation
+import { escapeHTML, sanitizeHTML } from "@/lib/utils/sanitize";
+
 /**
  * Type pour un listing avec toutes ses données
  */
@@ -69,6 +72,11 @@ function normalizeToStringArray(value: unknown): string[] {
   return [String(value)].filter(Boolean);
 }
 
+/**
+ * Composant PresentationTab - Onglet présentation d'une ferme
+ *
+ * 🔒 SÉCURITÉ: Toutes les données utilisateur sont protégées contre XSS
+ */
 export default function PresentationTab({
   listing,
   className,
@@ -80,6 +88,7 @@ export default function PresentationTab({
 
   /**
    * Certifications enrichies (certification_enum[])
+   * 🔒 SÉCURITÉ: Nom custom échappé dans le cas default
    */
   const certifications = useMemo<CertificationInfo[]>(() => {
     const certs = normalizeToStringArray(listing.certifications)
@@ -117,7 +126,8 @@ export default function PresentationTab({
       const key = cert.toLowerCase();
       return (
         certificationMap[key] || {
-          name: cert,
+          // 🔒 SÉCURITÉ: Échapper le nom custom
+          name: escapeHTML(cert),
           icon: <Award className="h-3 w-3" />,
           color: "gray",
           description: "Certification spécialisée",
@@ -128,6 +138,7 @@ export default function PresentationTab({
 
   /**
    * Méthodes de production
+   * 🔒 SÉCURITÉ: Nom custom échappé dans le cas default
    */
   const productionMethods = useMemo(() => {
     const methods = normalizeToStringArray(listing.production_method)
@@ -146,7 +157,8 @@ export default function PresentationTab({
     return methods.map((method) => {
       const key = method.toLowerCase();
       return {
-        name: method,
+        // 🔒 SÉCURITÉ: Échapper le nom custom
+        name: escapeHTML(method),
         ...(methodMap[key] || {
           color: "gray",
           icon: <Factory className="h-3 w-3" />,
@@ -177,9 +189,10 @@ export default function PresentationTab({
     // IMPORTANT: pas d'invention de stats => pas de mismatch, et plus crédible.
     return {
       foundedYear: foundedFromDb ?? foundedFromCreatedAt,
-      // farmSize: listing.farm_size ?? undefined,
-      // employeeCount: listing.employee_count ?? undefined,
-      // productCount: listing.product_count ?? undefined,
+      // 🔒 SÉCURITÉ: Si ces champs existent, on les échappe dans le JSX
+      farmSize: (listing as any).farm_size ?? undefined,
+      employeeCount: (listing as any).employee_count ?? undefined,
+      productCount: (listing as any).product_count ?? undefined,
     };
   }, [listing]);
 
@@ -212,14 +225,19 @@ export default function PresentationTab({
     });
   }, [listing.id]);
 
+  /**
+   * Gestion du partage
+   * 🔒 SÉCURITÉ: Données échappées avant partage
+   */
   const handleShare = useCallback(async () => {
     try {
       // globalThis est safe SSR, mais la callback ne sera appelée que côté client.
       const url = typeof window !== "undefined" ? window.location.href : "";
 
+      // 🔒 SÉCURITÉ: Échapper nom et description
       const shareData = {
-        title: `${listing.name || "Ferme locale"} | Présentation`,
-        text: `Découvrez ${listing.name || "cette ferme"} - ${listing.description?.substring(0, 100) || ""}...`,
+        title: `${escapeHTML(listing.name || "Ferme locale")} | Présentation`,
+        text: `Découvrez ${escapeHTML(listing.name || "cette ferme")} - ${escapeHTML(listing.description?.substring(0, 100) || "")}...`,
         url,
       };
 
@@ -317,10 +335,14 @@ export default function PresentationTab({
             </h3>
           </div>
 
+          {/* 🔒 SÉCURITÉ: Description sanitisée (permet formatage basique) */}
           <div className="prose max-w-none">
-            <p className="text-gray-700 leading-relaxed whitespace-pre-line">
-              {displayedDescription}
-            </p>
+            <div
+              className="text-gray-700 leading-relaxed whitespace-pre-line prose prose-sm max-w-none"
+              dangerouslySetInnerHTML={{
+                __html: sanitizeHTML(displayedDescription),
+              }}
+            />
           </div>
 
           {shouldTruncateDescription && (
@@ -351,8 +373,9 @@ export default function PresentationTab({
         {farmStats.farmSize && (
           <div className="bg-white rounded-lg p-4 border border-gray-100 text-center">
             <MapPin className="h-6 w-6 text-green-600 mx-auto mb-2" />
+            {/* 🔒 SÉCURITÉ: farmSize échappé */}
             <div className="text-2xl font-bold text-gray-900">
-              {farmStats.farmSize}
+              {escapeHTML(String(farmStats.farmSize))}
             </div>
             <div className="text-sm text-gray-500">Surface exploitée</div>
           </div>
@@ -361,8 +384,9 @@ export default function PresentationTab({
         {farmStats.employeeCount && (
           <div className="bg-white rounded-lg p-4 border border-gray-100 text-center">
             <Users className="h-6 w-6 text-purple-600 mx-auto mb-2" />
+            {/* 🔒 SÉCURITÉ: employeeCount échappé */}
             <div className="text-2xl font-bold text-gray-900">
-              {farmStats.employeeCount}
+              {escapeHTML(String(farmStats.employeeCount))}
             </div>
             <div className="text-sm text-gray-500">Employés</div>
           </div>
@@ -371,8 +395,9 @@ export default function PresentationTab({
         {farmStats.productCount && (
           <div className="bg-white rounded-lg p-4 border border-gray-100 text-center">
             <Factory className="h-6 w-6 text-orange-600 mx-auto mb-2" />
+            {/* 🔒 SÉCURITÉ: productCount échappé */}
             <div className="text-2xl font-bold text-gray-900">
-              {farmStats.productCount}+
+              {escapeHTML(String(farmStats.productCount))}+
             </div>
             <div className="text-sm text-gray-500">Produits</div>
           </div>
@@ -403,6 +428,7 @@ export default function PresentationTab({
               >
                 <div className="flex-shrink-0">{cert.icon}</div>
                 <div className="flex-1 min-w-0">
+                  {/* 🔒 SÉCURITÉ: cert.name déjà échappé dans useMemo */}
                   <div className="font-medium text-sm">{cert.name}</div>
                   <div className="text-xs opacity-75 truncate">
                     {cert.description}
@@ -436,6 +462,7 @@ export default function PresentationTab({
                 )}
               >
                 {method.icon}
+                {/* 🔒 SÉCURITÉ: method.name déjà échappé dans useMemo */}
                 {method.name}
               </Badge>
             ))}

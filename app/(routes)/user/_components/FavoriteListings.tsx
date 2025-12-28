@@ -14,11 +14,17 @@ import type { Database } from "@/lib/types/database";
 // ✅ Import userStore avec types
 import { useUserFavorites, useUserActions } from "@/lib/store/userStore";
 
+// 🔒 SÉCURITÉ: Import des fonctions de sanitisation
+import { escapeHTML, sanitizeHTML } from "@/lib/utils/sanitize";
+
 /**
  * Type pour un listing favori avec ses images
  */
 type FavoriteListing = Database["public"]["Tables"]["listing"]["Row"] & {
-  listingImages: Pick<Database["public"]["Tables"]["listingImages"]["Row"], "url">[];
+  listingImages: Pick<
+    Database["public"]["Tables"]["listingImages"]["Row"],
+    "url"
+  >[];
 };
 
 /**
@@ -36,7 +42,9 @@ interface ErrorState {
 
 /**
  * Composant d'affichage des listings favoris
- * 
+ *
+ * 🔒 SÉCURITÉ: Toutes les données utilisateur sont protégées contre XSS
+ *
  * Features:
  * - Synchronisation avec le userStore pour les favoris
  * - Chargement optimisé des données Supabase
@@ -45,7 +53,7 @@ interface ErrorState {
  * - Actions rapides (voir, retirer des favoris)
  * - Responsive design adaptatif
  * - Optimisation des performances avec useCallback
- * 
+ *
  * @returns JSX.Element - Interface des favoris utilisateur
  */
 export default function FavoriteListings(): JSX.Element {
@@ -56,7 +64,9 @@ export default function FavoriteListings(): JSX.Element {
   const { loadFavorites, toggleFavorite } = useUserActions();
 
   // États locaux avec types stricts
-  const [favoriteListings, setFavoriteListings] = useState<FavoriteListing[]>([]);
+  const [favoriteListings, setFavoriteListings] = useState<FavoriteListing[]>(
+    []
+  );
   const [loadingState, setLoadingState] = useState<LoadingState>("idle");
   const [error, setError] = useState<ErrorState | null>(null);
   const [retryCount, setRetryCount] = useState<number>(0);
@@ -86,10 +96,12 @@ export default function FavoriteListings(): JSX.Element {
     try {
       const { data, error: supabaseError } = await supabase
         .from("listing")
-        .select(`
+        .select(
+          `
           *,
           listingImages(url)
-        `)
+        `
+        )
         .in("id", favoriteIds)
         .eq("active", true); // ✅ Seulement les listings actifs
 
@@ -99,14 +111,17 @@ export default function FavoriteListings(): JSX.Element {
 
       // ✅ Trier les listings selon l'ordre des favoris
       const sortedListings = favoriteIds
-        .map(id => data?.find(listing => listing.id === id))
+        .map((id) => data?.find((listing) => listing.id === id))
         .filter((listing): listing is FavoriteListing => listing !== undefined);
 
       setFavoriteListings(sortedListings);
       setLoadingState("success");
       setRetryCount(0); // Reset retry count on success
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Erreur lors du chargement des favoris";
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : "Erreur lors du chargement des favoris";
       console.error("[FavoriteListings] Erreur:", err);
       setError({ message: errorMessage });
       setLoadingState("error");
@@ -124,9 +139,9 @@ export default function FavoriteListings(): JSX.Element {
    * Gère le retry avec backoff exponentiel
    */
   const handleRetry = useCallback(() => {
-    setRetryCount(prev => prev + 1);
+    setRetryCount((prev) => prev + 1);
     const delay = Math.min(1000 * Math.pow(2, retryCount), 10000); // Max 10s
-    
+
     setTimeout(() => {
       fetchFavoriteListings();
     }, delay);
@@ -135,20 +150,25 @@ export default function FavoriteListings(): JSX.Element {
   /**
    * Retire un listing des favoris avec optimistic update
    */
-  const handleRemoveFavorite = useCallback(async (listingId: number) => {
-    if (!user?.id) return;
+  const handleRemoveFavorite = useCallback(
+    async (listingId: number) => {
+      if (!user?.id) return;
 
-    // Optimistic update
-    setFavoriteListings(prev => prev.filter(listing => listing.id !== listingId));
-    
-    try {
-      await toggleFavorite(listingId, user.id);
-    } catch (error) {
-      console.error("Erreur suppression favori:", error);
-      // Revert on error
-      fetchFavoriteListings();
-    }
-  }, [user?.id, toggleFavorite, fetchFavoriteListings]);
+      // Optimistic update
+      setFavoriteListings((prev) =>
+        prev.filter((listing) => listing.id !== listingId)
+      );
+
+      try {
+        await toggleFavorite(listingId, user.id);
+      } catch (error) {
+        console.error("Erreur suppression favori:", error);
+        // Revert on error
+        fetchFavoriteListings();
+      }
+    },
+    [user?.id, toggleFavorite, fetchFavoriteListings]
+  );
 
   /**
    * Obtient l'URL de l'image principale ou le placeholder
@@ -183,10 +203,13 @@ export default function FavoriteListings(): JSX.Element {
         <div>
           <h2 className="font-bold text-2xl">Mes favoris</h2>
           <p className="text-gray-500 text-sm mt-1">
-            {favoriteIds.length} {favoriteIds.length === 1 ? 'ferme sauvegardée' : 'fermes sauvegardées'}
+            {favoriteIds.length}{" "}
+            {favoriteIds.length === 1
+              ? "ferme sauvegardée"
+              : "fermes sauvegardées"}
           </p>
         </div>
-        
+
         {favoriteIds.length > 0 && (
           <Button
             variant="outline"
@@ -214,11 +237,12 @@ export default function FavoriteListings(): JSX.Element {
         <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
           <div className="text-red-600 mb-4">
             <p className="font-medium">Erreur lors du chargement</p>
-            <p className="text-sm mt-1">{error.message}</p>
+            {/* 🔒 SÉCURITÉ: Message d'erreur échappé */}
+            <p className="text-sm mt-1">{escapeHTML(error.message)}</p>
           </div>
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             onClick={handleRetry}
             className="text-red-600 border-red-200 hover:bg-red-50"
           >
@@ -231,7 +255,9 @@ export default function FavoriteListings(): JSX.Element {
       {loadingState === "success" && favoriteIds.length === 0 && (
         <div className="text-center p-12 bg-gray-50 rounded-lg">
           <Heart className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="font-medium text-gray-900 mb-2">Aucun favori pour le moment</h3>
+          <h3 className="font-medium text-gray-900 mb-2">
+            Aucun favori pour le moment
+          </h3>
           <p className="text-gray-500 mb-6">
             Explorez nos producteurs et sauvegardez vos fermes préférées
           </p>
@@ -257,7 +283,7 @@ export default function FavoriteListings(): JSX.Element {
               )}
               style={{
                 animationDelay: `${index * 100}ms`,
-                animation: "fadeInUp 0.6s ease-out forwards"
+                animation: "fadeInUp 0.6s ease-out forwards",
               }}
             >
               {/* Image avec overlay */}
@@ -266,10 +292,10 @@ export default function FavoriteListings(): JSX.Element {
                   src={getListingImageUrl(listing)}
                   fill
                   className="object-cover group-hover:scale-110 transition-transform duration-500"
-                  alt={listing.name || "Image de la ferme"}
+                  alt={escapeHTML(listing.name || "Image de la ferme")}
                   sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
                 />
-                
+
                 {/* Bouton favori */}
                 <button
                   onClick={() => handleRemoveFavorite(listing.id)}
@@ -287,7 +313,8 @@ export default function FavoriteListings(): JSX.Element {
                 {listing.certifications && (
                   <div className="absolute bottom-3 left-3">
                     <span className="bg-green-500/90 text-white text-xs px-2 py-1 rounded-md backdrop-blur-sm">
-                      {listing.certifications}
+                      {/* 🔒 SÉCURITÉ: Certification échappée */}
+                      {escapeHTML(String(listing.certifications))}
                     </span>
                   </div>
                 )}
@@ -296,21 +323,29 @@ export default function FavoriteListings(): JSX.Element {
               {/* Contenu */}
               <div className="p-5 space-y-3">
                 <div className="space-y-2">
+                  {/* 🔒 SÉCURITÉ: Nom échappé */}
                   <h3 className="font-bold text-lg line-clamp-1">
-                    {listing.name || "Ferme sans nom"}
+                    {escapeHTML(listing.name || "Ferme sans nom")}
                   </h3>
-                  
+
                   <div className="flex items-center gap-2 text-sm text-gray-600">
                     <MapPin className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                    <span className="line-clamp-1">{listing.address || "Adresse non définie"}</span>
+                    {/* 🔒 SÉCURITÉ: Adresse échappée */}
+                    <span className="line-clamp-1">
+                      {escapeHTML(listing.address || "Adresse non définie")}
+                    </span>
                   </div>
                 </div>
 
                 {/* Description si disponible */}
                 {listing.description && (
-                  <p className="text-sm text-gray-600 line-clamp-2">
-                    {listing.description}
-                  </p>
+                  /* 🔒 SÉCURITÉ: Description sanitisée (permet HTML basique) */
+                  <p
+                    className="text-sm text-gray-600 line-clamp-2"
+                    dangerouslySetInnerHTML={{
+                      __html: sanitizeHTML(listing.description),
+                    }}
+                  />
                 )}
 
                 {/* Tags produits */}
@@ -318,13 +353,15 @@ export default function FavoriteListings(): JSX.Element {
                   {listing.product_type && (
                     <span className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-700 rounded-md px-2 py-1">
                       <Globe className="h-3 w-3" />
-                      {listing.product_type}
+                      {/* 🔒 SÉCURITÉ: Type produit échappé */}
+                      {escapeHTML(String(listing.product_type))}
                     </span>
                   )}
                   {listing.purchase_mode && (
                     <span className="inline-flex items-center gap-1 text-xs bg-green-50 text-green-700 rounded-md px-2 py-1">
                       <Globe className="h-3 w-3" />
-                      {listing.purchase_mode}
+                      {/* 🔒 SÉCURITÉ: Mode d'achat échappé */}
+                      {escapeHTML(String(listing.purchase_mode))}
                     </span>
                   )}
                 </div>
@@ -332,9 +369,9 @@ export default function FavoriteListings(): JSX.Element {
                 {/* Actions */}
                 <div className="flex gap-2 pt-2">
                   <Link href={`/farm/${listing.id}`} className="flex-1">
-                    <Button 
-                      size="sm" 
-                      variant="default" 
+                    <Button
+                      size="sm"
+                      variant="default"
                       className="w-full group-hover:shadow-md transition-shadow"
                     >
                       <ExternalLink className="h-4 w-4 mr-2" />
@@ -349,13 +386,15 @@ export default function FavoriteListings(): JSX.Element {
       )}
 
       {/* Message informatif si certains favoris ne sont plus actifs */}
-      {favoriteIds.length > favoriteListings.length && loadingState === "success" && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-          <p className="text-yellow-800 text-sm">
-            <strong>Note:</strong> Certaines fermes de vos favoris ne sont plus disponibles ou ont été désactivées.
-          </p>
-        </div>
-      )}
+      {favoriteIds.length > favoriteListings.length &&
+        loadingState === "success" && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <p className="text-yellow-800 text-sm">
+              <strong>Note:</strong> Certaines fermes de vos favoris ne sont
+              plus disponibles ou ont été désactivées.
+            </p>
+          </div>
+        )}
     </div>
   );
 }

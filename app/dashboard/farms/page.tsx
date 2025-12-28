@@ -33,8 +33,13 @@ import { COLORS, PATHS, TABLES, LISTING_COLUMNS } from "@/lib/config";
 import { cn } from "@/lib/utils";
 import type { Listing } from "@/lib/types";
 
+// 🔒 SÉCURITÉ: Import des fonctions de sanitisation
+import { escapeHTML, sanitizeHTML } from "@/lib/utils/sanitize";
+
 /**
  * Dashboard pour les producteurs/agriculteurs
+ *
+ * 🔒 SÉCURITÉ: Toutes les données utilisateur sont protégées contre XSS
  *
  * Features:
  * - Affichage et gestion de la fiche ferme
@@ -160,8 +165,9 @@ export default function FarmerDashboard(): JSX.Element {
               borderColor: `${COLORS.ERROR}30`,
             }}
           >
+            {/* 🔒 SÉCURITÉ: Message d'erreur échappé */}
             <p className="mb-4" style={{ color: COLORS.ERROR }}>
-              {error}
+              {escapeHTML(error)}
             </p>
             <Button
               onClick={() => window.location.reload()}
@@ -358,11 +364,12 @@ export default function FarmerDashboard(): JSX.Element {
         >
           <div className="flex items-start justify-between">
             <div className="flex-1">
+              {/* 🔒 SÉCURITÉ: Nom de ferme échappé */}
               <h2
                 className="text-xl font-semibold mb-1"
                 style={{ color: COLORS.PRIMARY_DARK }}
               >
-                {listing.name || "Ferme sans nom"}
+                {escapeHTML(listing.name || "Ferme sans nom")}
               </h2>
               {listing.address && (
                 <div
@@ -373,7 +380,8 @@ export default function FarmerDashboard(): JSX.Element {
                     className="h-4 w-4 mr-2"
                     style={{ color: COLORS.TEXT_MUTED }}
                   />
-                  {listing.address}
+                  {/* 🔒 SÉCURITÉ: Adresse échappée */}
+                  {escapeHTML(listing.address)}
                 </div>
               )}
             </div>
@@ -416,14 +424,18 @@ export default function FarmerDashboard(): JSX.Element {
               >
                 Description
               </h3>
-              <p
-                className="text-sm leading-relaxed"
+              {/* 🔒 SÉCURITÉ: Description sanitisée (permet formatage basique) */}
+              <div
+                className="text-sm leading-relaxed prose prose-sm max-w-none"
                 style={{ color: COLORS.TEXT_SECONDARY }}
-              >
-                {listing.description.length > 200
-                  ? `${listing.description.substring(0, 200)}...`
-                  : listing.description}
-              </p>
+                dangerouslySetInnerHTML={{
+                  __html: sanitizeHTML(
+                    listing.description.length > 200
+                      ? `${listing.description.substring(0, 200)}...`
+                      : listing.description
+                  ),
+                }}
+              />
             </div>
           )}
 
@@ -450,7 +462,8 @@ export default function FarmerDashboard(): JSX.Element {
                           borderColor: `${COLORS.PRIMARY}30`,
                         }}
                       >
-                        {type}
+                        {/* 🔒 SÉCURITÉ: Type de produit échappé */}
+                        {escapeHTML(type)}
                       </span>
                     ))}
                   </div>
@@ -470,13 +483,26 @@ export default function FarmerDashboard(): JSX.Element {
                   className="space-y-1 text-sm"
                   style={{ color: COLORS.TEXT_SECONDARY }}
                 >
-                  {listing.email && <p>📧 {listing.email}</p>}
-                  {listing.phoneNumber && <p>📞 {listing.phoneNumber}</p>}
+                  {/* 🔒 SÉCURITÉ: Email échappé */}
+                  {listing.email && <p>📧 {escapeHTML(listing.email)}</p>}
+
+                  {/* 🔒 SÉCURITÉ: Téléphone échappé */}
+                  {listing.phoneNumber && (
+                    <p>📞 {escapeHTML(listing.phoneNumber)}</p>
+                  )}
+
+                  {/* 🔒 SÉCURITÉ: URL validée et sécurisée */}
                   {listing.website && (
                     <p>
                       🌐{" "}
                       <a
-                        href={listing.website}
+                        href={
+                          // ✅ VALIDATION: Force HTTPS si absent
+                          listing.website.startsWith("http://") ||
+                          listing.website.startsWith("https://")
+                            ? listing.website
+                            : `https://${listing.website}`
+                        }
                         target="_blank"
                         rel="noopener noreferrer"
                         className={cn(
