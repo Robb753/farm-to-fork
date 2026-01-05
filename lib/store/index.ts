@@ -1,86 +1,121 @@
-// lib/store/index.ts - Version finale avec alias de compatibilité
-// Point d'entrée unifié pour tous les stores modulaires
+// lib/store/index.ts - VERSION MIGRÉE VERS STORE UNIFIÉ
+// Point d'entrée centralisé pour le store unifié
 
-// ==================== EXPORTS DES STORES ====================
+// ==================== STORE UNIFIÉ ====================
 
-// Store de la carte (mapStore.ts)
+// ✅ Export du store unifié et tous ses hooks
 export {
-  useMapStore,
-  useMapState,
-  useMapActions,
-  useMapCoordinates,
+  useUnifiedStore,
   useMapBounds,
-  useMapZoom,
-  useMapInstance,
-  useIsMapApiLoaded,
-  useIsMapApiLoading,
-} from "./mapStore";
-
-// Store des listings et interactions (listingsStore.ts)
-export {
-  useListingsStore,
-  useListingsState,
-  useInteractionsState,
-  useListingsActions,
+  useMapCoordinates,
   useAllListings,
   useVisibleListings,
   useFilteredListings,
   useIsListingsLoading,
-  useListingsPage,
-  useHasMoreListings,
-  useSelectedListing,
-  useHoveredListing,
-} from "./listingsStore";
+  useCurrentFilters,
+  useHasActiveFilters,
+  useIsMapExpanded,
+  useMapActions,
+  useListingsActions,
+  useFiltersActions,
+  useUIActions,
+} from "./unifiedStore";
 
-// ✅ Helper pour interactions
-export const useInteractionsActions = () => {
-  const {
-    setHoveredListingId,
-    setSelectedListingId,
-    setOpenInfoWindowId,
-    clearSelection,
-  } = useListingsActions();
+// ✅ Export des types du store unifié
+export type {
+  UnifiedStore,
+  MapState,
+  ListingsState,
+  FiltersState,
+  InteractionsState,
+  UIState,
+  MapActions,
+  ListingsActions,
+  FiltersActions,
+  InteractionsActions,
+  UIActions,
+  MapBounds,
+  MapCoordinates,
+  Listing,
+} from "./unifiedStore";
 
-  return {
-    setHoveredListingId,
-    setSelectedListingId,
-    setOpenInfoWindowId,
-    clearSelection,
-  };
+// ==================== ALIAS DE COMPATIBILITÉ ====================
+// Pour les composants qui n'ont pas encore été migrés
+
+import {
+  useUnifiedStore,
+  useCurrentFilters,
+  useFiltersActions,
+  type FilterState,
+  type Listing,
+  type MapBounds,
+} from "./unifiedStore";
+
+/**
+ * @deprecated Utiliser useUnifiedStore((state) => state.filters.current)
+ * Alias de compatibilité pour les anciens composants
+ */
+export const useFiltersStoreState = () => {
+  const filters = useCurrentFilters();
+  return { filters };
 };
 
-// Store des filtres (filtersStore.ts) avec TOUS les alias de compatibilité
-export {
-  useFiltersStore,
-  useFiltersState,
-  useFiltersActions,
-  useCurrentFilters,
-  useAreFiltersHydrated,
-  useHasActiveFilters,
-  useActiveFiltersCount,
-} from "./filtersStore";
-
-// ✅ ALIAS DE COMPATIBILITÉ pour les composants existants
-import { useFiltersState, useFiltersActions } from "./filtersStore";
-
-// Alias pour les noms utilisés dans les composants existants
-export const useFiltersStoreState = useFiltersState;
+/**
+ * @deprecated Utiliser useFiltersActions() depuis unifiedStore
+ * Alias de compatibilité pour les anciens composants
+ */
 export const useFiltersStoreActions = useFiltersActions;
 
-// Store de l'interface utilisateur (uiStore.ts)
-export {
-  useUIStore,
-  useUIState,
-  useUIActions,
-  useIsMapExpanded,
-  useIsMobile,
-  useIsTablet,
-  useIsDesktop,
-  useDeviceType,
-  useNotifications,
-  useHasUnreadNotifications,
-  useResponsiveDetection,
-} from "./uiStore";
+/**
+ * @deprecated Utiliser useUnifiedStore((state) => state.map)
+ * Alias de compatibilité pour les anciens composants
+ */
+export const useMapStoreState = () => {
+  const coordinates = useUnifiedStore((state) => state.map.coordinates);
+  const bounds = useUnifiedStore((state) => state.map.bounds);
+  const zoom = useUnifiedStore((state) => state.map.zoom);
+  const isLoading = useUnifiedStore((state) => state.map.isLoading);
+  const error = useUnifiedStore((state) => state.map.error);
+
+  return { coordinates, bounds, zoom, isLoading, error };
+};
+
+/**
+ * @deprecated Utiliser useMapActions() depuis unifiedStore
+ */
+export const useMapStoreActions = () => {
+  return useUnifiedStore((state) => state.mapActions);
+};
+
+/**
+ * @deprecated Utiliser useUnifiedStore((state) => state.listings)
+ */
+export const useListingsStoreState = () => {
+  const all = useUnifiedStore((state) => state.listings.all);
+  const visible = useUnifiedStore((state) => state.listings.visible);
+  const filtered = useUnifiedStore((state) => state.listings.filtered);
+  const isLoading = useUnifiedStore((state) => state.listings.isLoading);
+  const error = useUnifiedStore((state) => state.listings.error);
+
+  return { all, visible, filtered, isLoading, error };
+};
+
+/**
+ * @deprecated Utiliser useListingsActions() depuis unifiedStore
+ */
+export const useListingsStoreActions = () => {
+  return useUnifiedStore((state) => state.listingsActions);
+};
+
+/**
+ * @deprecated Utiliser useUnifiedStore((state) => state.interactions)
+ */
+export const useInteractionsActions = () => {
+  return useUnifiedStore((state) => state.interactionsActions);
+};
+
+// ==================== STORES INDÉPENDANTS ====================
+// Ces stores ne font PAS partie du store unifié
 
 // Store utilisateur (userStore.ts)
 export {
@@ -103,24 +138,9 @@ export {
   useLanguageActions,
 } from "./settingsStore";
 
-// ==================== EXPORTS DES TYPES ====================
-
-// Types depuis les stores (exports locaux)
-export type { LatLng, MapBounds, Listing, ListingImage } from "./listingsStore";
-
-// Types depuis les stores avec types locaux
-export type { UserProfile, Role } from "./userStore";
-
-// ✅ Type FilterState défini localement pour éviter les imports
-export interface FilterState {
-  product_type: string[];
-  certifications: string[];
-  purchase_mode: string[];
-  production_method: string[];
-  additional_services: string[];
-  availability: string[];
-  mapType: string[];
-}
+// ==================== RE-EXPORT DU TYPE FilterState ====================
+// Pour compatibilité avec les composants existants
+export type { FilterState };
 
 // ==================== TYPE GUARDS ====================
 
@@ -146,17 +166,12 @@ export const isMapBoundsValid = (obj: any): obj is MapBounds => {
   return (
     obj &&
     typeof obj === "object" &&
-    obj.ne &&
-    obj.sw &&
-    typeof obj.ne.lat === "number" &&
-    typeof obj.ne.lng === "number" &&
-    typeof obj.sw.lat === "number" &&
-    typeof obj.sw.lng === "number"
+    typeof obj.north === "number" &&
+    typeof obj.south === "number" &&
+    typeof obj.east === "number" &&
+    typeof obj.west === "number"
   );
 };
-
-// Import pour éviter erreur de référence sur les types
-import { useListingsActions, type Listing, type MapBounds } from "./listingsStore";
 
 // Export par défaut
 const storeIndex = {

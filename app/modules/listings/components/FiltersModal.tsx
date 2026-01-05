@@ -3,12 +3,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "@/utils/icons";
-import { COLORS, FILTER_SECTIONS } from "@/lib/config"; // ✅ Import filterSections
+import { COLORS, FILTER_SECTIONS } from "@/lib/config";
 import { cn } from "@/lib/utils";
 
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { useFiltersStoreActions, useFiltersStoreState } from "@/lib/store"; // ✅ Noms corrects
-import type { FilterState } from "@/lib/store"; // ✅ Import du type FilterState
+// ✅ MIGRATION: Import du store unifié
+import { useUnifiedStore } from "@/lib/store/unifiedStore";
+import type { FilterState } from "@/lib/store/unifiedStore";
 
 /**
  * Interface pour les props de la modale
@@ -72,39 +73,32 @@ const buildUrlSearch = (
   return qs.toString();
 };
 
-/**
- * Modale de filtres avec interface moderne
- *
- * Features:
- * - Interface de filtres avec sections configurables
- * - Synchronisation URL et store
- * - Preview des sélections avant application
- * - Animations fluides et effets glass
- * - Gestion du scroll et de l'accessibilité
- * - Configuration centralisée des couleurs
- */
 export default function FiltersModal({
   open = false,
   onClose,
 }: FiltersModalProps): JSX.Element | null {
-  // ✅ Correction: récupérer les filtres depuis le nouvel état du store avec les bons noms
-  const filtersState = useFiltersStoreState();
-  const storeFilters = filtersState.filters; // ✅ Extraire les filtres du state
-  const { setFilters, resetFilters } = useFiltersStoreActions();
+  // ✅ MIGRATION: Sélecteurs optimisés du store unifié
+  const currentFilters = useUnifiedStore((state) => state.filters.current);
+  const setFilters = useUnifiedStore(
+    (state) => state.filtersActions.setFilters
+  );
+  const resetFilters = useUnifiedStore(
+    (state) => state.filtersActions.resetFilters
+  );
 
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
 
-  // ✅ On édite une copie locale, puis on applique via "Voir les résultats"
-  const [draft, setDraft] = useState<FilterState>(storeFilters);
+  // ✅ Draft local pour édition avant application
+  const [draft, setDraft] = useState<FilterState>(currentFilters);
 
   /**
    * Synchronisation du draft avec le store quand la modale s'ouvre
    */
   useEffect(() => {
-    if (open) setDraft(storeFilters);
-  }, [open, storeFilters]);
+    if (open) setDraft(currentFilters);
+  }, [open, currentFilters]);
 
   /**
    * Bloque le scroll derrière la modale quand open = true
@@ -147,7 +141,7 @@ export default function FiltersModal({
    * Comptage des filtres actifs
    */
   const activeCount = useMemo(() => {
-    return Object.values(draft).reduce((acc, v) => {
+    return Object.values(draft).reduce((acc, v: string[] | unknown) => {
       if (Array.isArray(v)) {
         return acc + v.length;
       }
@@ -159,7 +153,7 @@ export default function FiltersModal({
    * Toggle d'un filtre dans le draft
    */
   const toggleDraft = (key: string, value: string): void => {
-    setDraft((prevDraft) => {
+    setDraft((prevDraft: FilterState) => {
       const arr = Array.isArray(prevDraft[key as keyof FilterState])
         ? (prevDraft[key as keyof FilterState] as string[])
         : [];
@@ -174,20 +168,23 @@ export default function FiltersModal({
    * Effacement d'une section de filtres
    */
   const clearSection = (key: string): void => {
-    setDraft((prevDraft) => ({
+    setDraft((prevDraft: FilterState) => ({
       ...prevDraft,
       [key]: [],
     }));
   };
 
   /**
-   * Application des filtres
+   * ✅ MIGRATION: Application des filtres avec synchronisation automatique
+   *
+   * setFilters(draft) déclenche automatiquement applyFiltersAndBounds()
+   * qui synchronise carte + listings sans events custom
    */
   const apply = (): void => {
-    // 1) MAJ store
+    // ✅ Synchronisation automatique
     setFilters(draft);
 
-    // 2) MAJ URL (lat/lng/zoom conservés)
+    // MAJ URL (lat/lng/zoom conservés)
     const query = buildUrlSearch(searchParams, draft);
     router.replace(`${pathname}${query ? `?${query}` : ""}`, { scroll: false });
 
@@ -195,16 +192,16 @@ export default function FiltersModal({
   };
 
   /**
-   * Effacement de tous les filtres
+   * ✅ MIGRATION: Effacement avec synchronisation automatique
    */
   const clearAll = (): void => {
     const cleared = makeEmptyFilters();
 
-    // 1) MAJ store + local draft
+    // ✅ Synchronisation automatique
     resetFilters();
     setDraft(cleared);
 
-    // 2) Nettoyer l'URL tout en gardant lat/lng/zoom
+    // Nettoyer l'URL tout en gardant lat/lng/zoom
     const query = buildUrlSearch(searchParams, cleared);
     router.replace(`${pathname}${query ? `?${query}` : ""}`, { scroll: false });
 

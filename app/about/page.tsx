@@ -38,11 +38,20 @@ export default function AboutLandingPage(): JSX.Element {
    */
   const aboutCards: AboutCard[] = [
     {
-      id: "missions",
-      title: "Notre Mission",
+      id: "how",
+      title: "Comment ça marche",
       description:
-        "Découvrez pourquoi nous avons créé Farm To Fork et ce que nous défendons.",
-      href: "/about/missions",
+        "Une carte, des fiches claires, et un contact direct avec les fermes.",
+      href: "/about/how",
+      icon: Handshake,
+      colors: { bg: "#fefce8", text: "#ca8a04", icon: "#a16207" },
+    },
+    {
+      id: "for-producers",
+      title: "Pour les producteurs",
+      description:
+        "Créez votre fiche et vos produits en 10 minutes, sans paperasse.",
+      href: "/about/producers",
       icon: Target,
       colors: {
         bg: COLORS.PRIMARY_BG,
@@ -51,32 +60,16 @@ export default function AboutLandingPage(): JSX.Element {
       },
     },
     {
-      id: "how",
-      title: "Comment ça marche",
+      id: "trust",
+      title: "Confiance & transparence",
       description:
-        "Comprenez comment la plateforme relie producteurs et consommateurs.",
-      href: "/about/how",
-      icon: Handshake,
-      colors: {
-        bg: "#fefce8", // yellow-50 equivalent
-        text: "#ca8a04", // yellow-600 equivalent
-        icon: "#a16207", // yellow-700 equivalent
-      },
-    },
-    {
-      id: "durability",
-      title: "Durabilité",
-      description:
-        "Notre engagement pour un modèle alimentaire local et responsable.",
-      href: "/about/durability",
+        "Infos simples et vérifiables. Pas de promesses, pas de jargon.",
+      href: "/about/trust",
       icon: Leaf,
-      colors: {
-        bg: "#eff6ff", // blue-50 equivalent
-        text: "#2563eb", // blue-600 equivalent
-        icon: "#1d4ed8", // blue-700 equivalent
-      },
+      colors: { bg: "#eff6ff", text: "#2563eb", icon: "#1d4ed8" },
     },
   ];
+
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">

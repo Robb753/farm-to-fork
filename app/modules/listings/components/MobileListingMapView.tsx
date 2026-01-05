@@ -34,15 +34,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 
-// ✅ Import du nouveau store unifié
+// ✅ MIGRATION: Store unifié
+import { useUnifiedStore } from "@/lib/store/unifiedStore";
 
 import { useUser } from "@clerk/nextjs";
 import { useUserFavorites, useUserActions } from "@/lib/store/userStore";
 import { ListingImage } from "@/components/ui/OptimizedImage";
 import { openMobileFilters } from "@/app/_components/layout/FilterSection/FilterSection";
 import { COLORS } from "@/lib/config";
-import { useInteractionsActions, useListingsActions, useListingsState, useMapActions, useMapState } from "@/lib/store";
-import { useFiltersState } from "@/lib/store/filtersStore";
 import { escapeHTML } from "@/lib/utils/sanitize";
 
 /**
@@ -65,8 +64,8 @@ interface ListingItem {
   product_type?: string[];
   hours?: string;
   listingImages?: Array<{ url: string }> | { url: string };
-  lat?: number | string; // ✅ Peut être string ou number
-  lng?: number | string; // ✅ Peut être string ou number
+  lat?: number | string;
+  lng?: number | string;
 }
 
 interface CitySearchResult {
@@ -98,7 +97,7 @@ interface UrlUpdateParams {
 }
 
 // --- Config ---
-const PAGE_SIZE = 20; // garder en phase avec l'API
+const PAGE_SIZE = 20;
 
 // lazy (évite SSR/hydration issues)
 const MapboxCitySearch = dynamic(
@@ -120,7 +119,6 @@ const formatDistance = (item: ListingItem): string | null => {
     return `${item.distance_km.toFixed(1)} km`;
   }
   if (typeof item?.distance === "string") {
-    // 🔒 SÉCURITÉ: Distance échappée
     return escapeHTML(item.distance);
   }
   return null;
@@ -136,7 +134,10 @@ const pickAddress = (item: ListingItem): string | null => {
   if (typeof item?.address === "object" && item.address?.label) {
     return item.address.label;
   }
-  if (typeof item?.address === "object" && (item.address?.street || item?.city)) {
+  if (
+    typeof item?.address === "object" &&
+    (item.address?.street || item?.city)
+  ) {
     return [item.address.street, item.city].filter(Boolean).join(", ");
   }
   return null;
@@ -148,37 +149,39 @@ const pickAddress = (item: ListingItem): string | null => {
 const computeBadges = (item: ListingItem): string[] => {
   const badges: string[] = [];
   const certs = Array.isArray(item?.certifications) ? item.certifications : [];
-  
+
   if (certs.some((c) => /bio|ab|organic/i.test(String(c)))) {
     badges.push("Bio");
   }
-  
+
   if (
     Array.isArray(item?.purchase_mode) &&
     item.purchase_mode.includes("vente_directe")
   ) {
     badges.push("Vente directe");
   }
-  
+
   if (Array.isArray(item?.delivery_options) && item.delivery_options.length) {
     badges.push("Livraison");
   }
-  
+
   if (item?.is_new) {
     badges.push("Nouveau");
   }
-  
+
   return badges.slice(0, 3);
 };
 
 /**
  * Calcul de l'état d'ouverture
  */
-const computeOpenState = (item: ListingItem): { isOpen: boolean; label: string } | null => {
+const computeOpenState = (
+  item: ListingItem
+): { isOpen: boolean; label: string } | null => {
   if (typeof item?.is_open === "boolean") {
     return {
       isOpen: item.is_open,
-      label: item.is_open ? "Ouvert" : "Fermé"
+      label: item.is_open ? "Ouvert" : "Fermé",
     };
   }
   return null;
@@ -196,7 +199,9 @@ const FarmCard = memo<FarmCardProps>(function FarmCard({
 }) {
   const cover =
     (Array.isArray(item.listingImages) && item.listingImages[0]?.url) ||
-    (typeof item.listingImages === 'object' && 'url' in item.listingImages && item.listingImages.url) ||
+    (typeof item.listingImages === "object" &&
+      "url" in item.listingImages &&
+      item.listingImages.url) ||
     "/default-farm-image.jpg";
 
   const address = pickAddress(item);
@@ -204,7 +209,8 @@ const FarmCard = memo<FarmCardProps>(function FarmCard({
   const badges = computeBadges(item);
   const openState = computeOpenState(item);
   const rating = typeof item?.rating === "number" ? item.rating : null;
-  const reviewCount = typeof item?.reviewCount === "number" ? item.reviewCount : null;
+  const reviewCount =
+    typeof item?.reviewCount === "number" ? item.reviewCount : null;
   const products = Array.isArray(item?.product_type)
     ? item.product_type.slice(0, 6)
     : [];
@@ -232,7 +238,7 @@ const FarmCard = memo<FarmCardProps>(function FarmCard({
         >
           <ListingImage
             src={cover}
-            alt={escapeHTML(item.name || "Ferme")} // ✅ Échappé
+            alt={escapeHTML(item.name || "Ferme")}
             fallbackSrc="/default-farm-image.jpg"
             className="h-full w-full object-cover"
           />
@@ -251,7 +257,7 @@ const FarmCard = memo<FarmCardProps>(function FarmCard({
               "transition-all duration-200 hover:scale-110"
             )}
             style={{
-              backgroundColor: `${COLORS.BG_WHITE}E6`, // 90% opacity
+              backgroundColor: `${COLORS.BG_WHITE}E6`,
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = COLORS.BG_WHITE;
@@ -284,7 +290,6 @@ const FarmCard = memo<FarmCardProps>(function FarmCard({
                   "shadow-md transition-colors bg-green-600 text-white hover:bg-green-700"
                 )}
               >
-                {/* 🔒 SÉCURITÉ: Badge échappé */}
                 {escapeHTML(badge)}
               </Badge>
             ))}
@@ -298,7 +303,6 @@ const FarmCard = memo<FarmCardProps>(function FarmCard({
                   "shadow-md bg-white/90 text-green-700 hover:bg-white"
                 )}
               >
-                {/* 🔒 SÉCURITÉ: Distance échappée (déjà fait dans formatDistance si corrigé) */}
                 <MapPin className="mr-1 h-3 w-3" /> {distance}
               </Badge>
             </div>
@@ -311,7 +315,6 @@ const FarmCard = memo<FarmCardProps>(function FarmCard({
               className="font-bold text-lg leading-tight line-clamp-1"
               style={{ color: COLORS.TEXT_PRIMARY }}
             >
-              {/* 🔒 SÉCURITÉ: Nom de ferme échappé */}
               {escapeHTML(item.name || "Ferme")}
             </h3>
             {openState && (
@@ -365,7 +368,6 @@ const FarmCard = memo<FarmCardProps>(function FarmCard({
                 style={{ color: COLORS.TEXT_SECONDARY }}
               >
                 <Clock className="h-3.5 w-3.5" />
-                {/* 🔒 SÉCURITÉ: Heures échappées */}
                 <span className="text-xs">{escapeHTML(item.hours)}</span>
               </div>
             )}
@@ -381,7 +383,6 @@ const FarmCard = memo<FarmCardProps>(function FarmCard({
                 className="h-4 w-4 mt-0.5 flex-shrink-0"
                 style={{ color: COLORS.PRIMARY }}
               />
-              {/* 🔒 SÉCURITÉ: Adresse échappée */}
               <span className="leading-relaxed line-clamp-2">
                 {escapeHTML(address)}
               </span>
@@ -397,7 +398,6 @@ const FarmCard = memo<FarmCardProps>(function FarmCard({
                   variant="secondary"
                   className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
                 >
-                  {/* 🔒 SÉCURITÉ: Type de produit échappé */}
                   {escapeHTML(product)}
                 </Badge>
               ))}
@@ -502,8 +502,10 @@ const FarmCard = memo<FarmCardProps>(function FarmCard({
 /* ----------------------- Main component ----------------------- */
 
 /**
+ * ✅ COMPOSANT MIGRÉ VERS STORE UNIFIÉ
+ *
  * Composant principal pour la vue mobile (liste + carte)
- * 
+ *
  * Features:
  * - Vue liste avec cartes optimisées
  * - Vue carte full-screen
@@ -513,13 +515,26 @@ const FarmCard = memo<FarmCardProps>(function FarmCard({
  * - Gestion des favoris
  */
 export default function MobileListingMapView(): JSX.Element {
-  // ✅ stores avec nouveau store unifié
-  const { mapInstance } = useMapState();
-  const { setCoordinates, setZoom } = useMapActions();
-  const filters = useFiltersState();
-  const { visible, isLoading, hasMore, page } = useListingsState();
-  const { fetchListings, resetListings } = useListingsActions();
-  const { setHoveredListingId } = useInteractionsActions();
+  // ✅ MIGRATION: Sélecteurs optimisés du store unifié
+  const mapInstance = useUnifiedStore((state) => state.map.instance);
+  const setCoordinates = useUnifiedStore(
+    (state) => state.mapActions.setCoordinates
+  );
+  const setZoom = useUnifiedStore((state) => state.mapActions.setZoom);
+  const filters = useUnifiedStore((state) => state.filters.current);
+  const visible = useUnifiedStore((state) => state.listings.visible);
+  const isLoading = useUnifiedStore((state) => state.listings.isLoading);
+  const hasMore = useUnifiedStore((state) => state.listings.hasMore);
+  const page = useUnifiedStore((state) => state.listings.page);
+  const fetchListings = useUnifiedStore(
+    (state) => state.listingsActions.fetchListings
+  );
+  const resetListings = useUnifiedStore(
+    (state) => state.listingsActions.resetListings
+  );
+  const setHoveredListingId = useUnifiedStore(
+    (state) => state.interactionsActions.setHoveredListing
+  );
 
   // user + favoris
   const { user } = useUser();
@@ -531,11 +546,13 @@ export default function MobileListingMapView(): JSX.Element {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // ✅ local UI state avec types appropriés
+  // ✅ local UI state
   const [showMap, setShowMap] = useState<boolean>(false);
   const [quickSearch, setQuickSearch] = useState<string>("");
   const [searchCity, setSearchCity] = useState<string>("");
-  const [sortBy, setSortBy] = useState<"distance" | "rating" | "name">("distance");
+  const [sortBy, setSortBy] = useState<"distance" | "rating" | "name">(
+    "distance"
+  );
   const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -547,8 +564,8 @@ export default function MobileListingMapView(): JSX.Element {
 
   // Reset pagination quand les filtres changent fortement
   useEffect(() => {
-    resetListings?.();
-    fetchListings({ page: 1, forceRefresh: true } as FetchListingsOptions);
+    resetListings();
+    fetchListings({ page: 1, forceRefresh: true });
   }, [filters, resetListings, fetchListings]);
 
   // filtre rapide (client-side)
@@ -591,7 +608,7 @@ export default function MobileListingMapView(): JSX.Element {
     if (!loadMoreRef.current || !hasMore || isLoading) return;
 
     const el = loadMoreRef.current;
-    let ticking = false; // micro-throttle
+    let ticking = false;
 
     const io = new IntersectionObserver(
       (entries) => {
@@ -601,7 +618,7 @@ export default function MobileListingMapView(): JSX.Element {
           setIsLoadingMore(true);
           const nextPage =
             (page || Math.floor((visible?.length || 0) / PAGE_SIZE)) + 1;
-          fetchListings({ page: nextPage, append: true } as FetchListingsOptions)
+          fetchListings({ page: nextPage, append: true })
             .catch(() => {})
             .finally(() => {
               setIsLoadingMore(false);
@@ -628,7 +645,6 @@ export default function MobileListingMapView(): JSX.Element {
         return;
       }
 
-      // ✅ Conversion sécurisée de l'ID
       const numericId = typeof id === "number" ? id : parseInt(String(id), 10);
 
       if (isNaN(numericId)) {
@@ -636,15 +652,13 @@ export default function MobileListingMapView(): JSX.Element {
         return;
       }
 
-      // ✅ Appel du store avec un number garanti
       toggleFavorite(numericId, user.id);
     },
     [user, toggleFavorite]
   );
 
-
   const handleSearchInArea = useCallback(() => {
-    fetchListings({ page: 1, forceRefresh: true } as FetchListingsOptions).then((data) => {
+    fetchListings({ page: 1, forceRefresh: true }).then((data) => {
       if (Array.isArray(data) && data.length) {
         toast.success(`${data.length} fermes trouvées dans cette zone`);
       } else {
@@ -703,7 +717,7 @@ export default function MobileListingMapView(): JSX.Element {
 
       if (Array.isArray(city)) {
         [lng, lat] = city;
-      } else if (city && typeof city === 'object') {
+      } else if (city && typeof city === "object") {
         if (city.center && Array.isArray(city.center)) {
           [lng, lat] = city.center;
         } else if (city.location) {
@@ -728,13 +742,17 @@ export default function MobileListingMapView(): JSX.Element {
         updateUrl({ lat, lng, zoom });
       }
 
-      // ✅ Utilisation du nouveau store unifié
+      // ✅ MIGRATION: Utilisation du store unifié
       try {
-        if (setCoordinates && typeof lat === "number" && typeof lng === "number") {
+        if (
+          setCoordinates &&
+          typeof lat === "number" &&
+          typeof lng === "number"
+        ) {
           setCoordinates({ lat, lng });
         }
       } catch {}
-      
+
       try {
         if (setZoom && typeof zoom === "number") {
           setZoom(zoom);
@@ -748,13 +766,13 @@ export default function MobileListingMapView(): JSX.Element {
           page: 1,
           forceRefresh: true,
           bbox: current || bbox || undefined,
-        } as FetchListingsOptions);
+        });
       } else {
         await fetchListings({
           page: 1,
           forceRefresh: true,
           bbox: bbox || undefined,
-        } as FetchListingsOptions);
+        });
       }
     },
     [
@@ -827,7 +845,6 @@ export default function MobileListingMapView(): JSX.Element {
               className="font-semibold"
               style={{ color: COLORS.TEXT_PRIMARY }}
             >
-              {/* 🔒 SÉCURITÉ: Ville échappée */}
               {escapeHTML(searchCity || "Sélectionnez une ville")}
             </span>
           </div>
@@ -912,14 +929,23 @@ export default function MobileListingMapView(): JSX.Element {
           </div>
         ) : (
           <div className="space-y-4">
-            {filtered.map((item) => (
-              <FarmCard
-                key={item.id}
-                item={item as ListingItem}
-                isFavorite={Array.isArray(favs) && favs.includes(item.id)}
-                onToggleFavorite={() => handleToggleFavorite(item.id)}
-              />
-            ))}
+            {filtered.map((item) => {
+              const idNum =
+                typeof item.id === "number" ? item.id : Number(item.id);
+              const isFav =
+                Number.isFinite(idNum) &&
+                Array.isArray(favs) &&
+                favs.includes(idNum);
+
+              return (
+                <FarmCard
+                  key={item.id}
+                  item={item as ListingItem}
+                  isFavorite={isFav}
+                  onToggleFavorite={() => handleToggleFavorite(item.id)}
+                />
+              );
+            })}
 
             {hasMore && (
               <div ref={loadMoreRef} className="py-6 text-center">
@@ -990,7 +1016,7 @@ export default function MobileListingMapView(): JSX.Element {
   /* ----------------------- MAP VIEW ----------------------- */
 
   const MapView = (
-    <div 
+    <div
       className={cn(
         "relative h-[70dvh] w-full overflow-hidden rounded-t-2xl",
         "border-t shadow-inner"
@@ -1050,9 +1076,9 @@ export default function MobileListingMapView(): JSX.Element {
         </Button>
       </div>
 
-      <Suspense 
+      <Suspense
         fallback={
-          <div 
+          <div
             className="h-full w-full"
             style={{ backgroundColor: COLORS.BG_GRAY }}
           />

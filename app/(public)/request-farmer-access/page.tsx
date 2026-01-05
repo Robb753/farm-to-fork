@@ -37,17 +37,6 @@ interface FarmerRequestFormData {
   products: string;
   website: string;
 }
-
-/**
- * Page de demande d'accès producteur
- *
- * Features:
- * - Formulaire complet avec validation
- * - Vérification des doublons
- * - Normalisation du numéro de téléphone
- * - Envoi de notification admin
- * - Intégration avec la configuration centralisée
- */
 export default function RequestFarmerAccessPage(): JSX.Element {
   const { user } = useUser();
   const { getToken, isSignedIn } = useAuth();

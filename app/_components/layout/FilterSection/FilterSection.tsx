@@ -14,9 +14,8 @@ import ActiveFilters from "./components/ActiveFilters";
 import ViewToggle from "./components/ViewToggle";
 import MobileFilters from "./components/MobileFilters";
 
-// ✅ Store unifié
-import { useFiltersStoreState } from "@/lib/store";
-import type { FilterState } from "@/lib/store";
+import { useUnifiedStore } from "@/lib/store/unifiedStore";
+import type { FilterState } from "@/lib/store/unifiedStore";
 
 // ✅ Configuration et utils
 import { AGRICULTURE_TYPES } from "./utils/constants";
@@ -62,8 +61,8 @@ const FilterSection: React.FC<FilterSectionProps> = ({ className = "" }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isMobileModalOpen, setIsMobileModalOpen] = useState(false);
 
-  // ═══ Store state ═══
-  const { filters } = useFiltersStoreState();
+  // ✅ MIGRATION: Sélecteur optimisé du store unifié
+  const filters = useUnifiedStore((state) => state.filters.current);
 
   // ═══ Hooks personnalisés ═══
   const {
@@ -84,6 +83,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({ className = "" }) => {
     handleFilterChange(key as keyof FilterState, value);
 
   // ═══ Gestion des événements mobiles ═══
+  // ⚠️ TODO: Remplacer par state.ui.isMobileFiltersOpen dans le store unifié
   useEffect(() => {
     const handleOpenMobileFilters = () => setIsMobileModalOpen(true);
     window.addEventListener("openMobileFilters", handleOpenMobileFilters);
@@ -118,7 +118,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({ className = "" }) => {
 
   // ✅ Helper pour obtenir les valeurs d'un filtre
   const getFilterValues = (key: string): string[] => {
-    const value = (filters as any)?.[key];
+    const value = filters[key as keyof FilterState];
     return Array.isArray(value) ? value : [];
   };
 

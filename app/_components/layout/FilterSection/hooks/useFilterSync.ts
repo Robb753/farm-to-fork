@@ -1,38 +1,33 @@
-// hooks/useFilterSync.ts - VERSION MIGRÉE
+// hooks/useFilterSync.ts - VERSION MIGRÉE VERS STORE UNIFIÉ
 import { useCallback, useMemo } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 
-// ✅ NOUVEAU : Import depuis les stores modulaires
-import { useFiltersStoreState, useFiltersStoreActions } from "@/lib/store";
-import { FILTER_SECTIONS } from "@/lib/config"; // ✅ Configuration centralisée
+// ✅ MIGRATION: Import depuis le store unifié
+import { useUnifiedStore } from "@/lib/store/unifiedStore";
+import { FILTER_SECTIONS } from "@/lib/config";
 
 // ✅ Types depuis le store unifié
-import type { FilterState } from "@/lib/store";
+import type { FilterState } from "@/lib/store/unifiedStore";
 
-/**
- * Hook personnalisé pour la synchronisation des filtres
- *
- *
- * Features:
- * - Synchronisation bidirectionnelle URL ↔ Store
- * - Gestion optimisée des mises à jour
- * - Memoization pour éviter les re-renders
- * - Type safety complet
- * - Architecture modulaire
- */
 export const useFilterSync = () => {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
 
-  // ═══ Store state - NOUVEAU ═══
-  const filtersState = useFiltersStoreState();
-  const filters = filtersState.filters;
-  const { toggleFilter, resetFilters, setFilters } = useFiltersStoreActions();
+  // ✅ MIGRATION: Sélecteurs optimisés du store unifié
+  const filters = useUnifiedStore((state) => state.filters.current);
+  const toggleFilter = useUnifiedStore(
+    (state) => state.filtersActions.toggleFilter
+  );
+  const resetFilters = useUnifiedStore(
+    (state) => state.filtersActions.resetFilters
+  );
+  const setFilters = useUnifiedStore(
+    (state) => state.filtersActions.setFilters
+  );
 
   /**
    * Sections de filtres memoizées depuis la configuration
-   * ✅ NOUVEAU : utilise FILTER_SECTIONS centralisé
    */
   const memoizedFilterSections = useMemo(() => {
     // Conversion du format nouveau vers l'ancien pour compatibilité
@@ -47,9 +42,12 @@ export const useFilterSync = () => {
    * Comptage des filtres actifs
    */
   const activeFilterCount = useMemo(() => {
-    return Object.values(filters).reduce((count, filterArray) => {
-      return count + (Array.isArray(filterArray) ? filterArray.length : 0);
-    }, 0);
+    return Object.values(filters).reduce(
+      (count, filterArray: string[] | unknown) => {
+        return count + (Array.isArray(filterArray) ? filterArray.length : 0);
+      },
+      0
+    );
   }, [filters]);
 
   /**
@@ -83,20 +81,21 @@ export const useFilterSync = () => {
   );
 
   /**
-   * Gestion du changement d'un filtre
+   * ✅ MIGRATION: Gestion du changement d'un filtre
+   *
+   * AVANT: toggleFilter + calcul manuel + syncFiltersToUrl
+   * APRÈS: toggleFilter déclenche automatiquement applyFiltersAndBounds()
    */
   const handleFilterChange = useCallback(
     (filterKey: keyof FilterState, value: string) => {
-      // ✅ Utilise l'action du nouveau store
+      // ✅ Toggle le filtre (synchronisation automatique dans le store)
       toggleFilter(filterKey, value);
 
-      // ✅ Synchroniser avec l'URL
-      // Note: Le nouveau state sera disponible au prochain render
-      // On peut soit attendre le re-render, soit calculer le nouveau state ici
+      // ✅ Calculer le nouveau state pour l'URL
       const currentValues = filters[filterKey] || [];
       const isSelected = currentValues.includes(value);
       const newValues = isSelected
-        ? currentValues.filter((v) => v !== value)
+        ? currentValues.filter((v: string) => v !== value)
         : [...currentValues, value];
 
       const newFilters = { ...filters, [filterKey]: newValues };
@@ -106,7 +105,9 @@ export const useFilterSync = () => {
   );
 
   /**
-   * Effacer une section de filtres
+   * ✅ MIGRATION: Effacer une section de filtres
+   *
+   * setFilters déclenche automatiquement applyFiltersAndBounds()
    */
   const clearSection = useCallback(
     (filterKey: keyof FilterState) => {
@@ -118,10 +119,13 @@ export const useFilterSync = () => {
   );
 
   /**
-   * Reset de tous les filtres
+   * ✅ MIGRATION: Reset de tous les filtres
+   *
+   * resetFilters déclenche automatiquement applyFiltersAndBounds()
    */
   const resetAllFilters = useCallback(() => {
     resetFilters();
+
     // ✅ Nettoyer l'URL tout en gardant les paramètres carte
     const params = new URLSearchParams();
     const mapParams = ["lat", "lng", "zoom"];
@@ -161,7 +165,7 @@ export const useFilterSync = () => {
       }
     });
 
-    // ✅ Mettre à jour le store si nécessaire
+    // ✅ Mettre à jour le store si nécessaire (sync automatique)
     if (hasChanges) {
       setFilters({ ...filters, ...urlFilters } as FilterState);
     }

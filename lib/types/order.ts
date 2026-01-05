@@ -1,8 +1,3 @@
-/**
- * Types TypeScript pour le système de commandes Farm2Fork
- * À placer dans: lib/types/order.ts
- */
-
 import type { Product } from "lib/store/cartStore";
 
 /**
