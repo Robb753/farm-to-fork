@@ -4,40 +4,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { clerkClient, auth } from "@clerk/nextjs/server";
 import { sendFarmerRequestStatusEmail } from "@/lib/config/email-notifications";
-import type { Database } from "@/lib/types/database";
-
-// Si tu as exporté ce type dans email-notifications, tu peux l'importer.
-// Sinon, tu peux supprimer cette ligne et laisser le `as any` plus bas.
+import type { Database, ListingInsert } from "@/lib/types/database";
 import type { FarmerRequest as EmailFarmerRequest } from "@/lib/config/email-notifications";
 
 /**
  * Types pour la requête de validation
  */
 interface ValidateFarmerRequestBody {
-  requestId: number; // ✅ on force number après sanitisation
+  requestId: number; // number garanti après sanitisation
   userId: string;
   role: "farmer" | "admin" | "user";
   status: "approved" | "rejected";
-  reason?: string; // Optionnel : raison de la décision
-}
-
-/**
- * Types pour les données de la demande farmer
- */
-interface FarmerRequestData {
-  id: number;
-  user_id: string;
-  email: string;
-  farm_name: string;
-  location: string;
-  description: string | null;
-  phone: string | null;
-  website: string | null;
-  products: string | null;
-  status: string;
-  created_at: string;
-  updated_at: string;
-  approved_by_admin_at: string | null;
+  reason?: string;
 }
 
 /**
@@ -60,6 +38,7 @@ interface ValidationResult {
   errors: string[];
   sanitizedData?: ValidateFarmerRequestBody;
 }
+
 /**
  * Constantes de validation
  */
@@ -82,17 +61,14 @@ function createSupabaseClient() {
   }
 
   return createClient<Database>(supabaseUrl, supabaseKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
+    auth: { autoRefreshToken: false, persistSession: false },
   });
 }
 
 /**
- * Fonction pour valider et sanitiser les données de validation
+ * Valider + sanitiser les données
  */
-function validateFarmerRequestData(data: any): ValidationResult {
+function validateFarmerRequestData(data: unknown): ValidationResult {
   const errors: string[] = [];
 
   if (!data || typeof data !== "object") {
@@ -102,28 +78,34 @@ function validateFarmerRequestData(data: any): ValidationResult {
     };
   }
 
-  // Validation du requestId
-  const requestIdRaw = data.requestId;
-  if (!requestIdRaw) {
+  const raw = data as Record<string, unknown>;
+
+  // requestId
+  const requestIdRaw = raw.requestId;
+  if (
+    requestIdRaw === undefined ||
+    requestIdRaw === null ||
+    requestIdRaw === ""
+  ) {
     errors.push("L'ID de la demande est requis");
   } else {
     const numericRequestId = Number(requestIdRaw);
-    if (isNaN(numericRequestId) || numericRequestId <= 0) {
+    if (!Number.isFinite(numericRequestId) || numericRequestId <= 0) {
       errors.push("L'ID de la demande doit être un nombre positif");
     }
   }
 
-  // Validation du userId
-  const userId = typeof data.userId === "string" ? data.userId.trim() : "";
+  // userId
+  const userId = typeof raw.userId === "string" ? raw.userId.trim() : "";
   if (!userId) {
     errors.push("L'ID utilisateur est requis");
   } else if (!/^user_[a-zA-Z0-9]{24,}$/.test(userId)) {
     errors.push("Format d'ID utilisateur invalide");
   }
 
-  // Validation du rôle
+  // role
   const role =
-    typeof data.role === "string" ? data.role.trim().toLowerCase() : "";
+    typeof raw.role === "string" ? raw.role.trim().toLowerCase() : "";
   if (!role) {
     errors.push("Le rôle est requis");
   } else if (!VALID_ROLES.includes(role as any)) {
@@ -132,9 +114,9 @@ function validateFarmerRequestData(data: any): ValidationResult {
     );
   }
 
-  // Validation du statut
+  // status
   const status =
-    typeof data.status === "string" ? data.status.trim().toLowerCase() : "";
+    typeof raw.status === "string" ? raw.status.trim().toLowerCase() : "";
   if (!status) {
     errors.push("Le statut est requis");
   } else if (!VALID_STATUSES.includes(status as any)) {
@@ -143,50 +125,40 @@ function validateFarmerRequestData(data: any): ValidationResult {
     );
   }
 
-  // Validation de la raison (optionnelle)
-  const reason =
-    typeof data.reason === "string" ? data.reason.trim() : undefined;
+  // reason
+  const reason = typeof raw.reason === "string" ? raw.reason.trim() : undefined;
   if (reason && reason.length > MAX_REASON_LENGTH) {
     errors.push(
       `La raison ne peut pas dépasser ${MAX_REASON_LENGTH} caractères`
     );
   }
 
-  // Si pas d'erreurs, retourner les données sanitisées
-  if (errors.length === 0) {
-    const sanitizedData: ValidateFarmerRequestBody = {
-      requestId: Number(requestIdRaw), // ✅ number garanti ici
-      userId,
-      role: role as any,
-      status: status as any,
-      ...(reason && { reason }),
-    };
-
-    return {
-      isValid: true,
-      errors: [],
-      sanitizedData,
-    };
-  }
+  if (errors.length > 0) return { isValid: false, errors };
 
   return {
-    isValid: false,
-    errors,
+    isValid: true,
+    errors: [],
+    sanitizedData: {
+      requestId: Number(requestIdRaw),
+      userId,
+      role: role as ValidateFarmerRequestBody["role"],
+      status: status as ValidateFarmerRequestBody["status"],
+      ...(reason ? { reason } : {}),
+    },
   };
 }
 
 /**
- * Fonction pour vérifier les permissions administrateur
+ * Vérifier permissions admin (Clerk)
  */
 async function checkAdminPermissions(requestingUserId: string): Promise<{
   hasPermission: boolean;
   error?: string;
 }> {
   try {
-    // ✅ clerkClient est maintenant une fonction asynchrone
     const client = await clerkClient();
     const requestingUser = await client.users.getUser(requestingUserId);
-    const userRole = requestingUser.publicMetadata?.role as string;
+    const userRole = requestingUser.publicMetadata?.role as string | undefined;
 
     if (userRole !== "admin") {
       return {
@@ -210,26 +182,34 @@ async function checkAdminPermissions(requestingUserId: string): Promise<{
 }
 
 /**
- * Fonction pour créer automatiquement un listing approuvé
+ * Crée un listing pour un farmer approuvé
+ * - supprime le champ `status` (il n'existe pas dans ta table listing)
+ * - évite d'insérer 2 listings si `createdBy` est UNIQUE (check + early return)
+ * - utilise les types ListingInsert (alignés avec lib/types/database.ts)
  */
 async function createListingForApprovedFarmer(
   supabase: ReturnType<typeof createSupabaseClient>,
-  farmerRequest: FarmerRequestData,
+  farmerRequest: Database["public"]["Tables"]["farmer_requests"]["Row"],
   userId: string
 ): Promise<{ success: boolean; listingId?: number; error?: string }> {
   try {
-    const {
-      id: requestId,
-      farm_name,
-      location,
-      description,
-      phone,
-      website,
-      email,
-      products,
-    } = farmerRequest;
+    const requestId = farmerRequest.id;
 
-    // ✅ Récupérer les coordonnées GPS depuis farmer_requests
+    // ✅ si createdBy est UNIQUE, on évite un doublon
+    const { data: existingListing, error: existingError } = await supabase
+      .from("listing")
+      .select("id")
+      .eq("createdBy", userId)
+      .maybeSingle();
+
+    if (existingError) {
+      console.warn("[VALIDATE] Warning check existing listing:", existingError);
+      // non bloquant, on continue
+    } else if (existingListing?.id) {
+      return { success: true, listingId: existingListing.id };
+    }
+
+    // ✅ récupérer coords depuis farmer_requests (tu as lat/lng dans le type)
     const { data: requestWithCoords, error: coordsError } = await supabase
       .from("farmer_requests")
       .select("lat, lng")
@@ -244,11 +224,11 @@ async function createListingForApprovedFarmer(
       };
     }
 
-    const lat = requestWithCoords?.lat;
-    const lng = requestWithCoords?.lng;
+    const lat = requestWithCoords?.lat ?? null;
+    const lng = requestWithCoords?.lng ?? null;
 
-    // ✅ Vérifier que les coordonnées existent et sont valides
-    if (!lat || !lng || lat === 0 || lng === 0) {
+    // ✅ Vérifier coordonnées valides
+    if (lat === null || lng === null || lat === 0 || lng === 0) {
       console.error(
         `[VALIDATE] Coordonnées GPS invalides pour farmer_request ${requestId}:`,
         { lat, lng }
@@ -260,30 +240,24 @@ async function createListingForApprovedFarmer(
       };
     }
 
-    console.log(
-      `[VALIDATE] Création listing avec coordonnées GPS: lat=${lat}, lng=${lng}`
-    );
-
-    const listingData = {
+    const listingData: ListingInsert = {
       createdBy: userId,
-      name: farm_name,
-      description: description || null,
-      phoneNumber: phone || null,
-      email,
-      website: website || null,
-      address: location,
-      product_type: products || null,
-      status: "draft" as const,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      lat, // ✅ Coordonnées GPS depuis farmer_requests
-      lng, // ✅ Coordonnées GPS depuis farmer_requests
+      name: farmerRequest.farm_name,
+      description: farmerRequest.description ?? null,
+      phoneNumber: farmerRequest.phone ?? null,
+      email: farmerRequest.email ?? null,
+      website: farmerRequest.website ?? null,
+      address: farmerRequest.location,
+      product_type: farmerRequest.products ?? null, // ✅ selon tes types (string | null)
+      lat,
+      lng,
       active: true,
+      updated_at: new Date().toISOString(),
     };
 
     const { data: insertedListing, error: insertListingError } = await supabase
       .from("listing")
-      .insert([listingData])
+      .insert(listingData) // ✅ 1 objet
       .select("id")
       .single();
 
@@ -295,7 +269,7 @@ async function createListingForApprovedFarmer(
       };
     }
 
-    // Mise à jour du profil avec farm_id
+    // Liaison profile -> farm_id (non bloquant)
     const { error: profileLinkError } = await supabase
       .from("profiles")
       .update({
@@ -309,17 +283,13 @@ async function createListingForApprovedFarmer(
         "[VALIDATE] Erreur liaison profil-listing:",
         profileLinkError
       );
-      // Non bloquant
     }
 
     console.log(
-      `✅ Listing créé avec succès (ID: ${insertedListing.id}) avec coordonnées GPS: lat=${lat}, lng=${lng}`
+      `✅ Listing créé (ID: ${insertedListing.id}) lat=${lat} lng=${lng}`
     );
 
-    return {
-      success: true,
-      listingId: insertedListing.id,
-    };
+    return { success: true, listingId: insertedListing.id };
   } catch (error) {
     console.error("[VALIDATE] Erreur lors de la création du listing:", error);
     return {
@@ -338,7 +308,6 @@ export async function POST(
   const timestamp = new Date().toISOString();
 
   try {
-    // ✅ auth() est maintenant asynchrone
     const { userId: requestingUserId } = await auth();
     if (!requestingUserId) {
       return NextResponse.json(
@@ -352,7 +321,7 @@ export async function POST(
       );
     }
 
-    // Vérification des permissions administrateur
+    // Permissions admin
     const permissionCheck = await checkAdminPermissions(requestingUserId);
     if (!permissionCheck.hasPermission) {
       return NextResponse.json(
@@ -366,23 +335,22 @@ export async function POST(
       );
     }
 
-    // Parse et validation du corps de requête
-    let requestBody: any;
+    // Parse JSON
+    const contentType = req.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Type de contenu invalide",
+          message: "Le content-type doit être application/json",
+          timestamp,
+        },
+        { status: 400 }
+      );
+    }
 
+    let requestBody: unknown;
     try {
-      const contentType = req.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Type de contenu invalide",
-            message: "Le content-type doit être application/json",
-            timestamp,
-          },
-          { status: 400 }
-        );
-      }
-
       requestBody = await req.json();
     } catch (parseError) {
       console.error("[VALIDATE] Erreur parsing JSON:", parseError);
@@ -397,10 +365,9 @@ export async function POST(
       );
     }
 
-    // Validation et sanitisation des données
+    // Validate / sanitize
     const validation = validateFarmerRequestData(requestBody);
-
-    if (!validation.isValid) {
+    if (!validation.isValid || !validation.sanitizedData) {
       console.warn("[VALIDATE] Validation échouée:", validation.errors);
       return NextResponse.json(
         {
@@ -414,19 +381,19 @@ export async function POST(
     }
 
     const { requestId, userId, role, status, reason } =
-      validation.sanitizedData!;
+      validation.sanitizedData;
 
-    // Création du client Supabase
+    // Client Supabase service role
     const supabase = createSupabaseClient();
 
-    // 1. Récupération de la demande
-    const { data: farmerRequestData, error: requestError } = await supabase
+    // 1) Fetch farmer request
+    const { data: farmerRequest, error: requestError } = await supabase
       .from("farmer_requests")
       .select("*")
-      .eq("id", requestId) // ✅ requestId est bien un number
+      .eq("id", requestId)
       .single();
 
-    if (requestError || !farmerRequestData) {
+    if (requestError || !farmerRequest) {
       console.error("[VALIDATE] Demande introuvable:", requestError);
       return NextResponse.json(
         {
@@ -439,9 +406,7 @@ export async function POST(
       );
     }
 
-    const farmerRequest = farmerRequestData as FarmerRequestData;
-
-    // Vérifier que la demande est en attente
+    // Déjà traité ?
     if (farmerRequest.status !== "pending") {
       return NextResponse.json(
         {
@@ -454,25 +419,22 @@ export async function POST(
       );
     }
 
-    // 2. Mise à jour du rôle Clerk
+    // 2) Update Clerk user role
     try {
-      const client = await clerkClient(); // ✅ client Clerk
+      const client = await clerkClient();
       await client.users.updateUser(userId, {
         publicMetadata: {
           role,
           roleUpdatedAt: timestamp,
           roleUpdatedBy: requestingUserId,
-          ...(reason && { roleChangeReason: reason }),
+          ...(reason ? { roleChangeReason: reason } : {}),
         },
       });
     } catch (clerkError: any) {
       console.error("[VALIDATE] Erreur Clerk update:", clerkError);
-      const errorMessage = (clerkError as any)?.message || String(clerkError);
+      const errorMessage = clerkError?.message || String(clerkError);
 
-      if (
-        errorMessage.includes("not found") ||
-        (clerkError as any)?.status === 404
-      ) {
+      if (errorMessage.includes("not found") || clerkError?.status === 404) {
         return NextResponse.json(
           {
             success: false,
@@ -497,13 +459,10 @@ export async function POST(
       );
     }
 
-    // 3. Mise à jour du rôle dans Supabase (profil)
+    // 3) Update Supabase profile role
     const { error: profileUpdateError } = await supabase
       .from("profiles")
-      .update({
-        role,
-        updated_at: timestamp,
-      })
+      .update({ role, updated_at: timestamp })
       .eq("user_id", userId);
 
     if (profileUpdateError) {
@@ -519,14 +478,15 @@ export async function POST(
       );
     }
 
-    // 4. Mise à jour de la demande (statut + timestamp)
-    const updateData = {
-      status,
-      updated_at: timestamp,
-      approved_by_admin_at: status === "approved" ? timestamp : null,
-      ...(reason && { admin_reason: reason }),
-      validated_by: requestingUserId,
-    };
+    // 4) Update farmer request status
+    const updateData: Database["public"]["Tables"]["farmer_requests"]["Update"] =
+      {
+        status,
+        updated_at: timestamp,
+        approved_by_admin_at: status === "approved" ? timestamp : null,
+        validated_by: requestingUserId,
+        ...(reason ? { admin_reason: reason } : {}),
+      };
 
     const { error: requestUpdateError } = await supabase
       .from("farmer_requests")
@@ -546,9 +506,8 @@ export async function POST(
       );
     }
 
+    // 5) Create listing if approved
     let createdListingId: number | undefined;
-
-    // 5. Création automatique du listing si approuvé
     if (status === "approved") {
       const listingResult = await createListingForApprovedFarmer(
         supabase,
@@ -557,28 +516,24 @@ export async function POST(
       );
 
       if (!listingResult.success) {
-        // Le listing n'a pas pu être créé, mais on ne bloque pas la validation
         console.warn("[VALIDATE] Échec création listing:", listingResult.error);
       } else {
         createdListingId = listingResult.listingId;
       }
     }
 
-    // 6. Envoi de l'email de statut au producteur
+    // 6) Send status email (non bloquant)
     try {
-      // ✅ Adaptation du type phone: string | null -> string | undefined
       const emailPayload: EmailFarmerRequest = {
         ...(farmerRequest as any),
-        phone: farmerRequest.phone ?? undefined,
+        phone: farmerRequest.phone ?? undefined, // adapt null -> undefined if needed
       };
 
       await sendFarmerRequestStatusEmail(emailPayload, status);
     } catch (emailError) {
       console.warn("[VALIDATE] Email non envoyé:", emailError);
-      // Non bloquant - on continue même si l'email échoue
     }
 
-    // Réponse de succès
     const successMessage =
       status === "approved"
         ? `Demande approuvée avec succès${
@@ -591,7 +546,7 @@ export async function POST(
         success: true,
         message: successMessage,
         timestamp,
-        ...(createdListingId && { createdListingId }),
+        ...(createdListingId ? { createdListingId } : {}),
       },
       {
         status: 200,
@@ -603,7 +558,6 @@ export async function POST(
     );
   } catch (error) {
     console.error("[VALIDATE] Erreur serveur critique:", error);
-
     const isDev = process.env.NODE_ENV === "development";
 
     return NextResponse.json(
@@ -619,12 +573,4 @@ export async function POST(
   }
 }
 
-/**
- * Export des types pour utilisation externe
- */
-export type {
-  ValidateFarmerRequestBody,
-  FarmerRequestData,
-  ApiResponse,
-  ValidationResult,
-};
+export type { ValidateFarmerRequestBody, ApiResponse, ValidationResult };
