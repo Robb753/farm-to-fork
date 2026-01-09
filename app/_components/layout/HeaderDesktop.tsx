@@ -580,7 +580,7 @@ export default function HeaderDesktop({
 
           {/* Bouton devenir producteur */}
           <Link
-            href="/become-farmer"
+            href="/onboarding/step-1"
             className="hidden md:flex items-center gap-1 text-sm font-medium px-3 py-2 rounded-lg transition-all"
             style={{
               color: COLORS.PRIMARY,

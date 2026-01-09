@@ -39,17 +39,56 @@ export type {
   Listing,
 } from "./unifiedStore";
 
-// ==================== ALIAS DE COMPATIBILITÉ ====================
-// Pour les composants qui n'ont pas encore été migrés
+// ==================== EXPORTS SUPPLÉMENTAIRES POUR EXPLORE.TSX ====================
 
 import {
   useUnifiedStore,
   useCurrentFilters,
   useFiltersActions,
+  useAllListings,
+  useFilteredListings,
+  useVisibleListings,
+  useIsListingsLoading,
+  useMapBounds,
+  useMapCoordinates,
   type FilterState,
   type Listing,
   type MapBounds,
+  type MapCoordinates,
+  useIsMapExpanded,
 } from "./unifiedStore";
+
+// ✅ Export type LatLng (alias de MapCoordinates)
+export type LatLng = MapCoordinates;
+
+// ✅ Hook useListingsState compatible avec Explore.tsx
+export const useListingsState = () => {
+  return {
+    all: useAllListings(),
+    filtered: useFilteredListings(),
+    visible: useVisibleListings(),
+    isLoading: useIsListingsLoading(),
+    hasMore: useUnifiedStore((state) => state.listings.hasMore),
+    page: useUnifiedStore((state) => state.listings.page),
+    totalCount: useUnifiedStore((state) => state.listings.all.length), // ou depuis l'API
+    error: useUnifiedStore((state) => state.listings.error),
+  };
+};
+
+// ✅ Hook useMapState compatible avec Explore.tsx
+export const useMapState = () => {
+  return {
+    coordinates: useMapCoordinates(),
+    bounds: useMapBounds(),
+    zoom: useUnifiedStore((state) => state.map.zoom),
+    mapInstance: useUnifiedStore((state) => state.map.instance),
+    isLoading: useUnifiedStore((state) => state.map.isLoading),
+    error: useUnifiedStore((state) => state.map.error),
+  };
+};
+
+// ==================== ALIAS DE COMPATIBILITÉ ====================
+// Pour les composants qui n'ont pas encore été migrés
 
 /**
  * @deprecated Utiliser useUnifiedStore((state) => state.filters.current)
@@ -58,6 +97,30 @@ import {
 export const useFiltersStoreState = () => {
   const filters = useCurrentFilters();
   return { filters };
+};
+
+export const useUIState = () => {
+  return {
+    isMapExpanded: useIsMapExpanded(),
+    isMobile: useUnifiedStore((state) => state.ui.isMobile),
+    isTablet: useUnifiedStore((state) => state.ui.isTablet),
+    isDesktop: useUnifiedStore((state) => state.ui.isDesktop),
+    isFiltersModalOpen: useUnifiedStore((state) => state.ui.isFiltersModalOpen),
+  };
+};
+
+export const useInteractionsState = () => {
+  return {
+    hoveredListingId: useUnifiedStore(
+      (state) => state.interactions.hoveredListingId
+    ),
+    selectedListingId: useUnifiedStore(
+      (state) => state.interactions.selectedListingId
+    ),
+    infoWindowOpen: useUnifiedStore(
+      (state) => state.interactions.infoWindowOpen
+    ),
+  };
 };
 
 /**

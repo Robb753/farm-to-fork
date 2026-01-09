@@ -219,6 +219,7 @@ async function createListingForApprovedFarmer(
 ): Promise<{ success: boolean; listingId?: number; error?: string }> {
   try {
     const {
+      id: requestId,
       farm_name,
       location,
       description,
@@ -227,6 +228,41 @@ async function createListingForApprovedFarmer(
       email,
       products,
     } = farmerRequest;
+
+    // ✅ Récupérer les coordonnées GPS depuis farmer_requests
+    const { data: requestWithCoords, error: coordsError } = await supabase
+      .from("farmer_requests")
+      .select("lat, lng")
+      .eq("id", requestId)
+      .single();
+
+    if (coordsError) {
+      console.error("[VALIDATE] Erreur récupération coordonnées:", coordsError);
+      return {
+        success: false,
+        error: "Erreur lors de la récupération des coordonnées GPS",
+      };
+    }
+
+    const lat = requestWithCoords?.lat;
+    const lng = requestWithCoords?.lng;
+
+    // ✅ Vérifier que les coordonnées existent et sont valides
+    if (!lat || !lng || lat === 0 || lng === 0) {
+      console.error(
+        `[VALIDATE] Coordonnées GPS invalides pour farmer_request ${requestId}:`,
+        { lat, lng }
+      );
+      return {
+        success: false,
+        error:
+          "Coordonnées GPS manquantes ou invalides. L'adresse doit être saisie avec Mapbox au Step 1.",
+      };
+    }
+
+    console.log(
+      `[VALIDATE] Création listing avec coordonnées GPS: lat=${lat}, lng=${lng}`
+    );
 
     const listingData = {
       createdBy: userId,
@@ -240,8 +276,8 @@ async function createListingForApprovedFarmer(
       status: "draft" as const,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-      lat: 0, // À mettre à jour via géocodage
-      lng: 0, // À mettre à jour via géocodage
+      lat, // ✅ Coordonnées GPS depuis farmer_requests
+      lng, // ✅ Coordonnées GPS depuis farmer_requests
       active: true,
     };
 
@@ -275,6 +311,10 @@ async function createListingForApprovedFarmer(
       );
       // Non bloquant
     }
+
+    console.log(
+      `✅ Listing créé avec succès (ID: ${insertedListing.id}) avec coordonnées GPS: lat=${lat}, lng=${lng}`
+    );
 
     return {
       success: true,

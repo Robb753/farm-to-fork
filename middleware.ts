@@ -24,6 +24,7 @@ const isPublicRoute = createRouteMatcher([
   "/api/public(.*)", // APIs publiques
   "/api/webhooks(.*)", // Webhooks (Clerk, Stripe, etc.)
   "/api/auth(.*)", // ✅ AJOUT: APIs d'authentification (éviter les boucles)
+  "/api/onboarding(.*)", // ✅ NOUVEAU: APIs onboarding (pour les tests)
 ]);
 
 const isAdminRoute = createRouteMatcher(["/admin(.*)"]);
@@ -42,7 +43,6 @@ export default clerkMiddleware(async (auth, req) => {
 
   // ==================== GESTION UTILISATEUR NON CONNECTÉ ====================
   if (!userId) {
-
     const signInUrl = new URL("/sign-in", req.url);
     signInUrl.searchParams.set("redirect_url", pathname);
     return NextResponse.redirect(signInUrl);
@@ -61,7 +61,6 @@ export default clerkMiddleware(async (auth, req) => {
         metadata?.publicMetadata?.isAdmin;
 
       if (!isAdmin) {
-
         // Rediriger vers dashboard avec message d'erreur
         const dashboardUrl = new URL("/dashboard", req.url);
         dashboardUrl.searchParams.set("error", "admin_access_required");
@@ -85,7 +84,6 @@ export default clerkMiddleware(async (auth, req) => {
     const profileUserId = pathname.split("/profile/")[1]?.split("/")[0];
 
     if (profileUserId && profileUserId !== userId) {
-
       // Rediriger vers son propre profil
       const ownProfileUrl = new URL(`/profile/${userId}`, req.url);
       return NextResponse.redirect(ownProfileUrl);

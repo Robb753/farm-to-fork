@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAllListingsWithImages } from "@/app/hooks/useAllListingsWithImages";
 import { MAPBOX_CONFIG } from "@/lib/config";
-import type { LatLng } from "@/lib/store"; // ✅ Import depuis le nouveau store
+import type { LatLng } from "@/lib/store";
 import {
   useListingsActions,
   useListingsState,

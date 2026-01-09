@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useEffect, useRef, useCallback } from "react";
+import React, { useEffect, useRef, useCallback, useState } from "react";
 import mapboxgl from "mapbox-gl";
 
 // ✅ IMPORTS CORRECTS : Store modulaire équilibré
 import { useMapState, useMapActions } from "@/lib/store";
 
-// ✅ Types du projet
-import type { MapBounds, LatLng } from "@/lib/store/shared/types";
+// ✅ Types du projet - utiliser les types de unifiedStore
+import type { LatLng } from "@/lib/store/shared/types";
 
 import MapboxMarkers from "./MapboxMarkers";
 import { COLORS } from "@/lib/config";
@@ -29,7 +29,16 @@ interface MapboxSectionProps {
   isMapExpanded?: boolean;
   className?: string;
   onMapReady?: (map: mapboxgl.Map) => void;
-  onViewChange?: (center: LatLng, zoom: number, bounds: MapBounds) => void;
+  onViewChange?: (
+    center: LatLng,
+    zoom: number,
+    bounds: {
+      north: number;
+      south: number;
+      east: number;
+      west: number;
+    }
+  ) => void;
 }
 
 type MapboxCoordinates = [number, number]; // [lng, lat]
@@ -100,16 +109,13 @@ export default function MapboxSection({
   const userInteractingRef = useRef<boolean>(false);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
 
-  const { coordinates, zoom, isApiLoaded, isApiLoading, bounds } =
-    useMapState();
-  const {
-    setMapInstance,
-    setMapBounds,
-    setApiLoaded,
-    setApiLoading,
-    setZoom,
-    setCoordinates,
-  } = useMapActions();
+  // ✅ CORRECTION : États locaux pour loading
+  const [isApiLoading, setIsApiLoading] = useState<boolean>(true);
+  const [isApiLoaded, setIsApiLoaded] = useState<boolean>(false);
+
+  // ✅ CORRECTION : Utiliser seulement les états et actions disponibles
+  const { coordinates, zoom, bounds, mapInstance } = useMapState();
+  const mapActions = useMapActions();
 
   /** Force la projection Mercator et une vue plane */
   const enforceFlatView = useCallback((map: mapboxgl.Map): void => {
@@ -129,22 +135,24 @@ export default function MapboxSection({
     (map: mapboxgl.Map): void => {
       try {
         const b = map.getBounds();
-        // 👇 garde pour satisfaire TS ("b is possibly null")
         if (!b) {
           console.warn("Bounds Mapbox indisponibles");
           return;
         }
 
-        const storeBounds: MapBounds = {
-          sw: { lat: b.getSouth(), lng: b.getWest() },
-          ne: { lat: b.getNorth(), lng: b.getEast() },
+        // ✅ Format attendu par unifiedStore : { north, south, east, west }
+        const storeBounds = {
+          north: b.getNorth(),
+          south: b.getSouth(),
+          east: b.getEast(),
+          west: b.getWest(),
         };
-        setMapBounds(storeBounds);
+        mapActions.setBounds(storeBounds);
       } catch (error) {
         console.error("Erreur update bounds:", error);
       }
     },
-    [setMapBounds]
+    [mapActions]
   );
 
   /** Met à jour centre/zoom + notifie onViewChange */
@@ -152,25 +160,27 @@ export default function MapboxSection({
     (map: mapboxgl.Map): void => {
       try {
         const currentZoom = map.getZoom();
-        setZoom(currentZoom);
+        mapActions.setZoom(currentZoom);
 
         const center = map.getCenter();
         const centerCoords = mapboxToStoreCoords(center);
         if (centerCoords) {
-          setCoordinates(centerCoords);
+          mapActions.setCoordinates(centerCoords);
         }
 
         if (onViewChange && centerCoords) {
           const b = map.getBounds();
-          // 👇 même garde ici
           if (!b) {
             console.warn("Bounds Mapbox indisponibles pour onViewChange");
             return;
           }
 
-          const changedBounds: MapBounds = {
-            sw: { lat: b.getSouth(), lng: b.getWest() },
-            ne: { lat: b.getNorth(), lng: b.getEast() },
+          // ✅ Format attendu : { north, south, east, west }
+          const changedBounds = {
+            north: b.getNorth(),
+            south: b.getSouth(),
+            east: b.getEast(),
+            west: b.getWest(),
           };
           onViewChange(centerCoords, currentZoom, changedBounds);
         }
@@ -178,7 +188,7 @@ export default function MapboxSection({
         console.error("Erreur update position:", error);
       }
     },
-    [setZoom, setCoordinates, onViewChange]
+    [mapActions.setZoom, mapActions.setCoordinates, onViewChange]
   );
 
   const cleanContainer = useCallback((container: HTMLDivElement): void => {
@@ -222,15 +232,15 @@ export default function MapboxSection({
             const markerEl = document.createElement("div");
             markerEl.className = "custom-marker";
             markerEl.style.cssText = `
-            width: 24px;
-            height: 24px;
-            background-color: ${COLORS.PRIMARY};
-            border: 2px solid ${COLORS.BG_WHITE};
-            border-radius: 50%;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-          `;
+              width: 24px;
+              height: 24px;
+              background-color: ${COLORS.PRIMARY};
+              border: 2px solid ${COLORS.BG_WHITE};
+              border-radius: 50%;
+              cursor: pointer;
+              transition: all 0.2s ease;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            `;
 
             markerEl.addEventListener("mouseenter", () => {
               markerEl.style.transform = "scale(1.2)";
@@ -269,12 +279,15 @@ export default function MapboxSection({
   );
 
   const highlightMarker = useCallback((id: number | null) => {
+    // TODO: Implémenter la logique de highlight
   }, []);
 
   const selectMarker = useCallback((id: number | null) => {
+    // TODO: Implémenter la logique de sélection
   }, []);
 
   const openInfoWindow = useCallback((id: number | null) => {
+    // TODO: Implémenter la logique d'info window
   }, []);
 
   // ✅ ÉCOUTE DES ÉVÉNEMENTS DU STORE
@@ -282,7 +295,7 @@ export default function MapboxSection({
     if (!mapRef.current) return;
 
     const handleListingsUpdated = (event: CustomEvent) => {
-      const { listings, source } = event.detail;
+      const { listings } = event.detail;
       addMarkersToMap(listings);
     };
 
@@ -342,7 +355,7 @@ export default function MapboxSection({
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
-    setApiLoading(true);
+    setIsApiLoading(true);
     cleanContainer(containerRef.current);
 
     try {
@@ -389,16 +402,16 @@ export default function MapboxSection({
 
       const handleMapLoad = () => {
         try {
-          setMapInstance(map);
-          setApiLoaded(true);
-          setApiLoading(false);
+          // mapActions.setMapInstance removed - not needed
+          setIsApiLoaded(true);
+          setIsApiLoading(false);
           enforceFlatView(map);
 
           if (!isValidCoords(coordinates)) {
             const fb = mapboxToStoreCoords(MAPBOX_CONFIG.center);
             if (fb) {
-              setCoordinates(fb);
-              setZoom(MAPBOX_CONFIG.zoom);
+              mapActions.setCoordinates(fb);
+              mapActions.setZoom(MAPBOX_CONFIG.zoom);
             }
           }
 
@@ -406,7 +419,7 @@ export default function MapboxSection({
           onMapReady?.(map);
         } catch (error) {
           console.error("Erreur load carte:", error);
-          setApiLoading(false);
+          setIsApiLoading(false);
         }
       };
 
@@ -437,7 +450,7 @@ export default function MapboxSection({
 
       const handleMapError = (e: any) => {
         console.error("Erreur Mapbox:", e);
-        setApiLoading(false);
+        setIsApiLoading(false);
       };
       map.on("error", handleMapError);
 
@@ -463,15 +476,15 @@ export default function MapboxSection({
 
         if (containerRef.current) cleanContainer(containerRef.current);
 
-        setMapInstance(null);
-        setApiLoaded(false);
-        setApiLoading(false);
+        // mapActions.setMapInstance removed - not needed
+        setIsApiLoaded(false);
+        setIsApiLoading(false);
       };
     } catch (error) {
       console.error("Erreur init carte:", error);
-      setApiLoading(false);
+      setIsApiLoading(false);
     }
-  }, []); // on garde ton choix ici
+  }, []);
 
   /** Suit les changements coords/zoom → met à jour la vue */
   useEffect(() => {

@@ -175,45 +175,106 @@ export interface Database {
         ];
       };
 
+      // ✅ FARMER_REQUESTS - AVEC LAT/LNG AJOUTÉS
       farmer_requests: {
         Row: {
           id: number;
           created_at: string;
+          updated_at: string;
           user_id: string;
           email: string;
+
+          // ✅ Informations personnelles
+          first_name: string;
+          last_name: string;
+          phone: string | null;
+
+          // ✅ Informations entreprise
+          siret: string;
+          department: string;
+
+          // ✅ Informations ferme
           farm_name: string;
           location: string;
-          phone: string | null;
-          description: string;
+          description: string | null;
           products: string | null;
           website: string | null;
+
+          // ✅ Coordonnées GPS (AJOUTÉES)
+          lat: number | null;
+          lng: number | null;
+
+          // ✅ Workflow
           status: string;
+          approved_by_admin_at: string | null;
+          validated_by: string | null;
+          admin_reason: string | null;
         };
         Insert: {
           id?: number;
           created_at?: string;
+          updated_at?: string;
           user_id: string;
           email: string;
+
+          // ✅ Informations personnelles
+          first_name: string;
+          last_name: string;
+          phone?: string | null;
+
+          // ✅ Informations entreprise
+          siret: string;
+          department: string;
+
+          // ✅ Informations ferme
           farm_name: string;
           location: string;
-          phone?: string | null;
-          description: string;
+          description?: string | null;
           products?: string | null;
           website?: string | null;
+
+          // ✅ Coordonnées GPS (AJOUTÉES)
+          lat?: number | null;
+          lng?: number | null;
+
+          // ✅ Workflow
           status?: string;
+          approved_by_admin_at?: string | null;
+          validated_by?: string | null;
+          admin_reason?: string | null;
         };
         Update: {
           id?: number;
           created_at?: string;
+          updated_at?: string;
           user_id?: string;
           email?: string;
+
+          // ✅ Informations personnelles
+          first_name?: string;
+          last_name?: string;
+          phone?: string | null;
+
+          // ✅ Informations entreprise
+          siret?: string;
+          department?: string;
+
+          // ✅ Informations ferme
           farm_name?: string;
           location?: string;
-          phone?: string | null;
-          description?: string;
+          description?: string | null;
           products?: string | null;
           website?: string | null;
+
+          // ✅ Coordonnées GPS (AJOUTÉES)
+          lat?: number | null;
+          lng?: number | null;
+
+          // ✅ Workflow
           status?: string;
+          approved_by_admin_at?: string | null;
+          validated_by?: string | null;
+          admin_reason?: string | null;
         };
         Relationships: [];
       };
@@ -236,7 +297,7 @@ export interface Database {
 
           image_url: string | null;
 
-          // tu m’as confirmé l’avoir
+          // tu m'as confirmé l'avoir
           stock_status: string | null;
 
           created_at: string;

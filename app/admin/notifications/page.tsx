@@ -1,3 +1,4 @@
+// app/admin/notifications/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -36,13 +37,25 @@ import { cn } from "@/lib/utils";
 interface FarmerRequest {
   id: number;
   user_id: string;
+  email: string;
+
+  // Informations personnelles
+  first_name: string;
+  last_name: string;
+  phone?: string;
+
+  // Informations entreprise
+  siret: string;
+  department: string;
+
+  // Informations ferme
   farm_name: string;
   location: string;
-  email: string;
-  phone?: string;
-  website?: string;
-  description: string;
+  description?: string;
   products?: string;
+  website?: string;
+
+  // Workflow
   status: "pending" | "approved" | "rejected";
   created_at: string;
   updated_at?: string;
@@ -69,7 +82,7 @@ interface ValidationPayload {
  * Features:
  * - Gestion des demandes d'accès producteur
  * - Temps réel avec Supabase realtime
- * - Actions d'approbation/rejet
+ * - ✅ Confirmations avant approbation/rejet
  * - Interface détaillée pour chaque demande
  * - Contrôle d'accès admin
  */
@@ -83,6 +96,12 @@ export default function AdminNotificationsPage(): JSX.Element {
   const [selectedRequest, setSelectedRequest] = useState<FarmerRequest | null>(
     null
   );
+
+  // ✅ NOUVEAU : États pour les confirmations
+  const [confirmingAction, setConfirmingAction] = useState<{
+    request: FarmerRequest;
+    action: "approve" | "reject";
+  } | null>(null);
 
   /**
    * Vérifie l'accès admin et initialise les données
@@ -117,7 +136,7 @@ export default function AdminNotificationsPage(): JSX.Element {
           {
             event: "INSERT",
             schema: "public",
-            table: "farmer_requests", // Supposé être TABLES.FARMER_REQUESTS si défini
+            table: "farmer_requests",
           },
           (payload) => {
             fetchNotifications();
@@ -144,7 +163,7 @@ export default function AdminNotificationsPage(): JSX.Element {
     setLoading(true);
     try {
       const { data, error } = await supabase
-        .from("farmer_requests") // Supposé être TABLES.FARMER_REQUESTS
+        .from("farmer_requests")
         .select("*")
         .order("created_at", { ascending: false });
 
@@ -167,18 +186,34 @@ export default function AdminNotificationsPage(): JSX.Element {
   };
 
   /**
-   * Traite une action d'approbation ou de rejet
+   * ✅ NOUVEAU : Demande de confirmation avant action
    */
-  const handleAction = async (
-    requestId: number,
-    userId: string,
-    role: string,
-    status: RequestStatus
-  ): Promise<void> => {
-    try {
-      const payload: ValidationPayload = { requestId, userId, role, status };
+  const handleRequestAction = (
+    request: FarmerRequest,
+    action: "approve" | "reject"
+  ): void => {
+    setConfirmingAction({ request, action });
+  };
 
-      const response = await fetch("/api/validate-farmer-request", {
+  /**
+   * ✅ MODIFIÉ : Action confirmée
+   */
+  const handleConfirmedAction = async (): Promise<void> => {
+    if (!confirmingAction) return;
+
+    const { request, action } = confirmingAction;
+    const status = action === "approve" ? "approved" : "rejected";
+    const role = action === "approve" ? "farmer" : "user";
+
+    try {
+      const payload: ValidationPayload = {
+        requestId: request.id,
+        userId: request.user_id,
+        role,
+        status,
+      };
+
+      const response = await fetch("/api/admin/validate-farmer-request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -190,12 +225,13 @@ export default function AdminNotificationsPage(): JSX.Element {
       }
 
       toast.success(
-        status === "approved"
-          ? "Producteur approuvé avec succès"
-          : "Demande rejetée"
+        action === "approve"
+          ? "✅ Producteur approuvé avec succès !"
+          : "❌ Demande rejetée"
       );
 
-      // Fermer le modal et rafraîchir les données
+      // Fermer les modals et rafraîchir
+      setConfirmingAction(null);
       setSelectedRequest(null);
       fetchNotifications();
     } catch (err) {
@@ -417,31 +453,23 @@ export default function AdminNotificationsPage(): JSX.Element {
                             </Button>
                             {notif.status === "pending" && (
                               <>
+                                {/* ✅ Bouton Approuver avec confirmation */}
                                 <Button
                                   variant="ghost"
                                   size="sm"
                                   onClick={() =>
-                                    handleAction(
-                                      notif.id,
-                                      notif.user_id,
-                                      "farmer",
-                                      "approved"
-                                    )
+                                    handleRequestAction(notif, "approve")
                                   }
                                   className="text-xs text-green-600 hover:text-green-700"
                                 >
                                   Approuver
                                 </Button>
+                                {/* ✅ Bouton Rejeter avec confirmation */}
                                 <Button
                                   variant="ghost"
                                   size="sm"
                                   onClick={() =>
-                                    handleAction(
-                                      notif.id,
-                                      notif.user_id,
-                                      "user",
-                                      "rejected"
-                                    )
+                                    handleRequestAction(notif, "reject")
                                   }
                                   className="text-xs text-red-600 hover:text-red-700"
                                 >
@@ -461,7 +489,79 @@ export default function AdminNotificationsPage(): JSX.Element {
         </CardContent>
       </Card>
 
-      {/* ✅ Modal de détails */}
+      {/* ✅ NOUVEAU : AlertDialog de confirmation d'action */}
+      <AlertDialog
+        open={!!confirmingAction}
+        onOpenChange={() => setConfirmingAction(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle
+              style={{
+                color:
+                  confirmingAction?.action === "approve"
+                    ? COLORS.SUCCESS
+                    : COLORS.ERROR,
+              }}
+            >
+              {confirmingAction?.action === "approve"
+                ? "✅ Approuver cette demande ?"
+                : "❌ Rejeter cette demande ?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmingAction?.action === "approve" ? (
+                <>
+                  <strong>
+                    {confirmingAction.request.first_name}{" "}
+                    {confirmingAction.request.last_name}
+                  </strong>{" "}
+                  deviendra producteur et pourra créer sa fiche ferme.
+                  <br />
+                  <br />
+                  <strong>Ferme :</strong> {confirmingAction.request.farm_name}
+                  <br />
+                  <strong>SIRET :</strong> {confirmingAction.request.siret}
+                  <br />
+                  <strong>Département :</strong>{" "}
+                  {confirmingAction.request.department}
+                </>
+              ) : (
+                <>
+                  La demande de{" "}
+                  <strong>
+                    {confirmingAction?.request.first_name}{" "}
+                    {confirmingAction?.request.last_name}
+                  </strong>{" "}
+                  sera rejetée.
+                  <br />
+                  <br />
+                  L'utilisateur recevra un email l'informant du rejet.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmedAction}
+              style={{
+                backgroundColor:
+                  confirmingAction?.action === "approve"
+                    ? COLORS.SUCCESS
+                    : COLORS.ERROR,
+                color: COLORS.BG_WHITE,
+              }}
+              className="hover:opacity-90"
+            >
+              {confirmingAction?.action === "approve"
+                ? "Oui, approuver"
+                : "Oui, rejeter"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ✅ Modal de détails (existant) */}
       <AlertDialog
         open={!!selectedRequest}
         onOpenChange={() => setSelectedRequest(null)}
@@ -476,7 +576,9 @@ export default function AdminNotificationsPage(): JSX.Element {
             </AlertDialogTitle>
             <AlertDialogDescription>
               Demande de{" "}
-              <span className="font-medium">{selectedRequest?.farm_name}</span>
+              <span className="font-medium">
+                {selectedRequest?.first_name} {selectedRequest?.last_name}
+              </span>
             </AlertDialogDescription>
           </AlertDialogHeader>
 
@@ -488,10 +590,10 @@ export default function AdminNotificationsPage(): JSX.Element {
                     className="font-medium"
                     style={{ color: COLORS.TEXT_PRIMARY }}
                   >
-                    Nom de la ferme
+                    Nom
                   </h3>
                   <p style={{ color: COLORS.TEXT_SECONDARY }}>
-                    {selectedRequest.farm_name}
+                    {selectedRequest.first_name} {selectedRequest.last_name}
                   </p>
                 </div>
                 <div>
@@ -499,10 +601,10 @@ export default function AdminNotificationsPage(): JSX.Element {
                     className="font-medium"
                     style={{ color: COLORS.TEXT_PRIMARY }}
                   >
-                    Localisation
+                    Ferme
                   </h3>
                   <p style={{ color: COLORS.TEXT_SECONDARY }}>
-                    {selectedRequest.location}
+                    {selectedRequest.farm_name}
                   </p>
                 </div>
                 <div>
@@ -525,6 +627,39 @@ export default function AdminNotificationsPage(): JSX.Element {
                   </h3>
                   <p style={{ color: COLORS.TEXT_SECONDARY }}>
                     {selectedRequest.phone || "Non renseigné"}
+                  </p>
+                </div>
+                <div>
+                  <h3
+                    className="font-medium"
+                    style={{ color: COLORS.TEXT_PRIMARY }}
+                  >
+                    SIRET
+                  </h3>
+                  <p style={{ color: COLORS.TEXT_SECONDARY }}>
+                    {selectedRequest.siret}
+                  </p>
+                </div>
+                <div>
+                  <h3
+                    className="font-medium"
+                    style={{ color: COLORS.TEXT_PRIMARY }}
+                  >
+                    Département
+                  </h3>
+                  <p style={{ color: COLORS.TEXT_SECONDARY }}>
+                    {selectedRequest.department}
+                  </p>
+                </div>
+                <div>
+                  <h3
+                    className="font-medium"
+                    style={{ color: COLORS.TEXT_PRIMARY }}
+                  >
+                    Localisation
+                  </h3>
+                  <p style={{ color: COLORS.TEXT_SECONDARY }}>
+                    {selectedRequest.location}
                   </p>
                 </div>
                 <div>
@@ -555,7 +690,7 @@ export default function AdminNotificationsPage(): JSX.Element {
                     )}
                   </p>
                 </div>
-                <div>
+                <div className="col-span-2">
                   <h3
                     className="font-medium"
                     style={{ color: COLORS.TEXT_PRIMARY }}
@@ -577,23 +712,25 @@ export default function AdminNotificationsPage(): JSX.Element {
                 </div>
               </div>
 
-              <div className="col-span-2">
-                <h3
-                  className="font-medium"
-                  style={{ color: COLORS.TEXT_PRIMARY }}
-                >
-                  Description
-                </h3>
-                <p
-                  className="whitespace-pre-line"
-                  style={{ color: COLORS.TEXT_SECONDARY }}
-                >
-                  {selectedRequest.description}
-                </p>
-              </div>
+              {selectedRequest.description && (
+                <div>
+                  <h3
+                    className="font-medium"
+                    style={{ color: COLORS.TEXT_PRIMARY }}
+                  >
+                    Description
+                  </h3>
+                  <p
+                    className="whitespace-pre-line"
+                    style={{ color: COLORS.TEXT_SECONDARY }}
+                  >
+                    {selectedRequest.description}
+                  </p>
+                </div>
+              )}
 
               {selectedRequest.products && (
-                <div className="col-span-2">
+                <div>
                   <h3
                     className="font-medium"
                     style={{ color: COLORS.TEXT_PRIMARY }}
@@ -609,7 +746,7 @@ export default function AdminNotificationsPage(): JSX.Element {
                 </div>
               )}
 
-              <div className="col-span-2">
+              <div>
                 <h3
                   className="font-medium"
                   style={{ color: COLORS.TEXT_PRIMARY }}
@@ -627,16 +764,11 @@ export default function AdminNotificationsPage(): JSX.Element {
             <AlertDialogCancel>Fermer</AlertDialogCancel>
             {selectedRequest?.status === "pending" && (
               <>
-                <AlertDialogAction
-                  onClick={() =>
-                    selectedRequest &&
-                    handleAction(
-                      selectedRequest.id,
-                      selectedRequest.user_id,
-                      "user",
-                      "rejected"
-                    )
-                  }
+                <Button
+                  onClick={() => {
+                    setSelectedRequest(null);
+                    handleRequestAction(selectedRequest, "reject");
+                  }}
                   style={{
                     backgroundColor: COLORS.ERROR,
                     color: COLORS.BG_WHITE,
@@ -644,17 +776,12 @@ export default function AdminNotificationsPage(): JSX.Element {
                   className="hover:opacity-90"
                 >
                   Rejeter
-                </AlertDialogAction>
-                <AlertDialogAction
-                  onClick={() =>
-                    selectedRequest &&
-                    handleAction(
-                      selectedRequest.id,
-                      selectedRequest.user_id,
-                      "farmer",
-                      "approved"
-                    )
-                  }
+                </Button>
+                <Button
+                  onClick={() => {
+                    setSelectedRequest(null);
+                    handleRequestAction(selectedRequest, "approve");
+                  }}
                   style={{
                     backgroundColor: COLORS.SUCCESS,
                     color: COLORS.BG_WHITE,
@@ -662,7 +789,7 @@ export default function AdminNotificationsPage(): JSX.Element {
                   className="hover:opacity-90"
                 >
                   Approuver
-                </AlertDialogAction>
+                </Button>
               </>
             )}
           </AlertDialogFooter>

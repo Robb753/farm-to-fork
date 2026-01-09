@@ -58,10 +58,11 @@ export interface MapCoordinates {
  * Listing simplifié (adaptez selon votre modèle)
  */
 export interface Listing {
-  id: string;
+  id: number;
   name: string;
-  latitude: number;
-  longitude: number;
+  address: string;
+  lat: number;
+  lng: number;
   product_type?: string[];
   certifications?: string[];
   // ... autres champs selon votre modèle
@@ -107,8 +108,8 @@ interface FiltersState {
  * État des interactions
  */
 interface InteractionsState {
-  hoveredListingId: string | null;
-  selectedListingId: string | null;
+  hoveredListingId: number | null;
+  selectedListingId: number | null;
   infoWindowOpen: boolean;
 }
 
@@ -139,10 +140,16 @@ interface MapActions {
  */
 interface ListingsActions {
   setAllListings: (listings: Listing[]) => void;
+  setFilteredListings: (listings: Listing[]) => void;
+  setVisibleListings: (listings: Listing[]) => void;
+  setPage: (page: number) => void;
   setListingsLoading: (loading: boolean) => void;
   setListingsError: (error: string | null) => void;
   fetchListings: (options?: any) => Promise<void>;
   resetListings: () => void;
+  setHoveredListingId: (id: number | null) => void;
+  setOpenInfoWindowId: (id: number | null) => void;
+  clearSelection: () => void;
 }
 
 /**
@@ -150,6 +157,7 @@ interface ListingsActions {
  */
 interface FiltersActions {
   setFilters: (filters: FilterState) => void;
+  filterListings: (listings: Listing[], bounds: MapBounds | null) => Listing[];
   resetFilters: () => void;
   toggleFilter: (key: keyof FilterState, value: string) => void;
   applyFilters: () => void;
@@ -159,8 +167,8 @@ interface FiltersActions {
  * Actions des interactions
  */
 interface InteractionsActions {
-  setHoveredListing: (id: string | null) => void;
-  setSelectedListing: (id: string | null) => void;
+  setHoveredListing: (id: number | null) => void;
+  setSelectedListing: (id: number | null) => void;
   setInfoWindowOpen: (open: boolean) => void;
 }
 
@@ -228,14 +236,14 @@ function isListingInBounds(
 ): boolean {
   if (!bounds) return true;
 
-  const { latitude, longitude } = listing;
-  if (latitude == null || longitude == null) return false;
+  const { lat, lng } = listing;
+  if (lat == null || lng == null) return false;
 
   return (
-    latitude >= bounds.south &&
-    latitude <= bounds.north &&
-    longitude >= bounds.west &&
-    longitude <= bounds.east
+    lat >= bounds.south &&
+    lat <= bounds.north &&
+    lng >= bounds.west &&
+    lng <= bounds.east
   );
 }
 
@@ -370,6 +378,25 @@ export const useUnifiedStore = create<UnifiedStore>()(
             get().applyFiltersAndBounds();
           },
 
+          // ✅ AJOUTER CETTE MÉTHODE
+          setFilteredListings: (listings) => {
+            set((state) => ({
+              listings: { ...state.listings, filtered: listings },
+            }));
+          },
+
+          setVisibleListings: (listings) => {
+            set((state) => ({
+              listings: { ...state.listings, visible: listings },
+            }));
+          },
+
+          setPage: (page) => {
+            set((state) => ({
+              listings: { ...state.listings, page },
+            }));
+          },
+
           setListingsLoading: (loading) =>
             set((state) => ({
               listings: { ...state.listings, isLoading: loading },
@@ -396,7 +423,33 @@ export const useUnifiedStore = create<UnifiedStore>()(
                 hasMore: true,
               },
             })),
-        },
+          setHoveredListingId: (id) => {
+            set((state) => ({
+              interactions: { ...state.interactions, hoveredListingId: id },
+            }));
+          },
+
+          setOpenInfoWindowId: (id) => {
+            set((state) => ({
+              interactions: {
+                ...state.interactions,
+                selectedListingId: id,
+                infoWindowOpen: true,
+              },
+            }));
+          },
+
+          clearSelection: () => {
+            set((state) => ({
+              interactions: {
+                ...state.interactions,
+                hoveredListingId: null,
+                selectedListingId: null,
+                infoWindowOpen: false,
+              },
+            }));
+          },
+        }, // ✅ Fermeture de listingsActions
 
         // ============================================================
         // ACTIONS FILTERS
@@ -416,6 +469,25 @@ export const useUnifiedStore = create<UnifiedStore>()(
             }));
             // ✅ Synchronisation automatique après MAJ des filtres
             get().applyFiltersAndBounds();
+          },
+
+          // ✅ AJOUTER CETTE MÉTHODE
+          filterListings: (listings, bounds) => {
+            const filters = get().filters.applied;
+
+            // Filtrer par filtres métier
+            let filtered = listings.filter((listing) =>
+              doesListingMatchFilters(listing, filters)
+            );
+
+            // Filtrer par bounds si fourni
+            if (bounds) {
+              filtered = filtered.filter((listing) =>
+                isListingInBounds(listing, bounds)
+              );
+            }
+
+            return filtered;
           },
 
           resetFilters: () => {

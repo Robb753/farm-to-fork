@@ -6,9 +6,6 @@ import { MapPin, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { COLORS } from "@/lib/config";
 
-/**
- * Interfaces TypeScript pour AddressAutocompleteMapbox
- */
 interface AddressComponents {
   line1: string;
   city: string;
@@ -27,19 +24,12 @@ interface AddressSelectPayload {
 }
 
 interface AddressAutocompleteProps {
-  /** Valeur actuelle du champ */
   value: string;
-  /** Callback appelé quand le texte change */
   onChange: (text: string) => void;
-  /** Callback appelé quand une adresse est sélectionnée */
   onSelect: (payload: AddressSelectPayload) => void;
-  /** Placeholder du champ de saisie */
   placeholder?: string;
-  /** Code pays pour limiter les résultats */
   country?: string;
-  /** Classe CSS personnalisée */
   className?: string;
-  /** Désactiver le composant */
   disabled?: boolean;
 }
 
@@ -82,9 +72,6 @@ interface AddressItem {
   address: AddressComponents;
 }
 
-/**
- * Composant d'autocomplétion d'adresse via Mapbox Geocoding API
- */
 export default function AddressAutocompleteMapbox({
   value,
   onChange,
@@ -94,7 +81,6 @@ export default function AddressAutocompleteMapbox({
   className = "",
   disabled = false,
 }: AddressAutocompleteProps): JSX.Element {
-  // États locaux
   const [query, setQuery] = useState<string>(value || "");
   const [loading, setLoading] = useState<boolean>(false);
   const [items, setItems] = useState<AddressItem[]>([]);
@@ -102,12 +88,12 @@ export default function AddressAutocompleteMapbox({
   const [cursor, setCursor] = useState<number>(-1);
   const [error, setError] = useState<string>("");
 
-  // Refs pour la gestion du DOM et des requêtes
-  const abortRef = useRef<AbortController | null>(null);
-  const listRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  // ✅ FIX : Flag pour bloquer la recherche après sélection
+  const justSelected = useRef<boolean>(false);
 
-  // Refs / état pour le portal
+  const abortRef = useRef<AbortController | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const [dropdownRect, setDropdownRect] = useState<DOMRect | null>(null);
   const [isClient, setIsClient] = useState(false);
@@ -116,16 +102,15 @@ export default function AddressAutocompleteMapbox({
     setIsClient(true);
   }, []);
 
-  /**
-   * Synchronisation valeur externe → interne
-   */
+  // ✅ FIX : Ignorer les mises à jour de value juste après sélection
   useEffect(() => {
+    if (justSelected.current) {
+      justSelected.current = false;
+      return;
+    }
     setQuery(value || "");
   }, [value]);
 
-  /**
-   * Extrait un contexte spécifique des données Mapbox
-   */
   const extractContext = useCallback(
     (context: MapboxFeature["context"], idPart: string): string => {
       return context?.find((c) => (c.id || "").includes(idPart))?.text || "";
@@ -133,27 +118,20 @@ export default function AddressAutocompleteMapbox({
     []
   );
 
-  /**
-   * Parse les composants d'adresse depuis une feature Mapbox
-   */
   const parseAddressComponents = useCallback(
     (feature: MapboxFeature): AddressComponents => {
       const context = feature.context || [];
-
       const city =
         extractContext(context, "place") ||
         extractContext(context, "locality") ||
         extractContext(context, "district") ||
         "";
-
       const postcode = extractContext(context, "postcode") || "";
       const region = extractContext(context, "region") || "";
       const countryText = extractContext(context, "country") || "";
 
-      // Construction intelligente de la ligne d'adresse
       let line1: string;
       if (feature.address) {
-        // numéro + voie
         line1 = `${feature.address} ${feature.text}`.trim();
       } else if (feature.place_type?.includes("place")) {
         line1 = feature.text;
@@ -172,9 +150,6 @@ export default function AddressAutocompleteMapbox({
     [extractContext]
   );
 
-  /**
-   * Recherche d'adresses via l'API Mapbox Geocoding
-   */
   const search = useCallback(
     async (text: string): Promise<void> => {
       const trimmedQuery = text.trim();
@@ -185,7 +160,6 @@ export default function AddressAutocompleteMapbox({
         return;
       }
 
-      // Annuler la requête précédente
       if (abortRef.current) {
         abortRef.current.abort();
       }
@@ -226,7 +200,6 @@ export default function AddressAutocompleteMapbox({
 
         const mappedItems: AddressItem[] = features.map((feature) => {
           const addressComponents = parseAddressComponents(feature);
-
           return {
             id: feature.id,
             place_name: feature.place_name,
@@ -249,7 +222,6 @@ export default function AddressAutocompleteMapbox({
           console.debug("Requête de recherche d'adresse annulée");
           return;
         }
-
         console.error("Erreur lors de la recherche d'adresse Mapbox:", err);
         setError("Erreur lors de la recherche");
         setItems([]);
@@ -261,10 +233,12 @@ export default function AddressAutocompleteMapbox({
     [country, parseAddressComponents]
   );
 
-  /**
-   * Debouncing de la recherche
-   */
+  // ✅ FIX : Ne pas rechercher si justSelected est true
   useEffect(() => {
+    if (justSelected.current) {
+      return;
+    }
+
     const timeoutId = setTimeout(() => {
       search(query);
     }, 250);
@@ -272,20 +246,13 @@ export default function AddressAutocompleteMapbox({
     return () => clearTimeout(timeoutId);
   }, [query, search]);
 
-  /**
-   * Gestion de la sélection d'un élément
-   */
   const handleSelect = useCallback(
     (item: AddressItem): void => {
       try {
         const [lng, lat] = item.center || [0, 0];
 
-        // Validation des coordonnées
         if (!Number.isFinite(lng) || !Number.isFinite(lat)) {
-          console.error(
-            "Coordonnées invalides pour l'adresse sélectionnée:",
-            item
-          );
+          console.error("Coordonnées invalides:", item);
           setError("Coordonnées d'adresse invalides");
           return;
         }
@@ -299,9 +266,27 @@ export default function AddressAutocompleteMapbox({
           address: item.address,
         };
 
-        onSelect(payload);
+        // ✅ FIX : Activer le flag pour bloquer la prochaine recherche
+        justSelected.current = true;
+
+        // Fermer le dropdown
         setOpen(false);
+        setItems([]);
+        setCursor(-1);
         setError("");
+
+        // Mettre à jour la query localement
+        setQuery(payload.label);
+
+        // Appeler le callback parent
+        onSelect(payload);
+
+        // Retirer le focus
+        setTimeout(() => {
+          if (inputRef.current) {
+            inputRef.current.blur();
+          }
+        }, 0);
 
         console.debug("Adresse sélectionnée:", payload);
       } catch (err) {
@@ -312,9 +297,6 @@ export default function AddressAutocompleteMapbox({
     [onSelect]
   );
 
-  /**
-   * Gestion du clavier (flèches, Enter, Escape)
-   */
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>): void => {
       if (!open || disabled) return;
@@ -337,14 +319,12 @@ export default function AddressAutocompleteMapbox({
       } else if (e.key === "Escape") {
         e.preventDefault();
         setOpen(false);
+        setItems([]);
       }
     },
     [cursor, handleSelect, items, open, disabled]
   );
 
-  /**
-   * Fermeture au clic extérieur
-   */
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent): void => {
       const target = event.target as Node;
@@ -356,6 +336,7 @@ export default function AddressAutocompleteMapbox({
 
       if (clickedOutside) {
         setOpen(false);
+        setItems([]);
       }
     };
 
@@ -363,19 +344,14 @@ export default function AddressAutocompleteMapbox({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  /**
-   * Nettoyage lors du démontage
-   */
   useEffect(() => {
     return () => {
       abortRef.current?.abort();
     };
   }, []);
 
-  /**
-   * Effacement du champ
-   */
   const handleClear = useCallback((): void => {
+    justSelected.current = false; // Reset le flag
     setQuery("");
     onChange("");
     setItems([]);
@@ -384,31 +360,28 @@ export default function AddressAutocompleteMapbox({
     inputRef.current?.focus();
   }, [onChange]);
 
-  /**
-   * Gestion du changement de texte
-   */
   const handleInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>): void => {
       const newValue = e.target.value;
+      justSelected.current = false; // Reset le flag quand l'user tape
       setQuery(newValue);
       onChange(newValue);
       setError("");
+
+      if (!newValue.trim()) {
+        setOpen(false);
+        setItems([]);
+      }
     },
     [onChange]
   );
 
-  /**
-   * Calcul de la position du dropdown pour le portal
-   */
   useEffect(() => {
-    if (open && wrapperRef.current) {
+    if (open && wrapperRef.current && items.length > 0) {
       setDropdownRect(wrapperRef.current.getBoundingClientRect());
     }
   }, [open, items.length]);
 
-  /**
-   * Contenu du dropdown (liste ou état vide)
-   */
   const renderDropdownContent = (): React.ReactNode => {
     if (items.length > 0) {
       return (
@@ -423,7 +396,11 @@ export default function AddressAutocompleteMapbox({
           {items.map((item, index) => (
             <button
               key={item.id}
-              onClick={() => handleSelect(item)}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleSelect(item);
+              }}
               onMouseEnter={() => setCursor(index)}
               className={cn(
                 "w-full text-left px-3 py-2 border-b last:border-none transition-colors",
@@ -454,7 +431,6 @@ export default function AddressAutocompleteMapbox({
       );
     }
 
-    // État vide
     if (query.length >= 3 && !loading && !error) {
       return (
         <div
@@ -481,31 +457,12 @@ export default function AddressAutocompleteMapbox({
     return null;
   };
 
-  const dropdown =
-    isClient &&
-    open &&
-    !disabled &&
-    dropdownRect &&
-    renderDropdownContent() &&
-    createPortal(
-      <div
-        style={{
-          position: "fixed",
-          top: dropdownRect.bottom,
-          left: dropdownRect.left,
-          width: dropdownRect.width,
-          zIndex: 9999, // 🔥 au-dessus de tout
-        }}
-      >
-        {renderDropdownContent()}
-      </div>,
-      document.body
-    );
+  const shouldShowDropdown =
+    isClient && open && !disabled && items.length > 0 && dropdownRect;
 
   return (
     <>
       <div ref={wrapperRef} className={cn("relative", className)}>
-        {/* Champ de saisie avec design system */}
         <div
           className={cn(
             "flex items-center border rounded-lg px-3 py-2 transition-colors",
@@ -541,7 +498,6 @@ export default function AddressAutocompleteMapbox({
             aria-describedby={error ? "address-error" : undefined}
           />
 
-          {/* États du bouton avec design system */}
           {loading ? (
             <Loader2
               className="h-4 w-4 animate-spin"
@@ -560,7 +516,6 @@ export default function AddressAutocompleteMapbox({
           ) : null}
         </div>
 
-        {/* Message d'erreur */}
         {error && (
           <div
             id="address-error"
@@ -572,8 +527,21 @@ export default function AddressAutocompleteMapbox({
         )}
       </div>
 
-      {/* Dropdown rendu via portal, au-dessus de tout */}
-      {dropdown}
+      {shouldShowDropdown &&
+        createPortal(
+          <div
+            style={{
+              position: "fixed",
+              top: dropdownRect.bottom,
+              left: dropdownRect.left,
+              width: dropdownRect.width,
+              zIndex: 9999,
+            }}
+          >
+            {renderDropdownContent()}
+          </div>,
+          document.body
+        )}
     </>
   );
 }

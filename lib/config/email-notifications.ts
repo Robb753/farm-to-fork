@@ -8,7 +8,17 @@ export interface FarmerRequest {
   farm_name: string;
   email: string;
   location: string;
+
+  // ✅ Informations personnelles
+  first_name?: string;
+  last_name?: string;
   phone?: string | null;
+
+  // ✅ Informations entreprise
+  siret?: string;
+  department?: string;
+
+  // ✅ Informations ferme
   website?: string | null;
   description?: string | null;
   products?: string | null;
@@ -47,15 +57,35 @@ export async function sendAdminNotificationEmail(
       minute: "2-digit",
     });
 
-    // Construire le contenu HTML avec les builders centralisés
+    // ✅ Construire le contenu avec TOUTES les informations
     const infoRows = [
-      { label: "Nom de la ferme", value: farmerRequest.farm_name },
-      { label: "Localisation", value: farmerRequest.location },
+      // Informations personnelles
+      {
+        label: "Nom complet",
+        value:
+          farmerRequest.first_name && farmerRequest.last_name
+            ? `${farmerRequest.first_name} ${farmerRequest.last_name}`
+            : "Non renseigné",
+      },
       { label: "Email", value: farmerRequest.email },
       {
         label: "Téléphone",
         value: farmerRequest.phone || "Non renseigné",
       },
+
+      // Informations entreprise
+      {
+        label: "SIRET",
+        value: farmerRequest.siret || "Non renseigné",
+      },
+      {
+        label: "Département",
+        value: farmerRequest.department || "Non renseigné",
+      },
+
+      // Informations ferme
+      { label: "Nom de la ferme", value: farmerRequest.farm_name },
+      { label: "Localisation", value: farmerRequest.location },
     ];
 
     if (farmerRequest.website) {
@@ -73,7 +103,9 @@ export async function sendAdminNotificationEmail(
         `<div style="background-color: #f0fdf4; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
           <p style="margin: 0; font-size: 16px;">
             Une nouvelle demande d'accès producteur vient d'être soumise par 
-            <strong>${farmerRequest.farm_name}</strong> et nécessite votre validation.
+            <strong>${farmerRequest.first_name} ${farmerRequest.last_name}</strong> 
+            pour la ferme <strong>${farmerRequest.farm_name}</strong> 
+            et nécessite votre validation.
           </p>
         </div>` +
         `<div style="margin-bottom: 20px;">
@@ -83,7 +115,7 @@ export async function sendAdminNotificationEmail(
         `<div style="margin-bottom: 20px;">
           <h3 style="color: #16a34a; font-size: 16px; margin-bottom: 10px;">Description</h3>
           <p style="margin: 0; padding: 10px; background-color: #f9fafb; border-radius: 4px;">
-            ${farmerRequest.description || "Aucune description fournie."}
+            ${farmerRequest.description || "Sera complétée après approbation (Step 2)."}
           </p>
         </div>` +
         (farmerRequest.products
@@ -100,7 +132,7 @@ export async function sendAdminNotificationEmail(
         )
     );
 
-    // Envoyer l'email aux administrateurs (conversion du type readonly)
+    // Envoyer l'email aux administrateurs
     const { data, error } = await resend.emails.send({
       from: EMAIL_CONFIG.fromAddress,
       to: toMutableArray(EMAIL_CONFIG.adminEmails),
@@ -132,7 +164,7 @@ export async function sendFarmerRequestStatusEmail(
       throw new Error("Informations insuffisantes");
     }
 
-    // Déterminer le contenu basé sur le statut
+    // ✅ Déterminer le contenu basé sur le statut
     let subject: string;
     let heading: string;
     let message: string;
@@ -141,23 +173,37 @@ export async function sendFarmerRequestStatusEmail(
 
     if (status === "approved") {
       subject = EMAIL_SUBJECTS.farmerRequestApproved;
-      heading = "Demande approuvée";
+      heading = "✅ Demande approuvée !";
       message = `
+        <p>Bonjour <strong>${requestData.first_name || "Producteur"}</strong>,</p>
         <p>Nous sommes ravis de vous informer que votre demande d'accès producteur pour 
         <strong>${requestData.farm_name}</strong> a été approuvée !</p>
-        <p>Vous pouvez maintenant ajouter votre ferme et commencer à publier vos produits 
-        sur la plateforme Farm to Fork.</p>
+        <p><strong>Prochaines étapes :</strong></p>
+        <ol style="margin: 10px 0; padding-left: 20px;">
+          <li>Complétez votre profil de producteur (description, produits, etc.)</li>
+          <li>Activez votre fiche ferme</li>
+          <li>Commencez à publier vos produits sur Farm to Fork</li>
+        </ol>
+        <p>Cliquez sur le bouton ci-dessous pour continuer votre inscription.</p>
       `;
-      ctaText = "Ajouter votre ferme";
-      ctaLink = `${process.env.NEXT_PUBLIC_SITE_URL}/add-new-listing`;
+      ctaText = "Continuer l'inscription (Step 2)";
+      // ✅ CORRECTION : Lien vers step-2, pas add-new-listing
+      ctaLink = `${process.env.NEXT_PUBLIC_SITE_URL}/onboarding/step-2`;
     } else {
       subject = EMAIL_SUBJECTS.farmerRequestRejected;
-      heading = "Demande non approuvée";
+      heading = "❌ Demande non approuvée";
       message = `
+        <p>Bonjour <strong>${requestData.first_name || "Producteur"}</strong>,</p>
         <p>Nous avons examiné votre demande d'accès producteur pour 
         <strong>${requestData.farm_name}</strong> et regrettons de vous informer que 
         nous ne pouvons pas l'approuver pour le moment.</p>
-        <p>Si vous avez des questions ou souhaitez obtenir plus d'informations, 
+        <p><strong>Raisons possibles :</strong></p>
+        <ul style="margin: 10px 0; padding-left: 20px;">
+          <li>Informations incomplètes ou incorrectes</li>
+          <li>SIRET non valide ou introuvable</li>
+          <li>Zone géographique non couverte actuellement</li>
+        </ul>
+        <p>Si vous pensez qu'il s'agit d'une erreur ou souhaitez obtenir plus d'informations, 
         n'hésitez pas à nous contacter.</p>
       `;
       ctaText = "Contacter le support";
@@ -167,10 +213,16 @@ export async function sendFarmerRequestStatusEmail(
     // Construire le contenu HTML
     const htmlContent = EMAIL_BUILDERS.buildContainer(
       EMAIL_BUILDERS.buildHeader(heading) +
-        `<div style="background-color: #f0fdf4; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+        `<div style="background-color: ${
+          status === "approved" ? "#f0fdf4" : "#fef2f2"
+        }; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
           ${message}
         </div>` +
-        EMAIL_BUILDERS.buildButton(ctaText, ctaLink)
+        EMAIL_BUILDERS.buildButton(ctaText, ctaLink) +
+        `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; color: #6b7280; font-size: 14px;">
+          <p style="margin: 0;">Vous avez des questions ? Contactez-nous à 
+          <a href="mailto:support@farm2fork.fr" style="color: #16a34a; text-decoration: none;">support@farm2fork.fr</a></p>
+        </div>`
     );
 
     // Envoyer l'email au producteur
