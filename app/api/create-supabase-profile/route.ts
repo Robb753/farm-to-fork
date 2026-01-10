@@ -285,17 +285,21 @@ export async function POST(
           listingError
         );
 
-        // Le profil est créé, mais pas le listing - on log l'erreur mais on ne fait pas échouer la requête
-        console.warn(
-          "[CREATE PROFILE] ⚠️ Listing non créé pour le farmer, mais profil OK"
+        // Le listing est essentiel pour un farmer - on doit faire échouer la requête
+        // On pourrait rollback le profil ici, mais on laisse pour debug et éviter les profils orphelins
+        console.error(
+          "[CREATE PROFILE] ❌ Échec de création du listing pour le farmer"
         );
 
-        return NextResponse.json({
-          success: true,
-          message:
-            "Profil créé avec succès, mais erreur lors de la création du listing",
-          data: responseData,
-        });
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Erreur lors de la création du listing",
+            message:
+              "Impossible de créer le listing pour le compte farmer. Le profil a été créé mais le compte est incomplet.",
+          },
+          { status: 500 }
+        );
       }
 
       // Mettre à jour le profil avec l'ID du listing
