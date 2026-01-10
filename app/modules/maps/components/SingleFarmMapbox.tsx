@@ -53,6 +53,11 @@ const SingleFarmMapbox: React.FC<SingleFarmMapboxProps> = ({
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markerRef = useRef<mapboxgl.Marker | null>(null);
+  const markerElementRef = useRef<HTMLDivElement | null>(null);
+  const markerHandlersRef = useRef<{
+    mouseenter: (() => void) | null;
+    mouseleave: (() => void) | null;
+  }>({ mouseenter: null, mouseleave: null });
 
   // États locaux
   const [isLoaded, setIsLoaded] = useState<boolean>(false);
@@ -128,22 +133,33 @@ const SingleFarmMapbox: React.FC<SingleFarmMapboxProps> = ({
       </div>
     `;
 
-    // Ajouter les effets hover
-    markerElement.addEventListener("mouseenter", () => {
+    // Create named event handlers for proper cleanup
+    const handleMouseEnter = () => {
       const div = markerElement.querySelector("div") as HTMLDivElement;
       if (div) {
         div.style.transform = "rotate(-45deg) scale(1.1)";
         div.style.backgroundColor = COLORS.PRIMARY_DARK;
       }
-    });
+    };
 
-    markerElement.addEventListener("mouseleave", () => {
+    const handleMouseLeave = () => {
       const div = markerElement.querySelector("div") as HTMLDivElement;
       if (div) {
         div.style.transform = "rotate(-45deg) scale(1)";
         div.style.backgroundColor = COLORS.PRIMARY;
       }
-    });
+    };
+
+    // Store handlers and element for cleanup
+    markerHandlersRef.current = {
+      mouseenter: handleMouseEnter,
+      mouseleave: handleMouseLeave,
+    };
+    markerElementRef.current = markerElement;
+
+    // Add event listeners
+    markerElement.addEventListener("mouseenter", handleMouseEnter);
+    markerElement.addEventListener("mouseleave", handleMouseLeave);
 
     return markerElement;
   }, []);
@@ -278,6 +294,21 @@ const SingleFarmMapbox: React.FC<SingleFarmMapboxProps> = ({
     // Nettoyage
     return () => {
       try {
+        // Remove event listeners before removing marker
+        if (
+          markerElementRef.current &&
+          markerHandlersRef.current.mouseenter &&
+          markerHandlersRef.current.mouseleave
+        ) {
+          markerElementRef.current.removeEventListener(
+            "mouseenter",
+            markerHandlersRef.current.mouseenter
+          );
+          markerElementRef.current.removeEventListener(
+            "mouseleave",
+            markerHandlersRef.current.mouseleave
+          );
+        }
         if (markerRef.current) {
           markerRef.current.remove();
           markerRef.current = null;
@@ -286,6 +317,8 @@ const SingleFarmMapbox: React.FC<SingleFarmMapboxProps> = ({
           mapRef.current.remove();
           mapRef.current = null;
         }
+        markerElementRef.current = null;
+        markerHandlersRef.current = { mouseenter: null, mouseleave: null };
       } catch (error) {
         console.error("Erreur lors du nettoyage de la carte:", error);
       }
