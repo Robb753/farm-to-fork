@@ -95,7 +95,7 @@ const DesktopListingMapView = (): JSX.Element => {
     page,
     totalCount,
   } = useListingsState();
-  const { fetchListings, setPage } = useListingsActions();
+  const { setPage } = useListingsActions();
   const { isMapExpanded } = useUIState();
   const { setMapExpanded } = useUIActions();
 
@@ -183,12 +183,12 @@ const DesktopListingMapView = (): JSX.Element => {
    * Handler pour la pagination (load more)
    */
   const handleLoadMoreListings = useCallback((): void => {
-    if (isLoading || !hasMore) return;
+    // si tu veux garder un compteur de page pour plus tard :
+    setPage(page + 1);
 
-    const newPage = page + 1;
-    setPage(newPage);
-    fetchListings({ page: newPage, append: true } as FetchListingsOptions);
-  }, [page, hasMore, isLoading, fetchListings, setPage]);
+    // optionnel : feedback propre au lieu de spam console
+    toast.info("Mode global actif : toutes les fermes sont déjà chargées.");
+  }, [page, setPage]);
 
   // ✅ Recherche manuelle supprimée - Le filtrage est maintenant automatique dans Explore.tsx
   // L'affichage se met à jour instantanément quand on déplace la carte
@@ -294,8 +294,8 @@ const DesktopListingMapView = (): JSX.Element => {
             )}
           >
             <Listing
-              onLoadMore={handleLoadMoreListings}
-              hasMore={hasMore}
+              onLoadMore={undefined}
+              hasMore={false}
               isLoading={isLoading}
             />
           </div>

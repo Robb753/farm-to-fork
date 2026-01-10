@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/utils/supabase/client";
@@ -29,31 +29,57 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { COLORS, PATHS, TABLES, LISTING_COLUMNS } from "@/lib/config";
+import { COLORS, TABLES } from "@/lib/config";
 import { cn } from "@/lib/utils";
 import type { Listing } from "@/lib/types";
 
-// 🔒 SÉCURITÉ: Import des fonctions de sanitisation
+// 🔒 SÉCURITÉ
 import { escapeHTML, sanitizeHTML } from "@/lib/utils/sanitize";
 
 /**
- * Dashboard pour les producteurs/agriculteurs
- *
- * 🔒 SÉCURITÉ: Toutes les données utilisateur sont protégées contre XSS
- *
- * Features:
- * - Affichage et gestion de la fiche ferme
- * - Création d'une nouvelle fiche si aucune n'existe
- * - Actions CRUD sur la fiche (voir, modifier, supprimer)
- * - États visuels (publié, brouillon)
- * - Configuration centralisée des couleurs et chemins
+ * Normalisation minimale côté client
+ * (évite les champs manquants qui cassent l'UI)
  */
+function normalizeListing(data: any): Listing {
+  return {
+    ...data,
+    active: data?.active ?? true,
+    created_at: data?.created_at ?? new Date().toISOString(),
+  } as Listing;
+}
+
+/**
+ * Sécurise une URL entrée utilisateur
+ * - force https:// si absent
+ * - bloque javascript:
+ */
+function getSafeWebsiteUrl(raw?: string | null): string | null {
+  const v = (raw ?? "").trim();
+  if (!v) return null;
+
+  const withProto =
+    v.startsWith("http://") || v.startsWith("https://") ? v : `https://${v}`;
+
+  // Bloque schémas dangereux (ceinture + bretelles)
+  if (withProto.toLowerCase().startsWith("javascript:")) return null;
+
+  return withProto;
+}
+
 export default function FarmerDashboard(): JSX.Element {
   const { user, isLoaded, isSignedIn } = useUser();
   const [listing, setListing] = useState<Listing | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+
+  const email = useMemo(() => {
+    return (
+      user?.primaryEmailAddress?.emailAddress ||
+      user?.emailAddresses?.[0]?.emailAddress ||
+      null
+    );
+  }, [user]);
 
   /**
    * Récupère la fiche ferme de l'utilisateur connecté
@@ -67,16 +93,15 @@ export default function FarmerDashboard(): JSX.Element {
         return;
       }
 
-      try {
-        const email =
-          user?.primaryEmailAddress?.emailAddress ||
-          user?.emailAddresses?.[0]?.emailAddress;
+      if (!email) {
+        setError("Email non trouvé");
+        setLoading(false);
+        return;
+      }
 
-        if (!email) {
-          setError("Email non trouvé");
-          setLoading(false);
-          return;
-        }
+      try {
+        setLoading(true);
+        setError(null);
 
         const { data, error: supabaseError } = await supabase
           .from(TABLES.LISTING)
@@ -89,41 +114,50 @@ export default function FarmerDashboard(): JSX.Element {
           setError(
             `Erreur Supabase: ${supabaseError.message || "Erreur inconnue"}`
           );
-        } else {
-          setListing(data as any as Listing);
+          setListing(null);
+          return;
         }
+
+        setListing(data ? normalizeListing(data) : null);
       } catch (err) {
         console.error("Erreur générale:", err);
         setError("Une erreur inattendue s'est produite");
+        setListing(null);
       } finally {
         setLoading(false);
       }
     };
 
     fetchListing();
-  }, [isLoaded, isSignedIn, user, router]);
+  }, [isLoaded, isSignedIn, email, router]);
 
   /**
    * Supprime la fiche ferme après confirmation
+   * ✅ Sécurisé : delete par id + createdBy
    */
   const handleDelete = async (): Promise<void> => {
     if (!listing) return;
+
+    if (!isLoaded || !isSignedIn || !email) {
+      toast.error("Impossible de supprimer : utilisateur non authentifié.");
+      return;
+    }
 
     try {
       const { error } = await supabase
         .from(TABLES.LISTING)
         .delete()
-        .eq("id", listing.id);
+        .eq("id", listing.id)
+        .eq("createdBy", email);
 
       if (error) {
         console.error("Erreur lors de la suppression :", error);
         toast.error("Erreur lors de la suppression.");
-      } else {
-        toast.success("Fiche supprimée avec succès !");
-        setListing(null); // Réinitialise l'état local
-        // Optionnel: redirection
-        // router.push("/dashboard/farms");
+        return;
       }
+
+      toast.success("Fiche supprimée avec succès !");
+      setListing(null);
     } catch (err) {
       console.error("Erreur lors de la suppression:", err);
       toast.error("Une erreur inattendue s'est produite.");
@@ -165,7 +199,6 @@ export default function FarmerDashboard(): JSX.Element {
               borderColor: `${COLORS.ERROR}30`,
             }}
           >
-            {/* 🔒 SÉCURITÉ: Message d'erreur échappé */}
             <p className="mb-4" style={{ color: COLORS.ERROR }}>
               {escapeHTML(error)}
             </p>
@@ -188,7 +221,6 @@ export default function FarmerDashboard(): JSX.Element {
   if (!listing) {
     return (
       <div className="container mx-auto px-4 py-8 max-w-4xl">
-        {/* Header */}
         <div className="text-center mb-12">
           <h1
             className="text-4xl font-bold mb-4"
@@ -202,7 +234,6 @@ export default function FarmerDashboard(): JSX.Element {
           </p>
         </div>
 
-        {/* Card principale */}
         <div
           className="rounded-lg shadow-md border overflow-hidden"
           style={{
@@ -227,7 +258,6 @@ export default function FarmerDashboard(): JSX.Element {
                 pour apparaître sur la carte et proposer vos produits locaux.
               </p>
 
-              {/* Placeholder image */}
               <div
                 className="w-full h-64 rounded-lg mb-8 flex items-center justify-center"
                 style={{ backgroundColor: COLORS.BG_GRAY }}
@@ -272,7 +302,6 @@ export default function FarmerDashboard(): JSX.Element {
           </div>
         </div>
 
-        {/* ✅ Section d'aide */}
         <div
           className="mt-8 p-6 rounded-lg border"
           style={{
@@ -330,10 +359,11 @@ export default function FarmerDashboard(): JSX.Element {
     );
   }
 
+  const safeWebsite = getSafeWebsiteUrl((listing as any).website);
+
   // ✅ Cas 2: Fiche ferme existante
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
-      {/* Header */}
       <div className="mb-8">
         <h1
           className="text-3xl font-bold mb-2"
@@ -346,7 +376,6 @@ export default function FarmerDashboard(): JSX.Element {
         </p>
       </div>
 
-      {/* Fiche ferme */}
       <div
         className="rounded-lg shadow-md border overflow-hidden"
         style={{
@@ -354,7 +383,6 @@ export default function FarmerDashboard(): JSX.Element {
           borderColor: COLORS.BORDER,
         }}
       >
-        {/* En-tête de la fiche */}
         <div
           className="px-6 py-4 border-b"
           style={{
@@ -364,14 +392,13 @@ export default function FarmerDashboard(): JSX.Element {
         >
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              {/* 🔒 SÉCURITÉ: Nom de ferme échappé */}
               <h2
                 className="text-xl font-semibold mb-1"
                 style={{ color: COLORS.PRIMARY_DARK }}
               >
-                {escapeHTML(listing.name || "Ferme sans nom")}
+                {escapeHTML((listing as any).name || "Ferme sans nom")}
               </h2>
-              {listing.address && (
+              {(listing as any).address && (
                 <div
                   className="flex items-center text-sm"
                   style={{ color: COLORS.TEXT_SECONDARY }}
@@ -380,11 +407,11 @@ export default function FarmerDashboard(): JSX.Element {
                     className="h-4 w-4 mr-2"
                     style={{ color: COLORS.TEXT_MUTED }}
                   />
-                  {/* 🔒 SÉCURITÉ: Adresse échappée */}
-                  {escapeHTML(listing.address)}
+                  {escapeHTML((listing as any).address)}
                 </div>
               )}
             </div>
+
             <div className="flex items-center gap-2">
               {listing.active ? (
                 <div
@@ -413,10 +440,8 @@ export default function FarmerDashboard(): JSX.Element {
           </div>
         </div>
 
-        {/* Contenu de la fiche */}
         <div className="p-6">
-          {/* Description */}
-          {listing.description && (
+          {(listing as any).description && (
             <div className="mb-6">
               <h3
                 className="font-medium mb-2"
@@ -424,26 +449,23 @@ export default function FarmerDashboard(): JSX.Element {
               >
                 Description
               </h3>
-              {/* 🔒 SÉCURITÉ: Description sanitisée (permet formatage basique) */}
               <div
                 className="text-sm leading-relaxed prose prose-sm max-w-none"
                 style={{ color: COLORS.TEXT_SECONDARY }}
                 dangerouslySetInnerHTML={{
                   __html: sanitizeHTML(
-                    listing.description.length > 200
-                      ? `${listing.description.substring(0, 200)}...`
-                      : listing.description
+                    (listing as any).description.length > 200
+                      ? `${(listing as any).description.substring(0, 200)}...`
+                      : (listing as any).description
                   ),
                 }}
               />
             </div>
           )}
 
-          {/* Informations complémentaires */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            {/* Types de produits */}
-            {Array.isArray(listing.product_type) &&
-              listing.product_type.length > 0 && (
+            {Array.isArray((listing as any).product_type) &&
+              (listing as any).product_type.length > 0 && (
                 <div>
                   <h3
                     className="font-medium mb-2"
@@ -452,26 +474,28 @@ export default function FarmerDashboard(): JSX.Element {
                     Types de produits
                   </h3>
                   <div className="flex flex-wrap gap-2">
-                    {listing.product_type.map((type: string, index: number) => (
-                      <span
-                        key={`${type}-${index}`}
-                        className="px-2 py-1 text-xs rounded-md border"
-                        style={{
-                          backgroundColor: `${COLORS.PRIMARY}10`,
-                          color: COLORS.PRIMARY,
-                          borderColor: `${COLORS.PRIMARY}30`,
-                        }}
-                      >
-                        {/* 🔒 SÉCURITÉ: Type de produit échappé */}
-                        {escapeHTML(type)}
-                      </span>
-                    ))}
+                    {(listing as any).product_type.map(
+                      (type: string, index: number) => (
+                        <span
+                          key={`${type}-${index}`}
+                          className="px-2 py-1 text-xs rounded-md border"
+                          style={{
+                            backgroundColor: `${COLORS.PRIMARY}10`,
+                            color: COLORS.PRIMARY,
+                            borderColor: `${COLORS.PRIMARY}30`,
+                          }}
+                        >
+                          {escapeHTML(type)}
+                        </span>
+                      )
+                    )}
                   </div>
                 </div>
               )}
 
-            {/* Contact */}
-            {(listing.email || listing.phoneNumber) && (
+            {((listing as any).email ||
+              (listing as any).phoneNumber ||
+              safeWebsite) && (
               <div>
                 <h3
                   className="font-medium mb-2"
@@ -483,26 +507,18 @@ export default function FarmerDashboard(): JSX.Element {
                   className="space-y-1 text-sm"
                   style={{ color: COLORS.TEXT_SECONDARY }}
                 >
-                  {/* 🔒 SÉCURITÉ: Email échappé */}
-                  {listing.email && <p>📧 {escapeHTML(listing.email)}</p>}
-
-                  {/* 🔒 SÉCURITÉ: Téléphone échappé */}
-                  {listing.phoneNumber && (
-                    <p>📞 {escapeHTML(listing.phoneNumber)}</p>
+                  {(listing as any).email && (
+                    <p>📧 {escapeHTML((listing as any).email)}</p>
+                  )}
+                  {(listing as any).phoneNumber && (
+                    <p>📞 {escapeHTML((listing as any).phoneNumber)}</p>
                   )}
 
-                  {/* 🔒 SÉCURITÉ: URL validée et sécurisée */}
-                  {listing.website && (
+                  {safeWebsite && (
                     <p>
                       🌐{" "}
                       <a
-                        href={
-                          // ✅ VALIDATION: Force HTTPS si absent
-                          listing.website.startsWith("http://") ||
-                          listing.website.startsWith("https://")
-                            ? listing.website
-                            : `https://${listing.website}`
-                        }
+                        href={safeWebsite}
                         target="_blank"
                         rel="noopener noreferrer"
                         className={cn(
@@ -520,49 +536,56 @@ export default function FarmerDashboard(): JSX.Element {
             )}
           </div>
 
-          {/* Date de mise à jour */}
           <div
             className="text-xs mb-6 space-y-1"
             style={{ color: COLORS.TEXT_MUTED }}
           >
-            {listing.created_at && (
+            {(listing as any).created_at && (
               <div className="flex items-center gap-1">
                 <Calendar className="h-3 w-3" />
                 Créée le :{" "}
-                {new Date(listing.created_at).toLocaleDateString("fr-FR", {
-                  day: "2-digit",
-                  month: "long",
-                  year: "numeric",
-                })}
+                {new Date((listing as any).created_at).toLocaleDateString(
+                  "fr-FR",
+                  {
+                    day: "2-digit",
+                    month: "long",
+                    year: "numeric",
+                  }
+                )}
               </div>
             )}
 
-            {listing.published_at && (
+            {(listing as any).published_at && (
               <div className="flex items-center gap-1">
                 <Calendar className="h-3 w-3" />
                 Publiée le :{" "}
-                {new Date(listing.published_at).toLocaleDateString("fr-FR", {
-                  day: "2-digit",
-                  month: "long",
-                  year: "numeric",
-                })}
+                {new Date((listing as any).published_at).toLocaleDateString(
+                  "fr-FR",
+                  {
+                    day: "2-digit",
+                    month: "long",
+                    year: "numeric",
+                  }
+                )}
               </div>
             )}
 
-            {listing.modified_at && (
+            {(listing as any).modified_at && (
               <div className="flex items-center gap-1">
                 <Calendar className="h-3 w-3" />
                 Modifiée le :{" "}
-                {new Date(listing.modified_at).toLocaleDateString("fr-FR", {
-                  day: "2-digit",
-                  month: "long",
-                  year: "numeric",
-                })}
+                {new Date((listing as any).modified_at).toLocaleDateString(
+                  "fr-FR",
+                  {
+                    day: "2-digit",
+                    month: "long",
+                    year: "numeric",
+                  }
+                )}
               </div>
             )}
           </div>
 
-          {/* Actions */}
           <div
             className="flex flex-wrap gap-3 pt-4"
             style={{ borderTopColor: COLORS.BORDER, borderTopWidth: "1px" }}
@@ -574,10 +597,7 @@ export default function FarmerDashboard(): JSX.Element {
                 "flex items-center gap-2 border-2",
                 "focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
               )}
-              style={{
-                borderColor: COLORS.PRIMARY,
-                color: COLORS.PRIMARY,
-              }}
+              style={{ borderColor: COLORS.PRIMARY, color: COLORS.PRIMARY }}
             >
               <Link href={`/edit-listing/${listing.id}`}>
                 <Edit className="h-4 w-4" />
@@ -593,10 +613,7 @@ export default function FarmerDashboard(): JSX.Element {
                   "flex items-center gap-2 border-2",
                   "focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 )}
-                style={{
-                  borderColor: COLORS.INFO,
-                  color: COLORS.INFO,
-                }}
+                style={{ borderColor: COLORS.INFO, color: COLORS.INFO }}
               >
                 <Link href={`/farm/${listing.id}`}>
                   <Eye className="h-4 w-4" />
@@ -621,6 +638,7 @@ export default function FarmerDashboard(): JSX.Element {
                   Supprimer la fiche
                 </Button>
               </AlertDialogTrigger>
+
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle style={{ color: COLORS.ERROR }}>

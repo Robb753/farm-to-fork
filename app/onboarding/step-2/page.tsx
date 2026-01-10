@@ -1,11 +1,12 @@
-// app/onboarding/step-2/page.tsx
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import type React from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { toast } from "sonner";
-import { Loader2, Building2, MapPin } from "lucide-react";
+import { Loader2, Building2, MapPin, Sprout } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -18,12 +19,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { supabase } from "@/utils/supabase/client";
+
 import { COLORS } from "@/lib/config";
 import { cn } from "@/lib/utils";
 import { ProgressIndicator } from "@/components/ui/progress-indicator";
 import Link from "next/link";
-import { Sprout } from "lucide-react";
+
+// ✅ Hook Clerk-aware Supabase
+import { useSupabaseWithClerk } from "@/utils/supabase/client";
 
 const steps = [
   { number: 1, label: "Demande" },
@@ -41,11 +44,25 @@ const PRODUCT_OPTIONS = [
   "Céréales",
   "Pain",
   "Autres",
-];
+] as const;
+
+type ProductUiLabel = (typeof PRODUCT_OPTIONS)[number];
+
+// Option A (enum DB = labels FR exacts)
+const PRODUCT_ENUM_VALUE: Record<ProductUiLabel, string> = {
+  Fruits: "Fruits",
+  Légumes: "Légumes",
+  "Produits laitiers": "Produits laitiers",
+  Viande: "Viande",
+  Œufs: "Œufs",
+  Miel: "Miel",
+  Céréales: "Céréales",
+  Pain: "Pain",
+  Autres: "Autres",
+};
 
 interface Step2FormData {
   description: string;
-  products: string;
   website: string;
   phone: string;
 }
@@ -53,59 +70,79 @@ interface Step2FormData {
 interface FarmerRequest {
   id: number;
   user_id: string;
-  status: string;
-  first_name: string;
-  last_name: string;
+  status: "approved";
+  first_name: string | null;
+  last_name: string | null;
   farm_name: string;
   email: string;
   location: string;
-  lat?: number | null;
-  lng?: number | null;
+  lat: number | null;
+  lng: number | null;
+  description: string | null;
+  products: string | null;
+  website: string | null;
+  phone: string | null;
 }
+
+type RequestStatus = "approved" | "pending" | "rejected";
 
 export default function OnboardingStep2Page() {
   const router = useRouter();
   const { user, isLoaded } = useUser();
 
+  // ✅ 1) client supabase ici
+  const supabase = useSupabaseWithClerk();
+
   const [formData, setFormData] = useState<Step2FormData>({
     description: "",
-    products: "",
     website: "",
     phone: "",
   });
 
-  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [checking, setChecking] = useState<boolean>(true);
+  const [selectedProducts, setSelectedProducts] = useState<ProductUiLabel[]>(
+    []
+  );
+  const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(true);
   const [farmerRequest, setFarmerRequest] = useState<FarmerRequest | null>(
     null
   );
 
-  // ✅ FIX : Flag pour éviter les vérifications multiples
   const hasChecked = useRef(false);
 
-  /**
-   * ✅ Vérifier UNE SEULE FOIS que l'utilisateur a une demande approuvée
-   */
+  const toggleProduct = useCallback((product: ProductUiLabel) => {
+    setSelectedProducts((prev) =>
+      prev.includes(product)
+        ? prev.filter((p) => p !== product)
+        : [...prev, product]
+    );
+  }, []);
+
+  const isFormValid =
+    formData.description.trim().length >= 50 && selectedProducts.length > 0;
+
+  // ✅ Vérifie que l’utilisateur est APPROVED (sinon -> pending)
   useEffect(() => {
-    // ✅ Bloquer si déjà vérifié
     if (hasChecked.current) return;
     if (!isLoaded) return;
+
     if (!user) {
       router.replace("/sign-in");
       return;
     }
 
-    const checkApprovalStatus = async () => {
-      hasChecked.current = true; // ✅ Marquer comme vérifié
+    const run = async () => {
+      hasChecked.current = true;
 
       try {
+        // On récupère la demande (peu importe status) pour router correctement
         const { data, error } = await supabase
           .from("farmer_requests")
-          .select("*")
+          .select(
+            "id,user_id,status,first_name,last_name,farm_name,email,location,lat,lng,description,products,website,phone"
+          )
           .eq("user_id", user.id)
-          .eq("status", "approved")
-          .maybeSingle(); // ✅ maybeSingle au lieu de single
+          .maybeSingle();
 
         if (error) {
           console.error("Erreur Supabase:", error);
@@ -115,56 +152,46 @@ export default function OnboardingStep2Page() {
         }
 
         if (!data) {
-          toast.error("Vous devez d'abord être approuvé par un administrateur");
+          // Pas de demande -> step-1
+          router.replace("/onboarding/step-1");
+          return;
+        }
+
+        const status = data.status as RequestStatus;
+
+        if (status !== "approved") {
+          // pending ou rejected -> page pending qui gère les variantes
           router.replace("/onboarding/pending");
           return;
         }
 
-        // ✅ Cast vers le type étendu
-        const requestData = data as any;
+        const req = data as FarmerRequest;
+        setFarmerRequest(req);
 
-        setFarmerRequest({
-          id: requestData.id,
-          user_id: requestData.user_id,
-          status: requestData.status,
-          first_name: requestData.first_name,
-          last_name: requestData.last_name,
-          farm_name: requestData.farm_name,
-          email: requestData.email,
-          location: requestData.location || "",
-          lat: requestData.lat || null,
-          lng: requestData.lng || null,
-        });
+        // Prefill champs
+        setFormData((prev) => ({
+          ...prev,
+          description: req.description ?? prev.description,
+          website: req.website ?? prev.website,
+          phone: req.phone ?? prev.phone,
+        }));
 
-        if (!requestData.lat || !requestData.lng) {
-          toast.warning(
-            "⚠️ Adresse incomplète. Veuillez contacter l'administrateur."
+        // Prefill produits (string "A, B, C")
+        if (req.products) {
+          const parsed = String(req.products)
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean);
+
+          const safe = parsed.filter((p): p is ProductUiLabel =>
+            (PRODUCT_OPTIONS as readonly string[]).includes(p)
           );
+          setSelectedProducts(safe);
         }
 
-        // Pré-remplir le formulaire
-        if (requestData.description) {
-          setFormData((prev) => ({
-            ...prev,
-            description: requestData.description || "",
-          }));
-        }
-        if (requestData.products) {
-          setFormData((prev) => ({
-            ...prev,
-            products: requestData.products || "",
-          }));
-          const existingProducts = requestData.products.split(", ");
-          setSelectedProducts(existingProducts);
-        }
-        if (requestData.website) {
-          setFormData((prev) => ({
-            ...prev,
-            website: requestData.website || "",
-          }));
-        }
-        if (requestData.phone) {
-          setFormData((prev) => ({ ...prev, phone: requestData.phone || "" }));
+        // Warn coords
+        if (req.lat == null || req.lng == null) {
+          toast.warning("⚠️ Coordonnées GPS manquantes. Reprenez l'étape 1.");
         }
       } catch (err) {
         console.error("Erreur vérification statut:", err);
@@ -175,31 +202,31 @@ export default function OnboardingStep2Page() {
       }
     };
 
-    checkApprovalStatus();
-  }, [isLoaded, user, router]);
-
-  const toggleProduct = (product: string) => {
-    setSelectedProducts((prev) =>
-      prev.includes(product)
-        ? prev.filter((p) => p !== product)
-        : [...prev, product]
-    );
-  };
-
-  const isFormValid = (): boolean => {
-    return Boolean(
-      formData.description.trim().length >= 50 && selectedProducts.length > 0
-    );
-  };
+    run();
+  }, [isLoaded, user, router, supabase]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isFormValid() || loading || !farmerRequest) return;
+    if (!isFormValid || loading || !farmerRequest) return;
+
+    if (!user) {
+      toast.error("Vous devez être connecté");
+      router.replace("/sign-in");
+      return;
+    }
+
+    // Refuser si coords manquantes
+    if (farmerRequest.lat == null || farmerRequest.lng == null) {
+      toast.error("Coordonnées GPS manquantes. Reprenez l'étape 1.");
+      router.replace("/onboarding/step-1");
+      return;
+    }
 
     setLoading(true);
 
     try {
-      const { error: updateError } = await supabase
+      // 1) Update farmer_requests (Step2 data)
+      const { error: updateReqError } = await supabase
         .from("farmer_requests")
         .update({
           description: formData.description.trim(),
@@ -210,64 +237,50 @@ export default function OnboardingStep2Page() {
         })
         .eq("id", farmerRequest.id);
 
-      if (updateError) throw updateError;
+      if (updateReqError) throw updateReqError;
 
-      const { error: listingError } = await supabase.from("listing").insert([
-        {
-          createdBy: farmerRequest.email,
-          email: farmerRequest.email,
-          name: farmerRequest.farm_name,
-          fullName: `${farmerRequest.first_name} ${farmerRequest.last_name}`,
-          address: farmerRequest.location,
-          lat: farmerRequest.lat ?? 0,
-          lng: farmerRequest.lng ?? 0,
-          description: formData.description.trim(),
-          product_type: JSON.stringify(selectedProducts),
-          phoneNumber: formData.phone.trim() || null,
-          website: formData.website.trim() || null,
-          active: false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-      ] as any);
+      // 2) Update/Upsert listing lié à l'utilisateur (trigger l’a peut-être déjà créé)
+      const productEnumArray = selectedProducts.map(
+        (p) => PRODUCT_ENUM_VALUE[p]
+      );
 
-      if (listingError) {
-        if (listingError.code === "23505") {
-          const { error: updateListingError } = await supabase
-            .from("listing")
-            .update({
-              name: farmerRequest.farm_name,
-              fullName: `${farmerRequest.first_name} ${farmerRequest.last_name}`,
-              address: farmerRequest.location,
-              lat: farmerRequest.lat ?? 0,
-              lng: farmerRequest.lng ?? 0,
-              description: formData.description.trim(),
-              product_type: JSON.stringify(selectedProducts),
-              phoneNumber: formData.phone.trim() || null,
-              website: formData.website.trim() || null,
-              updated_at: new Date().toISOString(),
-            } as any)
-            .eq("createdBy", farmerRequest.email);
+      // ✅ IMPORTANT : on aligne avec ta DB/RLS : listing.clerk_user_id = Clerk userId
+      const listingPayload = {
+        clerk_user_id: user.id,
+        createdBy: user.id, // si ta colonne existe encore et sert ailleurs, sinon retire-la
+        active: false, // Step-3 décidera publication
 
-          if (updateListingError) throw updateListingError;
-        } else {
-          throw listingError;
-        }
-      }
+        name: farmerRequest.farm_name,
+        email: farmerRequest.email,
+        address: farmerRequest.location,
 
-      toast.success("✅ Informations enregistrées avec succès !");
+        lat: farmerRequest.lat, // number (pas null ici)
+        lng: farmerRequest.lng,
+
+        description: formData.description.trim(),
+        website: formData.website.trim() || null,
+        phoneNumber: formData.phone.trim() || null,
+
+        // ⚠️ selon ton type DB, ça peut être Json / text[] / enum[]
+        // si ton schema TS le refuse, garde le "as any"
+        product_type: productEnumArray as any,
+
+        modified_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      // ✅ upsert sur clerk_user_id (1 user = 1 listing)
+      const { error: upsertListingError } = await supabase
+        .from("listing")
+        .upsert([listingPayload], { onConflict: "clerk_user_id" });
+
+      if (upsertListingError) throw upsertListingError;
+
+      toast.success("✅ Étape 2 enregistrée. Passage à l'activation !");
       router.push("/onboarding/step-3");
-    } catch (error) {
+    } catch (error: any) {
       console.error("=== ERREUR STEP 2 ===", error);
-
-      let errorMessage = "Erreur lors de l'enregistrement";
-      if (error && typeof error === "object") {
-        const err = error as any;
-        if (err.message) errorMessage = err.message;
-        if (err.code) errorMessage += ` (Code: ${err.code})`;
-      }
-
-      toast.error(errorMessage);
+      toast.error(error?.message || "Erreur lors de l'enregistrement");
     } finally {
       setLoading(false);
     }
@@ -292,10 +305,7 @@ export default function OnboardingStep2Page() {
     );
   }
 
-  // ✅ Bloquer le rendu si pas de farmerRequest
-  if (!farmerRequest) {
-    return null;
-  }
+  if (!farmerRequest) return null;
 
   return (
     <div className="min-h-screen bg-background p-4 py-12">
@@ -310,7 +320,6 @@ export default function OnboardingStep2Page() {
 
         <ProgressIndicator currentStep={2} steps={steps} />
 
-        {/* Reste du formulaire */}
         <Card className="shadow-lg border-2">
           <CardHeader>
             <CardTitle
@@ -321,50 +330,48 @@ export default function OnboardingStep2Page() {
               Informations de votre ferme
             </CardTitle>
             <CardDescription>
-              Complétez les informations pour créer votre fiche producteur
+              Complétez les informations pour finaliser votre fiche producteur
             </CardDescription>
           </CardHeader>
 
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-6">
-              {/* Adresse en lecture seule */}
-              {farmerRequest && (
-                <div
-                  className={`space-y-2 border rounded-lg p-4 ${
-                    farmerRequest.lat && farmerRequest.lng
-                      ? "bg-green-50 border-green-200"
-                      : "bg-yellow-50 border-yellow-200"
-                  }`}
-                >
-                  <Label className="flex items-center gap-2">
-                    <MapPin
-                      className="h-4 w-4"
-                      style={{
-                        color:
-                          farmerRequest.lat && farmerRequest.lng
-                            ? COLORS.SUCCESS
-                            : COLORS.WARNING,
-                      }}
-                    />
-                    Adresse de votre ferme (déjà enregistrée)
-                  </Label>
-                  <p className="text-sm font-medium">
-                    {farmerRequest.location || "Adresse non définie"}
-                  </p>
-                  {farmerRequest.lat && farmerRequest.lng ? (
-                    <p className="text-xs" style={{ color: COLORS.SUCCESS }}>
-                      ✓ Coordonnées GPS : {farmerRequest.lat.toFixed(6)},{" "}
-                      {farmerRequest.lng.toFixed(6)}
-                    </p>
-                  ) : (
-                    <p className="text-xs" style={{ color: COLORS.WARNING }}>
-                      ⚠️ Coordonnées GPS manquantes
-                    </p>
-                  )}
-                </div>
-              )}
+              <div
+                className={`space-y-2 border rounded-lg p-4 ${
+                  farmerRequest.lat != null && farmerRequest.lng != null
+                    ? "bg-green-50 border-green-200"
+                    : "bg-yellow-50 border-yellow-200"
+                }`}
+              >
+                <Label className="flex items-center gap-2">
+                  <MapPin
+                    className="h-4 w-4"
+                    style={{
+                      color:
+                        farmerRequest.lat != null && farmerRequest.lng != null
+                          ? COLORS.SUCCESS
+                          : COLORS.WARNING,
+                    }}
+                  />
+                  Adresse de votre ferme (déjà enregistrée)
+                </Label>
 
-              {/* Description */}
+                <p className="text-sm font-medium">
+                  {farmerRequest.location || "Adresse non définie"}
+                </p>
+
+                {farmerRequest.lat != null && farmerRequest.lng != null ? (
+                  <p className="text-xs" style={{ color: COLORS.SUCCESS }}>
+                    ✓ Coordonnées GPS : {farmerRequest.lat.toFixed(6)},{" "}
+                    {farmerRequest.lng.toFixed(6)}
+                  </p>
+                ) : (
+                  <p className="text-xs" style={{ color: COLORS.WARNING }}>
+                    ⚠️ Coordonnées GPS manquantes
+                  </p>
+                )}
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="description">
                   Description de votre ferme * (minimum 50 caractères)
@@ -397,7 +404,6 @@ export default function OnboardingStep2Page() {
                 </p>
               </div>
 
-              {/* Types de produits */}
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
                   Types de produits proposés *
@@ -411,6 +417,7 @@ export default function OnboardingStep2Page() {
                     </span>
                   )}
                 </Label>
+
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                   {PRODUCT_OPTIONS.map((product) => (
                     <button
@@ -431,7 +438,6 @@ export default function OnboardingStep2Page() {
                 </div>
               </div>
 
-              {/* Téléphone */}
               <div className="space-y-2">
                 <Label htmlFor="phone">Téléphone (optionnel)</Label>
                 <Input
@@ -447,7 +453,6 @@ export default function OnboardingStep2Page() {
                 />
               </div>
 
-              {/* Site web */}
               <div className="space-y-2">
                 <Label htmlFor="website">Site web (optionnel)</Label>
                 <Input
@@ -475,16 +480,7 @@ export default function OnboardingStep2Page() {
                 Retour
               </Button>
 
-              <Button
-                type="submit"
-                disabled={!isFormValid() || loading}
-                style={{
-                  backgroundColor: isFormValid()
-                    ? COLORS.PRIMARY
-                    : COLORS.BG_GRAY,
-                  color: COLORS.TEXT_WHITE,
-                }}
-              >
+              <Button type="submit" disabled={!isFormValid || loading}>
                 {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />

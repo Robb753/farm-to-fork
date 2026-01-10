@@ -25,7 +25,6 @@ import {
 } from "@/lib/store";
 import { useUserFavorites, useUserActions } from "@/lib/store/userStore";
 
-import { useListingsWithImages } from "@/app/hooks/useListingsWithImages";
 import Link from "next/link";
 import OptimizedImage from "@/components/ui/OptimizedImage";
 import { COLORS } from "@/lib/config";
@@ -570,30 +569,18 @@ export default function Listing({
   }, [user?.id, loadFavorites]);
 
   // IDs visibles pour les images
-  const visibleIds = useMemo(
-    () => visibleListings?.map((item) => item.id) || [],
-    [visibleListings]
-  );
-
-  const { listings, isLoading: isLoadingImages } =
-    useListingsWithImages(visibleIds);
-
-  // Transformation des coordonnées
   const transformedItems = useMemo(() => {
-    return (listings.length > 0 ? listings : visibleListings).map(
-      (listing) => ({
-        ...listing,
-        lat:
-          typeof listing.lat === "string"
-            ? parseFloat(listing.lat)
-            : listing.lat,
-        lng:
-          typeof listing.lng === "string"
-            ? parseFloat(listing.lng)
-            : listing.lng,
-      })
-    );
-  }, [listings, visibleListings]);
+    return (visibleListings || []).map((listing: any) => ({
+      ...listing,
+      lat:
+        typeof listing.lat === "string" ? parseFloat(listing.lat) : listing.lat,
+      lng:
+        typeof listing.lng === "string" ? parseFloat(listing.lng) : listing.lng,
+    }));
+  }, [visibleListings]);
+
+  // ✅ Plus besoin d'un loading "images" séparé
+  const isLoadingImages = false;
 
   // ✅ Fetch supprimé - Les données viennent maintenant d'Explore.tsx
   // Le composant Listing est maintenant purement présentationnel
@@ -736,13 +723,15 @@ export default function Listing({
               : parseInt(String(item.id), 10);
           const isHovered =
             !isNaN(itemNumericId) && hoveredListingId === itemNumericId;
+          const isFav =
+            !isNaN(itemNumericId) && favorites.includes(itemNumericId);
 
           return (
             <ListItem
               key={item.id}
               item={item}
               isHovered={isHovered}
-              isFavorite={favorites.includes(item.id)}
+              isFavorite={isFav}
               onMouseEnter={() => handleMouseEnter(item.id)}
               onMouseLeave={handleMouseLeave}
               onToggleFavorite={() => handleToggleFavorite(item.id)}

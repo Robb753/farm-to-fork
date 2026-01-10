@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Sprout, Clock, Mail, Loader2, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { ProgressIndicator } from "@/components/ui/progress-indicator";
-import { supabase } from "@/utils/supabase/client";
+import { useSupabaseWithClerk } from "@/utils/supabase/client";
 
 const steps = [
   { number: 1, label: "Demande" },
@@ -25,14 +25,19 @@ const steps = [
 export default function PendingPage() {
   const router = useRouter();
   const { user, isLoaded } = useUser();
+
+  // ✅ IMPORTANT : on appelle le hook ici (et PAS dans le useEffect)
+  const supabase = useSupabaseWithClerk();
+
   const [checkingStatus, setCheckingStatus] = useState(true);
   const [requestStatus, setRequestStatus] = useState<
     "pending" | "approved" | "rejected" | null
   >(null);
 
-  // ✅ Vérifier le statut DANS LA BASE uniquement
   useEffect(() => {
     if (!isLoaded || !user) return;
+
+    let cancelled = false;
 
     const checkRequestStatus = async () => {
       try {
@@ -42,6 +47,8 @@ export default function PendingPage() {
           .eq("user_id", user.id)
           .maybeSingle();
 
+        if (cancelled) return;
+
         if (error) {
           console.error("Erreur vérification:", error);
           setRequestStatus(null);
@@ -49,24 +56,29 @@ export default function PendingPage() {
         }
 
         if (!data) {
-          // Aucune demande trouvée, rediriger vers step-1
           router.replace("/onboarding/step-1");
           return;
         }
 
         setRequestStatus(data.status as "pending" | "approved" | "rejected");
       } catch (err) {
-        console.error("Erreur:", err);
-        setRequestStatus(null);
+        if (!cancelled) {
+          console.error("Erreur:", err);
+          setRequestStatus(null);
+        }
       } finally {
-        setCheckingStatus(false);
+        if (!cancelled) setCheckingStatus(false);
       }
     };
 
     checkRequestStatus();
-  }, [isLoaded, user, router]);
 
-  // Afficher un loader pendant la vérification
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoaded, user, router, supabase]);
+
+  // Loader
   if (checkingStatus || !isLoaded) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -80,7 +92,7 @@ export default function PendingPage() {
     );
   }
 
-  // ✅ Si approuvé, afficher un message différent avec lien
+  // ✅ approuvé
   if (requestStatus === "approved") {
     return (
       <div className="min-h-screen bg-background p-4 py-12">
@@ -139,7 +151,7 @@ export default function PendingPage() {
     );
   }
 
-  // ✅ Si rejeté
+  // ✅ rejeté
   if (requestStatus === "rejected") {
     return (
       <div className="min-h-screen bg-background p-4 py-12">
@@ -173,7 +185,7 @@ export default function PendingPage() {
     );
   }
 
-  // ✅ Si pending (en attente)
+  // ✅ pending
   return (
     <div className="min-h-screen bg-background p-4 py-12">
       <div className="max-w-4xl mx-auto">
@@ -202,59 +214,6 @@ export default function PendingPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="bg-muted p-6 rounded-lg space-y-3 text-left">
-              <h3 className="font-semibold text-lg flex items-center gap-2">
-                <Mail className="w-5 h-5 text-primary" />
-                Et après ?
-              </h3>
-              <div className="space-y-3 text-sm text-muted-foreground">
-                <div className="flex gap-3">
-                  <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-xs font-bold text-primary">1</span>
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground">
-                      Validation de votre demande
-                    </p>
-                    <p className="text-xs">
-                      Notre équipe vérifie que vous êtes bien un producteur
-                      agricole (SIRET, activité...)
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-xs font-bold text-primary">2</span>
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground">
-                      Réception de l'email
-                    </p>
-                    <p className="text-xs">
-                      Vous recevrez un email avec un lien pour continuer votre
-                      inscription
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-xs font-bold text-primary">3</span>
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground">
-                      Compléter votre profil
-                    </p>
-                    <p className="text-xs">
-                      En moins de 5 minutes, racontez votre histoire et publiez
-                      votre fiche ferme
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
             <div className="bg-accent/50 p-4 rounded-lg text-left">
               <p className="text-sm text-muted-foreground">
                 <strong className="text-foreground">

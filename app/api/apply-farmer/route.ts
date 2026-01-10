@@ -6,293 +6,212 @@ import type { Database } from "@/lib/types/database";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-/**
- * Types pour la candidature de producteur
- */
-interface ApplyFarmerRequestBody {
-  userId: string;
-  email: string;
-  farmName: string;
-  phone: string;
-  location: string;
-  description: string;
-  website?: string;
-  products?: string;
-}
-
-/**
- * Type pour la réponse API
- */
-interface ApplyFarmerResponse {
+type ApplyFarmerResponse = {
   success: boolean;
   error?: string;
   message?: string;
   requestId?: number;
   details?: string;
-}
+};
 
-/**
- * Type pour l'enregistrement farmer_request
- */
-interface FarmerRequestInsert {
-  user_id: string;
+type Body = {
+  userId: string;
   email: string;
-  farm_name: string;
-  phone: string;
-  location: string;
-  description: string;
-  website?: string | null;
-  products?: string | null;
-  status: "pending";
-  created_at: string;
-  updated_at: string;
-}
 
-// Validation des variables d'environnement
+  firstName: string;
+  lastName: string;
+  farmName: string;
+  siret: string;
+  department: string;
+
+  location: string;
+  lat: number;
+  lng: number;
+
+  // optionnels (step 2)
+  description?: string;
+  products?: string;
+  website?: string;
+  phone?: string;
+};
+
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error("Variables d'environnement Supabase manquantes");
 }
 
-// Accès serveur uniquement (pas NEXT_PUBLIC)
 const supabase = createClient<Database>(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+  { auth: { autoRefreshToken: false, persistSession: false } }
 );
 
-/**
- * API Route pour soumettre une candidature de producteur
- */
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const siretRegex = /^\d{14}$/;
+
 export async function POST(
   req: NextRequest
 ): Promise<NextResponse<ApplyFarmerResponse>> {
+  const now = new Date().toISOString();
+
   try {
-    // Parse et validation du corps de requête
-    let body: ApplyFarmerRequestBody;
+    const body = (await req.json()) as Partial<Body>;
 
-    try {
-      body = await req.json();
-    } catch (parseError) {
-      console.error("[APPLY FARMER] Erreur parsing JSON:", parseError);
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Corps de requête JSON invalide",
-          message: "Impossible de parser la requête",
-        },
-        { status: 400 }
-      );
-    }
+    const missing: string[] = [];
+    const requireString = (key: keyof Body) => {
+      const v = body[key];
+      if (typeof v !== "string" || v.trim().length === 0)
+        missing.push(String(key));
+    };
 
-    const {
-      userId,
-      email,
-      farmName,
-      phone,
-      location,
-      description,
-      website,
-      products,
-    } = body;
+    requireString("userId");
+    requireString("email");
+    requireString("firstName");
+    requireString("lastName");
+    requireString("farmName");
+    requireString("siret");
+    requireString("department");
+    requireString("location");
 
-    // Validation des champs requis
-    const requiredFields = [
-      { field: userId, name: "userId" },
-      { field: email, name: "email" },
-      { field: farmName, name: "farmName" },
-      { field: phone, name: "phone" },
-      { field: location, name: "location" },
-      { field: description, name: "description" },
-    ];
+    if (typeof body.lat !== "number" || !Number.isFinite(body.lat))
+      missing.push("lat");
+    if (typeof body.lng !== "number" || !Number.isFinite(body.lng))
+      missing.push("lng");
 
-    const missingFields = requiredFields
-      .filter(
-        ({ field }) =>
-          !field || (typeof field === "string" && field.trim().length === 0)
-      )
-      .map(({ name }) => name);
-
-    if (missingFields.length > 0) {
+    if (missing.length > 0) {
       return NextResponse.json(
         {
           success: false,
           error: "Champs requis manquants",
-          message: `Les champs suivants sont requis: ${missingFields.join(", ")}`,
+          message: `Manquants: ${missing.join(", ")}`,
         },
         { status: 400 }
       );
     }
 
-    // Validation du format email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email.trim())) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Format email invalide",
-          message: "L'adresse email n'est pas valide",
-        },
-        { status: 400 }
-      );
-    }
+    const userId = body.userId!.trim();
+    const email = body.email!.trim().toLowerCase();
 
-    // Validation du format userId Clerk
     if (!userId.startsWith("user_")) {
       return NextResponse.json(
         {
           success: false,
-          error: "Format userId invalide",
-          message: "L'ID utilisateur doit être un ID Clerk valide",
+          error: "userId invalide",
+          message: "ID Clerk attendu",
         },
         { status: 400 }
       );
     }
 
-    // Validation de la longueur des champs
-    if (farmName.trim().length < 2) {
+    if (!emailRegex.test(email)) {
       return NextResponse.json(
         {
           success: false,
-          error: "Nom de ferme trop court",
-          message: "Le nom de la ferme doit contenir au moins 2 caractères",
+          error: "Email invalide",
+          message: "Format email invalide",
         },
         { status: 400 }
       );
     }
 
-    if (description.trim().length < 10) {
+    const siret = body.siret!.replace(/\s/g, "");
+    if (!siretRegex.test(siret)) {
       return NextResponse.json(
         {
           success: false,
-          error: "Description trop courte",
-          message: "La description doit contenir au moins 10 caractères",
+          error: "SIRET invalide",
+          message: "Le SIRET doit contenir 14 chiffres",
         },
         { status: 400 }
       );
     }
 
-    // Vérifier s'il y a déjà une candidature en cours pour cet utilisateur
-    const { data: existingRequest, error: checkError } = await supabase
+    // Empêcher doublon pending
+    const { data: existing, error: existingErr } = await supabase
       .from("farmer_requests")
-      .select("id, status")
+      .select("id,status")
       .eq("user_id", userId)
       .eq("status", "pending")
-      .single();
+      .maybeSingle();
 
-    if (checkError && checkError.code !== "PGRST116") {
-      // PGRST116 = pas de résultat trouvé
-      console.error(
-        "[APPLY FARMER] Erreur vérification candidature existante:",
-        checkError
-      );
+    if (existingErr) {
       return NextResponse.json(
         {
           success: false,
-          error: "Erreur lors de la vérification",
-          message: "Impossible de vérifier les candidatures existantes",
+          error: "Erreur DB",
+          message: "Vérification impossible",
         },
         { status: 500 }
       );
     }
-
-    if (existingRequest) {
+    if (existing) {
       return NextResponse.json(
         {
           success: false,
-          error: "Candidature déjà existante",
-          message: "Vous avez déjà une candidature en cours de traitement",
+          error: "Déjà soumis",
+          message: "Une demande est déjà en cours (pending).",
         },
         { status: 409 }
       );
     }
 
-    // Préparation des données à insérer
-    const farmerRequestData: FarmerRequestInsert = {
-      user_id: userId,
-      email: email.trim().toLowerCase(),
-      farm_name: farmName.trim(),
-      phone: phone.trim(),
-      location: location.trim(),
-      description: description.trim(),
-      website: website?.trim() || null,
-      products: products?.trim() || null,
-      status: "pending",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+    const insertData: Database["public"]["Tables"]["farmer_requests"]["Insert"] =
+      {
+        user_id: userId,
+        email,
 
-    // Insertion de la demande dans la base de données
-    const { data: insertedRequest, error: insertError } = await supabase
+        first_name: body.firstName!.trim(),
+        last_name: body.lastName!.trim(),
+        phone: body.phone?.trim() || null,
+
+        siret,
+        department: body.department!.trim(),
+
+        farm_name: body.farmName!.trim(),
+        location: body.location!.trim(),
+        description: body.description?.trim() || null,
+        products: body.products?.trim() || null,
+        website: body.website?.trim() || null,
+
+        lat: body.lat!,
+        lng: body.lng!,
+
+        status: "pending",
+        created_at: now,
+        updated_at: now,
+      };
+
+    const { data: inserted, error: insertErr } = await supabase
       .from("farmer_requests")
-      .insert(farmerRequestData)
+      .insert(insertData)
       .select("id")
       .single();
 
-    if (insertError) {
-      console.error("[APPLY FARMER] Erreur insertion Supabase:", insertError);
-
-      // Gestion spécifique des erreurs de contrainte
-      if (insertError.code === "23505") {
-        // Contrainte unique violée
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Candidature déjà existante",
-            message: "Une candidature avec ces informations existe déjà",
-          },
-          { status: 409 }
-        );
-      }
-
+    if (insertErr) {
       return NextResponse.json(
         {
           success: false,
-          error: "Erreur d'enregistrement",
-          message: "Impossible d'enregistrer votre candidature",
+          error: "Insert failed",
+          message: "Impossible d'enregistrer la demande",
         },
         { status: 500 }
       );
     }
 
-    const requestId = insertedRequest?.id;
-
-    // Optionnel: Envoyer une notification aux administrateurs
-    try {
-      // Import dynamique pour éviter les erreurs si le service n'existe pas
-      const { sendAdminNotificationEmail } = await import(
-        "@/lib/config/email-notifications"
-      );
-
-      // Utiliser directement farmerRequestData qui correspond au type attendu
-      await sendAdminNotificationEmail(farmerRequestData as any);
-    } catch (emailError) {
-      console.warn(
-        "[APPLY FARMER] ⚠️ Erreur envoi notification admin:",
-        emailError
-      );
-      // Non bloquant - la candidature est enregistrée même si l'email échoue
-    }
-
     return NextResponse.json({
       success: true,
-      message:
-        "Votre candidature a été soumise avec succès. Vous recevrez une réponse par email.",
-      requestId,
+      message: "Demande envoyée avec succès.",
+      requestId: inserted.id,
     });
-  } catch (error) {
-    console.error("[APPLY FARMER] Erreur serveur:", error);
-
-    // Gestion d'erreur avec détails selon l'environnement
-    const isDev = process.env.NODE_ENV === "development";
-
+  } catch (e) {
     return NextResponse.json(
       {
         success: false,
-        error: "Erreur interne du serveur",
-        message:
-          "Une erreur inattendue s'est produite lors de l'enregistrement de votre candidature",
-        ...(isDev && {
-          details: error instanceof Error ? error.message : String(error),
-        }),
+        error: "Erreur serveur",
+        message: "Une erreur inattendue s'est produite",
+        details:
+          process.env.NODE_ENV === "development" && e instanceof Error
+            ? e.message
+            : undefined,
       },
       { status: 500 }
     );

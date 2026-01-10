@@ -1,27 +1,19 @@
 // app/api/onboarding/generate-profile/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { auth } from "@clerk/nextjs/server";
 import type { Database } from "@/lib/types/database";
-
-// ⚠️ Décommenter si tu utilises OpenAI
-// import OpenAI from "openai";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-/**
- * Interface pour le step 2
- */
 interface GenerateProfileBody {
   requestId: number;
   story: string;
   website?: string;
-  photos?: string[]; // URLs des photos uploadées
+  photos?: string[];
 }
 
-/**
- * Interface pour le profil généré
- */
 interface GeneratedProfile {
   farmProfile: {
     name: string;
@@ -43,37 +35,35 @@ interface GeneratedProfile {
 
 const supabase = createClient<Database>(
   process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  { auth: { autoRefreshToken: false, persistSession: false } }
 );
 
-// ⚠️ Décommenter si tu utilises OpenAI
-// const openai = new OpenAI({
-//   apiKey: process.env.OPENAI_API_KEY,
-// });
-
-/**
- * API Route pour générer un profil via AI (Step 2)
- *
- * Cette API est OPTIONNELLE - tu peux la développer plus tard
- * Pour l'instant, on peut retourner un profil mock ou skip cette étape
- */
 export async function POST(req: NextRequest) {
   try {
-    const { requestId, story, website, photos }: GenerateProfileBody =
-      await req.json();
+    // ✅ Auth server-side Clerk
+    const { userId: clerkUserId } = await Promise.resolve(auth());
+    if (!clerkUserId) {
+      return NextResponse.json(
+        { success: false, error: "Non authentifié" },
+        { status: 401 }
+      );
+    }
+
+    const { requestId, story, website }: GenerateProfileBody = await req.json();
 
     // Validation
-    if (!requestId || !story) {
+    if (!requestId || !story?.trim()) {
       return NextResponse.json(
         { success: false, error: "Données manquantes" },
         { status: 400 }
       );
     }
 
-    // Vérifier que la demande existe et est approuvée
+    // ✅ Charger la demande + ownership
     const { data: request, error: requestError } = await supabase
       .from("farmer_requests")
-      .select("id, status, farm_name")
+      .select("id, status, farm_name, user_id")
       .eq("id", requestId)
       .single();
 
@@ -84,6 +74,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // ✅ Autorisation: owner uniquement (ou admin si tu veux l'ajouter plus tard)
+    if (request.user_id !== clerkUserId) {
+      return NextResponse.json(
+        { success: false, error: "Forbidden", message: "Accès refusé" },
+        { status: 403 }
+      );
+    }
+
+    // ✅ Statut: doit être approved (sinon l'onboarding n'est pas validé)
     if (request.status !== "approved") {
       return NextResponse.json(
         { success: false, error: "Demande non approuvée" },
@@ -91,9 +90,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ========================================
-    // OPTION 1 : Mock (pour développement)
-    // ========================================
+    // Mock profile (ok pour dev)
     const mockProfile: GeneratedProfile = {
       farmProfile: {
         name: request.farm_name,
@@ -113,66 +110,50 @@ export async function POST(req: NextRequest) {
       ],
     };
 
-    // ========================================
-    // OPTION 2 : OpenAI (à décommenter)
-    // ========================================
-    /*
-    const prompt = `
-Tu es un expert en marketing agricole.
-À partir de cette histoire de ferme, génère un profil structuré JSON:
-
-Histoire: ${story}
-Site web: ${website || "Non renseigné"}
-
-Génère un JSON avec cette structure exacte:
-{
-  "farmProfile": {
-    "name": "nom de la ferme extrait",
-    "description": "description marketée (150-200 mots)",
-    "location": "localisation extraite",
-    "contact": "email extrait ou 'à compléter'"
-  },
-  "products": [
-    {
-      "id": 1,
-      "name": "nom produit",
-      "category": "légumes|fruits|produits laitiers|viande|oeufs",
-      "price": 0,
-      "unit": "kg|unité|litre",
-      "status": "available"
-    }
-  ],
-  "production_method": ["Agriculture biologique", "Agriculture durable"],
-  "purchase_mode": ["Vente directe à la ferme", "Marché local"]
-}
-
-Réponds UNIQUEMENT avec le JSON, sans markdown.
-`;
-
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.7,
-    });
-
-    const content = response.choices[0]?.message?.content || "{}";
-    const generatedProfile: GeneratedProfile = JSON.parse(content);
-    */
-
-    // Mise à jour de farmer_requests avec les nouvelles infos
-    await supabase
+    // ✅ Update farmer_requests (onboarding data)
+    const { error: updateReqError } = await supabase
       .from("farmer_requests")
       .update({
-        description: story,
-        website: website || null,
-        // products: JSON.stringify(generatedProfile.products), // Optionnel
+        description: story.trim(),
+        website: website?.trim() || null,
         updated_at: new Date().toISOString(),
       })
       .eq("id", requestId);
 
+    if (updateReqError) {
+      console.error(
+        "[GENERATE-PROFILE] update farmer_requests error:",
+        updateReqError
+      );
+      return NextResponse.json(
+        { success: false, error: "Update failed" },
+        { status: 500 }
+      );
+    }
+
+    // ✅ (Recommandé) Update listing correspondant (si déjà créé par le trigger)
+    // On se base sur clerk_user_id = request.user_id
+    const { error: updateListingError } = await supabase
+      .from("listing")
+      .update({
+        description: story.trim(),
+        website: website?.trim() || null,
+        modified_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("clerk_user_id", request.user_id);
+
+    if (updateListingError) {
+      // pas bloquant, mais utile en dev
+      console.warn(
+        "[GENERATE-PROFILE] update listing warning:",
+        updateListingError
+      );
+    }
+
     return NextResponse.json({
       success: true,
-      data: mockProfile, // ou generatedProfile si OpenAI activé
+      data: mockProfile,
       message: "Profil généré avec succès",
     });
   } catch (error) {

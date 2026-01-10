@@ -1,23 +1,20 @@
-// lib/store/userStore.ts - Version corrigée (jsonb favorites + TS safe)
+// lib/store/userStore.ts
 import { create } from "zustand";
 import { persist, subscribeWithSelector } from "zustand/middleware";
+import { toast } from "sonner";
+
+import type { UserResource } from "@clerk/types";
+import type { Json } from "@/lib/types/database";
+import type { SupabaseDbClient } from "@/lib/syncUserUtils";
+
 import {
   determineUserRole,
   updateClerkRole,
   syncProfileToSupabase,
 } from "@/lib/syncUserUtils";
-import { toast } from "sonner";
-import { supabase } from "@/utils/supabase/client";
-import type { UserResource } from "@clerk/types";
-import type { Json } from "@/lib/types/database";
 
 // ==================== TYPES ====================
 
-// ⚠️ Chez toi, la table profiles a:
-// - id: number
-// - user_id: string (Clerk)
-// Ici, ton store utilise "id" comme identifiant Clerk (string).
-// (On garde ton choix pour éviter de casser le reste de ton app.)
 export interface UserProfile {
   id: string; // Clerk user id
   email: string;
@@ -35,6 +32,10 @@ interface UserState {
   isReady: boolean;
   isWaitingForProfile: boolean;
   syncError: string | null;
+
+  // ✅ Injection du client Supabase (créé via useSupabaseWithClerk côté React)
+  supabase: SupabaseDbClient | null;
+  initSupabase: (client: SupabaseDbClient) => void;
 
   setProfile: (profile: UserProfile | null) => void;
   setRole: (role: Role) => void;
@@ -60,16 +61,15 @@ interface UserState {
 
 // Robust jsonb -> number[]
 const toNumberArray = (value: unknown): number[] => {
-  if (!value) return [];
+  if (value == null) return [];
 
-  // Supabase jsonb renvoie souvent déjà un array
   if (Array.isArray(value)) {
     return value
       .map((v) => (typeof v === "number" ? v : Number(v)))
       .filter((n) => Number.isFinite(n));
   }
 
-  // Compat avec ancien stockage stringifié
+  // Compat legacy stringifié
   if (typeof value === "string") {
     try {
       const parsed = JSON.parse(value);
@@ -82,8 +82,14 @@ const toNumberArray = (value: unknown): number[] => {
   return [];
 };
 
+// Dedup
+const uniq = (arr: number[]) => Array.from(new Set(arr));
+
+// ==================== INITIAL STATE ====================
+
 const INITIAL_STATE: Omit<
   UserState,
+  | "initSupabase"
   | "setProfile"
   | "setRole"
   | "setSyncing"
@@ -106,6 +112,8 @@ const INITIAL_STATE: Omit<
   isReady: false,
   isWaitingForProfile: false,
   syncError: null,
+
+  supabase: null,
 };
 
 // ==================== STORE ====================
@@ -115,6 +123,9 @@ export const useUserStore = create<UserState>()(
     persist(
       (set, get) => ({
         ...INITIAL_STATE,
+
+        // ✅ Injection Supabase (à appeler depuis un composant)
+        initSupabase: (client) => set({ supabase: client }),
 
         // ==================== ACTIONS BASIQUES ====================
         setProfile: (profile) => set({ profile }),
@@ -127,25 +138,38 @@ export const useUserStore = create<UserState>()(
 
         // ==================== FAVORITES ====================
         loadFavorites: async (userId) => {
+          const supabase = get().supabase;
+          if (!supabase) {
+            console.warn(
+              "[UserStore] Supabase non initialisé (loadFavorites)."
+            );
+            return;
+          }
+
           try {
             const { data, error } = await supabase
               .from("profiles")
-              .select("favorites")
+              .select("favorites,email,role,user_id")
               .eq("user_id", userId)
               .single();
 
             if (error) throw error;
 
-            const favoritesArray = toNumberArray(data?.favorites);
+            const favoritesArray = uniq(toNumberArray(data?.favorites));
 
             set((state) => {
-              if (!state.profile) return state;
-              return {
-                profile: {
-                  ...state.profile,
-                  favorites: favoritesArray,
-                },
+              // Si profile absent, on peut initialiser un minimum
+              const existing = state.profile;
+              const nextProfile: UserProfile = {
+                id: userId,
+                email: existing?.email ?? data?.email ?? "",
+                role: (existing?.role ??
+                  (data?.role as any) ??
+                  "user") as UserProfile["role"],
+                favorites: favoritesArray,
               };
+
+              return { profile: nextProfile };
             });
           } catch (error) {
             console.error("[UserStore] Error loading favorites:", error);
@@ -154,6 +178,12 @@ export const useUserStore = create<UserState>()(
         },
 
         toggleFavorite: async (listingId, userId) => {
+          const supabase = get().supabase;
+          if (!supabase) {
+            toast.error("Supabase non prêt. Réessaie dans un instant.");
+            return;
+          }
+
           const state = get();
           if (!state.profile) {
             toast.error("Vous devez être connecté pour gérer vos favoris");
@@ -162,9 +192,11 @@ export const useUserStore = create<UserState>()(
 
           const isCurrentlyFavorite =
             state.profile.favorites.includes(listingId);
-          const updatedFavorites = isCurrentlyFavorite
-            ? state.profile.favorites.filter((id) => id !== listingId)
-            : [...state.profile.favorites, listingId];
+          const updatedFavorites = uniq(
+            isCurrentlyFavorite
+              ? state.profile.favorites.filter((id) => id !== listingId)
+              : [...state.profile.favorites, listingId]
+          );
 
           const previousFavorites = state.profile.favorites;
 
@@ -180,7 +212,7 @@ export const useUserStore = create<UserState>()(
           });
 
           try {
-            // ✅ colonne = jsonb => on envoie directement un array (pas stringify)
+            // ✅ jsonb => array direct
             const { error } = await supabase
               .from("profiles")
               .update({ favorites: updatedFavorites as unknown as Json })
@@ -217,7 +249,7 @@ export const useUserStore = create<UserState>()(
             return {
               profile: {
                 ...state.profile,
-                favorites: [...state.profile.favorites, listingId],
+                favorites: uniq([...state.profile.favorites, listingId]),
               },
             };
           }),
@@ -235,10 +267,8 @@ export const useUserStore = create<UserState>()(
             };
           }),
 
-        isFavorite: (listingId) => {
-          const state = get();
-          return state.profile?.favorites.includes(listingId) ?? false;
-        },
+        isFavorite: (listingId) =>
+          get().profile?.favorites.includes(listingId) ?? false,
 
         // ==================== ACTIONS MÉTIER ====================
         syncUser: async (user) => {
@@ -250,11 +280,25 @@ export const useUserStore = create<UserState>()(
             setReady,
           } = get();
 
+          const supabase = get().supabase;
+
           if (!user) {
             setSyncing(false);
             setWaitingForProfile(false);
+            setSyncError(null);
             setRole(null);
             setReady(true);
+            set({ profile: null });
+            return;
+          }
+
+          if (!supabase) {
+            // On évite de “crasher” si le store sync avant initSupabase()
+            console.warn("[UserStore] Supabase non initialisé (syncUser).");
+            setRole(((user.publicMetadata as any)?.role ?? "user") as any);
+            setReady(true);
+            setSyncing(false);
+            setWaitingForProfile(false);
             return;
           }
 
@@ -264,16 +308,19 @@ export const useUserStore = create<UserState>()(
           setSyncError(null);
 
           try {
-            const resolvedRole = await determineUserRole(user);
+            const resolvedRole = await determineUserRole(supabase, user);
             setRole(resolvedRole);
 
             if ((user.publicMetadata as any)?.role !== resolvedRole) {
               await updateClerkRole(user.id, resolvedRole);
             }
 
-            await syncProfileToSupabase(user, resolvedRole, {
+            await syncProfileToSupabase(supabase, user, resolvedRole, {
               createListing: resolvedRole === "farmer",
             });
+
+            // Charge favorites + email/role depuis Supabase (source of truth)
+            await get().loadFavorites(user.id);
 
             setReady(true);
           } catch (e: unknown) {
@@ -297,6 +344,7 @@ export const useUserStore = create<UserState>()(
         resyncRole: async (user) => {
           const { isSyncing, setSyncing, setSyncError, setRole, setReady } =
             get();
+          const supabase = get().supabase;
 
           if (!user) {
             console.warn("[UserStore] Aucun utilisateur pour la re-sync");
@@ -304,14 +352,23 @@ export const useUserStore = create<UserState>()(
           }
           if (isSyncing) return;
 
+          if (!supabase) {
+            toast.error("Supabase non prêt. Réessaie dans un instant.");
+            return;
+          }
+
           setSyncing(true);
           setSyncError(null);
 
           try {
-            const resolvedRole = await determineUserRole(user);
+            const resolvedRole = await determineUserRole(supabase, user);
             setRole(resolvedRole);
+
             await updateClerkRole(user.id, resolvedRole);
-            await syncProfileToSupabase(user, resolvedRole);
+            await syncProfileToSupabase(supabase, user, resolvedRole);
+
+            // Refresh profil local
+            await get().loadFavorites(user.id);
 
             toast.success("Profil synchronisé avec succès");
             setReady(true);
@@ -339,6 +396,7 @@ export const useUserStore = create<UserState>()(
       }),
       {
         name: "farm2fork-user",
+        // ✅ on persiste supabase ? non (il n'est pas sérialisable)
         partialize: (state) => ({
           profile: state.profile,
           role: state.role,
@@ -365,6 +423,7 @@ export const useUserFavorites = () =>
 
 export const useUserActions = () =>
   useUserStore((s) => ({
+    initSupabase: s.initSupabase,
     setProfile: s.setProfile,
     setRole: s.setRole,
     setReady: s.setReady,

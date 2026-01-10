@@ -50,99 +50,195 @@ export interface Database {
         Row: {
           id: number;
           created_at: string;
+
           coordinates: Json | null;
-          createdBy: string;
-          active: boolean;
+
+          // SQL: "createdBy" text null + unique
+          createdBy: string | null;
+
+          active: boolean | null;
+
           typeferme: string | null;
+
           phoneNumber: string | null;
           email: string | null;
           website: string | null;
-          certifications: string | null;
+
+          // SQL: enum arrays
+          certifications:
+            | Database["public"]["Enums"]["certification_enum"][]
+            | null;
+
           description: string | null;
-          name: string;
+          name: string | null;
+
           profileImage: string | null;
           fullName: string | null;
-          product_type: string | null;
-          purchase_mode: string | null;
-          production_method: string | null;
-          availability: string | null;
-          additional_services: string | null;
-          address: string;
+
+          product_type:
+            | Database["public"]["Enums"]["product_type_enum"][]
+            | null;
+          purchase_mode:
+            | Database["public"]["Enums"]["purchase_mode_enum"][]
+            | null;
+          production_method:
+            | Database["public"]["Enums"]["production_method_enum"][]
+            | null;
+          availability:
+            | Database["public"]["Enums"]["availability_enum"][]
+            | null;
+          additional_services:
+            | Database["public"]["Enums"]["additional_services_enum"][]
+            | null;
+
+          address: string | null;
+
           updated_at: string | null;
-          lat: number;
-          lng: number;
-          opening_hours: Json | null;
+
+          // SQL: nullable + check (both null OR both not null)
+          lat: number | null;
+          lng: number | null;
 
           published_at: string | null;
           modified_at: string | null;
 
+          opening_hours: Json | null;
           pickup_days: string | null;
-          delivery_available: boolean | null;
+
+          // SQL: NOT NULL DEFAULT false
+          delivery_available: boolean;
+
+          founded_year: string | null;
+
+          // SQL: NOT NULL DEFAULT false
+          orders_enabled: boolean;
+
+          // SQL: text null + unique index where not null
+          clerk_user_id: string | null;
         };
+
         Insert: {
           id?: number;
           created_at?: string;
+
           coordinates?: Json | null;
-          createdBy: string;
-          active?: boolean;
+
+          createdBy?: string | null;
+          active?: boolean | null;
+
           typeferme?: string | null;
+
           phoneNumber?: string | null;
           email?: string | null;
           website?: string | null;
-          certifications?: string | null;
+
+          certifications?:
+            | Database["public"]["Enums"]["certification_enum"][]
+            | null;
+
           description?: string | null;
-          name: string;
+          name?: string | null;
+
           profileImage?: string | null;
           fullName?: string | null;
-          product_type?: string | null;
-          purchase_mode?: string | null;
-          production_method?: string | null;
-          availability?: string | null;
-          additional_services?: string | null;
-          address: string;
+
+          product_type?:
+            | Database["public"]["Enums"]["product_type_enum"][]
+            | null;
+          purchase_mode?:
+            | Database["public"]["Enums"]["purchase_mode_enum"][]
+            | null;
+          production_method?:
+            | Database["public"]["Enums"]["production_method_enum"][]
+            | null;
+          availability?:
+            | Database["public"]["Enums"]["availability_enum"][]
+            | null;
+          additional_services?:
+            | Database["public"]["Enums"]["additional_services_enum"][]
+            | null;
+
+          address?: string | null;
+
           updated_at?: string | null;
-          lat: number;
-          lng: number;
-          opening_hours?: Json | null;
+
+          lat?: number | null;
+          lng?: number | null;
 
           published_at?: string | null;
           modified_at?: string | null;
 
+          opening_hours?: Json | null;
           pickup_days?: string | null;
-          delivery_available?: boolean | null;
+
+          delivery_available?: boolean;
+          founded_year?: string | null;
+          orders_enabled?: boolean;
+
+          clerk_user_id?: string | null;
         };
+
         Update: {
           id?: number;
           created_at?: string;
+
           coordinates?: Json | null;
-          createdBy?: string;
-          active?: boolean;
+
+          createdBy?: string | null;
+          active?: boolean | null;
+
           typeferme?: string | null;
+
           phoneNumber?: string | null;
           email?: string | null;
           website?: string | null;
-          certifications?: string | null;
+
+          certifications?:
+            | Database["public"]["Enums"]["certification_enum"][]
+            | null;
+
           description?: string | null;
-          name?: string;
+          name?: string | null;
+
           profileImage?: string | null;
           fullName?: string | null;
-          product_type?: string | null;
-          purchase_mode?: string | null;
-          production_method?: string | null;
-          availability?: string | null;
-          additional_services?: string | null;
-          address?: string;
+
+          product_type?:
+            | Database["public"]["Enums"]["product_type_enum"][]
+            | null;
+          purchase_mode?:
+            | Database["public"]["Enums"]["purchase_mode_enum"][]
+            | null;
+          production_method?:
+            | Database["public"]["Enums"]["production_method_enum"][]
+            | null;
+          availability?:
+            | Database["public"]["Enums"]["availability_enum"][]
+            | null;
+          additional_services?:
+            | Database["public"]["Enums"]["additional_services_enum"][]
+            | null;
+
+          address?: string | null;
+
           updated_at?: string | null;
-          lat?: number;
-          lng?: number;
-          opening_hours?: Json | null;
+
+          lat?: number | null;
+          lng?: number | null;
 
           published_at?: string | null;
           modified_at?: string | null;
 
+          opening_hours?: Json | null;
           pickup_days?: string | null;
-          delivery_available?: boolean | null;
+
+          delivery_available?: boolean;
+          founded_year?: string | null;
+          orders_enabled?: boolean;
+
+          clerk_user_id?: string | null;
         };
+
         Relationships: [];
       };
 
@@ -175,7 +271,6 @@ export interface Database {
         ];
       };
 
-      // ✅ FARMER_REQUESTS - AVEC LAT/LNG AJOUTÉS
       farmer_requests: {
         Row: {
           id: number;
@@ -191,7 +286,6 @@ export interface Database {
 
           // ✅ Informations entreprise
           siret: string;
-          department: string;
 
           // ✅ Informations ferme
           farm_name: string;
@@ -224,7 +318,6 @@ export interface Database {
 
           // ✅ Informations entreprise
           siret: string;
-          department: string;
 
           // ✅ Informations ferme
           farm_name: string;
@@ -257,7 +350,6 @@ export interface Database {
 
           // ✅ Informations entreprise
           siret?: string;
-          department?: string;
 
           // ✅ Informations ferme
           farm_name?: string;
@@ -359,7 +451,6 @@ export interface Database {
         ];
       };
 
-      // ✅ NOUVELLE TABLE
       orders: {
         Row: {
           id: number;
@@ -590,7 +681,10 @@ export interface Database {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      debug_auth_jwt: {
+        Args: Record<string, never>;
+        Returns: any;
+      };
     };
     Enums: {
       user_role: "user" | "farmer" | "admin";

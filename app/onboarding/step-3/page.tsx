@@ -1,8 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
+import { toast } from "sonner";
+import Link from "next/link";
+
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -13,11 +16,10 @@ import {
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Sprout, Eye, Edit, MapPin, Mail, Loader2 } from "lucide-react";
-import Link from "next/link";
-import { toast } from "sonner";
 import { ProgressIndicator } from "@/components/ui/progress-indicator";
+import { Sprout, Eye, Edit, MapPin, Mail, Loader2 } from "lucide-react";
+
+import { useSupabaseWithClerk } from "@/utils/supabase/client";
 
 const steps = [
   { number: 1, label: "Demande" },
@@ -25,168 +27,204 @@ const steps = [
   { number: 3, label: "Activation" },
 ];
 
-// Type pour le profil généré
-interface GeneratedProfile {
-  farmProfile: {
-    name: string;
-    description: string;
-    location: string;
-    contact: string;
-  };
-  products: Array<{
-    id: number;
-    name: string;
-    category?: string;
-    price: number;
-    unit?: string;
-    status: string;
-  }>;
-}
+type ListingRow = {
+  id: number;
+  clerk_user_id: string | null;
+  createdBy: string | null; // colonne "createdBy" (mixed-case) exposée en JSON -> createdBy
+  active: boolean | null;
+  name: string | null;
+  description: string | null;
+  address: string | null;
+  email: string | null;
+  phoneNumber: string | null;
+  website: string | null;
+  lat: number | null;
+  lng: number | null;
+  published_at: string | null;
+  modified_at: string | null;
+  updated_at: string | null;
+
+  // ✅ dans ton schéma
+  orders_enabled: boolean;
+  delivery_available: boolean;
+};
+
+type ProfileRow = {
+  role: "user" | "farmer" | "admin";
+  farm_id: number | null;
+};
 
 export default function Step3Page() {
   const router = useRouter();
   const { user, isLoaded } = useUser();
+  const supabase = useSupabaseWithClerk();
+
+  const [listing, setListing] = useState<ListingRow | null>(null);
   const [enableOrders, setEnableOrders] = useState(false);
   const [publishFarm, setPublishFarm] = useState(false);
+  const [checking, setChecking] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [requestId, setRequestId] = useState<number | null>(null);
-  const [generatedData, setGeneratedData] = useState<GeneratedProfile | null>(
-    null
-  );
-  const [products, setProducts] = useState<GeneratedProfile["products"]>([]);
 
-  // Charger les données du step 2
-  useEffect(() => {
-    const storedRequestId = localStorage.getItem("farmerRequestId");
-    const storedProfile = localStorage.getItem("generatedProfile");
-
-    if (!storedRequestId || !storedProfile) {
-      toast.error("Données manquantes. Veuillez recommencer depuis l'étape 1.");
-      router.push("/onboarding/step-1");
-      return;
-    }
-
-    try {
-      const profile: GeneratedProfile = JSON.parse(storedProfile);
-      setRequestId(parseInt(storedRequestId, 10));
-      setGeneratedData(profile);
-      setProducts(profile.products || []);
-    } catch (error) {
-      console.error("Erreur parsing profil:", error);
-      toast.error("Erreur de chargement du profil");
-      router.push("/onboarding/step-2");
-    }
-  }, [router]);
-
-  // Vérifier que l'utilisateur est connecté et est farmer
   useEffect(() => {
     if (!isLoaded) return;
 
     if (!user) {
       toast.error("Vous devez être connecté");
-      router.push("/sign-in");
+      router.replace("/sign-in");
       return;
     }
 
-    const userRole = user.publicMetadata?.role as string;
-    if (userRole !== "farmer") {
-      toast.error("Votre demande n'a pas encore été approuvée");
-      router.push("/onboarding/pending");
-      return;
-    }
-  }, [isLoaded, user, router]);
+    const load = async () => {
+      setChecking(true);
+      try {
+        // ✅ rôle en DB
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("role,farm_id")
+          .eq("user_id", user.id)
+          .maybeSingle();
 
-  const updateProductPrice = (id: number, newPrice: string) => {
-    setProducts(
-      products.map((p) =>
-        p.id === id ? { ...p, price: parseFloat(newPrice) || 0 } : p
-      )
-    );
-  };
+        if (profileError) throw profileError;
 
-  const updateProductStatus = (id: number, newStatus: string) => {
-    setProducts(
-      products.map((p) => (p.id === id ? { ...p, status: newStatus } : p))
-    );
-  };
+        const role = (profile as ProfileRow | null)?.role;
+        if (role !== "farmer" && role !== "admin") {
+          toast.error("Votre demande n'a pas encore été approuvée");
+          router.replace("/onboarding/pending");
+          return;
+        }
+
+        // ✅ listing via clerk_user_id (aligné RLS + triggers)
+        const { data, error } = await supabase
+          .from("listing")
+          .select(
+            `
+            id,
+            clerk_user_id,
+            createdBy,
+            active,
+            name,
+            description,
+            address,
+            email,
+            phoneNumber,
+            website,
+            lat,
+            lng,
+            published_at,
+            modified_at,
+            updated_at,
+            orders_enabled,
+            delivery_available
+          `
+          )
+          .eq("clerk_user_id", user.id)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (!data) {
+          toast.error("Aucune fiche ferme trouvée. Reprenez l’étape 2.");
+          router.replace("/onboarding/step-2");
+          return;
+        }
+
+        const row = data as ListingRow;
+        setListing(row);
+
+        // ✅ prefill toggles depuis DB
+        setPublishFarm(Boolean(row.active));
+        setEnableOrders(Boolean(row.orders_enabled));
+      } catch (e: any) {
+        console.error("Erreur load listing:", e);
+        toast.error(e?.message || "Erreur lors du chargement");
+      } finally {
+        setChecking(false);
+      }
+    };
+
+    load();
+  }, [isLoaded, user, router, supabase]);
 
   const handlePublish = async () => {
+    if (!listing) return;
+
     if (!publishFarm) {
       toast.error("Veuillez cocher 'Publier ma ferme' pour continuer");
+      return;
+    }
+
+    // ✅ coords obligatoires pour affichage carte
+    if (listing.lat == null || listing.lng == null) {
+      toast.error("Coordonnées GPS manquantes. Reprenez l’étape 2.");
+      router.push("/onboarding/step-2");
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      if (!requestId || !generatedData) {
-        toast.error("Données manquantes");
-        return;
-      }
+      const now = new Date().toISOString();
 
-      // Appel à l'API create-listing
-      const response = await fetch("/api/onboarding/create-listing", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          requestId,
-          userId: user?.id,
-          email: user?.primaryEmailAddress?.emailAddress,
-          farmProfile: generatedData.farmProfile,
-          products: products,
-          enableOrders,
-          publishFarm,
-        }),
-      });
+      const payload = {
+        active: true,
+        orders_enabled: enableOrders,
+        modified_at: now,
+        updated_at: now,
+        published_at: listing.published_at ?? now,
+      };
 
-      const result = await response.json();
+      const { data, error } = await supabase
+        .from("listing")
+        .update(payload)
+        .eq("id", listing.id)
+        .select(
+          `
+          id,
+          clerk_user_id,
+          createdBy,
+          active,
+          name,
+          description,
+          address,
+          email,
+          phoneNumber,
+          website,
+          lat,
+          lng,
+          published_at,
+          modified_at,
+          updated_at,
+          orders_enabled,
+          delivery_available
+        `
+        )
+        .single();
 
-      if (result.success) {
-        // Nettoyer le localStorage
-        localStorage.removeItem("farmerRequestId");
-        localStorage.removeItem("generatedProfile");
+      if (error) throw error;
 
-        toast.success(result.message || "Ferme publiée avec succès !");
-        router.push("/onboarding/success");
-      } else {
-        toast.error(result.message || "Erreur lors de la publication");
-      }
-    } catch (error) {
-      console.error("Erreur réseau:", error);
-      toast.error("Erreur de connexion. Veuillez réessayer.");
+      setListing(data as ListingRow);
+      toast.success("✅ Ferme publiée avec succès !");
+      router.push("/onboarding/success");
+    } catch (e: any) {
+      console.error("Erreur publish:", e);
+      toast.error(e?.message || "Erreur lors de la publication");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "available":
-        return (
-          <Badge className="bg-primary text-primary-foreground">
-            Disponible
-          </Badge>
-        );
-      case "limited":
-        return <Badge variant="secondary">Limité</Badge>;
-      case "order":
-        return <Badge variant="outline">Sur commande</Badge>;
-      default:
-        return null;
-    }
-  };
-
-  // Afficher un loader pendant le chargement
-  if (!requestId || !generatedData) {
+  if (!isLoaded || checking) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-primary" />
-          <p className="text-muted-foreground">Chargement de votre profil...</p>
+          <p className="text-muted-foreground">Chargement...</p>
         </div>
       </div>
     );
   }
+
+  if (!listing) return null;
 
   return (
     <div className="min-h-screen bg-background p-4 py-12">
@@ -204,17 +242,12 @@ export default function Step3Page() {
         <div className="space-y-6">
           <Card className="shadow-lg border-2">
             <CardHeader>
-              <div className="flex items-start justify-between">
-                <div>
-                  <CardTitle className="text-3xl text-balance">
-                    Validation & Activation
-                  </CardTitle>
-                  <CardDescription className="text-base leading-relaxed mt-2">
-                    Votre fiche a été générée automatiquement. Vérifiez et
-                    activez votre profil !
-                  </CardDescription>
-                </div>
-              </div>
+              <CardTitle className="text-3xl text-balance">
+                Validation & Activation
+              </CardTitle>
+              <CardDescription className="text-base leading-relaxed mt-2">
+                Vérifiez votre fiche et publiez-la pour apparaître sur la carte.
+              </CardDescription>
             </CardHeader>
           </Card>
 
@@ -228,24 +261,25 @@ export default function Step3Page() {
                 </Button>
               </div>
             </CardHeader>
+
             <CardContent className="space-y-4">
               <div>
                 <h3 className="text-2xl font-bold mb-2">
-                  {generatedData.farmProfile.name}
+                  {listing.name ?? "Nom à compléter"}
                 </h3>
                 <p className="text-muted-foreground leading-relaxed">
-                  {generatedData.farmProfile.description}
+                  {listing.description || "Description à compléter"}
                 </p>
               </div>
 
               <div className="flex flex-wrap gap-4 text-sm">
                 <div className="flex items-center gap-2">
                   <MapPin className="w-4 h-4 text-primary" />
-                  <span>{generatedData.farmProfile.location}</span>
+                  <span>{listing.address || "Adresse à compléter"}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Mail className="w-4 h-4 text-primary" />
-                  <span>{generatedData.farmProfile.contact}</span>
+                  <span>{listing.email || "Email manquant"}</span>
                 </div>
               </div>
 
@@ -255,75 +289,8 @@ export default function Step3Page() {
                 asChild
               >
                 <Link href="/onboarding/step-2">
-                  Modifier la description <Edit className="w-3 h-3 ml-1" />
+                  Modifier ma fiche <Edit className="w-3 h-3 ml-1" />
                 </Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-md border">
-            <CardHeader>
-              <CardTitle className="text-xl">Mes produits</CardTitle>
-              <CardDescription>
-                Ajustez les prix et la disponibilité. Pas besoin de gérer des
-                stocks précis.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {products.map((product) => (
-                  <div
-                    key={product.id}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-muted rounded-lg"
-                  >
-                    <div className="flex-1">
-                      <p className="font-medium">{product.name}</p>
-                      {product.category && (
-                        <p className="text-xs text-muted-foreground">
-                          {product.category}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <div className="flex items-center gap-2">
-                        <Label className="text-xs text-muted-foreground whitespace-nowrap">
-                          Prix :
-                        </Label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          value={product.price}
-                          onChange={(e) =>
-                            updateProductPrice(product.id, e.target.value)
-                          }
-                          className="w-20 px-2 py-1 border rounded text-sm bg-background"
-                        />
-                        <span className="text-sm">
-                          €/{product.unit || "kg"}
-                        </span>
-                      </div>
-
-                      <select
-                        value={product.status}
-                        onChange={(e) =>
-                          updateProductStatus(product.id, e.target.value)
-                        }
-                        className="px-3 py-1 border rounded text-sm bg-background"
-                      >
-                        <option value="available">Disponible</option>
-                        <option value="limited">Limité</option>
-                        <option value="order">Sur commande</option>
-                      </select>
-
-                      {getStatusBadge(product.status)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <Button variant="outline" className="w-full mt-4 bg-transparent">
-                + Ajouter un produit
               </Button>
             </CardContent>
           </Card>
@@ -335,6 +302,7 @@ export default function Step3Page() {
                 Choisissez comment vous souhaitez être visible
               </CardDescription>
             </CardHeader>
+
             <CardContent className="space-y-6">
               <div className="space-y-4">
                 <div className="flex items-start gap-3 p-4 border rounded-lg">
@@ -342,7 +310,7 @@ export default function Step3Page() {
                     id="enableOrders"
                     checked={enableOrders}
                     onCheckedChange={(checked) =>
-                      setEnableOrders(checked as boolean)
+                      setEnableOrders(Boolean(checked))
                     }
                     className="mt-1"
                   />
@@ -351,11 +319,10 @@ export default function Step3Page() {
                       htmlFor="enableOrders"
                       className="text-base font-semibold cursor-pointer"
                     >
-                      Activer les commandes sur ma ferme
+                      Activer les commandes
                     </Label>
                     <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
-                      Vous recevrez les demandes par email. Le paiement en ligne
-                      peut être activé plus tard.
+                      Active <code>orders_enabled</code> (colonne dédiée).
                     </p>
                   </div>
                 </div>
@@ -365,7 +332,7 @@ export default function Step3Page() {
                     id="publishFarm"
                     checked={publishFarm}
                     onCheckedChange={(checked) =>
-                      setPublishFarm(checked as boolean)
+                      setPublishFarm(Boolean(checked))
                     }
                     className="mt-1"
                   />
@@ -394,26 +361,23 @@ export default function Step3Page() {
                   {isSubmitting ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Publication en cours...
+                      Publication...
                     </>
                   ) : (
                     "Publier ma ferme"
                   )}
                 </Button>
+
                 <Button
                   variant="outline"
                   size="lg"
                   className="sm:w-auto bg-transparent"
                   disabled={isSubmitting}
+                  onClick={() => toast.message("Enregistré")}
                 >
                   Enregistrer pour plus tard
                 </Button>
               </div>
-
-              <p className="text-xs text-muted-foreground text-center">
-                Vous pourrez modifier ces paramètres à tout moment depuis votre
-                tableau de bord.
-              </p>
             </CardContent>
           </Card>
         </div>

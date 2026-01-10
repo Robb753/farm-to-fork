@@ -2,10 +2,14 @@
 "use client";
 
 import type React from "react";
-
-import { useState, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
+
+import Link from "next/link";
+import { toast } from "sonner";
+import { Sprout, MapPin, Loader2 } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,13 +20,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Sprout, MapPin, Loader2 } from "lucide-react";
-import Link from "next/link";
-import { toast } from "sonner";
 import { ProgressIndicator } from "@/components/ui/progress-indicator";
+
 import AddressAutocompleteMapbox from "@/app/modules/maps/components/shared/AddressAutocompleteMapbox";
 import { COLORS } from "@/lib/config";
-import supabase from "@/utils/supabase/client";
+
+import { useSupabaseWithClerk } from "@/utils/supabase/client";
 
 const steps = [
   { number: 1, label: "Demande" },
@@ -45,159 +48,164 @@ interface AddressSelectPayload {
   };
 }
 
-interface Coordinates {
-  lat: number;
-  lng: number;
-}
+type Coordinates = { lat: number; lng: number };
 
 export default function Step1Page() {
   const router = useRouter();
   const { user, isLoaded } = useUser();
+  const supabase = useSupabaseWithClerk();
 
-  const [formData, setFormData] = useState({
-    farmName: "",
-    firstName: "",
-    lastName: "",
-    email: user?.primaryEmailAddress?.emailAddress || "",
-    siret: "",
-    address: "",
-    coordinates: null as Coordinates | null,
-  });
+  const [farmName, setFarmName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+
+  const [siret, setSiret] = useState("");
+
+  // ✅ cinématique “ancienne”
+  const [selectedAddress, setSelectedAddress] = useState("");
+  const [coordinates, setCoordinates] = useState<Coordinates | null>(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  /**
-   * Gestion de la sélection d'adresse
-   */
-  const handleAddressSelect = useCallback(
-    (payload: AddressSelectPayload): void => {
-      try {
-        const { label, lat, lng, address } = payload;
+  useEffect(() => {
+    if (!isLoaded) return;
+    setEmail(user?.primaryEmailAddress?.emailAddress ?? "");
+  }, [isLoaded, user]);
 
-        if (!label || !Number.isFinite(lat) || !Number.isFinite(lng)) {
-          toast.error("Adresse invalide sélectionnée");
-          return;
-        }
-
-        setFormData((prev) => ({
-          ...prev,
-          address: label,
-          coordinates: { lat, lng },
-        }));
-
-        toast.success("Adresse enregistrée !");
-        console.debug("Adresse sélectionnée:", { label, lat, lng, address });
-
-        // ✅ Fermer le dropdown en retirant le focus
-        setTimeout(() => {
-          const activeElement = document.activeElement as HTMLElement;
-          if (activeElement) {
-            activeElement.blur();
-          }
-        }, 100);
-      } catch (error) {
-        console.error("Erreur sélection adresse:", error);
-        toast.error("Erreur lors de la sélection de l'adresse");
-      }
-    },
-    []
-  );
-
-  /**
-   * Extraire le département du code postal
-   */
-  const extractDepartment = (address: string): string => {
-    // Chercher le code postal (5 chiffres)
-    const postcodeMatch = address.match(/\b(\d{5})\b/);
-    if (postcodeMatch) {
-      const postcode = postcodeMatch[1];
-      // Extraire les 2 premiers chiffres
-      const dept = postcode.substring(0, 2);
-      return dept;
-    }
-    return "00"; // Fallback si pas trouvé
-  };
-
-  /**
-   * Validation du SIRET
-   */
-  const validateSiret = (siret: string): boolean => {
-    const cleaned = siret.replace(/\s/g, "");
+  const validateSiret = (value: string): boolean => {
+    const cleaned = value.replace(/\s/g, "");
     return /^\d{14}$/.test(cleaned);
   };
 
+  const handleAddressSelect = useCallback((payload: AddressSelectPayload) => {
+    try {
+      const { label, lat, lng } = payload;
+
+      if (!label || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+        toast.error("Adresse invalide sélectionnée");
+        return;
+      }
+
+      // ✅ on conserve le flow : on set l’adresse (visible) + coords (tech)
+      setSelectedAddress(label);
+      setCoordinates({ lat, lng });
+
+      toast.success("Adresse enregistrée !");
+      setTimeout(() => {
+        const activeElement = document.activeElement as HTMLElement | null;
+        activeElement?.blur();
+      }, 100);
+    } catch (error) {
+      console.error("Erreur sélection adresse:", error);
+      toast.error("Erreur lors de la sélection de l'adresse");
+    }
+  }, []);
+
+  // ✅ important: si l’utilisateur retape du texte manuellement après sélection,
+  // on invalide les coords pour éviter un mismatch adresse/coords
+  useEffect(() => {
+    // si l’adresse change mais que ça ne correspond plus à “une sélection”
+    // (on ne peut pas le savoir parfaitement), on fait simple :
+    // si l’utilisateur modifie le champ => coords reset.
+    // Le composant Mapbox rappellera onSelect quand l’utilisateur choisira à nouveau.
+    setCoordinates(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAddress]);
+
+  const isFormValid = useMemo(() => {
+    return (
+      farmName.trim().length > 0 &&
+      firstName.trim().length > 0 &&
+      lastName.trim().length > 0 &&
+      email.trim().length > 0 &&
+      validateSiret(siret) &&
+      selectedAddress.trim().length > 0 &&
+      coordinates != null
+    );
+  }, [
+    farmName,
+    firstName,
+    lastName,
+    email,
+    siret,
+    selectedAddress,
+    coordinates,
+  ]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
+    if (isSubmitting) return;
 
     try {
-      // Vérifier que l'utilisateur est connecté
       if (!isLoaded || !user) {
         toast.error("Vous devez être connecté pour soumettre une demande");
         router.push("/sign-in");
         return;
       }
 
-      // Validation SIRET
-      if (!validateSiret(formData.siret)) {
+      if (!validateSiret(siret)) {
         toast.error("Le SIRET doit contenir exactement 14 chiffres");
-        setIsSubmitting(false);
         return;
       }
 
-      // Validation coordonnées
-      if (!formData.coordinates) {
-        toast.error("Veuillez sélectionner une adresse valide");
-        setIsSubmitting(false);
+      if (!coordinates) {
+        toast.error("Veuillez sélectionner une adresse dans la liste");
         return;
       }
 
-      // ✅ Extraire le département automatiquement
-      const department = extractDepartment(formData.address);
+      setIsSubmitting(true);
 
-      // ✅ Vérifier si un listing existe déjà (comme AddNewListing)
-      const { data: existingRequest } = await supabase
+      // ✅ Vérifie juste un pending existant
+      const { data: existingRequest, error: existingError } = await supabase
         .from("farmer_requests")
-        .select("id")
+        .select("id,status")
         .eq("user_id", user.id)
+        .eq("status", "pending")
         .maybeSingle();
 
+      if (existingError) {
+        console.error("Erreur check existing request:", existingError);
+        toast.error("Impossible de vérifier vos demandes. Réessayez.");
+        return;
+      }
+
       if (existingRequest) {
-        toast.error(
-          "Vous avez déjà soumis une demande. Veuillez attendre la validation."
-        );
+        toast.error("Vous avez déjà une demande en cours.");
         router.push("/onboarding/pending");
         return;
       }
 
+      // ✅ POST API (sans département)
       const response = await fetch("/api/onboarding/submit-request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: user.id,
-          email: user.primaryEmailAddress?.emailAddress,
-          firstName: formData.firstName.trim(),
-          lastName: formData.lastName.trim(),
-          farmName: formData.farmName.trim(),
-          siret: formData.siret.replace(/\s/g, ""),
-          department: department,
+          email: user.primaryEmailAddress?.emailAddress ?? email,
 
-          // ✅ Adresse et coordonnées (comme AddNewListing)
-          location: formData.address,
-          lat: formData.coordinates.lat,
-          lng: formData.coordinates.lng,
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          farmName: farmName.trim(),
+          siret: siret.replace(/\s/g, ""),
+
+          // ✅ seulement ce que tu veux remonter
+          location: selectedAddress.trim(),
+          lat: coordinates.lat,
+          lng: coordinates.lng,
         }),
       });
 
       const result = await response.json();
 
-      if (result.success) {
-        localStorage.setItem("farmerRequestId", result.requestId.toString());
-        toast.success(result.message || "Demande envoyée avec succès !");
-        router.push("/onboarding/pending");
-      } else {
-        toast.error(result.message || "Erreur lors de l'envoi de la demande");
+      if (!response.ok || !result?.success) {
+        toast.error(result?.message || "Erreur lors de l'envoi de la demande");
+        return;
       }
+
+      localStorage.setItem("farmerRequestId", String(result.requestId));
+      toast.success(result.message || "Demande envoyée avec succès !");
+      router.push("/onboarding/pending");
     } catch (error) {
       console.error("Erreur réseau:", error);
       toast.error("Erreur de connexion. Veuillez réessayer.");
@@ -205,15 +213,6 @@ export default function Step1Page() {
       setIsSubmitting(false);
     }
   };
-
-  const isFormValid =
-    formData.farmName.trim() &&
-    formData.firstName.trim() &&
-    formData.lastName.trim() &&
-    formData.email &&
-    formData.siret &&
-    formData.address &&
-    formData.coordinates;
 
   return (
     <div className="min-h-screen bg-background p-4 py-12">
@@ -238,25 +237,22 @@ export default function Step1Page() {
               pourrez compléter votre fiche ensuite.
             </CardDescription>
           </CardHeader>
+
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Nom de la ferme */}
               <div className="space-y-2">
                 <Label htmlFor="farmName">Nom de la ferme *</Label>
                 <Input
                   id="farmName"
                   type="text"
                   placeholder="Ex: Ferme du Bonheur"
-                  value={formData.farmName}
-                  onChange={(e) =>
-                    setFormData({ ...formData, farmName: e.target.value })
-                  }
+                  value={farmName}
+                  onChange={(e) => setFarmName(e.target.value)}
                   required
                   className="text-base"
                 />
               </div>
 
-              {/* Prénom & Nom */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="firstName">Prénom *</Label>
@@ -264,10 +260,8 @@ export default function Step1Page() {
                     id="firstName"
                     type="text"
                     placeholder="Jean"
-                    value={formData.firstName}
-                    onChange={(e) =>
-                      setFormData({ ...formData, firstName: e.target.value })
-                    }
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
                     required
                     className="text-base"
                   />
@@ -279,47 +273,36 @@ export default function Step1Page() {
                     id="lastName"
                     type="text"
                     placeholder="Dupont"
-                    value={formData.lastName}
-                    onChange={(e) =>
-                      setFormData({ ...formData, lastName: e.target.value })
-                    }
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
                     required
                     className="text-base"
                   />
                 </div>
               </div>
 
-              {/* Email */}
               <div className="space-y-2">
                 <Label htmlFor="email">Email *</Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="jean.dupont@example.com"
-                  value={formData.email}
-                  onChange={(e) =>
-                    setFormData({ ...formData, email: e.target.value })
-                  }
-                  required
-                  className="text-base"
+                  value={email}
                   disabled
+                  className="text-base"
                 />
                 <p className="text-xs text-muted-foreground">
                   Email récupéré depuis votre compte
                 </p>
               </div>
 
-              {/* SIRET */}
               <div className="space-y-2">
                 <Label htmlFor="siret">SIRET *</Label>
                 <Input
                   id="siret"
                   type="text"
                   placeholder="12345678901234"
-                  value={formData.siret}
-                  onChange={(e) =>
-                    setFormData({ ...formData, siret: e.target.value })
-                  }
+                  value={siret}
+                  onChange={(e) => setSiret(e.target.value)}
                   required
                   className="text-base"
                   maxLength={14}
@@ -329,7 +312,6 @@ export default function Step1Page() {
                 </p>
               </div>
 
-              {/* ✅ ADRESSE MAPBOX */}
               <div className="space-y-2">
                 <Label htmlFor="address" className="flex items-center gap-2">
                   <MapPin
@@ -338,27 +320,27 @@ export default function Step1Page() {
                   />
                   Adresse complète de votre ferme *
                 </Label>
+
                 <AddressAutocompleteMapbox
-                  value={formData.address}
-                  onChange={(text) =>
-                    setFormData((prev) => ({ ...prev, address: text }))
-                  }
+                  value={selectedAddress || ""}
+                  onChange={setSelectedAddress}
                   onSelect={handleAddressSelect}
-                  placeholder="123 Route des Champs, 67000 Strasbourg"
+                  placeholder="Numéro, rue, ville (ex : 123 Route des Champs, 67000 Strasbourg)"
                   country="FR"
                 />
-                {formData.coordinates && (
+
+                {coordinates && (
                   <p className="text-xs" style={{ color: COLORS.SUCCESS }}>
-                    ✓ Coordonnées GPS : {formData.coordinates.lat.toFixed(6)},{" "}
-                    {formData.coordinates.lng.toFixed(6)}
+                    ✓ Coordonnées GPS : {coordinates.lat.toFixed(6)},{" "}
+                    {coordinates.lng.toFixed(6)}
                   </p>
                 )}
+
                 <p className="text-xs text-muted-foreground">
                   Cette adresse sera utilisée pour vous localiser sur la carte
                 </p>
               </div>
 
-              {/* Boutons */}
               <div className="pt-4 flex flex-col sm:flex-row gap-3">
                 <Button
                   type="submit"
@@ -375,6 +357,7 @@ export default function Step1Page() {
                     "Envoyer la demande"
                   )}
                 </Button>
+
                 <Button
                   type="button"
                   variant="outline"

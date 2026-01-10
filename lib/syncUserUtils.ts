@@ -1,5 +1,6 @@
 // lib/syncUserUtils.ts
-import { supabase } from "@/utils/supabase/client";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/types/database";
 import type { UserResource } from "@clerk/types";
 
 /**
@@ -9,7 +10,8 @@ interface SyncProfileOptions {
   createListing?: boolean;
 }
 
-type AllowedRole = "user" | "farmer" | "admin";
+export type AllowedRole = "user" | "farmer" | "admin";
+export type SupabaseDbClient = SupabaseClient<Database>;
 
 /**
  * Extrait l'email principal d'un utilisateur Clerk
@@ -58,9 +60,11 @@ export const updateClerkRole = async (
 };
 
 /**
- * ✅ CORRECTION COMPLÈTE: Synchronise le profil utilisateur avec Supabase
+ * ✅ Synchronise le profil utilisateur avec Supabase (upsert)
+ * IMPORTANT: supabase est passé en paramètre (pas de hook ici).
  */
 export const syncProfileToSupabase = async (
+  supabase: SupabaseDbClient,
   user: UserResource,
   role: AllowedRole,
   options: SyncProfileOptions = {}
@@ -76,36 +80,31 @@ export const syncProfileToSupabase = async (
     const email = getEmailFromUser(user);
     if (!email) throw new Error("Email non disponible");
 
-    // ✅ CORRECTION: Ne pas mettre farm_id pour les utilisateurs normaux
+    // ✅ jsonb: on stocke un tableau, pas une string
     const profileData: any = {
       user_id: user.id,
       email,
       role,
       updated_at: new Date().toISOString(),
-      favorites: JSON.stringify([]), // ✅ JSON.stringify pour compatibilité Supabase
+      favorites: [],
     };
 
-    // ✅ Seulement ajouter farm_id si c'est un farmer ET qu'on a un listing
+    // ✅ Seulement ajouter farm_id si farmer + demande de création listing
     if (role === "farmer" && options.createListing) {
       try {
-        const listingId = await ensureFarmerListing(user.id);
+        const listingId = await ensureFarmerListing(supabase, user.id);
         profileData.farm_id = listingId;
       } catch (listingError) {
         console.warn(
           "[DEBUG] Impossible de créer le listing, profil sans farm_id:",
           listingError
         );
-        // On continue sans farm_id plutôt que de faire échouer toute la création
       }
     }
-    // ✅ Pour les users normaux, on ne met PAS de farm_id (NULL par défaut)
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from("profiles")
-      .upsert(profileData, {
-        onConflict: "user_id",
-        ignoreDuplicates: false,
-      });
+      .upsert(profileData, { onConflict: "user_id" });
 
     if (error) {
       console.error("[DEBUG] Erreur Supabase:", error);
@@ -124,27 +123,32 @@ export const syncProfileToSupabase = async (
  */
 let isCreatingListing = false;
 const listingCreationQueue: Array<{
-  email: string;
+  userId: string;
   resolve: (id: number) => void;
   reject: (error: Error) => void;
 }> = [];
 
 /**
- * ✅ CORRECTION: Utiliser l'userId au lieu de l'email pour éviter les conflits
+ * ✅ Crée (si besoin) un listing "placeholder" pour un farmer et renvoie son id
+ * - identifie le listing par createdBy = userId
+ * - gère les conflits et évite les créations simultanées
  */
-export const ensureFarmerListing = async (userId: string): Promise<number> => {
+export const ensureFarmerListing = async (
+  supabase: SupabaseDbClient,
+  userId: string
+): Promise<number> => {
   if (!userId) return Promise.reject(new Error("UserId manquant"));
 
   if (isCreatingListing) {
     return new Promise((resolve, reject) => {
-      listingCreationQueue.push({ email: userId, resolve, reject }); // Réutilise la queue existante
+      listingCreationQueue.push({ userId, resolve, reject });
     });
   }
 
   isCreatingListing = true;
 
   try {
-    // Vérifier si le listing existe déjà avec l'userId
+    // 1) Vérifier si un listing existe déjà
     const { data: existingListing, error: checkError } = await supabase
       .from("listing")
       .select("id")
@@ -152,17 +156,17 @@ export const ensureFarmerListing = async (userId: string): Promise<number> => {
       .maybeSingle();
 
     if (checkError) throw checkError;
-    if (existingListing) return existingListing.id;
+    if (existingListing?.id) return existingListing.id;
 
-    // Créer un nouveau listing avec les champs requis
+    // 2) Créer un listing minimal
     const { data: newListing, error: createError } = await supabase
       .from("listing")
       .insert({
-        name: `Ferme de ${userId.substring(0, 8)}`, // Nom par défaut basé sur l'userId
-        address: "À compléter", // Champ requis
-        lat: 46.2276, // Centre de la France par défaut
-        lng: 2.2137, // Centre de la France par défaut
-        createdBy: userId, // ✅ userId au lieu de l'email
+        name: `Ferme de ${userId.substring(0, 8)}`,
+        address: "À compléter",
+        lat: 46.2276,
+        lng: 2.2137,
+        createdBy: userId,
         active: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -171,22 +175,25 @@ export const ensureFarmerListing = async (userId: string): Promise<number> => {
       .single();
 
     if (createError) {
-      if (createError.code === "23505") {
-        // Conflit - listing créé entre temps
-        const { data: conflictListing } = await supabase
+      // 23505 = unique violation (si tu as une contrainte unique sur createdBy)
+      if ((createError as any).code === "23505") {
+        const { data: conflictListing, error: conflictError } = await supabase
           .from("listing")
           .select("id")
           .eq("createdBy", userId)
           .maybeSingle();
 
-        if (conflictListing) return conflictListing.id;
+        if (conflictError) throw conflictError;
+        if (conflictListing?.id) return conflictListing.id;
+
         throw new Error("Listing existant mais non récupéré");
       }
 
       throw createError;
     }
 
-    return newListing?.id;
+    if (!newListing?.id) throw new Error("Listing créé mais id manquant");
+    return newListing.id;
   } catch (error) {
     console.error("[DEBUG] Erreur ensureFarmerListing:", error);
     throw error;
@@ -196,7 +203,9 @@ export const ensureFarmerListing = async (userId: string): Promise<number> => {
     // Traiter le prochain élément de la queue
     if (listingCreationQueue.length > 0) {
       const next = listingCreationQueue.shift()!;
-      ensureFarmerListing(next.email).then(next.resolve).catch(next.reject);
+      ensureFarmerListing(supabase, next.userId)
+        .then(next.resolve)
+        .catch(next.reject);
     }
   }
 };
@@ -205,6 +214,7 @@ export const ensureFarmerListing = async (userId: string): Promise<number> => {
  * Récupère le profil depuis Supabase avec retry automatique
  */
 export const getProfileFromSupabase = async (
+  supabase: SupabaseDbClient,
   userId: string,
   maxAttempts: number = 5
 ): Promise<{ role: AllowedRole } | null> => {
@@ -221,15 +231,17 @@ export const getProfileFromSupabase = async (
 
     if (data) return data as { role: AllowedRole };
 
+    // PGRST116 = no rows found
     if (error?.code === "PGRST116" && attempt < maxAttempts) {
       console.warn(
         `[DEBUG] Tentative ${attempt} : profil non trouvé, nouvelle tentative...`
       );
-      await new Promise((res) => setTimeout(res, 400 * attempt)); // Backoff exponentiel
-    } else {
-      console.error("[DEBUG] Erreur récupération profil Supabase:", error);
-      return null;
+      await new Promise((res) => setTimeout(res, 400 * attempt));
+      continue;
     }
+
+    console.error("[DEBUG] Erreur récupération profil Supabase:", error);
+    return null;
   }
 
   return null;
@@ -239,22 +251,23 @@ export const getProfileFromSupabase = async (
  * Détermine le rôle utilisateur à partir de Clerk et/ou Supabase
  */
 export const determineUserRole = async (
+  supabase: SupabaseDbClient,
   user: UserResource
 ): Promise<AllowedRole> => {
   if (!user?.id) return "user";
 
-  // Vérifier d'abord les métadonnées Clerk
+  // 1) Vérifier d'abord les métadonnées Clerk
   const clerkRole = (user.publicMetadata as any)?.role;
   if (["user", "farmer", "admin"].includes(clerkRole)) {
     return clerkRole as AllowedRole;
   }
 
-  // Fallback vers Supabase avec retry intégré
-  const profile = await getProfileFromSupabase(user.id);
+  // 2) Fallback vers Supabase avec retry intégré
+  const profile = await getProfileFromSupabase(supabase, user.id);
   if (profile?.role && ["user", "farmer", "admin"].includes(profile.role)) {
     return profile.role;
   }
 
-  // Valeur par défaut sécurisée
+  // 3) Valeur par défaut sécurisée
   return "user";
 };

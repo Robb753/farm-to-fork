@@ -1,71 +1,63 @@
 // app/api/onboarding/submit-request/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import type { Database } from "@/lib/types/database";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-/**
- * Interface pour le step 1 de l'onboarding
- */
 interface OnboardingStep1Body {
-  userId: string;
-  email: string;
+  userId?: string; // optionnel, anti-usurpation si présent
+  email?: string;
   firstName: string;
   lastName: string;
-  phone?: string; // Optionnel au step 1
+  phone?: string;
   farmName: string;
   siret: string;
-  department: string;
+  location: string;
+  lat: number;
+  lng: number;
 }
 
-/**
- * Interface pour la réponse
- */
 interface OnboardingResponse {
   success: boolean;
   message: string;
   requestId?: number;
   error?: string;
+  details?: string;
 }
 
-/**
- * Création du client Supabase
- */
 const supabase = createClient<Database>(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  }
+  { auth: { autoRefreshToken: false, persistSession: false } }
 );
 
-/**
- * API Route pour soumettre une demande d'onboarding (Step 1)
- *
- * Flow:
- * 1. Validation des données
- * 2. Vérification des doublons
- * 3. Insertion dans farmer_requests avec les BONNES colonnes
- * 4. Envoi notification admin
- * 5. Retour requestId pour tracking
- */
 export async function POST(
   req: NextRequest
 ): Promise<NextResponse<OnboardingResponse>> {
   const timestamp = new Date().toISOString();
 
   try {
-    // Parse du body
-    let body: OnboardingStep1Body;
+    // ✅ IMPORTANT : dans ta version, auth() retourne une Promise => await obligatoire
+    const { userId: clerkUserId } = await auth();
 
+    if (!clerkUserId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Non authentifié",
+          message: "Vous devez être connecté pour soumettre une demande",
+        },
+        { status: 401 }
+      );
+    }
+
+    let body: OnboardingStep1Body;
     try {
       body = await req.json();
-    } catch (parseError) {
+    } catch {
       return NextResponse.json(
         {
           success: false,
@@ -77,45 +69,63 @@ export async function POST(
     }
 
     const {
-      userId,
-      email,
+      userId: userIdFromBody,
+      email: emailFromBody,
       firstName,
       lastName,
       phone,
       farmName,
       siret,
-      department,
+      location,
+      lat,
+      lng,
     } = body;
 
-    // Validation des champs requis
-    const requiredFields = [
-      { field: userId, name: "userId" },
-      { field: email, name: "email" },
-      { field: firstName, name: "firstName" },
-      { field: lastName, name: "lastName" },
-      { field: farmName, name: "farmName" },
-      { field: siret, name: "siret" },
-      { field: department, name: "department" },
-    ];
+    // ✅ Anti-usurpation si userId est fourni par le client
+    if (userIdFromBody && userIdFromBody !== clerkUserId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Forbidden",
+          message: "userId ne correspond pas à l'utilisateur authentifié",
+        },
+        { status: 403 }
+      );
+    }
 
-    const missingFields = requiredFields
-      .filter(({ field }) => !field || String(field).trim().length === 0)
-      .map(({ name }) => name);
+    // ✅ Email fiable côté serveur via Clerk (évite getToken)
+    const clerkUser = await currentUser();
+    const emailFromClerk = clerkUser?.primaryEmailAddress?.emailAddress ?? null;
 
-    if (missingFields.length > 0) {
+    const resolvedEmail = (emailFromClerk ?? emailFromBody ?? "")
+      .trim()
+      .toLowerCase();
+
+    // ✅ required fields
+    const missing: string[] = [];
+    if (!resolvedEmail) missing.push("email");
+    if (!firstName?.trim()) missing.push("firstName");
+    if (!lastName?.trim()) missing.push("lastName");
+    if (!farmName?.trim()) missing.push("farmName");
+    if (!siret?.trim()) missing.push("siret");
+    if (!location?.trim()) missing.push("location");
+    if (!Number.isFinite(Number(lat))) missing.push("lat");
+    if (!Number.isFinite(Number(lng))) missing.push("lng");
+
+    if (missing.length > 0) {
       return NextResponse.json(
         {
           success: false,
           error: "Champs requis manquants",
-          message: `Champs manquants: ${missingFields.join(", ")}`,
+          message: `Champs manquants: ${missing.join(", ")}`,
         },
         { status: 400 }
       );
     }
 
-    // Validation format email
+    // ✅ Email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email.trim())) {
+    if (!emailRegex.test(resolvedEmail)) {
       return NextResponse.json(
         {
           success: false,
@@ -126,19 +136,7 @@ export async function POST(
       );
     }
 
-    // Validation format userId Clerk
-    if (!userId.startsWith("user_")) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "UserId invalide",
-          message: "L'ID utilisateur doit être un ID Clerk valide",
-        },
-        { status: 400 }
-      );
-    }
-
-    // Validation SIRET (14 chiffres)
+    // ✅ SIRET
     const siretCleaned = siret.replace(/\s/g, "");
     if (!/^\d{14}$/.test(siretCleaned)) {
       return NextResponse.json(
@@ -151,25 +149,37 @@ export async function POST(
       );
     }
 
-    // Validation département (2 ou 3 chiffres, ou 2A/2B pour la Corse)
-    const departmentCleaned = department.trim().toUpperCase();
-    if (!/^(?:\d{2,3}|2[AB])$/.test(departmentCleaned)) {
+    // ✅ Coords
+    const latNum = Number(lat);
+    const lngNum = Number(lng);
+
+    if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) {
       return NextResponse.json(
         {
           success: false,
-          error: "Département invalide",
-          message:
-            "Le département doit être au format 01-95, 971-976, 2A ou 2B",
+          error: "Coordonnées invalides",
+          message: "lat/lng doivent être des nombres valides",
         },
         { status: 400 }
       );
     }
 
-    // Vérifier si demande en attente existe déjà
+    if (latNum < -90 || latNum > 90 || lngNum < -180 || lngNum > 180) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Coordonnées invalides",
+          message: "lat/lng hors limites",
+        },
+        { status: 400 }
+      );
+    }
+
+    // ✅ Doublon pending
     const { data: existing, error: checkError } = await supabase
       .from("farmer_requests")
-      .select("id, status")
-      .eq("user_id", userId)
+      .select("id,status")
+      .eq("user_id", clerkUserId)
       .eq("status", "pending")
       .maybeSingle();
 
@@ -190,45 +200,37 @@ export async function POST(
         {
           success: false,
           error: "Candidature existante",
-          message: "Vous avez déjà une candidature en cours de traitement",
+          message: "Vous avez déjà une candidature en cours",
         },
         { status: 409 }
       );
     }
 
-    // ✅ CORRECTION : Préparation des données avec les BONNES colonnes
-    const requestData = {
-      // Identifiants
-      user_id: userId,
-      email: email.trim().toLowerCase(),
+    const requestData: Database["public"]["Tables"]["farmer_requests"]["Insert"] =
+      {
+        user_id: clerkUserId,
+        email: resolvedEmail,
 
-      // ✅ Informations personnelles dans leurs colonnes dédiées
-      first_name: firstName.trim(),
-      last_name: lastName.trim(),
-      phone: phone?.trim() || null,
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        phone: phone?.trim() || null,
 
-      // ✅ Informations entreprise dans leurs colonnes dédiées
-      siret: siretCleaned,
-      department: departmentCleaned,
+        siret: siretCleaned,
+        farm_name: farmName.trim(),
 
-      // ✅ Informations ferme
-      farm_name: farmName.trim(),
-      location: `Département ${departmentCleaned}`, // Sera enrichi au step 2
+        location: location.trim(),
+        lat: latNum,
+        lng: lngNum,
 
-      // ✅ Description vide pour l'instant (sera remplie au step 2)
-      description: null,
+        description: null,
+        website: null,
+        products: null,
 
-      // ✅ Champs optionnels (seront remplis au step 2)
-      website: null,
-      products: null,
+        status: "pending",
+        created_at: timestamp,
+        updated_at: timestamp,
+      };
 
-      // ✅ Statut et timestamps
-      status: "pending" as const,
-      created_at: timestamp,
-      updated_at: timestamp,
-    };
-
-    // Insertion dans farmer_requests
     const { data: inserted, error: insertError } = await supabase
       .from("farmer_requests")
       .insert([requestData])
@@ -237,19 +239,16 @@ export async function POST(
 
     if (insertError) {
       console.error("[ONBOARDING] Erreur insertion:", insertError);
-
-      // Gestion des contraintes uniques
       if (insertError.code === "23505") {
         return NextResponse.json(
           {
             success: false,
             error: "Candidature existante",
-            message: "Une candidature avec ces informations existe déjà",
+            message: "Une candidature existe déjà",
           },
           { status: 409 }
         );
       }
-
       return NextResponse.json(
         {
           success: false,
@@ -260,59 +259,18 @@ export async function POST(
       );
     }
 
-    const requestId = inserted?.id;
-
-    // Envoi notification admin (non bloquant)
-    try {
-      const notificationPayload = {
-        requestId,
-        user_id: userId,
-        email: email.trim().toLowerCase(),
-        first_name: firstName.trim(),
-        last_name: lastName.trim(),
-        phone: phone?.trim() || null,
-        farm_name: farmName.trim(),
-        siret: siretCleaned,
-        department: departmentCleaned,
-        location: requestData.location,
-        status: "pending",
-        created_at: timestamp,
-      };
-
-      await fetch(
-        `${process.env.NEXT_PUBLIC_APP_URL}/api/admin/send-notification`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(notificationPayload),
-        }
-      );
-    } catch (emailError) {
-      console.warn("[ONBOARDING] ⚠️ Erreur notification admin:", emailError);
-      // Non bloquant - la demande est enregistrée
-    }
-
-    // Retour succès
     return NextResponse.json(
       {
         success: true,
         message:
           "Votre demande a été soumise avec succès. Vous recevrez une réponse sous 24-48h.",
-        requestId,
+        requestId: inserted.id,
       },
-      {
-        status: 201,
-        headers: {
-          "Content-Type": "application/json",
-          "Cache-Control": "no-cache, no-store, must-revalidate",
-        },
-      }
+      { status: 201 }
     );
   } catch (error) {
     console.error("[ONBOARDING] Erreur serveur critique:", error);
-
     const isDev = process.env.NODE_ENV === "development";
-
     return NextResponse.json(
       {
         success: false,
@@ -326,8 +284,3 @@ export async function POST(
     );
   }
 }
-
-/**
- * Export des types pour utilisation externe
- */
-export type { OnboardingStep1Body, OnboardingResponse };
