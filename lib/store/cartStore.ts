@@ -152,7 +152,21 @@ export const useCartStore = create<CartStore>()(
         set((state) => {
           if (quantity <= 0) {
             // Si quantité = 0, retirer le produit
-            return get().removeItem(productId), state;
+            const newItems = state.cart.items.filter(
+              (item) => item.product.id !== productId
+            );
+
+            // Si le panier est vide, réinitialiser
+            if (newItems.length === 0) {
+              return { cart: initialCart };
+            }
+
+            return {
+              cart: {
+                ...state.cart,
+                items: newItems,
+              },
+            };
           }
 
           const newItems = state.cart.items.map((item) =>
