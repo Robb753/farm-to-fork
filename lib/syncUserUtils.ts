@@ -45,16 +45,16 @@ export const updateClerkRole = async (
 
     if (!response.ok) {
       console.error(
-        `[DEBUG] Échec de la mise à jour du rôle. Statut: ${response.status}`
+        `Échec de la mise à jour du rôle. Statut: ${response.status}`
       );
       const data = await response.json().catch(() => ({}));
-      console.error("[DEBUG] Détails de l'erreur:", data);
+      console.error("Détails de l'erreur:", data);
       return false;
     }
 
     return true;
   } catch (error) {
-    console.error("[DEBUG] Erreur mise à jour rôle Clerk:", error);
+    console.error("Erreur mise à jour rôle Clerk:", error);
     return false;
   }
 };
@@ -96,7 +96,7 @@ export const syncProfileToSupabase = async (
         profileData.farm_id = listingId;
       } catch (listingError) {
         console.warn(
-          "[DEBUG] Impossible de créer le listing, profil sans farm_id:",
+          "Impossible de créer le listing, profil sans farm_id:",
           listingError
         );
       }
@@ -107,13 +107,13 @@ export const syncProfileToSupabase = async (
       .upsert(profileData, { onConflict: "user_id" });
 
     if (error) {
-      console.error("[DEBUG] Erreur Supabase:", error);
+      console.error("Erreur Supabase:", error);
       throw new Error(`Erreur Supabase: ${error.message}`);
     }
 
     return true;
   } catch (error) {
-    console.error("[DEBUG] Erreur sync Supabase:", error);
+    console.error("Erreur sync Supabase:", error);
     throw error;
   }
 };
@@ -195,7 +195,7 @@ export const ensureFarmerListing = async (
     if (!newListing?.id) throw new Error("Listing créé mais id manquant");
     return newListing.id;
   } catch (error) {
-    console.error("[DEBUG] Erreur ensureFarmerListing:", error);
+    console.error("Erreur ensureFarmerListing:", error);
     throw error;
   } finally {
     isCreatingListing = false;
@@ -234,13 +234,13 @@ export const getProfileFromSupabase = async (
     // PGRST116 = no rows found
     if (error?.code === "PGRST116" && attempt < maxAttempts) {
       console.warn(
-        `[DEBUG] Tentative ${attempt} : profil non trouvé, nouvelle tentative...`
+        `Tentative ${attempt} : profil non trouvé, nouvelle tentative...`
       );
       await new Promise((res) => setTimeout(res, 400 * attempt));
       continue;
     }
 
-    console.error("[DEBUG] Erreur récupération profil Supabase:", error);
+    console.error("Erreur récupération profil Supabase:", error);
     return null;
   }
 
