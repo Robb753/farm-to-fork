@@ -84,7 +84,6 @@ export default function SignupRoleModal({
         const errorData: UpdateRoleResponse = await response
           .json()
           .catch(() => ({}));
-        console.error("[DEBUG] Erreur API:", errorData);
         toast.warning("Compte créé, mais le rôle n'a pas pu être synchronisé.");
       } else {
         // ✅ Rafraîchir la session Clerk pour obtenir les nouvelles métadonnées
@@ -109,7 +108,6 @@ export default function SignupRoleModal({
         router.push(redirectUrl);
       }, 300);
     } catch (error) {
-      console.error("[DEBUG] Erreur lors de l'inscription:", error);
       toast.error("Une erreur est survenue pendant l'inscription.");
       setIsSubmitting(false);
     }
