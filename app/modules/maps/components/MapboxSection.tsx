@@ -107,7 +107,17 @@ export default function MapboxSection({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const userInteractingRef = useRef<boolean>(false);
-  const markersRef = useRef<mapboxgl.Marker[]>([]);
+  const markersRef = useRef<
+    Array<{
+      marker: mapboxgl.Marker;
+      element: HTMLDivElement;
+      handlers: {
+        mouseenter: () => void;
+        mouseleave: () => void;
+        click: () => void;
+      };
+    }>
+  >([]);
 
   // ✅ CORRECTION : États locaux pour loading
   const [isApiLoading, setIsApiLoading] = useState<boolean>(true);
@@ -204,13 +214,31 @@ export default function MapboxSection({
 
   // ✅ FONCTIONS POUR LES MARQUEURS
   const clearMarkers = useCallback(() => {
-    markersRef.current.forEach((marker) => {
-      try {
-        marker.remove();
-      } catch (e) {
-        console.warn("Erreur suppression marqueur:", e);
+    markersRef.current.forEach(
+      ({
+        marker,
+        element,
+        handlers,
+      }: {
+        marker: mapboxgl.Marker;
+        element: HTMLDivElement;
+        handlers: {
+          mouseenter: () => void;
+          mouseleave: () => void;
+          click: () => void;
+        };
+      }) => {
+        try {
+          // Remove event listeners before removing marker
+          element.removeEventListener("mouseenter", handlers.mouseenter);
+          element.removeEventListener("mouseleave", handlers.mouseleave);
+          element.removeEventListener("click", handlers.click);
+          marker.remove();
+        } catch (e) {
+          console.warn("Erreur suppression marqueur:", e);
+        }
       }
-    });
+    );
     markersRef.current = [];
   }, []);
 
@@ -242,19 +270,20 @@ export default function MapboxSection({
               box-shadow: 0 2px 4px rgba(0,0,0,0.2);
             `;
 
-            markerEl.addEventListener("mouseenter", () => {
+            // Create named event handlers for proper cleanup
+            const handleMouseEnter = () => {
               markerEl.style.transform = "scale(1.2)";
               markerEl.style.backgroundColor = COLORS.PRIMARY_DARK;
               markerEl.style.boxShadow = "0 4px 8px rgba(0,0,0,0.3)";
-            });
+            };
 
-            markerEl.addEventListener("mouseleave", () => {
+            const handleMouseLeave = () => {
               markerEl.style.transform = "scale(1)";
               markerEl.style.backgroundColor = COLORS.PRIMARY;
               markerEl.style.boxShadow = "0 2px 4px rgba(0,0,0,0.2)";
-            });
+            };
 
-            markerEl.addEventListener("click", () => {
+            const handleClick = () => {
               if (typeof window !== "undefined") {
                 window.dispatchEvent(
                   new CustomEvent("listingSelected", {
@@ -262,13 +291,25 @@ export default function MapboxSection({
                   })
                 );
               }
-            });
+            };
+
+            markerEl.addEventListener("mouseenter", handleMouseEnter);
+            markerEl.addEventListener("mouseleave", handleMouseLeave);
+            markerEl.addEventListener("click", handleClick);
 
             const marker = new mapboxgl.Marker(markerEl)
               .setLngLat([listing.lng, listing.lat])
               .addTo(map);
 
-            markersRef.current.push(marker);
+            markersRef.current.push({
+              marker,
+              element: markerEl,
+              handlers: {
+                mouseenter: handleMouseEnter,
+                mouseleave: handleMouseLeave,
+                click: handleClick,
+              },
+            });
           } catch (error) {
             console.warn("Erreur création marqueur pour", listing.id, error);
           }
