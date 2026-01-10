@@ -68,6 +68,7 @@ const useFileUpload = (
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [currentFiles, setCurrentFiles] = useState<File[]>([]);
   const isUpdatingRef = useRef<boolean>(false);
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const notifyParent = useCallback(
     (files: File[]): void => {
@@ -83,15 +84,32 @@ const useFileUpload = (
   );
 
   const simulateProgress = useCallback((): void => {
+    // Clear any existing interval before starting a new one
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+    }
+
     setUploadProgress(0);
     let progress = 0;
-    const interval = setInterval(() => {
+    progressIntervalRef.current = setInterval(() => {
       progress += 10;
       setUploadProgress(progress);
       if (progress >= 100) {
-        clearInterval(interval);
+        if (progressIntervalRef.current) {
+          clearInterval(progressIntervalRef.current);
+          progressIntervalRef.current = null;
+        }
       }
     }, 100);
+  }, []);
+
+  // Cleanup interval on unmount
+  useEffect(() => {
+    return () => {
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+      }
+    };
   }, []);
 
   return {
