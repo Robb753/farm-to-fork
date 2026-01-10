@@ -283,11 +283,19 @@ export const UPLOAD_HELPERS = {
   },
 
   /**
-   * Générer un nom de fichier unique
+   * Générer un nom de fichier unique (cryptographically secure)
    */
   generateUniqueFilename: (originalFilename: string): string => {
     const timestamp = Date.now();
-    const random = Math.random().toString(36).substring(2, 8);
+
+    // Use crypto.getRandomValues for cryptographically secure random generation
+    const randomBytes = new Uint8Array(4);
+    crypto.getRandomValues(randomBytes);
+    const random = Array.from(randomBytes)
+      .map((byte) => byte.toString(36))
+      .join('')
+      .substring(0, 6);
+
     const extension = UPLOAD_HELPERS.getFileExtension(originalFilename);
     const nameWithoutExt = originalFilename.replace(`.${extension}`, "");
     const sanitized = nameWithoutExt.replace(/[^a-zA-Z0-9]/g, "_");
