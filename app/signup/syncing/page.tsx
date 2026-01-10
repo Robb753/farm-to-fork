@@ -38,17 +38,26 @@ export default function SignupSyncingPage(): JSX.Element {
   useEffect(() => {
     if (!isReady) return;
 
+    let timeoutId: NodeJS.Timeout | null = null;
+
     // ✅ Redirection selon le rôle avec chemins configurés
     if (isFarmer) {
       setSyncStatus("Redirection vers votre dashboard...");
-      setTimeout(() => router.replace("/dashboard/farms"), 500);
+      timeoutId = setTimeout(() => router.replace("/dashboard/farms"), 500);
     } else if (isAdmin) {
       setSyncStatus("Redirection vers l'administration...");
-      setTimeout(() => router.replace("/admin"), 500);
+      timeoutId = setTimeout(() => router.replace("/admin"), 500);
     } else if (isUser) {
       setSyncStatus("Redirection vers l'accueil...");
-      setTimeout(() => router.replace(PATHS.HOME), 500);
+      timeoutId = setTimeout(() => router.replace(PATHS.HOME), 500);
     }
+
+    // ✅ Cleanup: Clear timeout if component unmounts before navigation
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
   }, [isReady, isFarmer, isUser, isAdmin, router]);
 
   /**
