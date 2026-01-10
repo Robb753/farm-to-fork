@@ -170,10 +170,20 @@ export function throttle<T extends (...args: any[]) => any>(
 }
 
 /**
- * Utilitaire pour générer un ID unique
+ * Utilitaire pour générer un ID unique (cryptographically secure)
  */
 export function generateId(): string {
-  return Math.random().toString(36).substring(2) + Date.now().toString(36);
+  // Use crypto.getRandomValues for cryptographically secure random generation
+  const randomBytes = new Uint8Array(16);
+  crypto.getRandomValues(randomBytes);
+
+  // Convert to base36 string
+  const randomPart = Array.from(randomBytes)
+    .map((byte) => byte.toString(36))
+    .join('')
+    .substring(0, 11);
+
+  return randomPart + Date.now().toString(36);
 }
 
 /**
