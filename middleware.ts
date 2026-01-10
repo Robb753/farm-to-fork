@@ -13,6 +13,32 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
  * - Gestion appropriée de l'authentification Clerk
  */
 
+// ==================== TYPE DEFINITIONS ====================
+/**
+ * Interface pour les métadonnées publiques Clerk
+ */
+interface ClerkPublicMetadata {
+  role?: "admin" | "farmer" | "user";
+  isAdmin?: boolean;
+}
+
+/**
+ * Interface pour les métadonnées privées Clerk
+ */
+interface ClerkMetadata {
+  role?: "admin" | "farmer" | "user";
+  isAdmin?: boolean;
+}
+
+/**
+ * Interface pour les claims de session Clerk
+ */
+interface ClerkSessionClaims {
+  metadata?: ClerkMetadata;
+  publicMetadata?: ClerkPublicMetadata;
+  [key: string]: unknown;
+}
+
 // ==================== MATCHERS DE ROUTES ====================
 const isPublicRoute = createRouteMatcher([
   "/", // Page d'accueil
@@ -51,8 +77,8 @@ export default clerkMiddleware(async (auth, req) => {
   // ==================== PROTECTION ROUTES ADMIN ====================
   if (isAdminRoute(req)) {
     try {
-      // ✅ CORRIGÉ: Vérifier le rôle admin directement depuis sessionClaims avec typage correct
-      const metadata = sessionClaims as any; // Cast temporaire pour éviter les erreurs TypeScript
+      // ✅ Vérifier le rôle admin directement depuis sessionClaims avec typage sécurisé
+      const metadata = sessionClaims as ClerkSessionClaims;
       const userRole =
         metadata?.metadata?.role || metadata?.publicMetadata?.role;
       const isAdmin =
