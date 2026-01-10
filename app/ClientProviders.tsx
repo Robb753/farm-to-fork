@@ -111,10 +111,12 @@ const AuthSync: React.FC = () => {
           lastName: user.lastName,
           emailAddresses: user.emailAddresses,
           primaryEmailAddressId: user.primaryEmailAddressId,
+          primaryEmailAddress: user.primaryEmailAddress,
           imageUrl: user.imageUrl,
           username: user.username,
           createdAt: user.createdAt,
           updatedAt: user.updatedAt,
+          publicMetadata: user.publicMetadata,
           // Propriétés manquantes avec valeurs par défaut
           banned: false,
           locked: false,
@@ -122,7 +124,8 @@ const AuthSync: React.FC = () => {
           lastActiveAt: user.lastSignInAt || user.createdAt,
         };
 
-        await syncUser(adaptedUser as any);
+        // Cast is safe as we've included all required properties
+        await syncUser(adaptedUser as UserResource);
       } catch (error) {
         console.error("Erreur lors de la synchronisation utilisateur:", error);
         // En cas d'erreur, marquer comme prêt quand même

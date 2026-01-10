@@ -83,7 +83,10 @@ export default function SignupRoleModal({
       if (!response.ok) {
         const errorData: UpdateRoleResponse = await response
           .json()
-          .catch(() => ({}));
+          .catch((parseError) => {
+            console.error("Failed to parse error response:", parseError);
+            return { success: false, error: "Unable to parse server response" };
+          });
         toast.warning("Compte créé, mais le rôle n'a pas pu être synchronisé.");
       } else {
         // ✅ Rafraîchir la session Clerk pour obtenir les nouvelles métadonnées

@@ -84,7 +84,6 @@ export default function FarmPage(): JSX.Element {
     async function loadListing() {
       // Vérifier que le paramètre existe
       if (!idParam || typeof idParam !== "string") {
-        console.log("No valid ID param");
         setIsLoading(false);
         setListing(null);
         return;
@@ -94,7 +93,6 @@ export default function FarmPage(): JSX.Element {
 
       // Vérifier que c'est un nombre valide
       if (isNaN(parsedId)) {
-        console.log("Invalid ID:", idParam);
         setIsLoading(false);
         setListing(null);
         return;
@@ -102,7 +100,6 @@ export default function FarmPage(): JSX.Element {
 
       try {
         setIsLoading(true);
-        console.log("Loading listing with ID:", parsedId);
 
         // Charger le listing avec ses images
         const { data: listingData, error: listingError } = await supabase
@@ -122,7 +119,6 @@ export default function FarmPage(): JSX.Element {
           throw listingError;
         }
 
-        console.log("Listing loaded:", listingData);
         setListing(listingData as ListingWithImages);
       } catch (error) {
         console.error("Erreur chargement ferme:", error);

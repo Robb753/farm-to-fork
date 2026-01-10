@@ -4,7 +4,7 @@ import { persist, subscribeWithSelector } from "zustand/middleware";
 import { toast } from "sonner";
 
 import type { UserResource } from "@clerk/types";
-import type { Json } from "@/lib/types/database";
+import type { Json, Database } from "@/lib/types/database";
 import type { SupabaseDbClient } from "@/lib/syncUserUtils";
 
 import {
@@ -14,6 +14,25 @@ import {
 } from "@/lib/syncUserUtils";
 
 // ==================== TYPES ====================
+
+/**
+ * Clerk public metadata interface
+ */
+interface ClerkPublicMetadata {
+  role?: "user" | "farmer" | "admin";
+}
+
+/**
+ * Extended Clerk UserResource with typed publicMetadata
+ */
+interface TypedUserResource extends UserResource {
+  publicMetadata: ClerkPublicMetadata;
+}
+
+/**
+ * Type alias for profiles table row from database
+ */
+type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 
 export interface UserProfile {
   id: string; // Clerk user id
@@ -160,12 +179,18 @@ export const useUserStore = create<UserState>()(
             set((state) => {
               // Si profile absent, on peut initialiser un minimum
               const existing = state.profile;
+
+              // Validate role from database
+              const dbRole = data?.role;
+              const validRole: UserProfile["role"] =
+                dbRole === "admin" || dbRole === "farmer" || dbRole === "user"
+                  ? dbRole
+                  : "user";
+
               const nextProfile: UserProfile = {
                 id: userId,
                 email: existing?.email ?? data?.email ?? "",
-                role: (existing?.role ??
-                  (data?.role as any) ??
-                  "user") as UserProfile["role"],
+                role: existing?.role ?? validRole,
                 favorites: favoritesArray,
               };
 
@@ -293,9 +318,10 @@ export const useUserStore = create<UserState>()(
           }
 
           if (!supabase) {
-            // On évite de “crasher” si le store sync avant initSupabase()
+            // On évite de "crasher" si le store sync avant initSupabase()
             console.warn("[UserStore] Supabase non initialisé (syncUser).");
-            setRole(((user.publicMetadata as any)?.role ?? "user") as any);
+            const typedUser = user as TypedUserResource;
+            setRole(typedUser.publicMetadata?.role ?? "user");
             setReady(true);
             setSyncing(false);
             setWaitingForProfile(false);
@@ -311,7 +337,8 @@ export const useUserStore = create<UserState>()(
             const resolvedRole = await determineUserRole(supabase, user);
             setRole(resolvedRole);
 
-            if ((user.publicMetadata as any)?.role !== resolvedRole) {
+            const typedUser = user as TypedUserResource;
+            if (typedUser.publicMetadata?.role !== resolvedRole) {
               await updateClerkRole(user.id, resolvedRole);
             }
 

@@ -10,8 +10,32 @@ interface SyncProfileOptions {
   createListing?: boolean;
 }
 
+/**
+ * Interface for PostgreSQL error with code property
+ */
+interface PostgresError {
+  code?: string;
+  message?: string;
+  details?: string;
+  hint?: string;
+}
+
 export type AllowedRole = "user" | "farmer" | "admin";
 export type SupabaseDbClient = SupabaseClient<Database>;
+
+/**
+ * Clerk public metadata interface
+ */
+interface ClerkPublicMetadata {
+  role?: AllowedRole;
+}
+
+/**
+ * Extended Clerk UserResource with typed publicMetadata
+ */
+interface TypedUserResource extends UserResource {
+  publicMetadata: ClerkPublicMetadata;
+}
 
 /**
  * Extrait l'email principal d'un utilisateur Clerk
@@ -180,8 +204,9 @@ export const ensureFarmerListing = async (
       .single();
 
     if (createError) {
-      // 23505 = unique violation (si tu as une contrainte unique sur createdBy)
-      if ((createError as any).code === "23505") {
+      // 23505 = unique violation (constraint unique sur createdBy)
+      const pgError = createError as PostgresError;
+      if (pgError.code === "23505") {
         const { data: conflictListing, error: conflictError } = await supabase
           .from("listing")
           .select("id")
@@ -262,9 +287,10 @@ export const determineUserRole = async (
   if (!user?.id) return "user";
 
   // 1) Vérifier d'abord les métadonnées Clerk
-  const clerkRole = (user.publicMetadata as any)?.role;
-  if (["user", "farmer", "admin"].includes(clerkRole)) {
-    return clerkRole as AllowedRole;
+  const typedUser = user as TypedUserResource;
+  const clerkRole = typedUser.publicMetadata?.role;
+  if (clerkRole && ["user", "farmer", "admin"].includes(clerkRole)) {
+    return clerkRole;
   }
 
   // 2) Fallback vers Supabase avec retry intégré
