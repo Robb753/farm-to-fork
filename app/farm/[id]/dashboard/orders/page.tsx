@@ -130,7 +130,22 @@ export default function FarmDashboardOrdersPage(): JSX.Element {
           return;
         }
 
-        // Mapper les données avec type safety
+        // Récupérer les emails des utilisateurs depuis la table profiles
+        const userIds = [...new Set(ordersData.map((order) => order.user_id))];
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("user_id, email")
+          .in("user_id", userIds);
+
+        // Créer un map user_id -> email pour un accès rapide
+        const userEmailMap = new Map<string, string>();
+        if (profiles) {
+          profiles.forEach((profile) => {
+            userEmailMap.set(profile.user_id, profile.email);
+          });
+        }
+
+        // Mapper les données avec les emails réels
         const ordersWithUsers: FarmerOrder[] = ordersData.map((order: any) => ({
           id: order.id,
           user_id: order.user_id,
@@ -144,7 +159,7 @@ export default function FarmDashboardOrdersPage(): JSX.Element {
           status: order.status,
           payment_status: order.payment_status,
           created_at: order.created_at,
-          user: { email: order.user_id }, // Temporaire - affiche user_id
+          user: { email: userEmailMap.get(order.user_id) || order.user_id },
         }));
 
         setOrders(ordersWithUsers);
