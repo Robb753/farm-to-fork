@@ -286,22 +286,6 @@ export const STORAGE_BUCKETS = {
  */
 export const DB_HELPERS = {
   /**
-   * Construire une clause WHERE pour les filtres
-   */
-  buildFilterWhere: (filters: Record<string, string[]>) => {
-    const conditions: string[] = [];
-
-    Object.entries(filters).forEach(([key, values]) => {
-      if (Array.isArray(values) && values.length > 0) {
-        // Pour les colonnes qui sont des tableaux (JSONB)
-        conditions.push(`${key} && ARRAY[${values.map((v) => `'${v}'`).join(",")}]`);
-      }
-    });
-
-    return conditions.length > 0 ? conditions.join(" AND ") : null;
-  },
-
-  /**
    * Construire une clause de tri
    */
   buildOrderBy: (column: string, direction: "asc" | "desc" = "desc") => {
@@ -316,6 +300,27 @@ export const DB_HELPERS = {
     const to = from + pageSize - 1;
     return { from, to };
   },
+
+  /**
+   * IMPORTANT: For array filtering, use Supabase's built-in methods instead of raw SQL:
+   *
+   * ✅ SAFE - Use Supabase query builder methods:
+   * - .overlaps(column, values) - checks if arrays have any common elements
+   * - .contains(column, values) - checks if array contains all values
+   * - .containedBy(column, values) - checks if array is contained by values
+   *
+   * Example:
+   * ```typescript
+   * // Filter listings by product types
+   * const query = supabase
+   *   .from('listing')
+   *   .select('*')
+   *   .overlaps('product_type', ['légumes', 'fruits']);
+   * ```
+   *
+   * ❌ UNSAFE - Never build raw SQL strings with user input:
+   * This can lead to SQL injection vulnerabilities.
+   */
 } as const;
 
 // ==================== EXPORT GROUPÉ ====================
