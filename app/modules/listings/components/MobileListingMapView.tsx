@@ -619,7 +619,10 @@ export default function MobileListingMapView(): JSX.Element {
           const nextPage =
             (page || Math.floor((visible?.length || 0) / PAGE_SIZE)) + 1;
           fetchListings({ page: nextPage, append: true })
-            .catch(() => {})
+            .catch((error) => {
+              console.error("Failed to load more listings:", error);
+              toast.error("Impossible de charger plus de fermes");
+            })
             .finally(() => {
               setIsLoadingMore(false);
               ticking = false;
@@ -658,13 +661,18 @@ export default function MobileListingMapView(): JSX.Element {
   );
 
   const handleSearchInArea = useCallback(() => {
-    fetchListings({ page: 1, forceRefresh: true }).then((data) => {
-      if (Array.isArray(data) && data.length) {
-        toast.success(`${data.length} fermes trouvées dans cette zone`);
-      } else {
-        toast.info("Aucune ferme trouvée dans cette zone");
-      }
-    });
+    fetchListings({ page: 1, forceRefresh: true })
+      .then((data) => {
+        if (Array.isArray(data) && data.length) {
+          toast.success(`${data.length} fermes trouvées dans cette zone`);
+        } else {
+          toast.info("Aucune ferme trouvée dans cette zone");
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to search in area:", error);
+        toast.error("Impossible de rechercher dans cette zone");
+      });
   }, [fetchListings]);
 
   const handleShowMap = useCallback(() => {
@@ -704,7 +712,9 @@ export default function MobileListingMapView(): JSX.Element {
         if (typeof lng === "number") params.set("lng", lng.toFixed(6));
         if (typeof zoom === "number") params.set("zoom", String(zoom));
         router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-      } catch (_) {}
+      } catch (error) {
+        console.error("Failed to update URL parameters:", error);
+      }
     },
     [router, pathname, searchParams]
   );
@@ -751,13 +761,17 @@ export default function MobileListingMapView(): JSX.Element {
         ) {
           setCoordinates({ lat, lng });
         }
-      } catch {}
+      } catch (error) {
+        console.error("Failed to set coordinates in map store:", error);
+      }
 
       try {
         if (setZoom && typeof zoom === "number") {
           setZoom(zoom);
         }
-      } catch {}
+      } catch (error) {
+        console.error("Failed to set zoom in map store:", error);
+      }
 
       if (mapInstance && typeof lat === "number" && typeof lng === "number") {
         await easeToCenter(mapInstance, [lng, lat], zoom);
