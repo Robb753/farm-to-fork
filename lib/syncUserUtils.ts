@@ -47,8 +47,13 @@ export const updateClerkRole = async (
       console.error(
         `Échec de la mise à jour du rôle. Statut: ${response.status}`
       );
-      const data = await response.json().catch(() => ({}));
-      console.error("Détails de l'erreur:", data);
+      try {
+        const data = await response.json();
+        console.error("Détails de l'erreur:", data);
+      } catch (parseError) {
+        console.error("Impossible de parser la réponse d'erreur:", parseError);
+        console.error("Status text:", response.statusText);
+      }
       return false;
     }
 
