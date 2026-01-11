@@ -120,7 +120,7 @@ export default function ModernAuthSystem() {
     setFarmerRequestData({
       farmName: "",
       location: "",
-      phone: "",
+      phoneNumber: "",
       description: "",
     });
   }, [setIsOpen, setMode, setSelectedRole]);
