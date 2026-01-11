@@ -127,8 +127,8 @@ export default function FarmerOnlySection({ children }: FarmerOnlySectionProps):
             </Button>
             <Button
               variant="outline"
-              onClick={() => openSignUp({ 
-                redirectUrl: "/become-farmer",
+              onClick={() => openSignUp({
+                redirectUrl: "/onboarding/step-1",
                 appearance: {
                   variables: {
                     colorPrimary: COLORS.PRIMARY,
@@ -226,7 +226,7 @@ export default function FarmerOnlySection({ children }: FarmerOnlySectionProps):
             
             <div className="flex gap-2">
               <Button
-                onClick={() => window.location.href = "/request-farmer-access"}
+                onClick={() => window.location.href = "/onboarding/step-1"}
                 size="sm"
                 className={cn(
                   "transition-all duration-200 hover:shadow-sm",

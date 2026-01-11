@@ -317,7 +317,6 @@ export const PATHS = {
 
   // API Routes
   API_LISTINGS: "/api/get-listings",
-  API_APPLY_FARMER: "/api/apply-farmer",
   API_VALIDATE_REQUEST: "/api/validate-farmer-request",
   API_GET_REQUESTS: "/api/get-farmer-requests",
 

@@ -4,6 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import Link from "next/link";
 import {
   Loader2,
@@ -15,6 +22,10 @@ import {
   CheckCircle,
   Clock,
   Trash2,
+  CheckCircle2,
+  Sprout,
+  Mail,
+  XCircle,
 } from "@/utils/icons";
 import {
   AlertDialog,
@@ -71,6 +82,10 @@ export default function FarmerDashboard(): JSX.Element {
   const [listing, setListing] = useState<Listing | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [farmerRequestStatus, setFarmerRequestStatus] = useState<
+    "pending" | "approved" | "rejected" | null
+  >(null);
+  const [checkingRequest, setCheckingRequest] = useState<boolean>(true);
   const router = useRouter();
 
   const supabase = useSupabaseWithClerk();
@@ -84,7 +99,46 @@ export default function FarmerDashboard(): JSX.Element {
   }, [user]);
 
   /**
-   * Récupère la fiche ferme de l'utilisateur connecté
+   * 🆕 ÉTAPE 1 : Vérifier le statut de la farmer_request
+   */
+  useEffect(() => {
+    const checkFarmerRequest = async (): Promise<void> => {
+      if (!isLoaded || !isSignedIn || !user) return;
+
+      try {
+        setCheckingRequest(true);
+        const { data, error: requestError } = await supabase
+          .from("farmer_requests")
+          .select("status")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (requestError) {
+          console.error("Erreur vérification farmer_request:", requestError);
+          setFarmerRequestStatus(null);
+          return;
+        }
+
+        if (!data) {
+          // Cas 1 : Aucune farmer_request
+          setFarmerRequestStatus(null);
+        } else {
+          // Cas 2, 3, 4 : pending, approved, rejected
+          setFarmerRequestStatus(data.status as "pending" | "approved" | "rejected");
+        }
+      } catch (err) {
+        console.error("Erreur:", err);
+        setFarmerRequestStatus(null);
+      } finally {
+        setCheckingRequest(false);
+      }
+    };
+
+    checkFarmerRequest();
+  }, [isLoaded, isSignedIn, user, supabase]);
+
+  /**
+   * ÉTAPE 2 : Récupérer le listing seulement si approved
    */
   useEffect(() => {
     const fetchListing = async (): Promise<void> => {
@@ -97,6 +151,15 @@ export default function FarmerDashboard(): JSX.Element {
 
       if (!email) {
         setError("Email non trouvé");
+        setLoading(false);
+        return;
+      }
+
+      // On attend que la vérification de farmer_request soit terminée
+      if (checkingRequest) return;
+
+      // Si pas approved, pas besoin de chercher le listing
+      if (farmerRequestStatus !== "approved") {
         setLoading(false);
         return;
       }
@@ -131,7 +194,7 @@ export default function FarmerDashboard(): JSX.Element {
     };
 
     fetchListing();
-  }, [isLoaded, isSignedIn, email, router]);
+  }, [isLoaded, isSignedIn, email, router, checkingRequest, farmerRequestStatus, user, supabase]);
 
   /**
    * Supprime la fiche ferme après confirmation
@@ -166,8 +229,8 @@ export default function FarmerDashboard(): JSX.Element {
     }
   };
 
-  // ✅ État de chargement
-  if (loading) {
+  // ✅ État de chargement global
+  if (loading || checkingRequest) {
     return (
       <div
         className="min-h-screen flex justify-center items-center"
@@ -179,7 +242,7 @@ export default function FarmerDashboard(): JSX.Element {
             style={{ color: COLORS.PRIMARY }}
           />
           <p style={{ color: COLORS.TEXT_SECONDARY }}>
-            Chargement de votre espace...
+            Vérification de votre statut...
           </p>
         </div>
       </div>
@@ -219,151 +282,335 @@ export default function FarmerDashboard(): JSX.Element {
     );
   }
 
-  // ✅ Cas 1: Aucune fiche ferme créée
-  if (!listing) {
+  // ========================================
+  // CAS 1 : AUCUNE FARMER_REQUEST
+  // ========================================
+  if (farmerRequestStatus === null) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
-        <div className="text-center mb-12">
-          <h1
-            className="text-4xl font-bold mb-4"
-            style={{ color: COLORS.PRIMARY_DARK }}
+      <div className="min-h-screen bg-background p-4 py-12">
+        <div className="max-w-4xl mx-auto">
+          <Link
+            href="/"
+            className="flex items-center gap-2 mb-8 text-primary hover:text-primary/80 transition-colors w-fit"
           >
-            Bienvenue sur votre espace Producteur
-          </h1>
-          <p className="text-lg" style={{ color: COLORS.TEXT_SECONDARY }}>
-            Commencez par créer votre première fiche de ferme pour rejoindre
-            notre communauté
-          </p>
-        </div>
+            <Sprout className="w-6 h-6" />
+            <span className="font-semibold text-lg">Farm2Fork</span>
+          </Link>
 
-        <div
-          className="rounded-lg shadow-md border overflow-hidden"
-          style={{
-            backgroundColor: COLORS.BG_WHITE,
-            borderColor: COLORS.BORDER,
-          }}
-        >
-          <div className="p-8">
-            <div className="text-center">
-              <h2
-                className="text-2xl font-semibold mb-4"
-                style={{ color: COLORS.TEXT_PRIMARY }}
-              >
-                Créer votre ferme
-              </h2>
-              <p className="mb-2" style={{ color: COLORS.TEXT_SECONDARY }}>
-                Étape 1 : Ajoutez votre ferme pour commencer à vendre vos
-                produits
-              </p>
-              <p className="mb-8" style={{ color: COLORS.TEXT_SECONDARY }}>
-                Vous n'avez pas encore de ferme enregistrée. Créez votre fiche
-                pour apparaître sur la carte et proposer vos produits locaux.
-              </p>
-
+          <Card className="shadow-lg border-2 text-center">
+            <CardHeader className="space-y-4">
               <div
-                className="w-full h-64 rounded-lg mb-8 flex items-center justify-center"
-                style={{ backgroundColor: COLORS.BG_GRAY }}
+                className="w-20 h-20 rounded-full flex items-center justify-center mx-auto"
+                style={{ backgroundColor: COLORS.PRIMARY_BG }}
               >
-                <div className="text-center">
-                  <div
-                    className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center"
-                    style={{ backgroundColor: COLORS.BORDER }}
-                  >
-                    <Plus
-                      className="w-8 h-8"
-                      style={{ color: COLORS.TEXT_MUTED }}
-                    />
-                  </div>
-                  <p style={{ color: COLORS.TEXT_MUTED }}>
-                    Ajoutez votre première ferme
-                  </p>
+                <Plus
+                  className="w-10 h-10"
+                  style={{ color: COLORS.PRIMARY }}
+                />
+              </div>
+              <CardTitle className="text-3xl text-balance">
+                Devenir producteur
+              </CardTitle>
+              <CardDescription className="text-base leading-relaxed max-w-2xl mx-auto">
+                Vous n'avez pas encore fait de demande pour devenir producteur.
+                Créez votre espace ferme et vendez vos produits locaux.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="bg-accent/50 p-6 rounded-lg text-left">
+                <h3 className="font-semibold mb-4" style={{ color: COLORS.PRIMARY }}>
+                  🌱 Pourquoi devenir producteur ?
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {[
+                    {
+                      icon: "🗺️",
+                      title: "Visibilité",
+                      desc: "Apparaissez sur notre carte interactive",
+                    },
+                    {
+                      icon: "🤝",
+                      title: "Vente directe",
+                      desc: "Vendez directement aux consommateurs",
+                    },
+                    {
+                      icon: "📈",
+                      title: "Croissance",
+                      desc: "Développez votre clientèle locale",
+                    },
+                    {
+                      icon: "🌍",
+                      title: "Impact",
+                      desc: "Participez à l'économie circulaire",
+                    },
+                  ].map((benefit, index) => (
+                    <div key={index} className="flex items-start space-x-3">
+                      <div className="text-2xl">{benefit.icon}</div>
+                      <div>
+                        <div
+                          className="font-medium"
+                          style={{ color: COLORS.TEXT_PRIMARY }}
+                        >
+                          {benefit.title}
+                        </div>
+                        <div
+                          className="text-sm"
+                          style={{ color: COLORS.TEXT_SECONDARY }}
+                        >
+                          {benefit.desc}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
-              <Button
-                asChild
-                size="lg"
-                className={cn(
-                  "font-semibold transition-all duration-200 hover:shadow-md",
-                  "focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                )}
-                style={{
-                  backgroundColor: COLORS.PRIMARY,
-                  color: COLORS.BG_WHITE,
-                }}
-              >
-                <Link
-                  href="/onboarding/step-1"
-                  className="flex items-center gap-2"
+              <div className="pt-4 space-y-3">
+                <Button
+                  size="lg"
+                  asChild
+                  className="w-full sm:w-auto"
+                  style={{
+                    backgroundColor: COLORS.PRIMARY,
+                    color: COLORS.BG_WHITE,
+                  }}
                 >
-                  <Plus className="h-5 w-5" />
-                  Créer ma ferme
-                </Link>
-              </Button>
-            </div>
-          </div>
-        </div>
+                  <Link href="/onboarding/step-1">
+                    Créer une demande
+                  </Link>
+                </Button>
 
-        <div
-          className="mt-8 p-6 rounded-lg border"
-          style={{
-            backgroundColor: COLORS.PRIMARY_BG,
-            borderColor: `${COLORS.PRIMARY}20`,
-          }}
-        >
-          <h3 className="font-semibold mb-4" style={{ color: COLORS.PRIMARY }}>
-            🌱 Pourquoi créer votre fiche ferme ?
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {[
-              {
-                icon: "🗺️",
-                title: "Visibilité",
-                desc: "Apparaissez sur notre carte interactive",
-              },
-              {
-                icon: "🤝",
-                title: "Vente directe",
-                desc: "Vendez directement aux consommateurs",
-              },
-              {
-                icon: "📈",
-                title: "Croissance",
-                desc: "Développez votre clientèle locale",
-              },
-              {
-                icon: "🌍",
-                title: "Impact",
-                desc: "Participez à l'économie circulaire",
-              },
-            ].map((benefit, index) => (
-              <div key={index} className="flex items-start space-x-3">
-                <div className="text-2xl">{benefit.icon}</div>
-                <div>
-                  <div
-                    className="font-medium"
-                    style={{ color: COLORS.TEXT_PRIMARY }}
-                  >
-                    {benefit.title}
-                  </div>
-                  <div
-                    className="text-sm"
-                    style={{ color: COLORS.TEXT_SECONDARY }}
-                  >
-                    {benefit.desc}
-                  </div>
-                </div>
+                <p className="text-xs text-muted-foreground">
+                  Le processus prend environ 5 minutes et sera validé sous 24-48h
+                </p>
               </div>
-            ))}
-          </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
   }
 
+  // ========================================
+  // CAS 2 : FARMER_REQUEST PENDING
+  // ========================================
+  if (farmerRequestStatus === "pending") {
+    return (
+      <div className="min-h-screen bg-background p-4 py-12">
+        <div className="max-w-4xl mx-auto">
+          <Link
+            href="/"
+            className="flex items-center gap-2 mb-8 text-primary hover:text-primary/80 transition-colors w-fit"
+          >
+            <Sprout className="w-6 h-6" />
+            <span className="font-semibold text-lg">Farm2Fork</span>
+          </Link>
+
+          <Card className="shadow-lg border-2 text-center">
+            <CardHeader className="space-y-4">
+              <div
+                className="w-20 h-20 rounded-full flex items-center justify-center mx-auto"
+                style={{ backgroundColor: COLORS.PRIMARY_BG }}
+              >
+                <Clock
+                  className="w-10 h-10"
+                  style={{ color: COLORS.PRIMARY }}
+                />
+              </div>
+              <CardTitle className="text-3xl text-balance">
+                Demande en attente
+              </CardTitle>
+              <CardDescription className="text-base leading-relaxed max-w-2xl mx-auto">
+                Nous vérifions que vous êtes bien producteur. Vous recevrez un
+                email de confirmation sous 24-48h pour compléter votre fiche
+                ferme.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="bg-accent/50 p-4 rounded-lg text-left">
+                <p className="text-sm text-muted-foreground">
+                  <strong className="text-foreground">
+                    Vérifiez votre boîte mail :
+                  </strong>{" "}
+                  {user?.primaryEmailAddress?.emailAddress}
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Pensez à vérifier vos spams si vous ne recevez pas d'email dans
+                  les prochaines heures.
+                </p>
+              </div>
+
+              <div className="pt-4 space-y-3">
+                <Button size="lg" asChild className="w-full sm:w-auto">
+                  <Link href="/">Retour à l'accueil</Link>
+                </Button>
+
+                <p className="text-xs text-muted-foreground">
+                  Des questions ? Contactez-nous à{" "}
+                  <a
+                    href="mailto:support@farm2fork.com"
+                    className="text-primary hover:underline font-medium"
+                  >
+                    support@farm2fork.com
+                  </a>
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // ========================================
+  // CAS 4 : FARMER_REQUEST REJECTED
+  // ========================================
+  if (farmerRequestStatus === "rejected") {
+    return (
+      <div className="min-h-screen bg-background p-4 py-12">
+        <div className="max-w-4xl mx-auto">
+          <Link
+            href="/"
+            className="flex items-center gap-2 mb-8 text-primary hover:text-primary/80 transition-colors w-fit"
+          >
+            <Sprout className="w-6 h-6" />
+            <span className="font-semibold text-lg">Farm2Fork</span>
+          </Link>
+
+          <Card className="shadow-lg border-2 text-center border-red-200 bg-red-50/50">
+            <CardHeader className="space-y-4">
+              <div
+                className="w-20 h-20 rounded-full flex items-center justify-center mx-auto"
+                style={{
+                  backgroundColor: `${COLORS.ERROR}20`,
+                }}
+              >
+                <XCircle
+                  className="w-10 h-10"
+                  style={{ color: COLORS.ERROR }}
+                />
+              </div>
+              <CardTitle className="text-3xl text-balance text-red-900">
+                Demande non approuvée
+              </CardTitle>
+              <CardDescription className="text-base leading-relaxed max-w-2xl mx-auto text-red-800">
+                Malheureusement, votre demande n'a pas pu être approuvée.
+                Vous pouvez refaire une demande ou nous contacter pour plus
+                d'informations.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="bg-white p-6 rounded-lg border-2 border-red-200">
+                <h3 className="font-semibold text-lg mb-3 text-red-900">
+                  Que faire maintenant ?
+                </h3>
+                <p className="text-sm text-red-800 mb-4">
+                  Vous pouvez soumettre une nouvelle demande avec des
+                  informations complémentaires ou nous contacter pour
+                  comprendre les raisons du refus.
+                </p>
+                <div className="flex gap-3 justify-center">
+                  <Button
+                    size="lg"
+                    asChild
+                    style={{
+                      backgroundColor: COLORS.PRIMARY,
+                      color: COLORS.BG_WHITE,
+                    }}
+                  >
+                    <Link href="/onboarding/step-1">
+                      Refaire une demande
+                    </Link>
+                  </Button>
+                  <Button variant="outline" asChild>
+                    <Link href="/">Retour à l'accueil</Link>
+                  </Button>
+                </div>
+              </div>
+
+              <div className="bg-red-100 p-4 rounded-lg text-left border border-red-300">
+                <p className="text-sm text-red-900">
+                  <Mail className="inline w-4 h-4 mr-2" />
+                  <strong>Besoin d'aide ?</strong> Contactez-nous à{" "}
+                  <a
+                    href="mailto:support@farm2fork.com"
+                    className="text-red-700 hover:underline font-medium"
+                  >
+                    support@farm2fork.com
+                  </a>
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // ========================================
+  // CAS 3 : FARMER_REQUEST APPROVED
+  // ========================================
+  // Sous-cas 3a : Pas de listing créé
+  if (!listing) {
+    return (
+      <div className="min-h-screen bg-background p-4 py-12">
+        <div className="max-w-4xl mx-auto">
+          <Link
+            href="/"
+            className="flex items-center gap-2 mb-8 text-primary hover:text-primary/80 transition-colors w-fit"
+          >
+            <Sprout className="w-6 h-6" />
+            <span className="font-semibold text-lg">Farm2Fork</span>
+          </Link>
+
+          <Card className="shadow-lg border-2 text-center border-green-200 bg-green-50/50">
+            <CardHeader className="space-y-4">
+              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+                <CheckCircle2 className="w-10 h-10 text-green-600" />
+              </div>
+              <CardTitle className="text-3xl text-balance text-green-900">
+                ✅ Demande approuvée !
+              </CardTitle>
+              <CardDescription className="text-base leading-relaxed max-w-2xl mx-auto text-green-800">
+                Félicitations ! Vous êtes maintenant producteur. Créez votre
+                fiche ferme pour commencer à vendre vos produits.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="bg-white p-6 rounded-lg border-2 border-green-200">
+                <h3 className="font-semibold text-lg mb-3 text-green-900">
+                  Prochaine étape : Créer votre ferme
+                </h3>
+                <p className="text-sm text-green-800 mb-4">
+                  Complétez les informations de votre ferme (description,
+                  produits, coordonnées, etc.) pour apparaître sur la carte et
+                  commencer à vendre.
+                </p>
+                <Button
+                  size="lg"
+                  className="w-full sm:w-auto bg-green-600 hover:bg-green-700"
+                  onClick={() => router.push("/onboarding/step-2")}
+                >
+                  Créer ma ferme →
+                </Button>
+              </div>
+
+              <div className="bg-green-100 p-4 rounded-lg text-left border border-green-300">
+                <p className="text-sm text-green-900">
+                  <strong>Un email de confirmation</strong> a été envoyé à{" "}
+                  {user?.primaryEmailAddress?.emailAddress}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // Sous-cas 3b : Listing existe - Dashboard complet
   const safeWebsite = getSafeWebsiteUrl((listing as any).website);
 
-  // ✅ Cas 2: Fiche ferme existante
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="mb-8">

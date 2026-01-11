@@ -31,6 +31,7 @@ import {
 import { COLORS } from "@/lib/config";
 import type { ProductInsert } from "@/lib/types/database";
 import { useSupabaseWithClerk } from "@/utils/supabase/client";
+import FarmerOnlySection from "@/app/modules/farmer/components/FarmerOnlySection";
 
 // ==================== DONNÉES PRODUITS RÉELLES ====================
 
@@ -687,7 +688,8 @@ export default function AddProductPage({ params }: PageProps) {
   ].filter(Boolean) as string[];
 
   return (
-    <div className="container max-w-2xl mx-auto py-12 px-4">
+    <FarmerOnlySection>
+      <div className="container max-w-2xl mx-auto py-12 px-4">
       <Card
         className="border-t-4 shadow-sm hover:shadow transition-shadow duration-300"
         style={{ borderTopColor: COLORS.PRIMARY }}
@@ -1012,6 +1014,7 @@ export default function AddProductPage({ params }: PageProps) {
         </CardFooter>
       </Card>
     </div>
+    </FarmerOnlySection>
   );
 }
 
