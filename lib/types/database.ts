@@ -404,7 +404,7 @@ export interface Database {
           is_published: boolean; // default true
           active: boolean; // default true
 
-          stock_status: "in_stock" | "low_stock" | "out_of_stock"; // check
+          stock_status: "in_stock" | "low_stock" | "out_of_stock";
         };
 
         Insert: {

@@ -164,7 +164,6 @@ export async function POST(
         phone: body.phone?.trim() || null,
 
         siret,
-        department: body.department!.trim(),
 
         farm_name: body.farmName!.trim(),
         location: body.location!.trim(),

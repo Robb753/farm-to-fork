@@ -1,11 +1,21 @@
 // app/api/onboarding/create-listing/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { auth } from "@clerk/nextjs/server";
-import type { Database } from "@/lib/types/database";
+import type {
+  Database,
+  ProductInsert,
+  ListingUpdate,
+} from "@/lib/types/database";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+
+/**
+ * Types
+ */
+type StockStatus =
+  Database["public"]["Tables"]["products"]["Row"]["stock_status"];
 
 interface CreateListingBody {
   requestId: number;
@@ -20,22 +30,55 @@ interface CreateListingBody {
     category: string;
     price: number;
     unit: string;
-    status: string;
+    status?: StockStatus; // ✅ plus "string"
   }>;
   enableOrders: boolean;
   publishFarm: boolean;
 }
 
-const supabase = createClient<Database>(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+/**
+ * Supabase client (Service Role)
+ * - IMPORTANT: service role = bypass RLS (ok pour route serveur)
+ */
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error(
+    "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment variables."
+  );
+}
+
+const supabase: SupabaseClient<Database> = createClient<Database>(
+  supabaseUrl,
+  supabaseKey,
   { auth: { autoRefreshToken: false, persistSession: false } }
 );
 
+/**
+ * Helpers
+ */
+const toStockStatus = (v: unknown): StockStatus => {
+  if (v === "in_stock" || v === "low_stock" || v === "out_of_stock") return v;
+  return "in_stock";
+};
+
+const safeTrim = (v: unknown): string =>
+  typeof v === "string" ? v.trim() : "";
+
+const toNumber = (v: unknown): number => {
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
+
 export async function POST(req: NextRequest) {
+  const now = new Date().toISOString();
+
   try {
-    // ✅ Clerk auth (OBLIGATOIRE)
-    const { userId: clerkUserId } = await Promise.resolve(auth());
+    /**
+     * Clerk auth (obligatoire)
+     */
+    const { userId: clerkUserId } = await auth();
     if (!clerkUserId) {
       return NextResponse.json(
         { success: false, error: "Non authentifié" },
@@ -43,18 +86,35 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body: CreateListingBody = await req.json();
-    const { requestId, farmProfile, products, enableOrders, publishFarm } =
-      body;
+    /**
+     * Parse body
+     */
+    let body: CreateListingBody;
+    try {
+      body = (await req.json()) as CreateListingBody;
+    } catch {
+      return NextResponse.json(
+        { success: false, error: "JSON invalide" },
+        { status: 400 }
+      );
+    }
 
-    if (!requestId || !farmProfile?.name?.trim()) {
+    const requestId = toNumber(body.requestId);
+    const farmName = safeTrim(body.farmProfile?.name);
+
+    if (!requestId || requestId <= 0 || !farmName) {
       return NextResponse.json(
         { success: false, error: "Données manquantes" },
         { status: 400 }
       );
     }
 
-    // ✅ Charger la demande (service role) + ownership
+    const publishFarm = Boolean(body.publishFarm);
+    const enableOrders = Boolean(body.enableOrders);
+
+    /**
+     * Charger la demande (service role) + ownership
+     */
     const { data: request, error: requestError } = await supabase
       .from("farmer_requests")
       .select(
@@ -70,7 +130,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ✅ Autorisation : owner uniquement (ou admin si tu veux l’ajouter plus tard)
+    // Autorisation : owner uniquement
     if (request.user_id !== clerkUserId) {
       return NextResponse.json(
         { success: false, error: "Forbidden", message: "Accès refusé" },
@@ -78,7 +138,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ✅ Doit être approved
+    // Doit être approved
     if (request.status !== "approved") {
       return NextResponse.json(
         { success: false, error: "Demande non approuvée" },
@@ -86,7 +146,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ✅ Récupérer le listing déjà créé par le trigger (1 par user)
+    /**
+     * Récupérer le listing déjà créé (trigger) (1 par user)
+     */
     const { data: existingListing, error: existingListingError } =
       await supabase
         .from("listing")
@@ -106,7 +168,6 @@ export async function POST(req: NextRequest) {
     }
 
     if (!existingListing) {
-      // Ton trigger est censé le créer au moment du approved
       return NextResponse.json(
         {
           success: false,
@@ -118,37 +179,36 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const now = new Date().toISOString();
-    const shouldPublish = Boolean(publishFarm);
-
-    // ✅ Finaliser le listing (UPDATE, pas INSERT)
-    const listingUpdate = {
-      // ownership
+    /**
+     * Finaliser le listing (UPDATE, pas INSERT)
+     * - on typpe en ListingUpdate pour éviter null/undefined mismatch
+     */
+    const listingUpdate: ListingUpdate = {
       clerk_user_id: request.user_id,
-      createdBy: request.user_id, // cohérent avec ton trigger + unique(createdBy)
+      createdBy: request.user_id,
 
-      // contenu
-      name: farmProfile.name.trim() || request.farm_name,
-      description: farmProfile.description?.trim() || request.description || "",
-      address: request.location || farmProfile.location || "",
-      email: request.email,
-      phoneNumber: request.phone || null,
-      website: request.website || null,
+      name: farmName || request.farm_name || null,
 
-      // coords => depuis la demande
-      ...(typeof request.lat === "number" ? { lat: request.lat } : {}),
-      ...(typeof request.lng === "number" ? { lng: request.lng } : {}),
+      // ✅ la colonne listing.description est string | null dans tes types
+      description:
+        safeTrim(body.farmProfile?.description) || request.description || null,
 
-      // état
-      orders_enabled: Boolean(enableOrders),
-      active: shouldPublish,
+      address: request.location || safeTrim(body.farmProfile?.location) || null,
+      email: request.email ?? null,
+      phoneNumber: request.phone ?? null,
+      website: request.website ?? null,
 
-      // timestamps
+      // coords depuis la demande (si valides)
+      lat: typeof request.lat === "number" ? request.lat : null,
+      lng: typeof request.lng === "number" ? request.lng : null,
+
+      orders_enabled: enableOrders,
+      active: publishFarm,
+
       modified_at: now,
       updated_at: now,
-      published_at: shouldPublish
-        ? (existingListing.published_at ?? now)
-        : null,
+
+      published_at: publishFarm ? (existingListing.published_at ?? now) : null,
     };
 
     const { data: updatedListing, error: updateListingError } = await supabase
@@ -171,35 +231,57 @@ export async function POST(req: NextRequest) {
 
     const listingId = updatedListing.id;
 
-    // ✅ Produits : optionnel, non-bloquant (mais on log si fail)
-    if (products?.length) {
-      const productsData = products.map((p) => ({
-        listing_id: listingId,
-        farm_id: listingId,
-        name: p.name.trim(),
-        description: null,
-        price: Number(p.price) || 0,
-        unit: p.unit?.trim() || "kg",
-        active: shouldPublish,
-        available: true,
-        stock_status: p.status || "in_stock",
-        created_at: now,
-        updated_at: now,
-      }));
+    /**
+     * Produits : optionnel, non-bloquant
+     * - ✅ typage strict ProductInsert[]
+     * - ✅ stock_status union (pas string)
+     */
+    if (body.products?.length) {
+      const productsData: ProductInsert[] = body.products
+        .map((p): ProductInsert | null => {
+          const name = safeTrim(p.name);
+          if (!name) return null;
 
-      const { error: productsError } = await supabase
-        .from("products")
-        .insert(productsData);
+          return {
+            listing_id: listingId,
+            farm_id: listingId,
 
-      if (productsError) {
-        console.warn(
-          "[CREATE-LISTING] products insert warning:",
-          productsError
-        );
+            name,
+            description: null,
+
+            price: toNumber(p.price) || 0,
+            unit: safeTrim(p.unit) || "kg",
+
+            available: true,
+            active: publishFarm,
+
+            category: safeTrim(p.category) || null,
+
+            stock_status: toStockStatus(p.status),
+
+            created_at: now,
+            updated_at: now,
+          };
+        })
+        .filter((x): x is ProductInsert => x !== null);
+
+      if (productsData.length) {
+        const { error: productsError } = await supabase
+          .from("products")
+          .insert(productsData);
+
+        if (productsError) {
+          console.warn(
+            "[CREATE-LISTING] products insert warning:",
+            productsError
+          );
+        }
       }
     }
 
-    // ✅ Lier profile -> farm_id (normalement déjà fait par trigger, mais on sécurise)
+    /**
+     * Lier profile -> farm_id (sécurisation)
+     */
     const { error: profileUpdateError } = await supabase
       .from("profiles")
       .update({ farm_id: listingId, updated_at: now })
@@ -212,7 +294,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ✅ farmer_requests : juste updated_at (tu gardes status approved)
+    /**
+     * farmer_requests : updated_at uniquement (status reste approved)
+     */
     const { error: reqUpdateError } = await supabase
       .from("farmer_requests")
       .update({ updated_at: now })

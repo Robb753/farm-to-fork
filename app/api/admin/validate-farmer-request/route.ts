@@ -1,14 +1,81 @@
 // app/api/admin/validate-farmer-request/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { clerkClient, auth } from "@clerk/nextjs/server";
 import { sendFarmerRequestStatusEmail } from "@/lib/config/email-notifications";
-import type { Database, ListingInsert } from "@/lib/types/database";
+import type {
+  Database,
+  ListingInsert,
+  FarmerRequestUpdate,
+} from "@/lib/types/database";
 import type { FarmerRequest as EmailFarmerRequest } from "@/lib/config/email-notifications";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 /**
- * Types pour la requête de validation
+ * ✅ Types DB utiles
+ */
+type DbProductType = Database["public"]["Enums"]["product_type_enum"];
+
+/**
+ * ✅ Parse robust product types (farmer_requests.products = string | null)
+ * - accepte: '["fruits","legumes"]' (JSON)
+ * - accepte: 'fruits,legumes' / 'fruits; legumes' / 'fruits|legumes'
+ * - accepte: array (si un jour tu changes le type)
+ */
+const PRODUCT_TYPE_VALUES: readonly DbProductType[] = [
+  "fruits",
+  "legumes",
+  "produits_laitiers",
+  "viande",
+  "cereales",
+] as const;
+
+function isDbProductType(v: unknown): v is DbProductType {
+  return (
+    typeof v === "string" &&
+    (PRODUCT_TYPE_VALUES as readonly string[]).includes(v)
+  );
+}
+
+function parseProductTypeEnumArray(raw: unknown): DbProductType[] | null {
+  if (raw == null) return null;
+
+  // array déjà
+  if (Array.isArray(raw)) {
+    const arr = raw.filter(isDbProductType);
+    return arr.length ? Array.from(new Set(arr)) : null;
+  }
+
+  // string: JSON ou CSV
+  if (typeof raw === "string") {
+    const t = raw.trim();
+    if (!t) return null;
+
+    // JSON array ?
+    try {
+      const parsed = JSON.parse(t);
+      if (Array.isArray(parsed)) return parseProductTypeEnumArray(parsed);
+    } catch {
+      // ignore
+    }
+
+    // CSV fallback
+    const parts = t
+      .split(/[,;|]/g)
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    return parseProductTypeEnumArray(parts);
+  }
+
+  return null;
+}
+
+/**
+ * Body / response types
  */
 interface ValidateFarmerRequestBody {
   requestId: number; // number garanti après sanitisation
@@ -18,9 +85,6 @@ interface ValidateFarmerRequestBody {
   reason?: string;
 }
 
-/**
- * Type pour la réponse API
- */
 interface ApiResponse {
   success: boolean;
   message: string;
@@ -30,33 +94,26 @@ interface ApiResponse {
   details?: string;
 }
 
-/**
- * Type pour la validation des données
- */
 interface ValidationResult {
   isValid: boolean;
   errors: string[];
   sanitizedData?: ValidateFarmerRequestBody;
 }
 
-/**
- * Constantes de validation
- */
 const VALID_STATUSES = ["approved", "rejected"] as const;
 const VALID_ROLES = ["farmer", "admin", "user"] as const;
 const MAX_REASON_LENGTH = 500;
 
 /**
- * Création sécurisée du client Supabase
+ * Supabase (service role) sécurisé
  */
-function createSupabaseClient() {
+function createSupabaseClient(): SupabaseClient<Database> {
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !supabaseKey) {
     throw new Error(
-      "Variables d'environnement Supabase manquantes. " +
-        "Vérifiez SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY dans votre fichier .env"
+      "Variables d'environnement Supabase manquantes. Vérifie SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY."
     );
   }
 
@@ -66,7 +123,7 @@ function createSupabaseClient() {
 }
 
 /**
- * Valider + sanitiser les données
+ * Validate + sanitize
  */
 function validateFarmerRequestData(data: unknown): ValidationResult {
   const errors: string[] = [];
@@ -89,26 +146,20 @@ function validateFarmerRequestData(data: unknown): ValidationResult {
   ) {
     errors.push("L'ID de la demande est requis");
   } else {
-    const numericRequestId = Number(requestIdRaw);
-    if (!Number.isFinite(numericRequestId) || numericRequestId <= 0) {
+    const n = Number(requestIdRaw);
+    if (!Number.isFinite(n) || n <= 0)
       errors.push("L'ID de la demande doit être un nombre positif");
-    }
   }
 
   // userId
   const userId = typeof raw.userId === "string" ? raw.userId.trim() : "";
-  if (!userId) {
-    errors.push("L'ID utilisateur est requis");
-  } else if (!/^user_[a-zA-Z0-9]{24,}$/.test(userId)) {
-    errors.push("Format d'ID utilisateur invalide");
-  }
+  if (!userId) errors.push("L'ID utilisateur est requis");
 
   // role
   const role =
     typeof raw.role === "string" ? raw.role.trim().toLowerCase() : "";
-  if (!role) {
-    errors.push("Le rôle est requis");
-  } else if (!VALID_ROLES.includes(role as any)) {
+  if (!role) errors.push("Le rôle est requis");
+  else if (!VALID_ROLES.includes(role as any)) {
     errors.push(
       `Le rôle doit être l'un des suivants: ${VALID_ROLES.join(", ")}`
     );
@@ -117,9 +168,8 @@ function validateFarmerRequestData(data: unknown): ValidationResult {
   // status
   const status =
     typeof raw.status === "string" ? raw.status.trim().toLowerCase() : "";
-  if (!status) {
-    errors.push("Le statut est requis");
-  } else if (!VALID_STATUSES.includes(status as any)) {
+  if (!status) errors.push("Le statut est requis");
+  else if (!VALID_STATUSES.includes(status as any)) {
     errors.push(
       `Le statut doit être l'un des suivants: ${VALID_STATUSES.join(", ")}`
     );
@@ -133,7 +183,7 @@ function validateFarmerRequestData(data: unknown): ValidationResult {
     );
   }
 
-  if (errors.length > 0) return { isValid: false, errors };
+  if (errors.length) return { isValid: false, errors };
 
   return {
     isValid: true,
@@ -149,7 +199,7 @@ function validateFarmerRequestData(data: unknown): ValidationResult {
 }
 
 /**
- * Vérifier permissions admin (Clerk)
+ * Admin permissions via Clerk
  */
 async function checkAdminPermissions(requestingUserId: string): Promise<{
   hasPermission: boolean;
@@ -170,10 +220,7 @@ async function checkAdminPermissions(requestingUserId: string): Promise<{
 
     return { hasPermission: true };
   } catch (error) {
-    console.error(
-      "[VALIDATE] Erreur lors de la vérification des permissions:",
-      error
-    );
+    console.error("[VALIDATE] Erreur vérification permissions:", error);
     return {
       hasPermission: false,
       error: "Impossible de vérifier les permissions",
@@ -182,20 +229,19 @@ async function checkAdminPermissions(requestingUserId: string): Promise<{
 }
 
 /**
- * Crée un listing pour un farmer approuvé
- * - supprime le champ `status` (il n'existe pas dans ta table listing)
- * - évite d'insérer 2 listings si `createdBy` est UNIQUE (check + early return)
- * - utilise les types ListingInsert (alignés avec lib/types/database.ts)
+ * ✅ Create listing for approved farmer
+ * - farmer_requests.products est string | null => on convertit vers enum array (DbProductType[] | null)
+ * - évite doublon si createdBy est UNIQUE
  */
 async function createListingForApprovedFarmer(
-  supabase: ReturnType<typeof createSupabaseClient>,
+  supabase: SupabaseClient<Database>,
   farmerRequest: Database["public"]["Tables"]["farmer_requests"]["Row"],
   userId: string
 ): Promise<{ success: boolean; listingId?: number; error?: string }> {
   try {
     const requestId = farmerRequest.id;
 
-    // ✅ si createdBy est UNIQUE, on évite un doublon
+    // éviter doublon
     const { data: existingListing, error: existingError } = await supabase
       .from("listing")
       .select("id")
@@ -204,33 +250,17 @@ async function createListingForApprovedFarmer(
 
     if (existingError) {
       console.warn("[VALIDATE] Warning check existing listing:", existingError);
-      // non bloquant, on continue
     } else if (existingListing?.id) {
       return { success: true, listingId: existingListing.id };
     }
 
-    // ✅ récupérer coords depuis farmer_requests (tu as lat/lng dans le type)
-    const { data: requestWithCoords, error: coordsError } = await supabase
-      .from("farmer_requests")
-      .select("lat, lng")
-      .eq("id", requestId)
-      .single();
+    // coords depuis farmerRequest (déjà dans Row)
+    const lat = farmerRequest.lat ?? null;
+    const lng = farmerRequest.lng ?? null;
 
-    if (coordsError) {
-      console.error("[VALIDATE] Erreur récupération coordonnées:", coordsError);
-      return {
-        success: false,
-        error: "Erreur lors de la récupération des coordonnées GPS",
-      };
-    }
-
-    const lat = requestWithCoords?.lat ?? null;
-    const lng = requestWithCoords?.lng ?? null;
-
-    // ✅ Vérifier coordonnées valides
     if (lat === null || lng === null || lat === 0 || lng === 0) {
       console.error(
-        `[VALIDATE] Coordonnées GPS invalides pour farmer_request ${requestId}:`,
+        `[VALIDATE] Coordonnées GPS invalides (request ${requestId})`,
         { lat, lng }
       );
       return {
@@ -242,22 +272,29 @@ async function createListingForApprovedFarmer(
 
     const listingData: ListingInsert = {
       createdBy: userId,
-      name: farmerRequest.farm_name,
+      clerk_user_id: userId, // ✅ très utile pour retrouver le listing
+      name: farmerRequest.farm_name ?? null,
       description: farmerRequest.description ?? null,
       phoneNumber: farmerRequest.phone ?? null,
       email: farmerRequest.email ?? null,
       website: farmerRequest.website ?? null,
-      address: farmerRequest.location,
-      product_type: farmerRequest.products ?? null, // ✅ selon tes types (string | null)
+      address: farmerRequest.location ?? null,
+
+      // ✅ FIX: enum array (pas string)
+      product_type: parseProductTypeEnumArray(farmerRequest.products),
+
       lat,
       lng,
+
       active: true,
       updated_at: new Date().toISOString(),
+      modified_at: new Date().toISOString(),
+      published_at: new Date().toISOString(), // si tu veux le publier direct à l’approval
     };
 
     const { data: insertedListing, error: insertListingError } = await supabase
       .from("listing")
-      .insert(listingData) // ✅ 1 objet
+      .insert(listingData)
       .select("id")
       .single();
 
@@ -269,7 +306,7 @@ async function createListingForApprovedFarmer(
       };
     }
 
-    // Liaison profile -> farm_id (non bloquant)
+    // profile -> farm_id (non bloquant)
     const { error: profileLinkError } = await supabase
       .from("profiles")
       .update({
@@ -285,13 +322,9 @@ async function createListingForApprovedFarmer(
       );
     }
 
-    console.log(
-      `✅ Listing créé (ID: ${insertedListing.id}) lat=${lat} lng=${lng}`
-    );
-
     return { success: true, listingId: insertedListing.id };
   } catch (error) {
-    console.error("[VALIDATE] Erreur lors de la création du listing:", error);
+    console.error("[VALIDATE] Erreur création listing:", error);
     return {
       success: false,
       error: "Erreur inattendue lors de la création du listing",
@@ -300,7 +333,7 @@ async function createListingForApprovedFarmer(
 }
 
 /**
- * API Route pour valider une demande de producteur
+ * API Route
  */
 export async function POST(
   req: NextRequest
@@ -321,7 +354,7 @@ export async function POST(
       );
     }
 
-    // Permissions admin
+    // admin permissions
     const permissionCheck = await checkAdminPermissions(requestingUserId);
     if (!permissionCheck.hasPermission) {
       return NextResponse.json(
@@ -335,7 +368,7 @@ export async function POST(
       );
     }
 
-    // Parse JSON
+    // content-type json
     const contentType = req.headers.get("content-type") || "";
     if (!contentType.includes("application/json")) {
       return NextResponse.json(
@@ -365,10 +398,8 @@ export async function POST(
       );
     }
 
-    // Validate / sanitize
     const validation = validateFarmerRequestData(requestBody);
     if (!validation.isValid || !validation.sanitizedData) {
-      console.warn("[VALIDATE] Validation échouée:", validation.errors);
       return NextResponse.json(
         {
           success: false,
@@ -383,10 +414,10 @@ export async function POST(
     const { requestId, userId, role, status, reason } =
       validation.sanitizedData;
 
-    // Client Supabase service role
+    // supabase service role
     const supabase = createSupabaseClient();
 
-    // 1) Fetch farmer request
+    // 1) fetch farmer_request
     const { data: farmerRequest, error: requestError } = await supabase
       .from("farmer_requests")
       .select("*")
@@ -406,7 +437,6 @@ export async function POST(
       );
     }
 
-    // Déjà traité ?
     if (farmerRequest.status !== "pending") {
       return NextResponse.json(
         {
@@ -419,7 +449,7 @@ export async function POST(
       );
     }
 
-    // 2) Update Clerk user role
+    // 2) update Clerk user metadata role
     try {
       const client = await clerkClient();
       await client.users.updateUser(userId, {
@@ -459,7 +489,7 @@ export async function POST(
       );
     }
 
-    // 3) Update Supabase profile role
+    // 3) update profile role
     const { error: profileUpdateError } = await supabase
       .from("profiles")
       .update({ role, updated_at: timestamp })
@@ -478,15 +508,14 @@ export async function POST(
       );
     }
 
-    // 4) Update farmer request status
-    const updateData: Database["public"]["Tables"]["farmer_requests"]["Update"] =
-      {
-        status,
-        updated_at: timestamp,
-        approved_by_admin_at: status === "approved" ? timestamp : null,
-        validated_by: requestingUserId,
-        ...(reason ? { admin_reason: reason } : {}),
-      };
+    // 4) update farmer_requests status
+    const updateData: FarmerRequestUpdate = {
+      status,
+      updated_at: timestamp,
+      approved_by_admin_at: status === "approved" ? timestamp : null,
+      validated_by: requestingUserId,
+      ...(reason ? { admin_reason: reason } : {}),
+    };
 
     const { error: requestUpdateError } = await supabase
       .from("farmer_requests")
@@ -506,7 +535,7 @@ export async function POST(
       );
     }
 
-    // 5) Create listing if approved
+    // 5) create listing if approved
     let createdListingId: number | undefined;
     if (status === "approved") {
       const listingResult = await createListingForApprovedFarmer(
@@ -522,11 +551,11 @@ export async function POST(
       }
     }
 
-    // 6) Send status email (non bloquant)
+    // 6) send email (non bloquant)
     try {
       const emailPayload: EmailFarmerRequest = {
         ...(farmerRequest as any),
-        phone: farmerRequest.phone ?? undefined, // adapt null -> undefined if needed
+        phone: farmerRequest.phone ?? undefined,
       };
 
       await sendFarmerRequestStatusEmail(emailPayload, status);
