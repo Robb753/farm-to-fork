@@ -9,7 +9,6 @@ import React, {
   useMemo,
 } from "react";
 import { useUser, useClerk } from "@clerk/nextjs";
-import { supabase } from "@/utils/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 // 🔒 SÉCURITÉ: Import des fonctions de sanitisation

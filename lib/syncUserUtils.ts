@@ -1,7 +1,7 @@
 // lib/syncUserUtils.ts
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
-import type { UserResource } from "@clerk/types";
+import type { ClerkUserDTO } from "@/lib/store/userStore";
 
 /**
  * Types pour la synchronisation utilisateur
@@ -24,30 +24,11 @@ export type AllowedRole = "user" | "farmer" | "admin";
 export type SupabaseDbClient = SupabaseClient<Database>;
 
 /**
- * Clerk public metadata interface
+ * Extrait l'email principal (DTO)
  */
-interface ClerkPublicMetadata {
-  role?: AllowedRole;
-}
-
-/**
- * Extended Clerk UserResource with typed publicMetadata
- */
-interface TypedUserResource extends UserResource {
-  publicMetadata: ClerkPublicMetadata;
-}
-
-/**
- * Extrait l'email principal d'un utilisateur Clerk
- */
-export const getEmailFromUser = (user: UserResource | null): string | null => {
+export const getEmailFromUser = (user: ClerkUserDTO | null): string | null => {
   if (!user) return null;
-
-  return (
-    user.primaryEmailAddress?.emailAddress ||
-    user.emailAddresses?.[0]?.emailAddress ||
-    null
-  );
+  return user.email ?? null;
 };
 
 /**
@@ -94,11 +75,11 @@ export const updateClerkRole = async (
  */
 export const syncProfileToSupabase = async (
   supabase: SupabaseDbClient,
-  user: UserResource,
+  user: ClerkUserDTO,
   role: AllowedRole,
   options: SyncProfileOptions = {}
 ): Promise<boolean> => {
-  if (!user) throw new Error("Utilisateur non défini");
+  if (!user?.id) throw new Error("Utilisateur non défini");
 
   const allowedRoles: AllowedRole[] = ["user", "farmer", "admin"];
   if (!allowedRoles.includes(role)) {
@@ -109,13 +90,26 @@ export const syncProfileToSupabase = async (
     const email = getEmailFromUser(user);
     if (!email) throw new Error("Email non disponible");
 
-    // ✅ jsonb: on stocke un tableau, pas une string
+    // ⚠️ ne pas écraser favorites à chaque upsert
+    // -> on ne met favorites: [] que si on est sûr de créer un profil
+    // -> Supabase upsert ne sait pas "coalesce", donc on fait un read léger d'abord.
+    const { data: existing, error: existingError } = await supabase
+      .from("profiles")
+      .select("user_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (existingError) {
+      // pas bloquant, mais on log
+      console.warn("Warn read profile before upsert:", existingError);
+    }
+
     const profileData: any = {
       user_id: user.id,
       email,
       role,
       updated_at: new Date().toISOString(),
-      favorites: [],
+      ...(existing ? {} : { favorites: [] }), // ✅ only set on create
     };
 
     // ✅ Seulement ajouter farm_id si farmer + demande de création listing
@@ -204,8 +198,9 @@ export const ensureFarmerListing = async (
       .single();
 
     if (createError) {
-      // 23505 = unique violation (constraint unique sur createdBy)
       const pgError = createError as PostgresError;
+
+      // 23505 = unique violation (constraint unique sur createdBy)
       if (pgError.code === "23505") {
         const { data: conflictListing, error: conflictError } = await supabase
           .from("listing")
@@ -278,27 +273,26 @@ export const getProfileFromSupabase = async (
 };
 
 /**
- * Détermine le rôle utilisateur à partir de Clerk et/ou Supabase
+ * Détermine le rôle utilisateur à partir de Clerk (DTO) et/ou Supabase
  */
 export const determineUserRole = async (
   supabase: SupabaseDbClient,
-  user: UserResource
+  user: ClerkUserDTO
 ): Promise<AllowedRole> => {
   if (!user?.id) return "user";
 
-  // 1) Vérifier d'abord les métadonnées Clerk
-  const typedUser = user as TypedUserResource;
-  const clerkRole = typedUser.publicMetadata?.role;
+  // 1) métadonnées Clerk
+  const clerkRole = user.publicMetadata?.role;
   if (clerkRole && ["user", "farmer", "admin"].includes(clerkRole)) {
     return clerkRole;
   }
 
-  // 2) Fallback vers Supabase avec retry intégré
+  // 2) fallback Supabase avec retry
   const profile = await getProfileFromSupabase(supabase, user.id);
   if (profile?.role && ["user", "farmer", "admin"].includes(profile.role)) {
     return profile.role;
   }
 
-  // 3) Valeur par défaut sécurisée
+  // 3) default safe
   return "user";
 };

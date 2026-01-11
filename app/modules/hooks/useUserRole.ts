@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useUser } from "@clerk/nextjs";
-import { supabase } from "@/utils/supabase/client";
 import { TABLES } from "@/lib/config";
+import { useSupabaseWithClerk } from "@/utils/supabase/client";
 
 /**
  * Types pour les rôles utilisateur
@@ -54,6 +54,8 @@ interface ProfileData {
  */
 export default function useUserRole(): UseUserRoleReturn {
   const { user, isLoaded } = useUser();
+
+  const supabase = useSupabaseWithClerk();
 
   const [role, setRole] = useState<UserRole | null>(null);
   const [loading, setLoading] = useState<boolean>(true);

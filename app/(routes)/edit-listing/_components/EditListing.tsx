@@ -28,7 +28,6 @@ import {
   ChevronRight,
   ChevronLeft,
 } from "@/utils/icons";
-import { supabase } from "@/utils/supabase/client";
 import { editListingSchema } from "@/app/schemas/editListingSchema";
 import type { z } from "zod";
 import ProductSelector from "./ProductSelector";
@@ -41,6 +40,7 @@ import type {
   Listing as DbListing,
   ListingImage as DbListingImage,
 } from "@/lib/types/database";
+import { useSupabaseWithClerk } from "@/utils/supabase/client";
 
 /**
  * ✅ Type du formulaire directement inféré depuis le schéma
@@ -132,6 +132,13 @@ type ListingData = {
   listingImages: Pick<DbListingImage, "url">[];
 };
 
+type MaybeArray<T> = T[] | null | undefined;
+
+function toDbEnumArray<T extends string>(value: MaybeArray<T>): T[] | null {
+  if (!value || value.length === 0) return null;
+  return value;
+}
+
 interface StepItem {
   id: number;
   title: string;
@@ -147,6 +154,8 @@ interface CheckboxItem {
 /**
  * Utilitaires de validation des types pour l'UI
  */
+const supabase = useSupabaseWithClerk();
+
 const isValidProductType = (value: string): value is ProductTypeId =>
   [
     "Fruits",
@@ -412,12 +421,13 @@ class ListingService {
       // ✅ mapping form -> DB (DB attend string|null sur ces champs)
       const updateData: Partial<DbListing> = {
         ...rest,
-        product_type: arrayToDbString(rest.product_type),
-        production_method: arrayToDbString(rest.production_method),
-        purchase_mode: arrayToDbString(rest.purchase_mode),
-        certifications: arrayToDbString(rest.certifications), // ✅ FIX de ton erreur
-        availability: arrayToDbString(rest.availability),
-        additional_services: arrayToDbString(rest.additional_services),
+
+        product_type: toDbEnumArray(rest.product_type),
+        production_method: toDbEnumArray(rest.production_method),
+        purchase_mode: toDbEnumArray(rest.purchase_mode),
+        certifications: toDbEnumArray(rest.certifications),
+        availability: toDbEnumArray(rest.availability),
+        additional_services: toDbEnumArray(rest.additional_services),
 
         active: isPublishing || currentActive || false,
         updated_at: new Date().toISOString(),

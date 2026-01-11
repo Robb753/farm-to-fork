@@ -6,8 +6,8 @@ import { useRouter } from "next/navigation";
 import { Package, ArrowRight, Calendar, MapPin, Truck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { COLORS } from "@/lib/config";
-import { supabase } from "@/utils/supabase/client";
 import { toast } from "sonner";
+import { useSupabaseWithClerk } from "@/utils/supabase/client";
 
 /**
  * Interface pour une commande dans la liste
@@ -39,6 +39,8 @@ export default function MyOrdersPage(): JSX.Element {
   const router = useRouter();
   const [orders, setOrders] = useState<OrderListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const supabase = useSupabaseWithClerk();
 
   useEffect(() => {
     async function loadOrders() {

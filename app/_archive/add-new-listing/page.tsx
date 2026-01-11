@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2, MapPin } from "lucide-react";
 import AddressAutocompleteMapbox from "@/app/modules/maps/components/shared/AddressAutocompleteMapbox";
-import { supabase } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -18,6 +17,7 @@ import {
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { COLORS } from "@/lib/config";
+import { useSupabaseWithClerk } from "@/utils/supabase/client";
 
 /**
  * Interfaces TypeScript pour AddNewListing
@@ -75,6 +75,7 @@ interface ExistingListing {
 
 type UserRole = "farmer" | "admin" | "user";
 
+const supabase = useSupabaseWithClerk();
 /**
  * Hook pour la gestion de l'authentification et des permissions
  */
@@ -291,6 +292,7 @@ const AddNewListing: React.FC<AddNewListingProps> = ({ className = "" }) => {
   } = useListingData();
 
   const router = useRouter();
+  
 
   /**
    * Gestion de la soumission du formulaire

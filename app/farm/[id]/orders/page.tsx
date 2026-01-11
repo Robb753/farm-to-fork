@@ -13,11 +13,11 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { COLORS } from "@/lib/config";
-import { supabase } from "@/utils/supabase/client";
 import { toast } from "sonner";
+import { useSupabaseWithClerk } from "@/utils/supabase/client";
 
 /**
- * Interface pour une commande
+ * Interface pour une commande (UI)
  */
 interface OrderListItem {
   id: number;
@@ -35,6 +35,28 @@ interface OrderListItem {
 }
 
 /**
+ * Type local "SELECT orders" pour éviter les soucis de types Supabase pas à jour
+ */
+type OrdersSelectRow = {
+  id: number;
+  farm_id: number;
+  items: unknown; // jsonb
+  total_price: number | string | null;
+  delivery_mode: "pickup" | "delivery";
+  delivery_day: string | null;
+  status: "pending" | "confirmed" | "ready" | "delivered" | "cancelled";
+  payment_status: "unpaid" | "paid" | "refunded" | null;
+  created_at: string;
+};
+
+/**
+ * Type local listing
+ */
+type ListingNameRow = {
+  name: string | null;
+};
+
+/**
  * Page de liste des commandes d'une ferme spécifique
  * Route: /farm/[id]/orders
  */
@@ -43,9 +65,11 @@ export default function FarmOrdersPage(): JSX.Element {
   const router = useRouter();
   const farmId = params.id ? Number(params.id) : NaN;
 
-  const [farmName, setFarmName] = useState("");
+  const supabase = useSupabaseWithClerk();
+
+  const [farmName, setFarmName] = useState<string>("");
   const [orders, setOrders] = useState<OrderListItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
     if (Number.isNaN(farmId)) {
@@ -53,14 +77,19 @@ export default function FarmOrdersPage(): JSX.Element {
       return;
     }
 
+    let mounted = true;
+
     async function loadOrders() {
       try {
         setIsLoading(true);
 
-        // Vérifier l'auth
+        // ✅ Vérifier l'auth
         const {
           data: { user },
+          error: authError,
         } = await supabase.auth.getUser();
+
+        if (authError) throw authError;
 
         if (!user) {
           toast.error("Vous devez être connecté");
@@ -68,55 +97,63 @@ export default function FarmOrdersPage(): JSX.Element {
           return;
         }
 
-        // Charger le nom de la ferme
-        const { data: farmData } = await supabase
+        // ✅ Charger le nom de la ferme
+        const { data: farmData, error: farmError } = await supabase
           .from("listing")
           .select("name")
           .eq("id", farmId)
-          .single();
+          .single<ListingNameRow>();
 
-        if (farmData) {
-          setFarmName(farmData.name);
+        if (farmError) throw farmError;
+
+        if (mounted) {
+          // ✅ FIX: name peut être null -> fallback
+          setFarmName(farmData?.name ?? "Ma ferme");
         }
 
-        // Charger les commandes de l'utilisateur POUR CETTE FERME
+        // ✅ Charger les commandes de l'utilisateur POUR CETTE FERME
         const { data: ordersData, error: ordersError } = await supabase
           .from("orders")
           .select(
-            "id, user_id, farm_id, items, total_price, delivery_mode, delivery_day, status, payment_status, created_at"
+            "id, farm_id, items, total_price, delivery_mode, delivery_day, status, payment_status, created_at"
           )
           .eq("user_id", user.id)
-          .eq("farm_id", farmId) // ✅ Filtrer par ferme
-          .order("created_at", { ascending: false });
+          .eq("farm_id", farmId)
+          .order("created_at", { ascending: false })
+          .returns<OrdersSelectRow[]>();
 
         if (ordersError) throw ordersError;
 
-        // Mapper avec type safety
-        const mappedOrders: OrderListItem[] = (ordersData || []).map(
-          (order: any) => ({
-            id: order.id,
-            farm_id: order.farm_id,
-            total_price: order.total_price || 0,
-            delivery_mode: order.delivery_mode,
-            delivery_day: order.delivery_day || "",
-            status: order.status,
-            payment_status: order.payment_status,
-            created_at: order.created_at,
-            items: order.items || [],
-          })
-        );
+        const mappedOrders: OrderListItem[] = (ordersData ?? []).map((o) => ({
+          id: Number(o.id),
+          farm_id: Number(o.farm_id),
+          total_price: Number(o.total_price ?? 0),
+          delivery_mode: o.delivery_mode,
+          delivery_day: o.delivery_day ?? "",
+          status: o.status,
+          payment_status: (o.payment_status ??
+            "unpaid") as OrderListItem["payment_status"],
+          created_at: o.created_at,
+          items: Array.isArray(o.items)
+            ? (o.items as OrderListItem["items"])
+            : [],
+        }));
 
-        setOrders(mappedOrders);
+        if (mounted) setOrders(mappedOrders);
       } catch (error) {
         console.error("Erreur chargement commandes:", error);
         toast.error("Impossible de charger vos commandes");
       } finally {
-        setIsLoading(false);
+        if (mounted) setIsLoading(false);
       }
     }
 
     loadOrders();
-  }, [farmId, router]);
+
+    return () => {
+      mounted = false;
+    };
+  }, [farmId, router, supabase]);
 
   if (isLoading) {
     return (
@@ -235,7 +272,7 @@ function OrderCard({
     ready: { emoji: "📦", label: "Prête", color: COLORS.PRIMARY },
     delivered: { emoji: "🎉", label: "Livrée", color: COLORS.SUCCESS },
     cancelled: { emoji: "❌", label: "Annulée", color: COLORS.ERROR },
-  };
+  } as const;
 
   const status = statusConfig[order.status];
   const itemsCount = order.items.reduce((sum, item) => sum + item.quantity, 0);
@@ -249,7 +286,6 @@ function OrderCard({
       )}
       style={{ backgroundColor: COLORS.BG_WHITE, borderColor: COLORS.BORDER }}
     >
-      {/* Header */}
       <div className="flex items-start justify-between gap-4 mb-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
@@ -277,7 +313,6 @@ function OrderCard({
         </div>
       </div>
 
-      {/* Détails */}
       <div className="grid grid-cols-2 gap-4 mb-4">
         <div className="flex items-center gap-2">
           {order.delivery_mode === "pickup" ? (
@@ -307,7 +342,6 @@ function OrderCard({
         </div>
       </div>
 
-      {/* Footer */}
       <div
         className="flex items-center justify-between pt-4 border-t"
         style={{ borderColor: COLORS.BORDER }}

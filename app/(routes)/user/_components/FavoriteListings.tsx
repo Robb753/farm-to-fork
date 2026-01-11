@@ -3,7 +3,6 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useUser } from "@clerk/nextjs";
-import { supabase } from "@/utils/supabase/client";
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -16,6 +15,7 @@ import { useUserFavorites, useUserActions } from "@/lib/store/userStore";
 
 // 🔒 SÉCURITÉ: Import des fonctions de sanitisation
 import { escapeHTML, sanitizeHTML } from "@/lib/utils/sanitize";
+import { useSupabaseWithClerk } from "@/utils/supabase/client";
 
 /**
  * Type pour un listing favori avec ses images
@@ -62,6 +62,8 @@ export default function FavoriteListings(): JSX.Element {
   // ✅ Utiliser le store pour les IDs des favoris avec types
   const favoriteIds = useUserFavorites();
   const { loadFavorites, toggleFavorite } = useUserActions();
+
+  const supabase = useSupabaseWithClerk();
 
   // États locaux avec types stricts
   const [favoriteListings, setFavoriteListings] = useState<FavoriteListing[]>(

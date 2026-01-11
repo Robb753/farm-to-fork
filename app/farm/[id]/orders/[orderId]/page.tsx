@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { CheckCircle, Package, MapPin, Truck, Calendar } from "lucide-react";
 import { COLORS } from "@/lib/config";
-import { supabase } from "@/utils/supabase/client";
 import { toast } from "sonner";
+import { useSupabaseWithClerk } from "@/utils/supabase/client";
 
 /**
  * Interface pour une commande avec infos jointes
@@ -56,6 +56,8 @@ interface OrderWithFarm {
 export default function FarmOrderConfirmationPage(): JSX.Element {
   const params = useParams();
   const router = useRouter();
+
+  const supabase = useSupabaseWithClerk();
 
   const farmId = params.id ? Number(params.id) : NaN;
   const orderId = params.orderId ? Number(params.orderId) : NaN;

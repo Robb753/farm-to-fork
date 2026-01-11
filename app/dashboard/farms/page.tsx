@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import {
@@ -35,6 +34,7 @@ import type { Listing } from "@/lib/types";
 
 // 🔒 SÉCURITÉ
 import { escapeHTML, sanitizeHTML } from "@/lib/utils/sanitize";
+import { useSupabaseWithClerk } from "@/utils/supabase/client";
 
 /**
  * Normalisation minimale côté client
@@ -72,6 +72,8 @@ export default function FarmerDashboard(): JSX.Element {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+
+  const supabase = useSupabaseWithClerk();
 
   const email = useMemo(() => {
     return (

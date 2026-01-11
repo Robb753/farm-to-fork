@@ -9,10 +9,11 @@ import { useCartStore } from "@/lib/store/cartStore";
 import { createOrder } from "@/lib/api/orders";
 import type { DeliveryAddress } from "@/lib/types/order";
 import { toast } from "sonner";
-import { supabase } from "@/utils/supabase/client";
+import { useSupabaseWithClerk } from "@/utils/supabase/client";
 
 /**
  * Interface pour une ferme
+ * ✅ On garde des strings "propres" côté UI
  */
 interface Farm {
   id: number;
@@ -31,6 +32,8 @@ export default function FarmCheckoutPage(): JSX.Element {
   const params = useParams();
   const router = useRouter();
   const farmId = params.id ? Number(params.id) : NaN;
+
+  const supabase = useSupabaseWithClerk();
 
   const cart = useCartStore((s) => s.cart);
   const clearCart = useCartStore((s) => s.clearCart);
@@ -57,10 +60,13 @@ export default function FarmCheckoutPage(): JSX.Element {
       return;
     }
 
+    let isMounted = true;
+
     async function loadFarm() {
       try {
         const { data, error } = await supabase
           .from("listing")
+          // ✅ name/address peuvent être null => on normalise après
           .select("id, name, address")
           .eq("id", farmId)
           .eq("active", true)
@@ -72,9 +78,13 @@ export default function FarmCheckoutPage(): JSX.Element {
           return;
         }
 
-        // Ajouter les valeurs par défaut pour les champs manquants
+        if (!isMounted) return;
+
+        // ✅ Normalisation : on force string côté UI
         setFarm({
-          ...data,
+          id: data.id,
+          name: data.name ?? "Ferme sans nom",
+          address: data.address ?? "Adresse non renseignée",
           pickup_days: "À définir avec le producteur",
           delivery_available: false,
           delivery_days: "À définir",
@@ -85,12 +95,16 @@ export default function FarmCheckoutPage(): JSX.Element {
         toast.error("Impossible de charger la ferme");
         router.push("/explore");
       } finally {
-        setIsLoadingFarm(false);
+        if (isMounted) setIsLoadingFarm(false);
       }
     }
 
     loadFarm();
-  }, [farmId, router]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [farmId, router, supabase]);
 
   // Rediriger si panier vide
   useEffect(() => {
@@ -102,10 +116,12 @@ export default function FarmCheckoutPage(): JSX.Element {
 
   // Calculs
   const subtotal = getTotalPrice();
+
   const deliveryPrice = useMemo(() => {
     if (!farm?.delivery_available || cart.deliveryMode !== "delivery") return 0;
-    return farm?.delivery_price ?? 5;
+    return farm.delivery_price ?? 5;
   }, [farm?.delivery_available, farm?.delivery_price, cart.deliveryMode]);
+
   const total = subtotal + deliveryPrice;
 
   // Date minimum (demain)
@@ -146,7 +162,6 @@ export default function FarmCheckoutPage(): JSX.Element {
     setIsCreatingOrder(true);
 
     try {
-      // Créer la commande via l'API
       const result = await createOrder({
         farmId: cart.farmId!,
         items: cart.items.map((item) => ({
@@ -161,16 +176,13 @@ export default function FarmCheckoutPage(): JSX.Element {
       });
 
       if (result.success && result.order) {
-        // ✅ Succès !
         toast.success("Commande créée avec succès !");
         clearCart();
         router.push(`/farm/${farmId}/orders/${result.order.id}`);
       } else {
-        // ❌ Erreur API
         toast.error(
           result.error || "Erreur lors de la création de la commande"
         );
-
         if (result.details) {
           result.details.forEach((detail) => {
             toast.error(detail, { duration: 5000 });

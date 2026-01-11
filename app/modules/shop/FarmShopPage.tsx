@@ -12,10 +12,10 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { COLORS } from "@/lib/config";
-import { supabase } from "@/utils/supabase/client";
 import { useCartStore, type Product } from "@/lib/store/cartStore";
 import { toast } from "sonner";
 import { escapeHTML, sanitizeHTML } from "@/lib/utils/sanitize";
+import { useSupabaseWithClerk } from "@/utils/supabase/client";
 
 /**
  * Interface pour une ferme
@@ -142,6 +142,8 @@ export default function FarmShopPage(): JSX.Element {
   const params = useParams();
   const router = useRouter();
 
+  const supabase = useSupabaseWithClerk();
+
   const rawId = params.id as string | undefined;
   const farmId = rawId ? Number.parseInt(rawId, 10) : Number.NaN;
 
@@ -195,8 +197,13 @@ export default function FarmShopPage(): JSX.Element {
           return;
         }
 
+        const safeFarmName = farmData.name ?? "Ferme sans nom";
+
         if (cancelled) return;
-        setFarm(farmData);
+        setFarm({
+          id: farmData.id,
+          name: safeFarmName,
+        });
 
         const { data: productsData, error: productsError } = await supabase
           .from("products")
@@ -210,14 +217,14 @@ export default function FarmShopPage(): JSX.Element {
         const transformedProducts: Product[] = (productsData || []).map(
           (p: any) => ({
             id: p.id,
-            name: p.name,
-            price: p.price ?? 0,
-            unit: p.unit || "unité",
+            name: p.name ?? "Produit sans nom",
+            price: typeof p.price === "number" ? p.price : Number(p.price ?? 0),
+            unit: p.unit ?? "unité",
             farm_id: farmId,
-            farm_name: farmData.name,
-            image_url: p.image_url,
-            stock_status: p.stock_status || "in_stock",
-            description: p.description,
+            farm_name: safeFarmName, // ✅ string garanti
+            image_url: p.image_url ?? null,
+            stock_status: p.stock_status ?? "in_stock",
+            description: p.description ?? null,
           })
         );
 
@@ -231,6 +238,7 @@ export default function FarmShopPage(): JSX.Element {
         if (!cancelled) setIsLoading(false);
       }
     }
+
 
     loadData();
 

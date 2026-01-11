@@ -14,12 +14,13 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { COLORS } from "@/lib/config";
-import { supabase } from "@/utils/supabase/client";
 import { useCartStore } from "@/lib/store/cartStore";
 import { toast } from "sonner";
+import { useSupabaseWithClerk } from "@/utils/supabase/client";
 
 /**
- * Interface pour une ferme
+ * Interface pour une ferme (UI)
+ * -> on impose string côté UI, donc on map depuis Supabase (string | null)
  */
 interface Farm {
   id: number;
@@ -33,11 +34,23 @@ interface Farm {
 }
 
 /**
- * Page Panier
+ * Type local du SELECT listing (Supabase peut retourner des null)
  */
+type ListingCartRow = {
+  id: number;
+  name: string | null;
+  address: string | null;
+  pickup_days: string | null;
+  delivery_available: boolean | null;
+  delivery_days: string | null;
+  delivery_price: number | null;
+  delivery_zones: string[] | null;
+};
+
 export default function CartPage(): JSX.Element {
   const params = useParams();
   const router = useRouter();
+  const supabase = useSupabaseWithClerk();
 
   const rawId = params.id as string | undefined;
   const farmId = rawId ? Number.parseInt(rawId, 10) : Number.NaN;
@@ -66,12 +79,15 @@ export default function CartPage(): JSX.Element {
       try {
         setIsLoading(true);
 
+        // ✅ Select ciblé + typage + mapping vers Farm (UI)
         const { data, error } = await supabase
           .from("listing")
-          .select("*")
+          .select(
+            "id, name, address, pickup_days, delivery_available, delivery_days, delivery_price, delivery_zones"
+          )
           .eq("id", farmId)
           .eq("active", true)
-          .single();
+          .single<ListingCartRow>();
 
         if (error) throw error;
 
@@ -81,7 +97,18 @@ export default function CartPage(): JSX.Element {
           return;
         }
 
-        if (!cancelled) setFarm(data);
+        const mappedFarm: Farm = {
+          id: data.id,
+          name: data.name ?? "Ferme sans nom",
+          address: data.address ?? "Adresse non renseignée",
+          pickup_days: data.pickup_days ?? null,
+          delivery_available: data.delivery_available ?? false,
+          delivery_days: data.delivery_days ?? null,
+          delivery_price: data.delivery_price ?? null,
+          delivery_zones: data.delivery_zones ?? null,
+        };
+
+        if (!cancelled) setFarm(mappedFarm);
       } catch (error) {
         console.error("Erreur chargement ferme:", error);
         toast.error("Impossible de charger les informations de la ferme");
@@ -96,7 +123,7 @@ export default function CartPage(): JSX.Element {
     return () => {
       cancelled = true;
     };
-  }, [rawId, farmId, router]);
+  }, [rawId, farmId, router, supabase]);
 
   // Vérifier que le panier correspond à la ferme
   useEffect(() => {
@@ -119,13 +146,10 @@ export default function CartPage(): JSX.Element {
   const handleDec = useCallback(
     (productId: number, currentQty: number) => {
       const next = Math.max(0, currentQty - 1);
-
-      // ✅ Si 0 => on supprime vraiment (sécurité même si store ne gère pas 0)
       if (next === 0) {
         removeItem(productId);
         return;
       }
-
       updateQuantity(productId, next);
     },
     [removeItem, updateQuantity]
@@ -138,9 +162,8 @@ export default function CartPage(): JSX.Element {
 
   // Totaux
   const deliveryPrice = useMemo(() => {
-    // si la ferme ne propose pas la livraison, on force 0
     if (!farm?.delivery_available) return 0;
-    return farm?.delivery_price ?? 5;
+    return farm.delivery_price ?? 5;
   }, [farm?.delivery_available, farm?.delivery_price]);
 
   const subtotal = getTotalPrice();
@@ -203,10 +226,7 @@ export default function CartPage(): JSX.Element {
           <Link
             href={`/farm/${farmId}/shop`}
             className="inline-flex items-center gap-2 px-6 py-3 rounded-lg font-medium"
-            style={{
-              backgroundColor: COLORS.PRIMARY,
-              color: COLORS.BG_WHITE,
-            }}
+            style={{ backgroundColor: COLORS.PRIMARY, color: COLORS.BG_WHITE }}
           >
             <ArrowLeft className="w-4 h-4" />
             Retour à la boutique
@@ -447,7 +467,7 @@ export default function CartPage(): JSX.Element {
                     className="text-sm"
                     style={{ color: COLORS.TEXT_SECONDARY }}
                   >
-                    🚚 {farm?.delivery_days || "Livraison disponible"}
+                    🚚 {farm.delivery_days || "Livraison disponible"}
                   </p>
                 </div>
                 <span className="font-bold" style={{ color: COLORS.PRIMARY }}>
@@ -510,14 +530,10 @@ export default function CartPage(): JSX.Element {
               !cart.deliveryMode &&
                 "opacity-50 cursor-not-allowed pointer-events-none"
             )}
-            style={{
-              backgroundColor: COLORS.PRIMARY,
-              color: COLORS.BG_WHITE,
-            }}
+            style={{ backgroundColor: COLORS.PRIMARY, color: COLORS.BG_WHITE }}
             onMouseEnter={(e) => {
-              if (cart.deliveryMode) {
+              if (cart.deliveryMode)
                 e.currentTarget.style.backgroundColor = COLORS.PRIMARY_DARK;
-              }
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = COLORS.PRIMARY;

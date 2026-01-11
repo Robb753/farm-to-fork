@@ -16,7 +16,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { supabase } from "@/utils/supabase/client";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,6 +29,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { COLORS, PATHS, TABLES } from "@/lib/config";
 import { cn } from "@/lib/utils";
+import { useSupabaseWithClerk } from "@/utils/supabase/client";
 
 /**
  * Interface pour les demandes d'accès producteur
@@ -46,7 +46,6 @@ interface FarmerRequest {
 
   // Informations entreprise
   siret: string;
-  department: string;
 
   // Informations ferme
   farm_name: string;
@@ -89,6 +88,8 @@ interface ValidationPayload {
 export default function AdminNotificationsPage(): JSX.Element {
   const { user, isLoaded, isSignedIn } = useUser();
   const router = useRouter();
+
+  const supabase = useSupabaseWithClerk(); 
 
   const [loading, setLoading] = useState<boolean>(true);
   const [isChecking, setIsChecking] = useState<boolean>(true);
@@ -522,8 +523,6 @@ export default function AdminNotificationsPage(): JSX.Element {
                   <br />
                   <strong>SIRET :</strong> {confirmingAction.request.siret}
                   <br />
-                  <strong>Département :</strong>{" "}
-                  {confirmingAction.request.department}
                 </>
               ) : (
                 <>
@@ -638,17 +637,6 @@ export default function AdminNotificationsPage(): JSX.Element {
                   </h3>
                   <p style={{ color: COLORS.TEXT_SECONDARY }}>
                     {selectedRequest.siret}
-                  </p>
-                </div>
-                <div>
-                  <h3
-                    className="font-medium"
-                    style={{ color: COLORS.TEXT_PRIMARY }}
-                  >
-                    Département
-                  </h3>
-                  <p style={{ color: COLORS.TEXT_SECONDARY }}>
-                    {selectedRequest.department}
                   </p>
                 </div>
                 <div>

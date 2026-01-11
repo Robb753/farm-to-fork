@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -39,22 +39,14 @@ interface HeroSectionProps {
   className?: string;
 }
 
-/**
- * Composant Hero Section d'un listing de ferme
- *
- * 🔒 SÉCURITÉ: Toutes les données utilisateur sont protégées contre XSS
- *
- * Features:
- * - Galerie d'images avec navigation
- * - Informations principales de la ferme
- * - Note et avis (statiques pour éviter hydration mismatch)
- * - Badges de certification et méthodes
- * - Actions de contact et partage
- *
- * @param listing - Données du listing
- * @param className - Classes CSS additionnelles
- * @returns JSX.Element - Section hero avec galerie et infos
- */
+type Certification = NonNullable<ListingWithImages["certifications"]>[number];
+
+type CertBadge = {
+  label: string;
+  color: string;
+  icon: string;
+};
+
 export default function HeroSection({
   listing,
   className,
@@ -70,10 +62,13 @@ export default function HeroSection({
   /**
    * Images de la galerie (images du listing + image de profil en fallback)
    */
-  const galleryImages = [
-    ...(listing.listingImages?.map((img) => img.url) || []),
-    ...(listing.profileImage ? [listing.profileImage] : []),
-  ];
+  const galleryImages = useMemo(() => {
+    const imgs = [
+      ...(listing.listingImages?.map((img) => img.url).filter(Boolean) || []),
+      ...(listing.profileImage ? [listing.profileImage] : []),
+    ];
+    return imgs;
+  }, [listing.listingImages, listing.profileImage]);
 
   // Image par défaut si aucune image
   const defaultImage = "/images/placeholder-farm.jpg";
@@ -101,6 +96,14 @@ export default function HeroSection({
   };
 
   /**
+   * Copie l'URL dans le clipboard
+   */
+  const copyToClipboard = (): void => {
+    navigator.clipboard.writeText(window.location.href);
+    // Ici tu pourrais ajouter un toast de confirmation
+  };
+
+  /**
    * Gestion du partage
    * 🔒 SÉCURITÉ: Données échappées avant partage
    */
@@ -109,24 +112,17 @@ export default function HeroSection({
       try {
         await navigator.share({
           title: escapeHTML(listing.name || "Ferme locale"),
-          text: `Découvrez ${escapeHTML(listing.name || "cette ferme")} - Ferme locale`,
+          text: `Découvrez ${escapeHTML(
+            listing.name || "cette ferme"
+          )} - Ferme locale`,
           url: window.location.href,
         });
-      } catch (error) {
-        // Fallback vers copie dans le clipboard
+      } catch {
         copyToClipboard();
       }
     } else {
       copyToClipboard();
     }
-  };
-
-  /**
-   * Copie l'URL dans le clipboard
-   */
-  const copyToClipboard = (): void => {
-    navigator.clipboard.writeText(window.location.href);
-    // Ici tu pourrais ajouter un toast de confirmation
   };
 
   /**
@@ -140,11 +136,9 @@ export default function HeroSection({
    */
   const handleContact = (): void => {
     if (listing.phoneNumber) {
-      // ✅ Nettoyer le numéro (garder uniquement chiffres, +, espaces, tirets, parenthèses)
       const cleanPhone = listing.phoneNumber.replace(/[^0-9+\s\-()]/g, "");
       window.open(`tel:${cleanPhone}`, "_self");
     } else if (listing.email) {
-      // Email dans mailto: est relativement safe
       window.open(`mailto:${listing.email}`, "_self");
     }
   };
@@ -154,34 +148,27 @@ export default function HeroSection({
    * 🔒 SÉCURITÉ: Validation stricte de l'URL + noopener/noreferrer
    */
   const handleWebsite = (): void => {
-    if (listing.website) {
-      // ✅ VALIDATION: Force HTTPS si protocole absent
-      const safeUrl =
-        listing.website.startsWith("http://") ||
-        listing.website.startsWith("https://")
-          ? listing.website
-          : `https://${listing.website}`;
+    if (!listing.website) return;
 
-      // ✅ SÉCURITÉ: noopener et noreferrer obligatoires
-      window.open(safeUrl, "_blank", "noopener,noreferrer");
-    }
+    const safeUrl =
+      listing.website.startsWith("http://") ||
+      listing.website.startsWith("https://")
+        ? listing.website
+        : `https://${listing.website}`;
+
+    window.open(safeUrl, "_blank", "noopener,noreferrer");
   };
 
   /**
    * Obtient les badges de certification
-   * 🔒 SÉCURITÉ: Label échappé dans le cas default
+   * ✅ FIX: certifications est un tableau
    */
-  const getCertificationBadges = () => {
-    // Si pas de certifications, retourner array vide
-    if (!listing.certifications) {
-      return [];
-    }
+  const certificationBadges: CertBadge[] = useMemo(() => {
+    const certs = listing.certifications;
 
-    // Enum certification_enum peut être une valeur unique ou null
-    // Convertir en array pour traitement uniforme
-    const cert = listing.certifications;
+    if (!certs || certs.length === 0) return [];
 
-    const badge = (() => {
+    const toBadge = (cert: Certification): CertBadge => {
       switch (cert) {
         case "bio":
           return {
@@ -208,17 +195,17 @@ export default function HeroSection({
             icon: "📍",
           };
         default:
-          // 🔒 SÉCURITÉ: Échapper les certifications non-standard
+          // 🔒 SÉCURITÉ: Échapper les valeurs non-standard (au cas où)
           return {
             label: escapeHTML(String(cert)),
             color: "bg-gray-100 text-gray-700 border-gray-200",
             icon: "✓",
           };
       }
-    })();
+    };
 
-    return [badge];
-  };
+    return certs.map(toBadge);
+  }, [listing.certifications]);
 
   if (!isClient) {
     return (
@@ -240,9 +227,8 @@ export default function HeroSection({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
         {/* Galerie d'images */}
         <div className="relative aspect-[4/3] lg:aspect-square">
-          {/* 🔒 SÉCURITÉ: Attribut alt échappé */}
           <Image
-            src={displayImages[currentImageIndex]}
+            src={displayImages[currentImageIndex] || defaultImage}
             alt={escapeHTML(
               `${listing.name || "Ferme"} - Image ${currentImageIndex + 1}`
             )}
@@ -250,9 +236,6 @@ export default function HeroSection({
             className="object-cover"
             priority
             sizes="(max-width: 768px) 100vw, 50vw"
-            onError={(e) => {
-              e.currentTarget.src = defaultImage;
-            }}
           />
 
           {/* Navigation galerie */}
@@ -313,10 +296,8 @@ export default function HeroSection({
 
         {/* Informations de la ferme */}
         <div className="p-6 lg:p-8 flex flex-col justify-between">
-          {/* Header avec nom et localisation */}
           <div className="space-y-4">
             <div>
-              {/* 🔒 SÉCURITÉ: Nom de ferme échappé */}
               <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">
                 {escapeHTML(listing.name || "Ferme sans nom")}
               </h1>
@@ -324,7 +305,6 @@ export default function HeroSection({
               {listing.address && (
                 <div className="flex items-center gap-2 text-gray-600">
                   <MapPin className="h-4 w-4 flex-shrink-0" />
-                  {/* 🔒 SÉCURITÉ: Adresse échappée */}
                   <span className="text-sm">{escapeHTML(listing.address)}</span>
                 </div>
               )}
@@ -363,23 +343,21 @@ export default function HeroSection({
                   className="bg-green-50 text-green-700 border-green-200"
                 >
                   <Award className="h-3 w-3 mr-1" />
-                  {/* 🔒 SÉCURITÉ: Type de ferme échappé */}
                   {escapeHTML(listing.typeferme)}
                 </Badge>
               </div>
             )}
 
             {/* Certifications */}
-            {listing.certifications && getCertificationBadges().length > 0 && (
+            {certificationBadges.length > 0 && (
               <div className="flex flex-wrap gap-2">
-                {getCertificationBadges().map((badge, index) => (
+                {certificationBadges.map((badge, index) => (
                   <Badge
-                    key={index}
+                    key={`${badge.label}-${index}`}
                     variant="outline"
                     className={cn("text-xs", badge.color)}
                   >
                     <span className="mr-1">{badge.icon}</span>
-                    {/* Label déjà échappé dans getCertificationBadges() */}
                     {badge.label}
                   </Badge>
                 ))}
@@ -388,7 +366,6 @@ export default function HeroSection({
 
             {/* Description courte */}
             {listing.description && (
-              /* 🔒 SÉCURITÉ: Description sanitisée (permet formatage basique) */
               <div
                 className="text-gray-600 text-sm leading-relaxed line-clamp-3 prose prose-sm max-w-none"
                 dangerouslySetInnerHTML={{
@@ -423,7 +400,6 @@ export default function HeroSection({
               )}
             </div>
 
-            {/* Informations additionnelles */}
             <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t">
               <div className="flex items-center gap-1">
                 <Calendar className="h-3 w-3" />

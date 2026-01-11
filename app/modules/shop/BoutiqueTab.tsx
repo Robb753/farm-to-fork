@@ -15,13 +15,13 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { COLORS } from "@/lib/config";
-import { supabase } from "@/utils/supabase/client";
 import { useCartStore, type Product } from "@/lib/store/cartStore";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { Database } from "@/lib/types/database";
 import { escapeHTML, sanitizeHTML } from "@/lib/utils/sanitize";
+import { useSupabaseWithClerk } from "@/utils/supabase/client";
 
 /**
  * Type pour un listing
@@ -43,6 +43,8 @@ export default function BoutiqueTab({
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const supabase = useSupabaseWithClerk();
 
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<

@@ -1,28 +1,64 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Package,
-  Calendar,
   User,
   MapPin,
   Truck,
   Check,
-  X,
   Loader2,
   ArrowLeft,
 } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { COLORS } from "@/lib/config";
-import { supabase } from "@/utils/supabase/client";
-import { toast } from "sonner";
-import Link from "next/link";
+import { useSupabaseWithClerk } from "@/utils/supabase/client";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/types/database";
 
 /**
- * Interface pour une commande farmer
+ * Row minimal pour listing
  */
-interface FarmerOrder {
+type ListingSelectRow = {
+  id: number;
+  name: string | null;
+  createdBy: string | null;
+};
+
+/**
+ * ✅ Row “SELECT” orders typée localement (indépendant de Database types)
+ * -> évite le TS error si tes types Supabase sont en retard
+ */
+type OrdersSelectRow = {
+  id: number;
+  user_id: string; // (si tu as gardé uuid côté DB, mets string quand même côté UI)
+  farm_id: number;
+  items: unknown; // jsonb
+  total_price: number | string | null;
+  delivery_mode: "pickup" | "delivery";
+  delivery_day: string | null;
+  delivery_address: unknown | null; // jsonb
+  customer_notes: string | null;
+  status: "pending" | "confirmed" | "ready" | "delivered" | "cancelled";
+  payment_status: "unpaid" | "paid" | "refunded" | null;
+  created_at: string;
+};
+
+/**
+ * Profile minimal
+ */
+type ProfileSelectRow = {
+  user_id: string | null;
+  email: string | null;
+};
+
+/**
+ * Interface UI finale
+ */
+interface FarmerOrderUI {
   id: number;
   user_id: string;
   farm_id: number;
@@ -39,29 +75,26 @@ interface FarmerOrder {
     street: string;
     city: string;
     postalCode: string;
+    additionalInfo?: string;
+    country?: string;
   };
   customer_notes?: string;
   status: "pending" | "confirmed" | "ready" | "delivered" | "cancelled";
   payment_status: "unpaid" | "paid" | "refunded";
   created_at: string;
-
-  user?: {
-    email: string;
-  };
+  user?: { email: string };
 }
 
-/**
- * Page Dashboard Farmer - Gestion des commandes d'une ferme spécifique
- * Route: /farm/[id]/dashboard/orders
- */
 export default function FarmDashboardOrdersPage(): JSX.Element {
   const params = useParams();
   const router = useRouter();
   const farmId = params.id ? Number(params.id) : NaN;
 
-  const [farmName, setFarmName] = useState("");
-  const [orders, setOrders] = useState<FarmerOrder[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const supabase = useSupabaseWithClerk();
+
+  const [farmName, setFarmName] = useState<string>("");
+  const [orders, setOrders] = useState<FarmerOrderUI[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [filter, setFilter] = useState<
     "all" | "pending" | "confirmed" | "ready"
   >("all");
@@ -72,107 +105,107 @@ export default function FarmDashboardOrdersPage(): JSX.Element {
       return;
     }
 
+    let mounted = true;
+
     async function loadOrders() {
       try {
         setIsLoading(true);
 
-        // Vérifier l'auth et le rôle
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-
-        if (!user) {
-          toast.error("Vous devez être connecté");
-          router.push("/login");
-          return;
-        }
-
-        // Vérifier que c'est bien le farmer de CETTE ferme
-        const { data: listing } = await supabase
+        // ✅ charge listing
+        const { data: listing, error: listingError } = await supabase
           .from("listing")
           .select("id, name, createdBy")
           .eq("id", farmId)
-          .single();
+          .single<ListingSelectRow>();
 
-        if (!listing) {
+        if (listingError || !listing) {
           toast.error("Ferme introuvable");
           router.push("/explore");
           return;
         }
 
-        // Vérifier que l'utilisateur est bien le propriétaire de la ferme
-        if (listing.createdBy !== user.id) {
-          toast.error(
-            "Accès non autorisé - Cette ferme ne vous appartient pas"
-          );
-          router.push("/");
-          return;
-        }
+        if (!mounted) return;
 
-        setFarmName(listing.name);
+        // ✅ name peut être null
+        setFarmName(listing.name ?? "Ma ferme");
 
-        // Charger les commandes de CETTE ferme
+        // ✅ charge orders (delivery_address inclus)
         const { data: ordersData, error: ordersError } = await supabase
           .from("orders")
           .select(
             "id, user_id, farm_id, items, total_price, delivery_mode, delivery_day, delivery_address, customer_notes, status, payment_status, created_at"
           )
           .eq("farm_id", farmId)
-          .order("created_at", { ascending: false });
+          .order("created_at", { ascending: false })
+          .returns<OrdersSelectRow[]>();
 
-        if (ordersError) {
-          console.error("Error fetching orders:", ordersError);
-          throw ordersError;
-        }
+        if (ordersError) throw ordersError;
 
         if (!ordersData || ordersData.length === 0) {
           setOrders([]);
           return;
         }
 
-        // Récupérer les emails des utilisateurs depuis la table profiles
-        const userIds = [...new Set(ordersData.map((order) => order.user_id))];
+        // ✅ récupérer emails depuis profiles
+        const userIds = [...new Set(ordersData.map((o) => String(o.user_id)))];
+
         const { data: profiles } = await supabase
           .from("profiles")
           .select("user_id, email")
-          .in("user_id", userIds);
+          .in("user_id", userIds)
+          .returns<ProfileSelectRow[]>();
 
-        // Créer un map user_id -> email pour un accès rapide
-        const userEmailMap = new Map<string, string>();
-        if (profiles) {
-          profiles.forEach((profile) => {
-            userEmailMap.set(profile.user_id, profile.email);
-          });
-        }
+        const emailMap = new Map<string, string>();
+        (profiles ?? []).forEach((p) => {
+          if (p.user_id && p.email) emailMap.set(p.user_id, p.email);
+        });
 
-        // Mapper les données avec les emails réels
-        const ordersWithUsers: FarmerOrder[] = ordersData.map((order: any) => ({
-          id: order.id,
-          user_id: order.user_id,
-          farm_id: order.farm_id,
-          items: order.items || [],
-          total_price: order.total_price || 0,
-          delivery_mode: order.delivery_mode,
-          delivery_day: order.delivery_day || "",
-          delivery_address: order.delivery_address || undefined,
-          customer_notes: order.customer_notes || undefined,
-          status: order.status,
-          payment_status: order.payment_status,
-          created_at: order.created_at,
-          user: { email: userEmailMap.get(order.user_id) || order.user_id },
-        }));
+        // ✅ normalisation
+        const normalized: FarmerOrderUI[] = ordersData.map((o) => {
+          const deliveryAddr =
+            o.delivery_address && typeof o.delivery_address === "object"
+              ? (o.delivery_address as FarmerOrderUI["delivery_address"])
+              : undefined;
 
-        setOrders(ordersWithUsers);
-      } catch (error) {
-        console.error("Erreur chargement commandes:", error);
+          const items = Array.isArray(o.items)
+            ? (o.items as FarmerOrderUI["items"])
+            : [];
+
+          return {
+            id: Number(o.id),
+            user_id: String(o.user_id),
+            farm_id: Number(o.farm_id),
+            items,
+            total_price: Number(o.total_price ?? 0),
+            delivery_mode: o.delivery_mode,
+            delivery_day: o.delivery_day ?? "",
+            delivery_address: deliveryAddr,
+            customer_notes: o.customer_notes ?? undefined,
+            status: o.status,
+            payment_status: (o.payment_status ??
+              "unpaid") as FarmerOrderUI["payment_status"],
+            created_at: o.created_at,
+            user: {
+              email: emailMap.get(String(o.user_id)) || String(o.user_id),
+            },
+          };
+        });
+
+        setOrders(normalized);
+      } catch (err) {
+        console.error("Erreur chargement commandes:", err);
         toast.error("Impossible de charger les commandes");
       } finally {
-        setIsLoading(false);
+        if (mounted) setIsLoading(false);
       }
     }
 
     loadOrders();
-  }, [farmId, router]);
+
+    return () => {
+      mounted = false;
+    };
+  }, [farmId, router, supabase]);
 
   const filteredOrders =
     filter === "all" ? orders : orders.filter((o) => o.status === filter);
@@ -199,7 +232,6 @@ export default function FarmDashboardOrdersPage(): JSX.Element {
   return (
     <div className="min-h-screen" style={{ backgroundColor: COLORS.BG_GRAY }}>
       <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Breadcrumb */}
         <Link
           href={`/farm/${farmId}`}
           className="inline-flex items-center gap-2 mb-6 text-sm hover:underline"
@@ -209,7 +241,6 @@ export default function FarmDashboardOrdersPage(): JSX.Element {
           Retour à ma ferme
         </Link>
 
-        {/* Header */}
         <div className="mb-8">
           <h1
             className="text-3xl font-bold mb-2"
@@ -222,7 +253,6 @@ export default function FarmDashboardOrdersPage(): JSX.Element {
           </p>
         </div>
 
-        {/* Filtres */}
         <div className="flex items-center gap-2 mb-6">
           <FilterButton
             active={filter === "all"}
@@ -246,7 +276,6 @@ export default function FarmDashboardOrdersPage(): JSX.Element {
           />
         </div>
 
-        {/* Liste des commandes */}
         {filteredOrders.length === 0 ? (
           <div className="text-center py-16">
             <Package
@@ -271,6 +300,7 @@ export default function FarmDashboardOrdersPage(): JSX.Element {
               <FarmerOrderCard
                 key={order.id}
                 order={order}
+                supabase={supabase}
                 onStatusChange={() => window.location.reload()}
               />
             ))}
@@ -310,15 +340,17 @@ function FilterButton({
 
 function FarmerOrderCard({
   order,
+  supabase,
   onStatusChange,
 }: {
-  order: FarmerOrder;
+  order: FarmerOrderUI;
+  supabase: SupabaseClient<Database>;
   onStatusChange: () => void;
 }) {
   const [isUpdating, setIsUpdating] = useState(false);
   const orderNumber = `FM2K-${String(order.id).padStart(6, "0")}`;
 
-  const handleStatusChange = async (newStatus: FarmerOrder["status"]) => {
+  const handleStatusChange = async (newStatus: FarmerOrderUI["status"]) => {
     if (isUpdating) return;
 
     try {
@@ -332,11 +364,18 @@ function FarmerOrderCard({
       if (error) throw error;
 
       toast.success(
-        `Commande ${newStatus === "confirmed" ? "confirmée" : newStatus === "ready" ? "marquée prête" : "mise à jour"}`
+        `Commande ${
+          newStatus === "confirmed"
+            ? "confirmée"
+            : newStatus === "ready"
+              ? "marquée prête"
+              : "mise à jour"
+        }`
       );
+
       onStatusChange();
-    } catch (error) {
-      console.error("Erreur mise à jour statut:", error);
+    } catch (err) {
+      console.error("Erreur mise à jour statut:", err);
       toast.error("Erreur lors de la mise à jour");
     } finally {
       setIsUpdating(false);
@@ -348,7 +387,6 @@ function FarmerOrderCard({
       className="p-6 rounded-xl border"
       style={{ backgroundColor: COLORS.BG_WHITE, borderColor: COLORS.BORDER }}
     >
-      {/* Header */}
       <div
         className="flex items-start justify-between gap-4 mb-4 pb-4 border-b"
         style={{ borderColor: COLORS.BORDER }}
@@ -379,7 +417,6 @@ function FarmerOrderCard({
         </div>
       </div>
 
-      {/* Client & Livraison */}
       <div className="grid grid-cols-2 gap-4 mb-4">
         <div>
           <div className="flex items-center gap-2 mb-2">
@@ -428,7 +465,6 @@ function FarmerOrderCard({
         </div>
       </div>
 
-      {/* Produits */}
       <div className="mb-4">
         <p
           className="text-sm font-semibold mb-2"
@@ -467,7 +503,6 @@ function FarmerOrderCard({
         </div>
       )}
 
-      {/* Actions */}
       <div
         className="flex items-center gap-3 pt-4 border-t"
         style={{ borderColor: COLORS.BORDER }}

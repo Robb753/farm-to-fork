@@ -4,7 +4,6 @@
 import { useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -24,6 +23,7 @@ import {
 } from "@/utils/icons";
 import { COLORS } from "@/lib/config";
 import { cn } from "@/lib/utils";
+import { useSupabaseWithClerk } from "@/utils/supabase/client";
 
 /**
  * Interface pour une demande producteur
@@ -67,6 +67,8 @@ interface FarmerRequest {
 export default function OnboardingStatus() {
   const { user, isLoaded } = useUser();
   const router = useRouter();
+
+  const supabase = useSupabaseWithClerk();
 
   const [request, setRequest] = useState<FarmerRequest | null>(null);
   const [loading, setLoading] = useState<boolean>(true);

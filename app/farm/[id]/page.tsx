@@ -6,7 +6,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Suspense, useState, useEffect } from "react";
 import { useParams, notFound } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/utils/supabase/client";
 import type { Database } from "@/lib/types/database";
 
 // Import des composants enfants
@@ -18,6 +17,7 @@ import ReviewsTab from "./_components/ReviewsTab";
 import ContactCard from "./_components/ContactCard";
 import OpeningHoursCard from "./_components/OpeningHoursCard";
 import MapCard from "./_components/MapCard";
+import { useSupabaseWithClerk } from "@/utils/supabase/client";
 
 /**
  * Type pour un listing avec ses images et relations
@@ -72,6 +72,8 @@ const TABS_CONFIG: Array<{
 export default function FarmPage(): JSX.Element {
   const params = useParams();
   const idParam = params?.id;
+
+  const supabase = useSupabaseWithClerk();
 
   const [listing, setListing] = useState<ListingWithImages | null>(null);
   const [isLoading, setIsLoading] = useState(true);

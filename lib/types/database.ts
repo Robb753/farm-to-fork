@@ -373,78 +373,122 @@ export interface Database {
 
       products: {
         Row: {
-          id: number;
-          listing_id: number;
-
-          // Champs utilisés dans ton code BoutiqueTab
-          farm_id: number;
-          active: boolean;
+          id: number; // bigint
+          listing_id: number | null; // bigint null
+          farm_id: number | null; // bigint null
 
           name: string;
           description: string | null;
-          price: number | null;
+
+          price: number | null; // numeric(10,2) (voir note)
           unit: string | null;
 
           available: boolean | null;
 
-          image_url: string | null;
-
-          // tu m'as confirmé l'avoir
-          stock_status: string | null;
-
           created_at: string;
           updated_at: string | null;
+
+          labels: string[] | null; // text[]
+          stock_quantity: number; // int not null default 0
+          min_stock: number; // int not null default 5
+
+          sku: string | null; // varchar(50)
+          category: string | null; // varchar(100)
+
+          image_url: string | null;
+
+          seasonal: boolean; // default false
+          season_start: string | null; // date
+          season_end: string | null; // date
+
+          is_published: boolean; // default true
+          active: boolean; // default true
+
+          stock_status: "in_stock" | "low_stock" | "out_of_stock"; // check
         };
+
         Insert: {
           id?: number;
-          listing_id: number;
 
-          farm_id: number;
-          active?: boolean;
+          listing_id?: number | null;
+          farm_id?: number | null;
 
           name: string;
           description?: string | null;
+
           price?: number | null;
           unit?: string | null;
 
-          available: boolean | null;
-
-          image_url?: string | null;
-          stock_status?: string | null;
+          available?: boolean | null;
 
           created_at?: string;
           updated_at?: string | null;
+
+          labels?: string[] | null;
+          stock_quantity?: number; // default 0
+          min_stock?: number; // default 5
+
+          sku?: string | null;
+          category?: string | null;
+
+          image_url?: string | null;
+
+          seasonal?: boolean;
+          season_start?: string | null;
+          season_end?: string | null;
+
+          is_published?: boolean;
+          active?: boolean;
+
+          stock_status?: "in_stock" | "low_stock" | "out_of_stock";
         };
+
         Update: {
           id?: number;
-          listing_id?: number;
 
-          farm_id?: number;
-          active?: boolean;
+          listing_id?: number | null;
+          farm_id?: number | null;
 
           name?: string;
           description?: string | null;
+
           price?: number | null;
           unit?: string | null;
 
-          available: boolean | null;
-
-          image_url?: string | null;
-          stock_status?: string | null;
+          available?: boolean | null;
 
           created_at?: string;
           updated_at?: string | null;
+
+          labels?: string[] | null;
+          stock_quantity?: number;
+          min_stock?: number;
+
+          sku?: string | null;
+          category?: string | null;
+
+          image_url?: string | null;
+
+          seasonal?: boolean;
+          season_start?: string | null;
+          season_end?: string | null;
+
+          is_published?: boolean;
+          active?: boolean;
+
+          stock_status?: "in_stock" | "low_stock" | "out_of_stock";
         };
+
         Relationships: [
           {
-            foreignKeyName: "products_listing_id_fkey";
-            columns: ["listing_id"];
+            foreignKeyName: "products_farm_id_fkey";
+            columns: ["farm_id"];
             referencedRelation: "listing";
             referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "products_farm_id_fkey";
-            columns: ["farm_id"];
+            foreignKeyName: "products_listing_id_fkey";
+            columns: ["listing_id"];
             referencedRelation: "listing";
             referencedColumns: ["id"];
           },
@@ -454,22 +498,36 @@ export interface Database {
       orders: {
         Row: {
           id: number;
-          user_id: string; // uuid renvoyé par supabase-js peut arriver en string côté TS
+          user_id: string; // ✅ TEXT = Clerk sub
           farm_id: number;
 
           delivery_mode: "pickup" | "delivery";
           delivery_day: string | null;
 
-          total_price: number;
+          total_price: number; // ⚠️ numeric(10,2) => souvent string côté supabase-js, voir note plus bas
           status: "pending" | "confirmed" | "ready" | "delivered" | "cancelled";
 
           items: Json; // jsonb
+
           created_at: string;
           updated_at: string;
+
+          payment_status: "unpaid" | "paid" | "refunded" | null;
+
+          delivery_address: Json | null;
+
+          customer_notes: string | null;
+          farmer_notes: string | null;
+
+          cancelled_reason: string | null;
+          cancelled_by: "customer" | "farmer" | "admin" | null;
+
+          metadata: Json | null;
         };
+
         Insert: {
           id?: number;
-          user_id: string; // uuid string
+          user_id: string; // ✅ TEXT = Clerk sub
           farm_id: number;
 
           delivery_mode: "pickup" | "delivery";
@@ -484,9 +542,23 @@ export interface Database {
             | "cancelled";
 
           items?: Json;
+
           created_at?: string;
           updated_at?: string;
+
+          payment_status?: "unpaid" | "paid" | "refunded" | null;
+
+          delivery_address?: Json | null;
+
+          customer_notes?: string | null;
+          farmer_notes?: string | null;
+
+          cancelled_reason?: string | null;
+          cancelled_by?: "customer" | "farmer" | "admin" | null;
+
+          metadata?: Json | null;
         };
+
         Update: {
           id?: number;
           user_id?: string;
@@ -504,9 +576,23 @@ export interface Database {
             | "cancelled";
 
           items?: Json;
+
           created_at?: string;
           updated_at?: string;
+
+          payment_status?: "unpaid" | "paid" | "refunded" | null;
+
+          delivery_address?: Json | null;
+
+          customer_notes?: string | null;
+          farmer_notes?: string | null;
+
+          cancelled_reason?: string | null;
+          cancelled_by?: "customer" | "farmer" | "admin" | null;
+
+          metadata?: Json | null;
         };
+
         Relationships: [
           {
             foreignKeyName: "orders_farm_id_fkey";

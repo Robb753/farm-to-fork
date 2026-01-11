@@ -5,9 +5,9 @@ import Link from "next/link";
 import { Package, Check, X, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { COLORS } from "@/lib/config";
-import { supabase } from "@/utils/supabase/client";
 import { useUser } from "@clerk/nextjs";
 import { toast } from "sonner";
+import { useSupabaseWithClerk } from "@/utils/supabase/client";
 
 /**
  * Interface pour une commande
@@ -42,6 +42,8 @@ export default function FarmerOrdersPage(): JSX.Element {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [farmId, setFarmId] = useState<number | null>(null);
+
+  const supabase = useSupabaseWithClerk();
 
   // Charger l'ID de la ferme de l'utilisateur
   useEffect(() => {

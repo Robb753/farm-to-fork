@@ -3,7 +3,6 @@ import { create } from "zustand";
 import { persist, subscribeWithSelector } from "zustand/middleware";
 import { toast } from "sonner";
 
-import type { UserResource } from "@clerk/types";
 import type { Json, Database } from "@/lib/types/database";
 import type { SupabaseDbClient } from "@/lib/syncUserUtils";
 
@@ -15,24 +14,24 @@ import {
 
 // ==================== TYPES ====================
 
-/**
- * Clerk public metadata interface
- */
-interface ClerkPublicMetadata {
-  role?: "user" | "farmer" | "admin";
-}
+export type Role = "user" | "farmer" | "admin" | null;
 
 /**
- * Extended Clerk UserResource with typed publicMetadata
+ * DTO minimal côté app (NE PAS utiliser UserResource ici)
+ * -> c'est exactement ce que tu construis dans ClientProviders.
  */
-interface TypedUserResource extends UserResource {
-  publicMetadata: ClerkPublicMetadata;
-}
-
-/**
- * Type alias for profiles table row from database
- */
-type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
+export type ClerkUserDTO = {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  imageUrl: string | null;
+  username: string | null;
+  publicMetadata: {
+    role?: "user" | "farmer" | "admin";
+    [k: string]: unknown;
+  };
+};
 
 export interface UserProfile {
   id: string; // Clerk user id
@@ -40,8 +39,6 @@ export interface UserProfile {
   role: "user" | "farmer" | "admin";
   favorites: number[];
 }
-
-export type Role = "user" | "farmer" | "admin" | null;
 
 interface UserState {
   profile: UserProfile | null;
@@ -63,8 +60,9 @@ interface UserState {
   setWaitingForProfile: (waiting: boolean) => void;
   setSyncError: (error: string | null) => void;
 
-  syncUser: (user: UserResource | null) => Promise<void>;
-  resyncRole: (user: UserResource | null) => Promise<void>;
+  // ✅ on sync avec un DTO, pas UserResource
+  syncUser: (user: ClerkUserDTO | null) => Promise<void>;
+  resyncRole: (user: ClerkUserDTO | null) => Promise<void>;
 
   loadFavorites: (userId: string) => Promise<void>;
   toggleFavorite: (listingId: number, userId: string) => Promise<void>;
@@ -131,7 +129,6 @@ const INITIAL_STATE: Omit<
   isReady: false,
   isWaitingForProfile: false,
   syncError: null,
-
   supabase: null,
 };
 
@@ -177,10 +174,8 @@ export const useUserStore = create<UserState>()(
             const favoritesArray = uniq(toNumberArray(data?.favorites));
 
             set((state) => {
-              // Si profile absent, on peut initialiser un minimum
               const existing = state.profile;
 
-              // Validate role from database
               const dbRole = data?.role;
               const validRole: UserProfile["role"] =
                 dbRole === "admin" || dbRole === "farmer" || dbRole === "user"
@@ -189,7 +184,8 @@ export const useUserStore = create<UserState>()(
 
               const nextProfile: UserProfile = {
                 id: userId,
-                email: existing?.email ?? data?.email ?? "",
+                // email DB sinon email existant sinon string vide
+                email: data?.email ?? existing?.email ?? "",
                 role: existing?.role ?? validRole,
                 favorites: favoritesArray,
               };
@@ -217,6 +213,7 @@ export const useUserStore = create<UserState>()(
 
           const isCurrentlyFavorite =
             state.profile.favorites.includes(listingId);
+
           const updatedFavorites = uniq(
             isCurrentlyFavorite
               ? state.profile.favorites.filter((id) => id !== listingId)
@@ -237,7 +234,6 @@ export const useUserStore = create<UserState>()(
           });
 
           try {
-            // ✅ jsonb => array direct
             const { error } = await supabase
               .from("profiles")
               .update({ favorites: updatedFavorites as unknown as Json })
@@ -269,8 +265,7 @@ export const useUserStore = create<UserState>()(
         addFavorite: (listingId) =>
           set((state) => {
             if (!state.profile) return state;
-            const exists = state.profile.favorites.includes(listingId);
-            if (exists) return state;
+            if (state.profile.favorites.includes(listingId)) return state;
             return {
               profile: {
                 ...state.profile,
@@ -297,6 +292,8 @@ export const useUserStore = create<UserState>()(
 
         // ==================== ACTIONS MÉTIER ====================
         syncUser: async (user) => {
+          const supabase = get().supabase;
+
           const {
             setSyncing,
             setWaitingForProfile,
@@ -305,8 +302,7 @@ export const useUserStore = create<UserState>()(
             setReady,
           } = get();
 
-          const supabase = get().supabase;
-
+          // Déconnexion
           if (!user) {
             setSyncing(false);
             setWaitingForProfile(false);
@@ -317,11 +313,22 @@ export const useUserStore = create<UserState>()(
             return;
           }
 
+          // Supabase pas encore injecté : fallback minimal
           if (!supabase) {
-            // On évite de "crasher" si le store sync avant initSupabase()
             console.warn("[UserStore] Supabase non initialisé (syncUser).");
-            const typedUser = user as TypedUserResource;
-            setRole(typedUser.publicMetadata?.role ?? "user");
+            setRole(user.publicMetadata?.role ?? "user");
+
+            // au minimum on hydrate un profil local (email si on l'a)
+            set({
+              profile: {
+                id: user.id,
+                email: user.email ?? "",
+                role: (user.publicMetadata?.role ??
+                  "user") as UserProfile["role"],
+                favorites: [],
+              },
+            });
+
             setReady(true);
             setSyncing(false);
             setWaitingForProfile(false);
@@ -337,8 +344,8 @@ export const useUserStore = create<UserState>()(
             const resolvedRole = await determineUserRole(supabase, user);
             setRole(resolvedRole);
 
-            const typedUser = user as TypedUserResource;
-            if (typedUser.publicMetadata?.role !== resolvedRole) {
+            // Clerk publicMetadata role doit refléter la vérité DB
+            if (user.publicMetadata?.role !== resolvedRole) {
               await updateClerkRole(user.id, resolvedRole);
             }
 
@@ -346,7 +353,6 @@ export const useUserStore = create<UserState>()(
               createListing: resolvedRole === "farmer",
             });
 
-            // Charge favorites + email/role depuis Supabase (source of truth)
             await get().loadFavorites(user.id);
 
             setReady(true);
@@ -369,9 +375,9 @@ export const useUserStore = create<UserState>()(
         },
 
         resyncRole: async (user) => {
+          const supabase = get().supabase;
           const { isSyncing, setSyncing, setSyncError, setRole, setReady } =
             get();
-          const supabase = get().supabase;
 
           if (!user) {
             console.warn("[UserStore] Aucun utilisateur pour la re-sync");
@@ -394,7 +400,6 @@ export const useUserStore = create<UserState>()(
             await updateClerkRole(user.id, resolvedRole);
             await syncProfileToSupabase(supabase, user, resolvedRole);
 
-            // Refresh profil local
             await get().loadFavorites(user.id);
 
             toast.success("Profil synchronisé avec succès");
@@ -423,7 +428,7 @@ export const useUserStore = create<UserState>()(
       }),
       {
         name: "farm2fork-user",
-        // ✅ on persiste supabase ? non (il n'est pas sérialisable)
+        // ✅ Ne pas persister supabase (non sérialisable)
         partialize: (state) => ({
           profile: state.profile,
           role: state.role,
