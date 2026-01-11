@@ -239,7 +239,7 @@ export async function POST(req: NextRequest) {
 
       address: request.location || safeTrim(body.farmProfile?.location) || null,
       email: request.email ?? null,
-      phoneNumber: request.phone ?? null,
+      phoneNumber: request.phoneNumber ?? null,
       website: request.website ?? null,
 
       lat: typeof request.lat === "number" ? request.lat : null,

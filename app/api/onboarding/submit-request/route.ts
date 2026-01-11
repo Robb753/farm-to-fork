@@ -209,7 +209,7 @@ export async function POST(
 
         first_name: firstName.trim(),
         last_name: lastName.trim(),
-        phone: phone?.trim() || null,
+        phoneNumber: phone?.trim() || null,
 
         siret: siretCleaned,
         farm_name: farmName.trim(),

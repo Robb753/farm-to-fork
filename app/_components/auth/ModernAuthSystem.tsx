@@ -27,7 +27,7 @@ import { COLORS, PATHS } from "@/lib/config";
 interface FarmerRequestData {
   farmName: string;
   location: string;
-  phone: string;
+  phoneNumber: string;
   description: string;
 }
 
@@ -101,7 +101,7 @@ export default function ModernAuthSystem() {
     {
       farmName: "",
       location: "",
-      phone: "",
+      phoneNumber: "",
       description: "",
     }
   );
@@ -381,11 +381,11 @@ export default function ModernAuthSystem() {
             />
             <input
               type="tel"
-              value={farmerRequestData.phone}
+              value={farmerRequestData.phoneNumber}
               onChange={(e) =>
                 setFarmerRequestData((prev) => ({
                   ...prev,
-                  phone: e.target.value,
+                  phoneNumber: e.target.value,
                 }))
               }
               className="w-full pl-12 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-offset-0 outline-none"
