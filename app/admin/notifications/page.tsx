@@ -89,7 +89,7 @@ export default function AdminNotificationsPage(): JSX.Element {
   const { user, isLoaded, isSignedIn } = useUser();
   const router = useRouter();
 
-  const supabase = useSupabaseWithClerk(); 
+  const supabase = useSupabaseWithClerk();
 
   const [loading, setLoading] = useState<boolean>(true);
   const [isChecking, setIsChecking] = useState<boolean>(true);
@@ -222,7 +222,15 @@ export default function AdminNotificationsPage(): JSX.Element {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Erreur de validation");
+        console.error("❌ Erreur API détaillée:", {
+          status: response.status,
+          statusText: response.statusText,
+          errorData,
+          payload,
+        });
+        throw new Error(
+          errorData.error || errorData.message || "Erreur de validation"
+        );
       }
 
       toast.success(
@@ -236,10 +244,10 @@ export default function AdminNotificationsPage(): JSX.Element {
       setSelectedRequest(null);
       fetchNotifications();
     } catch (err) {
-      console.error("Erreur d'action:", err);
+      console.error("❌ Erreur complète lors de l'action:", err);
       const errorMessage =
         err instanceof Error ? err.message : "Action impossible";
-      toast.error(`Action impossible: ${errorMessage}`);
+      toast.error(`Erreur lors de la mise à jour: ${errorMessage}`);
     }
   };
 

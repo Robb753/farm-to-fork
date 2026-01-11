@@ -1,84 +1,21 @@
 // app/api/admin/validate-farmer-request/route.ts
+// ✅ VERSION CORRIGÉE : Le trigger gère la création du listing
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { clerkClient, auth } from "@clerk/nextjs/server";
 import { sendFarmerRequestStatusEmail } from "@/lib/config/email-notifications";
-import type {
-  Database,
-  ListingInsert,
-  FarmerRequestUpdate,
-} from "@/lib/types/database";
+import type { Database, FarmerRequestUpdate } from "@/lib/types/database";
 import type { FarmerRequest as EmailFarmerRequest } from "@/lib/config/email-notifications";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * ✅ Types DB utiles
- */
-type DbProductType = Database["public"]["Enums"]["product_type_enum"];
-
-/**
- * ✅ Parse robust product types (farmer_requests.products = string | null)
- * - accepte: '["fruits","legumes"]' (JSON)
- * - accepte: 'fruits,legumes' / 'fruits; legumes' / 'fruits|legumes'
- * - accepte: array (si un jour tu changes le type)
- */
-const PRODUCT_TYPE_VALUES: readonly DbProductType[] = [
-  "fruits",
-  "legumes",
-  "produits_laitiers",
-  "viande",
-  "cereales",
-] as const;
-
-function isDbProductType(v: unknown): v is DbProductType {
-  return (
-    typeof v === "string" &&
-    (PRODUCT_TYPE_VALUES as readonly string[]).includes(v)
-  );
-}
-
-function parseProductTypeEnumArray(raw: unknown): DbProductType[] | null {
-  if (raw == null) return null;
-
-  // array déjà
-  if (Array.isArray(raw)) {
-    const arr = raw.filter(isDbProductType);
-    return arr.length ? Array.from(new Set(arr)) : null;
-  }
-
-  // string: JSON ou CSV
-  if (typeof raw === "string") {
-    const t = raw.trim();
-    if (!t) return null;
-
-    // JSON array ?
-    try {
-      const parsed = JSON.parse(t);
-      if (Array.isArray(parsed)) return parseProductTypeEnumArray(parsed);
-    } catch {
-      // ignore
-    }
-
-    // CSV fallback
-    const parts = t
-      .split(/[,;|]/g)
-      .map((s) => s.trim())
-      .filter(Boolean);
-
-    return parseProductTypeEnumArray(parts);
-  }
-
-  return null;
-}
-
-/**
  * Body / response types
  */
 interface ValidateFarmerRequestBody {
-  requestId: number; // number garanti après sanitisation
+  requestId: number;
   userId: string;
   role: "farmer" | "admin" | "user";
   status: "approved" | "rejected";
@@ -90,7 +27,6 @@ interface ApiResponse {
   message: string;
   error?: string;
   timestamp?: string;
-  createdListingId?: number;
   details?: string;
 }
 
@@ -224,105 +160,6 @@ async function checkAdminPermissions(requestingUserId: string): Promise<{
     return {
       hasPermission: false,
       error: "Impossible de vérifier les permissions",
-    };
-  }
-}
-
-async function createListingForApprovedFarmer(
-  supabase: SupabaseClient<Database>,
-  farmerRequest: Database["public"]["Tables"]["farmer_requests"]["Row"],
-  userId: string
-): Promise<{ success: boolean; listingId?: number; error?: string }> {
-  try {
-    const requestId = farmerRequest.id;
-
-    // éviter doublon
-    const { data: existingListing, error: existingError } = await supabase
-      .from("listing")
-      .select("id")
-      .eq("createdBy", userId)
-      .maybeSingle();
-
-    if (existingError) {
-      console.warn("[VALIDATE] Warning check existing listing:", existingError);
-    } else if (existingListing?.id) {
-      return { success: true, listingId: existingListing.id };
-    }
-
-    // coords depuis farmerRequest (déjà dans Row)
-    const lat = farmerRequest.lat ?? null;
-    const lng = farmerRequest.lng ?? null;
-
-    if (lat === null || lng === null || lat === 0 || lng === 0) {
-      console.error(
-        `[VALIDATE] Coordonnées GPS invalides (request ${requestId})`,
-        { lat, lng }
-      );
-      return {
-        success: false,
-        error:
-          "Coordonnées GPS manquantes ou invalides. L'adresse doit être saisie avec Mapbox au Step 1.",
-      };
-    }
-
-    const listingData: ListingInsert = {
-      createdBy: userId,
-      clerk_user_id: userId, // ✅ très utile pour retrouver le listing
-      name: farmerRequest.farm_name ?? null,
-      description: farmerRequest.description ?? null,
-      phoneNumber: farmerRequest.phone ?? null,
-      email: farmerRequest.email ?? null,
-      website: farmerRequest.website ?? null,
-      address: farmerRequest.location ?? null,
-
-      // ✅ FIX: enum array (pas string)
-      product_type: parseProductTypeEnumArray(farmerRequest.products),
-
-      lat,
-      lng,
-
-      active: true,
-      updated_at: new Date().toISOString(),
-      modified_at: new Date().toISOString(),
-      published_at: new Date().toISOString(), // si tu veux le publier direct à l’approval
-    };
-
-    const { data: insertedListing, error: insertListingError } = await supabase
-      .from("listing")
-      .insert(listingData)
-      .select("id")
-      .single();
-
-    if (insertListingError || !insertedListing) {
-      console.error("[VALIDATE] Erreur création listing:", insertListingError);
-      return {
-        success: false,
-        error: "Impossible de créer la fiche producteur",
-      };
-    }
-
-    // profile -> farm_id (non bloquant)
-    const { error: profileLinkError } = await supabase
-      .from("profiles")
-      .update({
-        farm_id: insertedListing.id,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("user_id", userId);
-
-    if (profileLinkError) {
-      console.warn(
-        "[VALIDATE] Erreur liaison profil-listing:",
-        profileLinkError
-      );
-    }
-
-    return { success: true, listingId: insertedListing.id };
-  } catch (error) {
-    console.error("[VALIDATE] Erreur création listing:", error);
-    return {
-      success: false,
-      error: "Erreur inattendue lors de la création du listing",
     };
   }
 }
@@ -484,26 +321,11 @@ export async function POST(
       );
     }
 
-    // 3) update profile role
-    const { error: profileUpdateError } = await supabase
-      .from("profiles")
-      .update({ role, updated_at: timestamp })
-      .eq("user_id", userId);
+    // 3) ✅ SUPPRIMÉ : Ne plus mettre à jour profile ici
+    // Le trigger s'en charge
 
-    if (profileUpdateError) {
-      console.error("[VALIDATE] Erreur update profil:", profileUpdateError);
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Erreur lors de la mise à jour du profil",
-          message: "Impossible de mettre à jour le profil Supabase",
-          timestamp,
-        },
-        { status: 500 }
-      );
-    }
-
-    // 4) update farmer_requests status
+    // 4) ✅ MODIFIÉ : Mise à jour de farmer_requests
+    // Le trigger va créer le profile et le listing automatiquement
     const updateData: FarmerRequestUpdate = {
       status,
       updated_at: timestamp,
@@ -511,6 +333,11 @@ export async function POST(
       validated_by: requestingUserId,
       ...(reason ? { admin_reason: reason } : {}),
     };
+
+    console.log("[VALIDATE] Mise à jour farmer_request:", {
+      requestId,
+      updateData,
+    });
 
     const { error: requestUpdateError } = await supabase
       .from("farmer_requests")
@@ -525,26 +352,17 @@ export async function POST(
           error: "Erreur lors de la mise à jour de la demande",
           message: "Impossible de mettre à jour le statut de la demande",
           timestamp,
+          details:
+            process.env.NODE_ENV === "development"
+              ? requestUpdateError.message
+              : undefined,
         },
         { status: 500 }
       );
     }
 
-    // 5) create listing if approved
-    let createdListingId: number | undefined;
-    if (status === "approved") {
-      const listingResult = await createListingForApprovedFarmer(
-        supabase,
-        farmerRequest,
-        userId
-      );
-
-      if (!listingResult.success) {
-        console.warn("[VALIDATE] Échec création listing:", listingResult.error);
-      } else {
-        createdListingId = listingResult.listingId;
-      }
-    }
+    // 5) ✅ SUPPRIMÉ : Ne plus créer le listing ici
+    // Le trigger s'en charge automatiquement
 
     // 6) send email (non bloquant)
     try {
@@ -560,9 +378,7 @@ export async function POST(
 
     const successMessage =
       status === "approved"
-        ? `Demande approuvée avec succès${
-            createdListingId ? `. Listing créé (ID: ${createdListingId})` : ""
-          }.`
+        ? "Demande approuvée avec succès ! Le listing et le profil ont été créés."
         : "Demande rejetée avec succès.";
 
     return NextResponse.json(
@@ -570,7 +386,6 @@ export async function POST(
         success: true,
         message: successMessage,
         timestamp,
-        ...(createdListingId ? { createdListingId } : {}),
       },
       {
         status: 200,

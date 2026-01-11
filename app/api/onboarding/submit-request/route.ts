@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 interface OnboardingStep1Body {
-  userId?: string; // optionnel, anti-usurpation si présent
+  userId?: string;
   email?: string;
   firstName: string;
   lastName: string;
@@ -40,7 +40,6 @@ export async function POST(
   const timestamp = new Date().toISOString();
 
   try {
-    // ✅ IMPORTANT : dans ta version, auth() retourne une Promise => await obligatoire
     const { userId: clerkUserId } = await auth();
 
     if (!clerkUserId) {
@@ -81,7 +80,6 @@ export async function POST(
       lng,
     } = body;
 
-    // ✅ Anti-usurpation si userId est fourni par le client
     if (userIdFromBody && userIdFromBody !== clerkUserId) {
       return NextResponse.json(
         {
@@ -93,7 +91,6 @@ export async function POST(
       );
     }
 
-    // ✅ Email fiable côté serveur via Clerk (évite getToken)
     const clerkUser = await currentUser();
     const emailFromClerk = clerkUser?.primaryEmailAddress?.emailAddress ?? null;
 
@@ -123,7 +120,6 @@ export async function POST(
       );
     }
 
-    // ✅ Email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(resolvedEmail)) {
       return NextResponse.json(
