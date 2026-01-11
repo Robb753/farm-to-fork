@@ -209,7 +209,7 @@ class ListingService {
       const { data, error } = await supabase
         .from("listing")
         .select("id")
-        .eq("clerk_user_id", user.id)
+        .eq("clerk_user_id", email)
         .maybeSingle();
 
       if (error) throw error;
