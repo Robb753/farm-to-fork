@@ -247,7 +247,6 @@ export default function OnboardingStep2Page() {
       // ✅ IMPORTANT : on aligne avec ta DB/RLS : listing.clerk_user_id = Clerk userId
       const listingPayload = {
         clerk_user_id: user.id,
-        createdBy: user.id, // si ta colonne existe encore et sert ailleurs, sinon retire-la
         active: false, // Step-3 décidera publication
 
         name: farmerRequest.farm_name,

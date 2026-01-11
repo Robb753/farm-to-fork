@@ -62,7 +62,7 @@ export default function UserListing(): JSX.Element {
       const { data, error: supabaseError } = await supabase
         .from("listing")
         .select(`*, listingImages(url, listing_id)`)
-        .eq("createdBy", user.id);
+        .eq("clerk_user_id", user.id);
 
       if (supabaseError) {
         throw new Error(`Erreur Supabase: ${supabaseError.message}`);

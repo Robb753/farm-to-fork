@@ -139,7 +139,7 @@ export default function ContactCard({
    * Gère l'envoi d'email
    */
   const handleEmail = useCallback((): void => {
-    const email = listing.email || listing.createdBy;
+    const email = listing.email;
     if (!email) return;
 
     try {
@@ -159,7 +159,7 @@ export default function ContactCard({
     } catch (error) {
       toast.error("Impossible d'ouvrir le client de messagerie");
     }
-  }, [listing.email, listing.createdBy, listing.name, listing.id]);
+  }, [listing.email, listing.name, listing.id]);
 
   /**
    * Gère l'ouverture du site web
@@ -192,7 +192,7 @@ export default function ContactCard({
 
     try {
       // Prioriser email > téléphone > site web
-      if (listing.email || listing.createdBy) {
+      if (listing.email) {
         handleEmail();
       } else if (listing.phoneNumber) {
         handlePhoneCall();
@@ -206,7 +206,7 @@ export default function ContactCard({
     }
   }, [listing, handleEmail, handlePhoneCall, handleWebsiteClick]);
 
-  const email = listing.email || listing.createdBy;
+  const email = listing.email;
   const hasContactInfo = !!(
     listing.address ||
     listing.phoneNumber ||
