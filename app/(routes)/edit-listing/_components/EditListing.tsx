@@ -42,6 +42,7 @@ import type {
 } from "@/lib/types/database";
 import { useSupabaseWithClerk } from "@/utils/supabase/client";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { logger } from "@/lib/logger";
 
 /**
  * ✅ Type du formulaire directement inféré depuis le schéma
@@ -616,7 +617,10 @@ class ListingService {
 
       if (error) throw error;
     } catch (error) {
-      console.error("Erreur lors de la mise à jour du listing:", error);
+      logger.error("edit-listing.submit failed", error, {
+        route: "/edit-listing/[id]",
+        listingId: id,
+      });
       throw error;
     }
   }
@@ -818,7 +822,9 @@ const EditListing: React.FC<EditListingProps> = ({
           toast.success("Modifications enregistrées");
         }
       } catch (error) {
-        console.error("Erreur de soumission:", error);
+        logger.error("edit-listing.ui submit failed", error, {
+          listingId: Number(params.id),
+        });
         const msg = error instanceof Error ? error.message : "Erreur inconnue";
         toast.error(`Erreur lors de la sauvegarde: ${msg}`);
       } finally {

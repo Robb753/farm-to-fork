@@ -2,7 +2,7 @@
 "use client";
 
 import type React from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 
@@ -66,7 +66,23 @@ export default function Step1Page() {
   const [selectedAddress, setSelectedAddress] = useState("");
   const [coordinates, setCoordinates] = useState<Coordinates | null>(null);
 
+  // ✅ mémorise la dernière adresse réellement sélectionnée dans la liste
+  const lastSelectedLabelRef = useRef<string>("");
+
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // ✅ Reset coords seulement si l’utilisateur modifie manuellement l’adresse
+  // et que ça ne correspond plus à l’adresse validée (sélection)
+  const handleAddressChange = (newValue: string) => {
+    setSelectedAddress(newValue);
+
+    if (
+      coordinates &&
+      newValue.trim() !== lastSelectedLabelRef.current.trim()
+    ) {
+      setCoordinates(null);
+    }
+  };
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -87,6 +103,9 @@ export default function Step1Page() {
         return;
       }
 
+      // ✅ adresse validée = sélection dropdown
+      lastSelectedLabelRef.current = label;
+
       // ✅ on conserve le flow : on set l’adresse (visible) + coords (tech)
       setSelectedAddress(label);
       setCoordinates({ lat, lng });
@@ -101,17 +120,6 @@ export default function Step1Page() {
       toast.error("Erreur lors de la sélection de l'adresse");
     }
   }, []);
-
-  // ✅ important: si l’utilisateur retape du texte manuellement après sélection,
-  // on invalide les coords pour éviter un mismatch adresse/coords
-  useEffect(() => {
-    // si l’adresse change mais que ça ne correspond plus à “une sélection”
-    // (on ne peut pas le savoir parfaitement), on fait simple :
-    // si l’utilisateur modifie le champ => coords reset.
-    // Le composant Mapbox rappellera onSelect quand l’utilisateur choisira à nouveau.
-    setCoordinates(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAddress]);
 
   const isFormValid = useMemo(() => {
     return (
@@ -323,7 +331,7 @@ export default function Step1Page() {
 
                 <AddressAutocompleteMapbox
                   value={selectedAddress || ""}
-                  onChange={setSelectedAddress}
+                  onChange={handleAddressChange}
                   onSelect={handleAddressSelect}
                   placeholder="Numéro, rue, ville (ex : 123 Route des Champs, 67000 Strasbourg)"
                   country="FR"

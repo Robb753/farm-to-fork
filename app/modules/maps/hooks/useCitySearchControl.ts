@@ -3,6 +3,7 @@
 import { useCallback } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useListingsActions, useMapActions, useMapState } from "@/lib/store";
+import { logger } from "@/lib/logger";
 
 /**
  * Interfaces TypeScript pour le contrôle de recherche de ville
@@ -223,7 +224,7 @@ export default function useCitySearchControl({
             setZoom(zoom);
           }
         } catch (error) {
-          console.error("Erreur lors de la mise à jour du zoom:", error);
+          logger.error("listing.create failed", error);
         }
 
         // 4) Fetch des listings seulement sur la page /explore

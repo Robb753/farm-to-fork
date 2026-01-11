@@ -1,5 +1,0 @@
-{
-  "scripts": {
-    "test:onboarding": "node tests/test-onboarding.js"
-  }
-}

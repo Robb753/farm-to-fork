@@ -108,7 +108,7 @@ export default function FarmerDashboard(): JSX.Element {
         const { data, error: supabaseError } = await supabase
           .from(TABLES.LISTING)
           .select("*")
-          .eq("createdBy", email)
+          .eq("clerk_user_id", user.id)
           .maybeSingle();
 
         if (supabaseError) {
@@ -150,7 +150,7 @@ export default function FarmerDashboard(): JSX.Element {
         .from(TABLES.LISTING)
         .delete()
         .eq("id", listing.id)
-        .eq("createdBy", email);
+        .eq("clerk_user_id", user.id);
 
       if (error) {
         console.error("Erreur lors de la suppression :", error);
@@ -293,7 +293,7 @@ export default function FarmerDashboard(): JSX.Element {
                 }}
               >
                 <Link
-                  href="/add-new-listing"
+                  href="/onboarding/step-1"
                   className="flex items-center gap-2"
                 >
                   <Plus className="h-5 w-5" />

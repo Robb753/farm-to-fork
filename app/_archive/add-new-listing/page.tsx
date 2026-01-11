@@ -51,7 +51,6 @@ interface ListingPayload {
   address: string;
   lat: number;
   lng: number;
-  createdBy: string;
   active: boolean;
   updated_at: string;
   name: string | null;
@@ -210,7 +209,7 @@ class ListingService {
       const { data, error } = await supabase
         .from("listing")
         .select("id")
-        .eq("createdBy", email)
+        .eq("clerk_user_id", user.id)
         .maybeSingle();
 
       if (error) throw error;
@@ -319,7 +318,6 @@ const AddNewListing: React.FC<AddNewListingProps> = ({ className = "" }) => {
         address: selectedAddress!,
         lat: parseFloat(coordinates!.lat.toString()),
         lng: parseFloat(coordinates!.lng.toString()),
-        createdBy: email,
         active: false,
         updated_at: new Date().toISOString(),
         name: null,

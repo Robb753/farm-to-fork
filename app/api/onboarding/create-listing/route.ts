@@ -18,20 +18,27 @@ type StockStatus =
   Database["public"]["Tables"]["products"]["Row"]["stock_status"];
 
 interface CreateListingBody {
-  requestId: number;
-  farmProfile: {
-    name: string;
-    description: string;
-    location: string;
-    contact: string;
+  // ✅ Step3
+  listingId?: number;
+
+  // ✅ Step2/Step3 compat
+  requestId?: number;
+
+  farmProfile?: {
+    name?: string;
+    description?: string;
+    location?: string;
+    contact?: string;
   };
+
   products?: Array<{
     name: string;
     category: string;
     price: number;
     unit: string;
-    status?: StockStatus; // ✅ plus "string"
+    status?: StockStatus;
   }>;
+
   enableOrders: boolean;
   publishFarm: boolean;
 }
@@ -75,9 +82,6 @@ export async function POST(req: NextRequest) {
   const now = new Date().toISOString();
 
   try {
-    /**
-     * Clerk auth (obligatoire)
-     */
     const { userId: clerkUserId } = await auth();
     if (!clerkUserId) {
       return NextResponse.json(
@@ -86,9 +90,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    /**
-     * Parse body
-     */
     let body: CreateListingBody;
     try {
       body = (await req.json()) as CreateListingBody;
@@ -99,38 +100,55 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const requestId = toNumber(body.requestId);
-    const farmName = safeTrim(body.farmProfile?.name);
-
-    if (!requestId || requestId <= 0 || !farmName) {
-      return NextResponse.json(
-        { success: false, error: "Données manquantes" },
-        { status: 400 }
-      );
-    }
-
     const publishFarm = Boolean(body.publishFarm);
     const enableOrders = Boolean(body.enableOrders);
 
+    const listingIdFromBody = toNumber(body.listingId);
+    const requestIdFromBody = toNumber(body.requestId);
+
     /**
-     * Charger la demande (service role) + ownership
+     * ✅ 1) Récupérer la request :
+     * - si requestId fourni -> on l'utilise
+     * - sinon -> on prend la dernière request approved du user
      */
-    const { data: request, error: requestError } = await supabase
+    let requestQuery = supabase
       .from("farmer_requests")
       .select(
         "id, status, user_id, email, farm_name, location, phone, website, description, lat, lng"
       )
-      .eq("id", requestId)
-      .single();
+      .eq("user_id", clerkUserId);
 
-    if (requestError || !request) {
+    if (requestIdFromBody > 0) {
+      requestQuery = requestQuery.eq("id", requestIdFromBody);
+    } else {
+      requestQuery = requestQuery.eq("status", "approved").order("id", {
+        ascending: false,
+      });
+    }
+
+    const { data: request, error: requestError } =
+      await requestQuery.maybeSingle();
+
+    if (requestError) {
+      console.error("[CREATE-LISTING] read request error:", requestError);
       return NextResponse.json(
-        { success: false, error: "Demande introuvable" },
+        { success: false, error: "Erreur lecture demande" },
+        { status: 500 }
+      );
+    }
+
+    if (!request) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Demande introuvable",
+          message:
+            "Aucune demande approuvée trouvée pour cet utilisateur (ou requestId invalide).",
+        },
         { status: 404 }
       );
     }
 
-    // Autorisation : owner uniquement
     if (request.user_id !== clerkUserId) {
       return NextResponse.json(
         { success: false, error: "Forbidden", message: "Accès refusé" },
@@ -138,7 +156,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Doit être approved
     if (request.status !== "approved") {
       return NextResponse.json(
         { success: false, error: "Demande non approuvée" },
@@ -147,14 +164,24 @@ export async function POST(req: NextRequest) {
     }
 
     /**
-     * Récupérer le listing déjà créé (trigger) (1 par user)
+     * ✅ 2) Récupérer le listing existant :
+     * - si listingId fourni -> on le charge (et on check owner)
+     * - sinon -> on le prend via clerk_user_id
      */
-    const { data: existingListing, error: existingListingError } =
-      await supabase
+    let existingListingQuery = supabase
+      .from("listing")
+      .select("id, published_at, active, clerk_user_id")
+      .eq("clerk_user_id", clerkUserId);
+
+    if (listingIdFromBody > 0) {
+      existingListingQuery = supabase
         .from("listing")
-        .select("id, published_at, active")
-        .eq("clerk_user_id", request.user_id)
-        .maybeSingle();
+        .select("id, published_at, active, clerk_user_id")
+        .eq("id", listingIdFromBody);
+    }
+
+    const { data: existingListing, error: existingListingError } =
+      await existingListingQuery.maybeSingle();
 
     if (existingListingError) {
       console.error(
@@ -173,23 +200,41 @@ export async function POST(req: NextRequest) {
           success: false,
           error: "Listing introuvable",
           message:
-            "Aucun listing n'a été créé pour cette demande. Vérifie ton trigger handle_farmer_request_status_change().",
+            "Aucun listing n'a été trouvé. Vérifie ton trigger handle_farmer_request_status_change().",
         },
         { status: 409 }
       );
     }
 
+    // ✅ si listingId était fourni, sécurise que c'est bien le listing du user
+    if (
+      existingListing.clerk_user_id &&
+      existingListing.clerk_user_id !== clerkUserId
+    ) {
+      return NextResponse.json(
+        { success: false, error: "Forbidden", message: "Listing non autorisé" },
+        { status: 403 }
+      );
+    }
+
     /**
-     * Finaliser le listing (UPDATE, pas INSERT)
-     * - on typpe en ListingUpdate pour éviter null/undefined mismatch
+     * ✅ 3) Construire les champs : Step3 peut ne pas fournir farmProfile
      */
+    const farmName =
+      safeTrim(body.farmProfile?.name) || safeTrim(request.farm_name) || "";
+
+    if (!farmName) {
+      return NextResponse.json(
+        { success: false, error: "Nom de ferme manquant" },
+        { status: 400 }
+      );
+    }
+
     const listingUpdate: ListingUpdate = {
-      clerk_user_id: request.user_id,
-      createdBy: request.user_id,
+      clerk_user_id: clerkUserId,
+      createdBy: clerkUserId,
 
-      name: farmName || request.farm_name || null,
-
-      // ✅ la colonne listing.description est string | null dans tes types
+      name: farmName || null,
       description:
         safeTrim(body.farmProfile?.description) || request.description || null,
 
@@ -198,7 +243,6 @@ export async function POST(req: NextRequest) {
       phoneNumber: request.phone ?? null,
       website: request.website ?? null,
 
-      // coords depuis la demande (si valides)
       lat: typeof request.lat === "number" ? request.lat : null,
       lng: typeof request.lng === "number" ? request.lng : null,
 
@@ -231,11 +275,7 @@ export async function POST(req: NextRequest) {
 
     const listingId = updatedListing.id;
 
-    /**
-     * Produits : optionnel, non-bloquant
-     * - ✅ typage strict ProductInsert[]
-     * - ✅ stock_status union (pas string)
-     */
+    // ✅ produits (inchangé)
     if (body.products?.length) {
       const productsData: ProductInsert[] = body.products
         .map((p): ProductInsert | null => {
@@ -245,20 +285,14 @@ export async function POST(req: NextRequest) {
           return {
             listing_id: listingId,
             farm_id: listingId,
-
             name,
             description: null,
-
             price: toNumber(p.price) || 0,
             unit: safeTrim(p.unit) || "kg",
-
             available: true,
             active: publishFarm,
-
             category: safeTrim(p.category) || null,
-
             stock_status: toStockStatus(p.status),
-
             created_at: now,
             updated_at: now,
           };
@@ -279,13 +313,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    /**
-     * Lier profile -> farm_id (sécurisation)
-     */
+    // ✅ profile farm_id
     const { error: profileUpdateError } = await supabase
       .from("profiles")
       .update({ farm_id: listingId, updated_at: now })
-      .eq("user_id", request.user_id);
+      .eq("user_id", clerkUserId);
 
     if (profileUpdateError) {
       console.warn(
@@ -294,13 +326,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    /**
-     * farmer_requests : updated_at uniquement (status reste approved)
-     */
+    // ✅ farmer_requests updated_at
     const { error: reqUpdateError } = await supabase
       .from("farmer_requests")
       .update({ updated_at: now })
-      .eq("id", requestId);
+      .eq("id", request.id);
 
     if (reqUpdateError) {
       console.warn(
@@ -310,12 +340,8 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json(
-      {
-        success: true,
-        message: "Listing finalisé avec succès",
-        listingId,
-      },
-      { status: 201 }
+      { success: true, message: "Listing finalisé avec succès", listingId },
+      { status: 200 } // ✅ update => 200
     );
   } catch (error) {
     console.error("[CREATE-LISTING] Erreur serveur:", error);

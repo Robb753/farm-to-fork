@@ -228,11 +228,6 @@ async function checkAdminPermissions(requestingUserId: string): Promise<{
   }
 }
 
-/**
- * ✅ Create listing for approved farmer
- * - farmer_requests.products est string | null => on convertit vers enum array (DbProductType[] | null)
- * - évite doublon si createdBy est UNIQUE
- */
 async function createListingForApprovedFarmer(
   supabase: SupabaseClient<Database>,
   farmerRequest: Database["public"]["Tables"]["farmer_requests"]["Row"],

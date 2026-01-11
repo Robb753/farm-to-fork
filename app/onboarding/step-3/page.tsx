@@ -153,7 +153,6 @@ export default function Step3Page() {
       return;
     }
 
-    // ✅ coords obligatoires pour affichage carte
     if (listing.lat == null || listing.lng == null) {
       toast.error("Coordonnées GPS manquantes. Reprenez l’étape 2.");
       router.push("/onboarding/step-2");
@@ -163,55 +162,74 @@ export default function Step3Page() {
     setIsSubmitting(true);
 
     try {
-      const now = new Date().toISOString();
+      const response = await fetch("/api/onboarding/create-listing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          listingId: listing.id,
+          enableOrders,
+          publishFarm: true,
+        }),
+      });
 
-      const payload = {
-        active: true,
-        orders_enabled: enableOrders,
-        modified_at: now,
-        updated_at: now,
-        published_at: listing.published_at ?? now,
-      };
+      type ApiOk = { success: true; listingId: number; message?: string };
+      type ApiErr = { success: false; error?: string; message?: string };
+      type ApiResult = ApiOk | ApiErr;
 
-      const { data, error } = await supabase
-        .from("listing")
-        .update(payload)
-        .eq("id", listing.id)
-        .select(
-          `
-          id,
-          clerk_user_id,
-          createdBy,
-          active,
-          name,
-          description,
-          address,
-          email,
-          phoneNumber,
-          website,
-          lat,
-          lng,
-          published_at,
-          modified_at,
-          updated_at,
-          orders_enabled,
-          delivery_available
-        `
-        )
-        .single();
+      const result: ApiResult = await response.json();
 
-      if (error) throw error;
+      if (!response.ok) {
+        const msg = !result.success
+          ? result.message || result.error || "Erreur publication"
+          : "Erreur publication";
+        throw new Error(msg);
+      }
 
-      setListing(data as ListingRow);
-      toast.success("✅ Ferme publiée avec succès !");
+      if (!result.success) {
+        throw new Error(result.message || result.error || "Erreur publication");
+      }
+
+      toast.success(result.message ?? "✅ Ferme publiée avec succès !");
       router.push("/onboarding/success");
     } catch (e: any) {
-      console.error("Erreur publish:", e);
+      console.error("Erreur publish via API:", e);
       toast.error(e?.message || "Erreur lors de la publication");
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const handleSaveDraft = async () => {
+    if (!listing) return;
+
+    setIsSubmitting(true);
+
+    try {
+      const now = new Date().toISOString();
+
+      const { error } = await supabase
+        .from("listing")
+        .update({
+          active: false, // ✅ brouillon
+          orders_enabled: enableOrders,
+          modified_at: now,
+          updated_at: now,
+          // published_at : on ne touche pas (on évite de “publier” sans le vouloir)
+        })
+        .eq("id", listing.id);
+
+      if (error) throw error;
+
+      toast.success("✅ Brouillon enregistré");
+      router.push("/dashboard/farms");
+    } catch (e: any) {
+      console.error("Erreur save draft:", e);
+      toast.error(e?.message || "Erreur lors de l'enregistrement du brouillon");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
 
   if (!isLoaded || checking) {
     return (
@@ -250,6 +268,16 @@ export default function Step3Page() {
               </CardDescription>
             </CardHeader>
           </Card>
+
+          {/* ✅ PATCH: bouton Retour vers step-2 */}
+          <div className="flex">
+            <Button
+              variant="outline"
+              onClick={() => router.push("/onboarding/step-2")}
+            >
+              ← Retour à l'étape 2
+            </Button>
+          </div>
 
           <Card className="shadow-md border">
             <CardHeader>
@@ -373,7 +401,7 @@ export default function Step3Page() {
                   size="lg"
                   className="sm:w-auto bg-transparent"
                   disabled={isSubmitting}
-                  onClick={() => toast.message("Enregistré")}
+                  onClick={handleSaveDraft}
                 >
                   Enregistrer pour plus tard
                 </Button>
