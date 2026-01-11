@@ -17,7 +17,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Loader2, ArrowLeft, Save, Send } from "@/utils/icons";
 import { useUser } from "@clerk/nextjs";
-import { supabase } from "@/utils/supabase/client";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,6 +30,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { COLORS } from "@/lib/config";
 import type { ProductInsert } from "@/lib/types/database";
+import { useSupabaseWithClerk } from "@/utils/supabase/client";
 
 // ==================== DONNÉES PRODUITS RÉELLES ====================
 
@@ -314,6 +314,8 @@ const PRODUCT_UNITS = [
   { value: "basket", label: "Panier" },
 ];
 
+const supabase = useSupabaseWithClerk();
+
 // ==================== TYPES ====================
 
 interface PageProps {
@@ -570,15 +572,24 @@ export default function AddProductPage({ params }: PageProps) {
           price,
           unit: formData.unit,
 
-          // ✅ requis par ton type ProductInsert
+          // ✅ ton schema SQL: available boolean default true, mais ok de le set
           available: true,
 
-          // optionnel mais ok
+          // ✅ "draft/publish" => piloté par is_published (+ active)
+          is_published: publish,
           active: publish,
 
-          // ⚠️ seulement si ta DB accepte "draft"
-          // sinon: supprime cette ligne ou mets une valeur autorisée
-          stock_status: publish ? "in_stock" : "draft",
+          // ✅ stock_status DOIT rester dans l'enum autorisé
+          // Ici on le calcule simplement avec la quantité
+          stock_status:
+            Number(formData.quantity) <= 0
+              ? "out_of_stock"
+              : Number(formData.quantity) <= 5
+                ? "low_stock"
+                : "in_stock",
+
+          // ✅ si tu veux coller à ton SQL (stock_quantity existe et NOT NULL)
+          stock_quantity: Math.max(0, Number(formData.quantity) || 0),
 
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),

@@ -4,12 +4,13 @@ import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Calendar, MapPin, Truck, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+
 import { COLORS } from "@/lib/config";
 import { useCartStore } from "@/lib/store/cartStore";
-import { createOrder } from "@/lib/api/orders";
 import type { DeliveryAddress } from "@/lib/types/order";
-import { toast } from "sonner";
 import { useSupabaseWithClerk } from "@/utils/supabase/client";
+import { useOrdersApi } from "@/lib/api/orders";
 
 /**
  * Interface pour une ferme
@@ -28,16 +29,42 @@ interface Farm {
 /**
  * Page Checkout - Finalisation de la commande
  */
-export default function FarmCheckoutPage(): JSX.Element {
+export default function FarmCheckoutPage(): JSX.Element | null {
   const params = useParams();
   const router = useRouter();
-  const farmId = params.id ? Number(params.id) : NaN;
 
   const supabase = useSupabaseWithClerk();
+  const { createOrder } = useOrdersApi();
 
   const cart = useCartStore((s) => s.cart);
   const clearCart = useCartStore((s) => s.clearCart);
   const getTotalPrice = useCartStore((s) => s.getTotalPrice);
+
+  const urlFarmId = params?.id ? Number(params.id) : NaN;
+
+  // ✅ Farm ID réel : priorité au panier, sinon URL
+  const effectiveFarmId = useMemo(() => {
+    const idFromCart = cart.farmId;
+    if (typeof idFromCart === "number" && Number.isFinite(idFromCart)) {
+      return idFromCart;
+    }
+    if (Number.isFinite(urlFarmId)) return urlFarmId;
+    return null;
+  }, [cart.farmId, urlFarmId]);
+
+  // ✅ Guard farm invalide → redirect
+  useEffect(() => {
+    if (effectiveFarmId === null) {
+      toast.error("Ferme invalide");
+      router.replace("/explore");
+    }
+  }, [effectiveFarmId, router]);
+
+  // ✅ Important: on stoppe le rendu tant que c'est null
+  if (effectiveFarmId === null) return null;
+
+  // ✅ Après ce point: farmId est un number garanti
+  const farmId: number = effectiveFarmId;
 
   const [farm, setFarm] = useState<Farm | null>(null);
   const [isLoadingFarm, setIsLoadingFarm] = useState(true);
@@ -53,20 +80,18 @@ export default function FarmCheckoutPage(): JSX.Element {
     country: "France",
   });
 
-  // Charger les infos de la ferme
+  /**
+   * Charger les infos de la ferme
+   */
   useEffect(() => {
-    if (Number.isNaN(farmId)) {
-      router.push("/explore");
-      return;
-    }
-
     let isMounted = true;
 
     async function loadFarm() {
+      setIsLoadingFarm(true);
+
       try {
         const { data, error } = await supabase
           .from("listing")
-          // ✅ name/address peuvent être null => on normalise après
           .select("id, name, address")
           .eq("id", farmId)
           .eq("active", true)
@@ -74,13 +99,12 @@ export default function FarmCheckoutPage(): JSX.Element {
 
         if (error || !data) {
           toast.error("Ferme introuvable");
-          router.push("/explore");
+          router.replace("/explore");
           return;
         }
 
         if (!isMounted) return;
 
-        // ✅ Normalisation : on force string côté UI
         setFarm({
           id: data.id,
           name: data.name ?? "Ferme sans nom",
@@ -93,7 +117,7 @@ export default function FarmCheckoutPage(): JSX.Element {
       } catch (err) {
         console.error("Erreur chargement ferme:", err);
         toast.error("Impossible de charger la ferme");
-        router.push("/explore");
+        router.replace("/explore");
       } finally {
         if (isMounted) setIsLoadingFarm(false);
       }
@@ -106,13 +130,15 @@ export default function FarmCheckoutPage(): JSX.Element {
     };
   }, [farmId, router, supabase]);
 
-  // Rediriger si panier vide
+  /**
+   * Rediriger si panier vide (une fois la ferme chargée)
+   */
   useEffect(() => {
     if (!isLoadingFarm && cart.items.length === 0) {
       toast.error("Votre panier est vide");
-      router.push(`/farm/${farmId}/shop`);
+      router.replace(`/farm/${farmId}/shop`);
     }
-  }, [cart.items.length, farmId, router, isLoadingFarm]);
+  }, [cart.items.length, farmId, isLoadingFarm, router]);
 
   // Calculs
   const subtotal = getTotalPrice();
@@ -134,10 +160,9 @@ export default function FarmCheckoutPage(): JSX.Element {
   /**
    * Handler de soumission du formulaire
    */
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    // Validations
     if (!cart.deliveryMode) {
       toast.error("Veuillez choisir un mode de livraison");
       return;
@@ -163,12 +188,12 @@ export default function FarmCheckoutPage(): JSX.Element {
 
     try {
       const result = await createOrder({
-        farmId: cart.farmId!,
+        farmId, // ✅ number garanti
         items: cart.items.map((item) => ({
           productId: item.product.id,
           quantity: item.quantity,
         })),
-        deliveryMode: cart.deliveryMode!,
+        deliveryMode: cart.deliveryMode,
         deliveryDay,
         deliveryAddress:
           cart.deliveryMode === "delivery" ? deliveryAddress : undefined,
@@ -179,15 +204,14 @@ export default function FarmCheckoutPage(): JSX.Element {
         toast.success("Commande créée avec succès !");
         clearCart();
         router.push(`/farm/${farmId}/orders/${result.order.id}`);
-      } else {
-        toast.error(
-          result.error || "Erreur lors de la création de la commande"
-        );
-        if (result.details) {
-          result.details.forEach((detail) => {
-            toast.error(detail, { duration: 5000 });
-          });
-        }
+        return;
+      }
+
+      toast.error(result.error || "Erreur lors de la création de la commande");
+      if (result.details) {
+        result.details.forEach((detail) => {
+          toast.error(detail, { duration: 5000 });
+        });
       }
     } catch (err) {
       console.error("Erreur checkout:", err);
@@ -375,7 +399,7 @@ export default function FarmCheckoutPage(): JSX.Element {
             </div>
 
             <Link
-              href={`/farm/${farmId}/cart`}
+              href={`/farm/${effectiveFarmId}/cart`}
               className="text-sm hover:underline mt-3 inline-block"
               style={{ color: COLORS.PRIMARY }}
             >

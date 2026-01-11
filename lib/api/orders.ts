@@ -1,11 +1,12 @@
-// lib/api/orders.ts (exemple)
+// lib/api/orders.ts
+"use client";
+
 import type {
   CreateOrderPayload,
   CreateOrderResponse,
 } from "@/lib/types/order";
 import { useAuth } from "@clerk/nextjs";
 
-// petit helper hook
 export function useOrdersApi() {
   const { getToken } = useAuth();
 
@@ -31,7 +32,10 @@ export function useOrdersApi() {
         body: JSON.stringify(payload),
       });
 
-      const data: CreateOrderResponse = await response.json();
+      const data: CreateOrderResponse = await response.json().catch(() => ({
+        success: false,
+        error: "Réponse serveur invalide",
+      }));
 
       if (!response.ok) {
         return {
