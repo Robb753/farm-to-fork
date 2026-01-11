@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 interface ListingBasic {
   id: number;
   created_at: string;
-  createdBy: string;
+  clerk_user_id: string | null;
   coordinates: any;
   active: boolean;
 }
@@ -175,7 +175,7 @@ export async function GET(
     // 2) Data query with range (safe now)
     let dataQuery = supabase
       .from("listing")
-      .select("id, created_at, createdBy, coordinates, active")
+      .select("id, created_at, clerk_user_id, coordinates, active")
       .order(params.sortBy, { ascending: params.sortOrder === "asc" });
 
     if (!params.includeInactive) dataQuery = dataQuery.eq("active", true);

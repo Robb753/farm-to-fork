@@ -25,7 +25,7 @@ import type { Database } from "@/lib/types/database";
 type ListingSelectRow = {
   id: number;
   name: string | null;
-  createdBy: string | null;
+  clerk_user_id: string | null;
 };
 
 /**
@@ -114,7 +114,7 @@ export default function FarmDashboardOrdersPage(): JSX.Element {
         // ✅ charge listing
         const { data: listing, error: listingError } = await supabase
           .from("listing")
-          .select("id, name, createdBy")
+          .select("id, name, clerk_user_id")
           .eq("id", farmId)
           .single<ListingSelectRow>();
 
