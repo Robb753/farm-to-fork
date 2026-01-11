@@ -2,6 +2,7 @@
 
 import React from "react";
 import EditListing from "../_components/EditListing";
+import FarmerOnlySection from "@/app/modules/farmer/components/FarmerOnlySection";
 
 /**
  * Interface pour les paramètres de route
@@ -38,23 +39,29 @@ const EditListingPage: React.FC<EditListingPageProps> = ({ params }) => {
       "EditListingPage: ID du listing manquant dans les paramètres"
     );
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center space-y-4">
-          <h1 className="text-2xl font-bold text-red-600">
-            Erreur de paramètres
-          </h1>
-          <p className="text-gray-600">
-            L'ID du listing est manquant dans l'URL
-          </p>
-          <p className="text-sm text-gray-500">
-            Veuillez vérifier l'URL et réessayer
-          </p>
+      <FarmerOnlySection>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center space-y-4">
+            <h1 className="text-2xl font-bold text-red-600">
+              Erreur de paramètres
+            </h1>
+            <p className="text-gray-600">
+              L'ID du listing est manquant dans l'URL
+            </p>
+            <p className="text-sm text-gray-500">
+              Veuillez vérifier l'URL et réessayer
+            </p>
+          </div>
         </div>
-      </div>
+      </FarmerOnlySection>
     );
   }
 
-  return <EditListing params={params} />;
+  return (
+    <FarmerOnlySection>
+      <EditListing params={params} />
+    </FarmerOnlySection>
+  );
 };
 
 export default EditListingPage;
