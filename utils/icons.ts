@@ -52,6 +52,8 @@ export {
   Gift,
   BookOpen,
   Utensils,
+  Sprout,
+  CheckCircle2,
   /** Chevron vers le bas */
   ChevronDown,
   /** Chevron vers le haut */
