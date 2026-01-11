@@ -479,7 +479,7 @@ export default function Details({
             <SingleFarmMapbox
               lat={coordinates.lat!}
               lng={coordinates.lng!}
-              name={listingDetail.name}
+              name={listingDetail.name ?? undefined}
             />
           ) : (
             <div className="flex flex-col items-center justify-center h-full bg-gray-100">
