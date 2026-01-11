@@ -13,7 +13,7 @@ interface FarmerRequest {
   farm_name: string;
   location: string;
   description: string;
-  phone: string | null;
+  phoneNumber: string | null;
   website: string | null;
   products: string | null;
   status: "pending" | "approved" | "rejected";
