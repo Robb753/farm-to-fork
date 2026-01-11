@@ -54,7 +54,7 @@ export default function FarmerOrdersPage(): JSX.Element {
         const { data, error } = await supabase
           .from("listing")
           .select("id")
-          .eq("createdBy", user.id)
+          .eq("clerk_user_id", user.id)
           .single();
 
         if (error) throw error;

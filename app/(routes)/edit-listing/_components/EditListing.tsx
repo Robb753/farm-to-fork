@@ -523,7 +523,7 @@ class ListingService {
   static async fetchListing(
     supabase: DbClient,
     id: number,
-    userEmail: string
+    userId: string
   ): Promise<ListingData> {
     type RawListing = DbListing & {
       listingImages: { url: string }[] | null;
@@ -532,7 +532,7 @@ class ListingService {
     const { data, error } = await supabase
       .from("listing")
       .select("*, listingImages(url)")
-      .eq("createdBy", userEmail)
+      .eq("clerk_user_id", userId)
       .eq("id", id)
       .single();
 
@@ -743,8 +743,8 @@ const EditListing: React.FC<EditListingProps> = ({
       }
 
       try {
-        const userEmail = user.primaryEmailAddress?.emailAddress;
-        if (!userEmail) throw new Error("Email utilisateur non trouvé");
+        const userId = user.id;
+        if (!userId) throw new Error("ID utilisateur non trouvé");
 
         const listingId = Number(params.id);
         if (!Number.isFinite(listingId))
@@ -753,7 +753,7 @@ const EditListing: React.FC<EditListingProps> = ({
         const data = await ListingService.fetchListing(
           supabase,
           listingId,
-          userEmail
+          userId
         );
 
         setListing(data);

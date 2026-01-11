@@ -30,7 +30,6 @@ const steps = [
 type ListingRow = {
   id: number;
   clerk_user_id: string | null;
-  createdBy: string | null; // colonne "createdBy" (mixed-case) exposée en JSON -> createdBy
   active: boolean | null;
   name: string | null;
   description: string | null;
@@ -100,7 +99,6 @@ export default function Step3Page() {
             `
             id,
             clerk_user_id,
-            createdBy,
             active,
             name,
             description,

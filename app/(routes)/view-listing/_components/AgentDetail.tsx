@@ -62,13 +62,13 @@ export default function AgentDetail({ listingDetail, className }: AgentDetailPro
   const getProfileImage = useCallback((): string => {
     if (imageError) {
       // Fallback avec initiales basées sur le nom
-      const initials = getInitials(listingDetail.fullName || listingDetail.createdBy);
+      const initials = getInitials(listingDetail.fullName);
       return `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&background=10b981&color=fff&size=128`;
     }
-    
-    return listingDetail.profileImage || 
-           `https://ui-avatars.com/api/?name=${encodeURIComponent(getInitials(listingDetail.fullName || listingDetail.createdBy))}&background=10b981&color=fff&size=128`;
-  }, [imageError, listingDetail.profileImage, listingDetail.fullName, listingDetail.createdBy]);
+
+    return listingDetail.profileImage ||
+           `https://ui-avatars.com/api/?name=${encodeURIComponent(getInitials(listingDetail.fullName))}&background=10b981&color=fff&size=128`;
+  }, [imageError, listingDetail.profileImage, listingDetail.fullName]);
 
   /**
    * Nom d'affichage avec fallback intelligent
@@ -116,8 +116,8 @@ export default function AgentDetail({ listingDetail, className }: AgentDetailPro
    * Gestionnaire pour le contact par email
    */
   const handleEmailContact = useCallback(async (): Promise<void> => {
-    const email = listingDetail.email || listingDetail.createdBy;
-    
+    const email = listingDetail.email;
+
     if (!email) {
       toast.error("Aucun email de contact disponible");
       return;
