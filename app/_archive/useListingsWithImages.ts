@@ -1,10 +1,10 @@
 // hooks/useListingsWithImages.ts
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { supabase } from "@/utils/supabase/client";
 import { toast } from "sonner";
 import { TABLES, LISTING_COLUMNS } from "@/lib/config";
 import type { Listing } from "@/lib/types";
+import { useSupabaseWithClerk } from "@/utils/supabase/client";
 
 interface UseListingsWithImagesResult {
   listings: Listing[];
@@ -12,6 +12,8 @@ interface UseListingsWithImagesResult {
   error: string | null;
   refetch: () => void;
 }
+
+const supabase = useSupabaseWithClerk();
 
 const parseListingCoords = (listing: any): Listing => ({
   ...listing,
