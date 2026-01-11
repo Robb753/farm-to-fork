@@ -368,7 +368,7 @@ export async function POST(
     try {
       const emailPayload: EmailFarmerRequest = {
         ...(farmerRequest as any),
-        phone: farmerRequest.phone ?? undefined,
+        phone: farmerRequest.phoneNumber ?? undefined,
       };
 
       await sendFarmerRequestStatusEmail(emailPayload, status);
