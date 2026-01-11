@@ -81,7 +81,7 @@ interface FarmerRequest {
   description: string | null;
   products: string | null;
   website: string | null;
-  phone: string | null;
+  phoneNumber: string | null;
 }
 
 type RequestStatus = "approved" | "pending" | "rejected";
@@ -139,7 +139,7 @@ export default function OnboardingStep2Page() {
         const { data, error } = await supabase
           .from("farmer_requests")
           .select(
-            "id,user_id,status,first_name,last_name,farm_name,email,location,lat,lng,description,products,website,phone"
+            "id,user_id,status,first_name,last_name,farm_name,email,location,lat,lng,description,products,website,phoneNumber"
           )
           .eq("user_id", user.id)
           .maybeSingle();
@@ -173,7 +173,7 @@ export default function OnboardingStep2Page() {
           ...prev,
           description: req.description ?? prev.description,
           website: req.website ?? prev.website,
-          phone: req.phone ?? prev.phone,
+          phone: req.phoneNumber ?? prev.phone,
         }));
 
         // Prefill produits (string "A, B, C")
@@ -232,7 +232,7 @@ export default function OnboardingStep2Page() {
           description: formData.description.trim(),
           products: selectedProducts.join(", "),
           website: formData.website.trim() || null,
-          phone: formData.phone.trim() || null,
+          phoneNumber: formData.phone.trim() || null,
           updated_at: new Date().toISOString(),
         })
         .eq("id", farmerRequest.id);
