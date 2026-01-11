@@ -200,6 +200,10 @@ export const COLORS = {
   PRIMARY_BG: "#f0fdf4", // Fond vert clair
   PRIMARY_DARK: "#15803d", // Vert foncé pour les hovers
 
+  // ✅ Accent (ex: doré)
+  ACCENT: "#FFD700",
+  ACCENT_BG: "#FFF6CC",
+
   // Couleurs de bordure et séparation
   BORDER: "#e5e7eb", // Bordure grise standard
   BORDER_LIGHT: "#f3f4f6", // Bordure grise claire
