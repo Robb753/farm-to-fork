@@ -232,7 +232,6 @@ export async function POST(req: NextRequest) {
 
     const listingUpdate: ListingUpdate = {
       clerk_user_id: clerkUserId,
-      createdBy: clerkUserId,
 
       name: farmName || null,
       description:

@@ -263,7 +263,7 @@ export async function POST(
     // Si rôle = farmer, créer une entrée vide dans listing
     if (role === "farmer") {
       const listingData = {
-        createdBy: userId, // Utilise l'ID utilisateur au lieu de l'email
+        clerk_user_id: userId, // Utilise clerk_user_id au lieu de createdBy
         name: "", // Nom par défaut vide
         address: "", // Adresse par défaut vide
         active: false,

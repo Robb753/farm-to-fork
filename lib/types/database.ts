@@ -53,9 +53,6 @@ export interface Database {
 
           coordinates: Json | null;
 
-          // SQL: "createdBy" text null + unique
-          createdBy: string | null;
-
           active: boolean | null;
 
           typeferme: string | null;
@@ -123,7 +120,6 @@ export interface Database {
 
           coordinates?: Json | null;
 
-          createdBy?: string | null;
           active?: boolean | null;
 
           typeferme?: string | null;
@@ -184,7 +180,6 @@ export interface Database {
 
           coordinates?: Json | null;
 
-          createdBy?: string | null;
           active?: boolean | null;
 
           typeferme?: string | null;
