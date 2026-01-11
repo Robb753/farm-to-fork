@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
     let requestQuery = supabase
       .from("farmer_requests")
       .select(
-        "id, status, user_id, email, farm_name, location, phone, website, description, lat, lng"
+        "id, status, user_id, email, farm_name, location, phoneNumber, website, description, lat, lng"
       )
       .eq("user_id", clerkUserId);
 
