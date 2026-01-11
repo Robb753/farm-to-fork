@@ -109,6 +109,7 @@ export default function MapboxSection({
   const userInteractingRef = useRef<boolean>(false);
   const markersRef = useRef<
     Array<{
+      id: number;
       marker: mapboxgl.Marker;
       element: HTMLDivElement;
       handlers: {
@@ -214,31 +215,17 @@ export default function MapboxSection({
 
   // ✅ FONCTIONS POUR LES MARQUEURS
   const clearMarkers = useCallback(() => {
-    markersRef.current.forEach(
-      ({
-        marker,
-        element,
-        handlers,
-      }: {
-        marker: mapboxgl.Marker;
-        element: HTMLDivElement;
-        handlers: {
-          mouseenter: () => void;
-          mouseleave: () => void;
-          click: () => void;
-        };
-      }) => {
-        try {
-          // Remove event listeners before removing marker
-          element.removeEventListener("mouseenter", handlers.mouseenter);
-          element.removeEventListener("mouseleave", handlers.mouseleave);
-          element.removeEventListener("click", handlers.click);
-          marker.remove();
-        } catch (e) {
-          console.warn("Erreur suppression marqueur:", e);
-        }
+    markersRef.current.forEach(({ marker, element, handlers }) => {
+      try {
+        // Remove event listeners before removing marker
+        element.removeEventListener("mouseenter", handlers.mouseenter);
+        element.removeEventListener("mouseleave", handlers.mouseleave);
+        element.removeEventListener("click", handlers.click);
+        marker.remove();
+      } catch (e) {
+        console.warn("Erreur suppression marqueur:", e);
       }
-    );
+    });
     markersRef.current = [];
   }, []);
 
@@ -302,6 +289,7 @@ export default function MapboxSection({
               .addTo(map);
 
             markersRef.current.push({
+              id: listing.id,
               marker,
               element: markerEl,
               handlers: {
@@ -320,15 +308,72 @@ export default function MapboxSection({
   );
 
   const highlightMarker = useCallback((id: number | null) => {
-    // TODO: Implémenter la logique de highlight
+    markersRef.current.forEach(({ id: markerId, element }) => {
+      if (id === null) {
+        // Reset all markers to default state
+        element.style.transform = "scale(1)";
+        element.style.backgroundColor = COLORS.PRIMARY;
+        element.style.boxShadow = "0 2px 4px rgba(0,0,0,0.2)";
+      } else if (markerId === id) {
+        // Highlight the matching marker
+        element.style.transform = "scale(1.2)";
+        element.style.backgroundColor = COLORS.PRIMARY_DARK;
+        element.style.boxShadow = "0 4px 8px rgba(0,0,0,0.3)";
+      } else {
+        // Dim other markers
+        element.style.transform = "scale(1)";
+        element.style.backgroundColor = COLORS.PRIMARY;
+        element.style.boxShadow = "0 2px 4px rgba(0,0,0,0.2)";
+        element.style.opacity = "0.6";
+      }
+    });
   }, []);
 
   const selectMarker = useCallback((id: number | null) => {
-    // TODO: Implémenter la logique de sélection
+    markersRef.current.forEach(({ id: markerId, element }) => {
+      if (markerId === id) {
+        // Apply selected state with distinct styling
+        element.style.transform = "scale(1.3)";
+        element.style.backgroundColor = COLORS.PRIMARY_DARK;
+        element.style.border = `3px solid ${COLORS.ACCENT || "#FFD700"}`;
+        element.style.boxShadow = "0 6px 12px rgba(0,0,0,0.4)";
+        element.style.opacity = "1";
+        element.style.zIndex = "1000";
+      } else {
+        // Reset other markers
+        element.style.transform = "scale(1)";
+        element.style.backgroundColor = COLORS.PRIMARY;
+        element.style.border = `2px solid ${COLORS.BG_WHITE}`;
+        element.style.boxShadow = "0 2px 4px rgba(0,0,0,0.2)";
+        element.style.opacity = id === null ? "1" : "0.5";
+        element.style.zIndex = "1";
+      }
+    });
   }, []);
 
   const openInfoWindow = useCallback((id: number | null) => {
-    // TODO: Implémenter la logique d'info window
+    const markerData = markersRef.current.find(({ id: markerId }) => markerId === id);
+    if (!markerData || !mapRef.current) return;
+
+    const { marker } = markerData;
+    const lngLat = marker.getLngLat();
+
+    // Create a simple popup with the listing ID
+    // In a real application, you would fetch listing details here
+    const popup = new mapboxgl.Popup({ offset: 25, closeButton: true })
+      .setLngLat(lngLat)
+      .setHTML(
+        `<div style="padding: 8px; font-family: sans-serif;">
+          <p style="margin: 0; font-weight: bold;">Listing #${id}</p>
+          <p style="margin: 4px 0 0 0; font-size: 12px; color: #666;">Click for details</p>
+        </div>`
+      )
+      .addTo(mapRef.current);
+
+    // Auto-close popup when clicking elsewhere
+    popup.on("close", () => {
+      // Optionally reset marker highlight when popup closes
+    });
   }, []);
 
   // ✅ ÉCOUTE DES ÉVÉNEMENTS DU STORE
