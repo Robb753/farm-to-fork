@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Calendar, MapPin, Truck, Loader2 } from "lucide-react";
@@ -11,6 +11,7 @@ import { useCartStore } from "@/lib/store/cartStore";
 import type { DeliveryAddress } from "@/lib/types/order";
 import { useSupabaseWithClerk } from "@/utils/supabase/client";
 import { useOrdersApi } from "@/lib/api/orders";
+import { logger } from "@/lib/logger";
 
 /**
  * Interface pour une ferme
@@ -45,26 +46,18 @@ export default function FarmCheckoutPage(): JSX.Element | null {
   // ✅ Farm ID réel : priorité au panier, sinon URL
   const effectiveFarmId = useMemo(() => {
     const idFromCart = cart.farmId;
-    if (typeof idFromCart === "number" && Number.isFinite(idFromCart)) {
+    if (typeof idFromCart === "number" && Number.isFinite(idFromCart))
       return idFromCart;
-    }
     if (Number.isFinite(urlFarmId)) return urlFarmId;
     return null;
   }, [cart.farmId, urlFarmId]);
 
-  // ✅ Guard farm invalide → redirect
-  useEffect(() => {
-    if (effectiveFarmId === null) {
-      toast.error("Ferme invalide");
-      router.replace("/explore");
-    }
-  }, [effectiveFarmId, router]);
+  // ✅ On évite un early-return avant hooks en gérant un flag
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
-  // ✅ Important: on stoppe le rendu tant que c'est null
-  if (effectiveFarmId === null) return null;
-
-  // ✅ Après ce point: farmId est un number garanti
-  const farmId: number = effectiveFarmId;
+  // ✅ FarmId utilisable dans les hooks (fallback)
+  // Important : on n'utilise PAS ce fallback pour requêter : on gate dans les effects.
+  const farmId = effectiveFarmId ?? 0;
 
   const [farm, setFarm] = useState<Farm | null>(null);
   const [isLoadingFarm, setIsLoadingFarm] = useState(true);
@@ -81,10 +74,31 @@ export default function FarmCheckoutPage(): JSX.Element | null {
   });
 
   /**
+   * ✅ Guard farm invalide → redirect (sans casser les hooks)
+   */
+  useEffect(() => {
+    if (effectiveFarmId === null) {
+      setIsRedirecting(true);
+      toast.error("Ferme invalide");
+      router.replace("/explore");
+    } else {
+      setIsRedirecting(false);
+    }
+  }, [effectiveFarmId, router]);
+
+  /**
    * Charger les infos de la ferme
    */
   useEffect(() => {
     let isMounted = true;
+
+    // ✅ On ne fait rien tant qu'on n'a pas un farmId valide
+    if (!effectiveFarmId) {
+      setIsLoadingFarm(false);
+      return () => {
+        isMounted = false;
+      };
+    }
 
     async function loadFarm() {
       setIsLoadingFarm(true);
@@ -115,7 +129,7 @@ export default function FarmCheckoutPage(): JSX.Element | null {
           delivery_price: 5,
         });
       } catch (err) {
-        console.error("Erreur chargement ferme:", err);
+        logger.error("Erreur chargement ferme:", err);
         toast.error("Impossible de charger la ferme");
         router.replace("/explore");
       } finally {
@@ -128,17 +142,20 @@ export default function FarmCheckoutPage(): JSX.Element | null {
     return () => {
       isMounted = false;
     };
-  }, [farmId, router, supabase]);
+  }, [effectiveFarmId, farmId, router, supabase]);
 
   /**
    * Rediriger si panier vide (une fois la ferme chargée)
    */
   useEffect(() => {
+    // ✅ Ne rien faire tant qu'on n'a pas un farmId valide
+    if (!effectiveFarmId) return;
+
     if (!isLoadingFarm && cart.items.length === 0) {
       toast.error("Votre panier est vide");
       router.replace(`/farm/${farmId}/shop`);
     }
-  }, [cart.items.length, farmId, isLoadingFarm, router]);
+  }, [cart.items.length, farmId, isLoadingFarm, router, effectiveFarmId]);
 
   // Calculs
   const subtotal = getTotalPrice();
@@ -160,66 +177,92 @@ export default function FarmCheckoutPage(): JSX.Element | null {
   /**
    * Handler de soumission du formulaire
    */
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
 
-    if (!cart.deliveryMode) {
-      toast.error("Veuillez choisir un mode de livraison");
-      return;
-    }
-
-    if (!deliveryDay) {
-      toast.error("Veuillez sélectionner un jour de livraison");
-      return;
-    }
-
-    if (cart.deliveryMode === "delivery") {
-      if (
-        !deliveryAddress.street ||
-        !deliveryAddress.city ||
-        !deliveryAddress.postalCode
-      ) {
-        toast.error("Veuillez renseigner l'adresse de livraison complète");
-        return;
-      }
-    }
-
-    setIsCreatingOrder(true);
-
-    try {
-      const result = await createOrder({
-        farmId, // ✅ number garanti
-        items: cart.items.map((item) => ({
-          productId: item.product.id,
-          quantity: item.quantity,
-        })),
-        deliveryMode: cart.deliveryMode,
-        deliveryDay,
-        deliveryAddress:
-          cart.deliveryMode === "delivery" ? deliveryAddress : undefined,
-        customerNotes: customerNotes || undefined,
-      });
-
-      if (result.success && result.order) {
-        toast.success("Commande créée avec succès !");
-        clearCart();
-        router.push(`/farm/${farmId}/orders/${result.order.id}`);
+      if (!effectiveFarmId) {
+        toast.error("Ferme invalide");
         return;
       }
 
-      toast.error(result.error || "Erreur lors de la création de la commande");
-      if (result.details) {
-        result.details.forEach((detail) => {
-          toast.error(detail, { duration: 5000 });
+      if (!cart.deliveryMode) {
+        toast.error("Veuillez choisir un mode de livraison");
+        return;
+      }
+
+      if (!deliveryDay) {
+        toast.error("Veuillez sélectionner un jour de livraison");
+        return;
+      }
+
+      if (cart.deliveryMode === "delivery") {
+        if (
+          !deliveryAddress.street ||
+          !deliveryAddress.city ||
+          !deliveryAddress.postalCode
+        ) {
+          toast.error("Veuillez renseigner l'adresse de livraison complète");
+          return;
+        }
+      }
+
+      setIsCreatingOrder(true);
+
+      try {
+        const result = await createOrder({
+          farmId: effectiveFarmId, // ✅ number garanti ici
+          items: cart.items.map((item) => ({
+            productId: item.product.id,
+            quantity: item.quantity,
+          })),
+          deliveryMode: cart.deliveryMode,
+          deliveryDay,
+          deliveryAddress:
+            cart.deliveryMode === "delivery" ? deliveryAddress : undefined,
+          customerNotes: customerNotes || undefined,
         });
+
+        if (result.success && result.order) {
+          toast.success("Commande créée avec succès !");
+          clearCart();
+          router.push(`/farm/${effectiveFarmId}/orders/${result.order.id}`);
+          return;
+        }
+
+        toast.error(
+          result.error || "Erreur lors de la création de la commande"
+        );
+        if (result.details) {
+          result.details.forEach((detail) =>
+            toast.error(detail, { duration: 5000 })
+          );
+        }
+      } catch (err) {
+        logger.error("Erreur checkout:", err);
+        toast.error("Une erreur inattendue s'est produite");
+      } finally {
+        setIsCreatingOrder(false);
       }
-    } catch (err) {
-      console.error("Erreur checkout:", err);
-      toast.error("Une erreur inattendue s'est produite");
-    } finally {
-      setIsCreatingOrder(false);
-    }
-  };
+    },
+    [
+      effectiveFarmId,
+      cart.deliveryMode,
+      cart.items,
+      deliveryDay,
+      deliveryAddress,
+      customerNotes,
+      createOrder,
+      clearCart,
+      router,
+    ]
+  );
+
+  /**
+   * ✅ Rendu “neutre” pendant redirection / id invalide
+   * (pas de hooks après ça, donc OK)
+   */
+  if (isRedirecting || effectiveFarmId === null) return null;
 
   // Loading state
   if (isLoadingFarm) {
@@ -341,7 +384,7 @@ export default function FarmCheckoutPage(): JSX.Element | null {
             </div>
           </div>
 
-          {/* Mode de livraison (lecture seule depuis cart) */}
+          {/* Mode de livraison */}
           <div
             className="p-6 rounded-xl border"
             style={{
@@ -399,7 +442,7 @@ export default function FarmCheckoutPage(): JSX.Element | null {
             </div>
 
             <Link
-              href={`/farm/${effectiveFarmId}/cart`}
+              href={`/farm/${farmId}/cart`}
               className="text-sm hover:underline mt-3 inline-block"
               style={{ color: COLORS.PRIMARY }}
             >
@@ -407,7 +450,7 @@ export default function FarmCheckoutPage(): JSX.Element | null {
             </Link>
           </div>
 
-          {/* Jour de livraison/retrait */}
+          {/* Jour */}
           <div
             className="p-6 rounded-xl border"
             style={{
@@ -445,7 +488,7 @@ export default function FarmCheckoutPage(): JSX.Element | null {
             </p>
           </div>
 
-          {/* Adresse de livraison (si delivery) */}
+          {/* Adresse (si delivery) */}
           {cart.deliveryMode === "delivery" && (
             <div
               className="p-6 rounded-xl border"
@@ -545,7 +588,7 @@ export default function FarmCheckoutPage(): JSX.Element | null {
                     className="block text-sm font-medium mb-1"
                     style={{ color: COLORS.TEXT_SECONDARY }}
                   >
-                    Complément d'adresse (optionnel)
+                    Complément d&apos;adresse (optionnel)
                   </label>
                   <input
                     type="text"
@@ -566,7 +609,7 @@ export default function FarmCheckoutPage(): JSX.Element | null {
             </div>
           )}
 
-          {/* Instructions spéciales */}
+          {/* Notes */}
           <div
             className="p-6 rounded-xl border"
             style={{
@@ -597,15 +640,12 @@ export default function FarmCheckoutPage(): JSX.Element | null {
             </p>
           </div>
 
-          {/* Bouton de soumission */}
+          {/* Submit */}
           <button
             type="submit"
             disabled={isCreatingOrder}
             className="w-full py-4 px-6 rounded-lg font-bold text-lg transition-all duration-200 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
-            style={{
-              backgroundColor: COLORS.PRIMARY,
-              color: COLORS.BG_WHITE,
-            }}
+            style={{ backgroundColor: COLORS.PRIMARY, color: COLORS.BG_WHITE }}
           >
             {isCreatingOrder ? (
               <>

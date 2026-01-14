@@ -7,6 +7,7 @@ import { clerkClient, auth } from "@clerk/nextjs/server";
 import { sendFarmerRequestStatusEmail } from "@/lib/config/email-notifications";
 import type { Database, FarmerRequestUpdate } from "@/lib/types/database";
 import type { FarmerRequest as EmailFarmerRequest } from "@/lib/config/email-notifications";
+import { logger } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -334,7 +335,7 @@ export async function POST(
       ...(reason ? { admin_reason: reason } : {}),
     };
 
-    console.log("[VALIDATE] Mise à jour farmer_request:", {
+    logger.info("[VALIDATE] Mise à jour farmer_request:", {
       requestId,
       updateData,
     });

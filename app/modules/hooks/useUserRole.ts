@@ -138,7 +138,7 @@ export default function useUserRole(): UseUserRoleReturn {
     return () => {
       isMounted = false;
     };
-  }, [isLoaded, user]);
+  }, [isLoaded, user, supabase]);
 
   /**
    * Flags de rôle calculés de manière optimisée

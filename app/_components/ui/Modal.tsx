@@ -1,49 +1,20 @@
 "use client";
 
-import React, { useEffect, useRef, forwardRef } from "react";
+import React, { useEffect, useRef, forwardRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { X } from "@/utils/icons";
 import { cn } from "@/lib/utils";
 import { COLORS } from "@/lib/config";
 import type { ModalProps } from "@/lib/types";
 
-/**
- * Props étendues pour le composant Modal
- */
 interface ExtendedModalProps extends ModalProps {
-  /**
-   * Classes CSS additionnelles pour la modal
-   */
   className?: string;
-  /**
-   * Titre de la modal pour l'accessibilité
-   */
   title?: string;
-  /**
-   * Désactiver la fermeture par ESC
-   */
   disableEscapeKeyDown?: boolean;
-  /**
-   * Désactiver la fermeture par clic sur le backdrop
-   */
   disableBackdropClick?: boolean;
-  /**
-   * Taille de la modal
-   */
   size?: "sm" | "md" | "lg" | "xl" | "full";
 }
 
-/**
- * Composant Modal accessible et réutilisable
- *
- * Features:
- * - Fermeture par ESC ou clic sur backdrop
- * - Focus management automatique
- * - Portal pour isolation DOM
- * - Prévention du scroll du body
- * - Animations avec Tailwind
- * - Accessibilité ARIA
- */
 const Modal = forwardRef<HTMLDivElement, ExtendedModalProps>(
   (
     {
@@ -56,44 +27,79 @@ const Modal = forwardRef<HTMLDivElement, ExtendedModalProps>(
       disableBackdropClick = false,
       size = "lg",
     },
-    ref
+    forwardedRef
   ) => {
-    const modalRef = useRef<HTMLDivElement>(null);
-    const backdropRef = useRef<HTMLDivElement>(null);
+    const modalRef = useRef<HTMLDivElement | null>(null);
+    const backdropRef = useRef<HTMLDivElement | null>(null);
     const isClosingRef = useRef<boolean>(false);
+    const closeTimeoutRef = useRef<number | null>(null);
 
-    // ✅ Fonction de fermeture sécurisée
-    const handleClose = (): void => {
+    /**
+     * ✅ Helper: assigne le même node au ref interne + ref externe
+     * Compatible callback ref et object ref, sans TS hacks.
+     */
+    const setRefs = useCallback(
+      (node: HTMLDivElement | null) => {
+        modalRef.current = node;
+
+        if (!forwardedRef) return;
+
+        if (typeof forwardedRef === "function") {
+          forwardedRef(node);
+        } else {
+          // ForwardedRef peut être readonly selon les types.
+          // On cast en MutableRefObject pour assigner proprement.
+          (
+            forwardedRef as React.MutableRefObject<HTMLDivElement | null>
+          ).current = node;
+        }
+      },
+      [forwardedRef]
+    );
+
+    const handleClose = useCallback((): void => {
       if (isClosingRef.current || !onClose) return;
+
       isClosingRef.current = true;
       onClose();
-      // Reset du flag après un délai pour permettre la réouverture
-      setTimeout(() => {
+
+      if (closeTimeoutRef.current) window.clearTimeout(closeTimeoutRef.current);
+
+      closeTimeoutRef.current = window.setTimeout(() => {
         isClosingRef.current = false;
+        closeTimeoutRef.current = null;
       }, 300);
-    };
+    }, [onClose]);
+
+    useEffect(() => {
+      return () => {
+        if (closeTimeoutRef.current) {
+          window.clearTimeout(closeTimeoutRef.current);
+          closeTimeoutRef.current = null;
+        }
+      };
+    }, []);
 
     // ✅ Fermeture avec ESC
     useEffect(() => {
       if (!isOpen || disableEscapeKeyDown) return;
 
       const handleKeyDown = (e: KeyboardEvent): void => {
-        if (e.key === "Escape") {
-          handleClose();
-        }
+        if (e.key === "Escape") handleClose();
       };
 
       document.addEventListener("keydown", handleKeyDown);
       return () => document.removeEventListener("keydown", handleKeyDown);
-    }, [isOpen, disableEscapeKeyDown]);
+    }, [isOpen, disableEscapeKeyDown, handleClose]);
 
     // ✅ Clic sur le backdrop
-    const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>): void => {
-      if (disableBackdropClick) return;
-      if (e.target === backdropRef.current) {
-        handleClose();
-      }
-    };
+    const handleBackdropClick = useCallback(
+      (e: React.MouseEvent<HTMLDivElement>): void => {
+        if (disableBackdropClick) return;
+        if (e.target === backdropRef.current) handleClose();
+      },
+      [disableBackdropClick, handleClose]
+    );
 
     // ✅ Prévenir le scroll du body
     useEffect(() => {
@@ -102,7 +108,6 @@ const Modal = forwardRef<HTMLDivElement, ExtendedModalProps>(
       const originalOverflow = document.body.style.overflow;
       const originalPaddingRight = document.body.style.paddingRight;
 
-      // Calcul de la largeur de la scrollbar pour éviter le "jump"
       const scrollbarWidth =
         window.innerWidth - document.documentElement.clientWidth;
 
@@ -117,22 +122,16 @@ const Modal = forwardRef<HTMLDivElement, ExtendedModalProps>(
       };
     }, [isOpen]);
 
-    // ✅ Focus management pour l'accessibilité
+    // ✅ Focus management
     useEffect(() => {
       if (!isOpen) return;
+      const node = modalRef.current;
+      if (!node) return;
 
-      const modal = modalRef.current;
-      if (modal) {
-        // Focus sur la modal avec un délai pour l'animation
-        const focusTimeout = setTimeout(() => {
-          modal.focus();
-        }, 100);
-
-        return () => clearTimeout(focusTimeout);
-      }
+      const t = window.setTimeout(() => node.focus(), 100);
+      return () => window.clearTimeout(t);
     }, [isOpen]);
 
-    // ✅ Classes de taille basées sur la configuration
     const getSizeClasses = (modalSize: ExtendedModalProps["size"]): string => {
       const sizeMap = {
         sm: "max-w-md",
@@ -144,7 +143,6 @@ const Modal = forwardRef<HTMLDivElement, ExtendedModalProps>(
       return sizeMap[modalSize || "lg"];
     };
 
-    // Ne pas rendre si la modal n'est pas ouverte
     if (!isOpen) return null;
 
     const modalContent = (
@@ -156,7 +154,7 @@ const Modal = forwardRef<HTMLDivElement, ExtendedModalProps>(
           "animate-in fade-in-0 duration-300"
         )}
         style={{
-          backgroundColor: `${COLORS.TEXT_PRIMARY}80`, // 50% opacity avec couleur configurée
+          backgroundColor: `${COLORS.TEXT_PRIMARY}80`,
         }}
         aria-modal="true"
         role="dialog"
@@ -165,7 +163,7 @@ const Modal = forwardRef<HTMLDivElement, ExtendedModalProps>(
         onClick={handleBackdropClick}
       >
         <div
-          ref={ref || modalRef}
+          ref={setRefs}
           tabIndex={-1}
           className={cn(
             "relative w-full max-h-[90vh]",
@@ -182,7 +180,6 @@ const Modal = forwardRef<HTMLDivElement, ExtendedModalProps>(
           }}
           onClick={(e: React.MouseEvent) => e.stopPropagation()}
         >
-          {/* ✅ Header optionnel avec titre */}
           {title && (
             <div
               className="px-6 py-4 border-b"
@@ -198,7 +195,6 @@ const Modal = forwardRef<HTMLDivElement, ExtendedModalProps>(
             </div>
           )}
 
-          {/* ✅ Bouton de fermeture accessible */}
           <button
             onClick={handleClose}
             className={cn(
@@ -214,7 +210,7 @@ const Modal = forwardRef<HTMLDivElement, ExtendedModalProps>(
               "text-gray-500 hover:text-gray-700"
             )}
             style={{
-              backgroundColor: `${COLORS.BG_WHITE}e6`, // 90% opacity
+              backgroundColor: `${COLORS.BG_WHITE}e6`,
               color: COLORS.TEXT_SECONDARY,
             }}
             aria-label="Fermer la fenêtre"
@@ -224,7 +220,6 @@ const Modal = forwardRef<HTMLDivElement, ExtendedModalProps>(
             <X className="w-4 h-4" />
           </button>
 
-          {/* ✅ Contenu du modal avec scroll */}
           <div
             id="modal-content"
             className="relative w-full h-full max-h-[90vh] overflow-auto"
@@ -235,7 +230,6 @@ const Modal = forwardRef<HTMLDivElement, ExtendedModalProps>(
       </div>
     );
 
-    // ✅ Utilisation de createPortal pour une meilleure isolation
     return typeof window !== "undefined"
       ? createPortal(modalContent, document.body)
       : null;

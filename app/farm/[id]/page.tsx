@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ChevronRight, Loader2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState, useEffect, useCallback } from "react";
 import { useParams, notFound } from "next/navigation";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/lib/types/database";
@@ -81,57 +81,58 @@ export default function FarmPage(): JSX.Element {
 
   /**
    * Charger les données du listing
+   * ✅ Extrait dans useCallback pour gérer les dépendances
    */
-  useEffect(() => {
-    async function loadListing() {
-      // Vérifier que le paramètre existe
-      if (!idParam || typeof idParam !== "string") {
-        setIsLoading(false);
-        setListing(null);
-        return;
-      }
-
-      const parsedId = parseInt(idParam, 10);
-
-      // Vérifier que c'est un nombre valide
-      if (isNaN(parsedId)) {
-        setIsLoading(false);
-        setListing(null);
-        return;
-      }
-
-      try {
-        setIsLoading(true);
-
-        // Charger le listing avec ses images
-        const { data: listingData, error: listingError } = await supabase
-          .from("listing")
-          .select(
-            `
-            *,
-            listingImages (*)
-          `
-          )
-          .eq("id", parsedId)
-          .eq("active", true)
-          .single();
-
-        if (listingError) {
-          console.error("Supabase error:", listingError);
-          throw listingError;
-        }
-
-        setListing(listingData as ListingWithImages);
-      } catch (error) {
-        console.error("Erreur chargement ferme:", error);
-        setListing(null);
-      } finally {
-        setIsLoading(false);
-      }
+  const loadListing = useCallback(async () => {
+    // Vérifier que le paramètre existe
+    if (!idParam || typeof idParam !== "string") {
+      setIsLoading(false);
+      setListing(null);
+      return;
     }
 
+    const parsedId = parseInt(idParam, 10);
+
+    // Vérifier que c'est un nombre valide
+    if (isNaN(parsedId)) {
+      setIsLoading(false);
+      setListing(null);
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+
+      // Charger le listing avec ses images
+      const { data: listingData, error: listingError } = await supabase
+        .from("listing")
+        .select(
+          `
+          *,
+          listingImages (*)
+        `
+        )
+        .eq("id", parsedId)
+        .eq("active", true)
+        .single();
+
+      if (listingError) {
+        console.error("Supabase error:", listingError);
+        throw listingError;
+      }
+
+      setListing(listingData as ListingWithImages);
+    } catch (error) {
+      console.error("Erreur chargement ferme:", error);
+      setListing(null);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [idParam, supabase]); // ✅ Dépendances explicites
+
+  useEffect(() => {
     loadListing();
-  }, [idParam]);
+  }, [loadListing]); // ✅ Dépendance sur la fonction stable
 
   /**
    * Analytics: Track tab switches

@@ -57,7 +57,7 @@ const useHomeNavigation = () => {
  * @returns Page d'accueil avec navigation conditionnelle
  */
 export default function Home({ className = "" }: HomeProps): JSX.Element {
-  const { viewMap, handleViewMap, handleBackToHome } = useHomeNavigation();
+  const { viewMap, handleViewMap } = useHomeNavigation();
 
   return (
     <div className={className}>

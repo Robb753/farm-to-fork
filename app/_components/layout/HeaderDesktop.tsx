@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import dynamic from "next/dynamic";
@@ -16,30 +16,19 @@ import {
 } from "lucide-react";
 import { useUser, useClerk } from "@clerk/nextjs";
 import { AvatarImage } from "@/components/ui/OptimizedImage";
-import {
-  useUserRole,
-  useUserSyncState,
-  useUserActions,
-} from "@/lib/store/userStore";
+import { useUserRole, useUserActions } from "@/lib/store/userStore";
 import { COLORS } from "@/lib/config/constants";
 import { cn } from "@/lib/utils";
+import { logger } from "@/lib/logger"; // ✅
 
-/**
- * Extension de Window pour le flag de montage HeaderDesktop
- */
 declare global {
   interface Window {
     __F2F_HEADER_DESKTOP_MOUNTED__?: boolean;
   }
 }
 
-/**
- * Interfaces TypeScript pour HeaderDesktop
- */
 interface HeaderDesktopProps {
-  /** Afficher la barre de recherche dans le header */
   showSearchInHeader?: boolean;
-  /** Classe CSS personnalisée */
   className?: string;
 }
 
@@ -52,9 +41,6 @@ interface UserDisplayInfo {
 
 type UserRole = "admin" | "farmer" | "user";
 
-/**
- * Chargement dynamique de MapboxCitySearch pour éviter les erreurs SSR
- */
 const MapboxCitySearch = dynamic(
   () => import("@/app/modules/maps/components/shared/MapboxCitySearch"),
   {
@@ -68,12 +54,9 @@ const MapboxCitySearch = dynamic(
   }
 );
 
-/**
- * Hook pour la gestion des informations utilisateur
- */
 const useUserDisplayInfo = (): UserDisplayInfo => {
   const { user } = useUser();
-  const role = useUserRole();
+  const role = useUserRole() as UserRole;
 
   const getUserAvatarUrl = useCallback((): string => {
     return user?.imageUrl || "/default-avatar.png";
@@ -107,31 +90,28 @@ const useUserDisplayInfo = (): UserDisplayInfo => {
   };
 };
 
-/**
- * Hook pour la gestion anti-doublon du HeaderDesktop
- */
 const useHeaderDesktopMountGuard = () => {
-  const [canRender, setCanRender] = useState<boolean>(true);
+  const [canRender] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
 
-  useEffect(() => {
-    // Protection anti-doublon (dev & hot-reload friendly)
-    if (typeof window !== "undefined") {
-      if (window.__F2F_HEADER_DESKTOP_MOUNTED__) {
-        setCanRender(false);
-        console.warn("HeaderDesktop déjà monté - rendu bloqué");
-      } else {
-        window.__F2F_HEADER_DESKTOP_MOUNTED__ = true;
-        console.debug("HeaderDesktop monté avec succès");
-      }
+    if (window.__F2F_HEADER_DESKTOP_MOUNTED__) {
+      logger.warn("HeaderDesktop déjà monté - rendu bloqué");
+      return false;
     }
 
+    window.__F2F_HEADER_DESKTOP_MOUNTED__ = true;
+    logger.debug("HeaderDesktop monté (guard ok)");
+    return true;
+  });
+
+  useEffect(() => {
     return () => {
       if (
         typeof window !== "undefined" &&
         window.__F2F_HEADER_DESKTOP_MOUNTED__
       ) {
         delete window.__F2F_HEADER_DESKTOP_MOUNTED__;
-        console.debug("HeaderDesktop démonté - flag nettoyé");
+        logger.debug("HeaderDesktop démonté - flag nettoyé");
       }
     };
   }, []);
@@ -139,9 +119,6 @@ const useHeaderDesktopMountGuard = () => {
   return canRender;
 };
 
-/**
- * Composant de navigation principale
- */
 const MainNavigation: React.FC = () => (
   <nav className="hidden md:flex items-center space-x-6">
     <Link
@@ -171,9 +148,6 @@ const MainNavigation: React.FC = () => (
   </nav>
 );
 
-/**
- * Composant des boutons d'authentification
- */
 interface AuthButtonsProps {
   onSignIn: () => void;
   onSignUp: () => void;
@@ -185,6 +159,7 @@ const AuthButtons: React.FC<AuthButtonsProps> = ({ onSignIn, onSignUp }) => (
       onClick={onSignIn}
       className="flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors hover:text-opacity-80"
       style={{ color: COLORS.TEXT_SECONDARY }}
+      type="button"
     >
       Se connecter
     </button>
@@ -192,20 +167,15 @@ const AuthButtons: React.FC<AuthButtonsProps> = ({ onSignIn, onSignUp }) => (
     <button
       onClick={onSignUp}
       className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all hover:bg-opacity-90"
-      style={{
-        backgroundColor: COLORS.PRIMARY,
-        color: COLORS.TEXT_WHITE,
-      }}
+      style={{ backgroundColor: COLORS.PRIMARY, color: COLORS.TEXT_WHITE }}
+      type="button"
     >
       <PlusCircle className="w-4 h-4" />
-      S'inscrire
+      S&apos;inscrire
     </button>
   </div>
 );
 
-/**
- * Composant du menu utilisateur connecté (version custom sans DropdownMenu)
- */
 interface UserMenuProps {
   userInfo: UserDisplayInfo;
   role: UserRole;
@@ -242,6 +212,7 @@ const UserMenu: React.FC<UserMenuProps> = ({ userInfo, role, onSignOut }) => {
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
+                aria-hidden="true"
               >
                 <path
                   d="M3 9L12 2L21 9V20C21 20.5304 20.7893 21.0391 20.4142 21.4142C20.0391 21.7893 19.5304 22 19 22H5C4.46957 22 3.96086 21.7893 3.58579 21.4142C3.21071 21.0391 3 20.5304 3 20V9Z"
@@ -272,7 +243,6 @@ const UserMenu: React.FC<UserMenuProps> = ({ userInfo, role, onSignOut }) => {
 
   return (
     <div className="flex items-center gap-3">
-      {/* Bouton favoris */}
       <Link
         href="/user#favorites"
         className="p-2 rounded-lg transition-all relative hover:bg-gray-100"
@@ -282,10 +252,10 @@ const UserMenu: React.FC<UserMenuProps> = ({ userInfo, role, onSignOut }) => {
         <Heart className="w-5 h-5" />
       </Link>
 
-      {/* Bouton notifications */}
       <button
         className="p-2 rounded-lg transition-all relative hover:bg-gray-100"
         style={{ color: COLORS.TEXT_SECONDARY }}
+        type="button"
       >
         <Bell className="w-5 h-5" />
         <span
@@ -294,11 +264,11 @@ const UserMenu: React.FC<UserMenuProps> = ({ userInfo, role, onSignOut }) => {
         />
       </button>
 
-      {/* Menu dropdown utilisateur custom */}
       <div className="relative">
         <button
-          onClick={() => setIsOpen(!isOpen)}
+          onClick={() => setIsOpen((v) => !v)}
           className="flex items-center gap-2 p-1 rounded-lg transition-colors focus:outline-none hover:bg-gray-50"
+          type="button"
         >
           <AvatarImage
             src={userInfo.avatarUrl}
@@ -320,7 +290,6 @@ const UserMenu: React.FC<UserMenuProps> = ({ userInfo, role, onSignOut }) => {
           </div>
         </button>
 
-        {/* Menu dropdown */}
         {isOpen && (
           <div
             className="absolute right-0 mt-2 w-64 rounded-xl shadow-xl z-50 py-2"
@@ -329,7 +298,6 @@ const UserMenu: React.FC<UserMenuProps> = ({ userInfo, role, onSignOut }) => {
               border: `1px solid ${COLORS.BORDER}`,
             }}
           >
-            {/* Header utilisateur */}
             <div
               className="p-3 border-b"
               style={{ borderColor: COLORS.BORDER }}
@@ -368,13 +336,12 @@ const UserMenu: React.FC<UserMenuProps> = ({ userInfo, role, onSignOut }) => {
               </div>
             </div>
 
-            {/* Menu items */}
             <div className="py-1">
               {menuItems.map((item, index) => {
                 const IconComponent = item.icon;
                 return (
                   <Link
-                    key={index}
+                    key={`${item.href}-${index}`}
                     href={item.href}
                     className="flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors"
                     onClick={() => setIsOpen(false)}
@@ -390,20 +357,19 @@ const UserMenu: React.FC<UserMenuProps> = ({ userInfo, role, onSignOut }) => {
                 );
               })}
 
-              {/* Séparateur */}
               <div
                 className="my-1 border-t"
                 style={{ borderColor: COLORS.BORDER }}
               />
 
-              {/* Déconnexion */}
               <button
                 onClick={() => {
                   setIsOpen(false);
-                  onSignOut();
+                  void onSignOut();
                 }}
                 className="flex items-center gap-3 px-4 py-2 hover:bg-red-50 transition-colors w-full text-left"
                 style={{ color: COLORS.ERROR }}
+                type="button"
               >
                 <LogIn className="w-4 h-4 rotate-180" />
                 <span>Se déconnecter</span>
@@ -412,7 +378,6 @@ const UserMenu: React.FC<UserMenuProps> = ({ userInfo, role, onSignOut }) => {
           </div>
         )}
 
-        {/* Overlay pour fermer le menu */}
         {isOpen && (
           <div
             className="fixed inset-0 z-40"
@@ -424,14 +389,11 @@ const UserMenu: React.FC<UserMenuProps> = ({ userInfo, role, onSignOut }) => {
   );
 };
 
-/**
- * Composant Skeleton pour le loading state
- */
 const HeaderDesktopSkeleton: React.FC = () => (
   <header
     className="sticky top-0 z-50 w-full border-b backdrop-blur supports-[backdrop-filter]:bg-white/60"
     style={{
-      backgroundColor: `${COLORS.BG_WHITE}F2`, // 95% opacity
+      backgroundColor: `${COLORS.BG_WHITE}F2`,
       borderColor: COLORS.BORDER,
     }}
   >
@@ -448,55 +410,28 @@ const HeaderDesktopSkeleton: React.FC = () => (
   </header>
 );
 
-/**
- * Composant HeaderDesktop principal
- *
- * Features:
- * - Navigation complète avec liens typés
- * - Authentification Clerk intégrée
- * - Menu utilisateur avec rôles
- * - Recherche Mapbox en header
- * - Design system cohérent
- * - Protection anti-doublon
- * - Gestion d'état robuste
- * - Animations et transitions
- *
- * @param props - Configuration du header desktop
- * @returns Header desktop complet
- */
 export default function HeaderDesktop({
   showSearchInHeader = true,
   className = "",
 }: HeaderDesktopProps): JSX.Element | null {
-  const { user, isSignedIn, isLoaded } = useUser();
+  const { isSignedIn, isLoaded } = useUser();
   const { signOut } = useClerk();
   const role = useUserRole() as UserRole;
   const { reset } = useUserActions();
 
-  const [isClient, setIsClient] = useState<boolean>(false);
   const canRender = useHeaderDesktopMountGuard();
   const userInfo = useUserDisplayInfo();
 
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
-
-  /**
-   * Gestion de la déconnexion avec nettoyage du store
-   */
   const handleSignOut = useCallback(async (): Promise<void> => {
     try {
-      reset(); // Nettoyage du store utilisateur
+      reset();
       await signOut();
-      console.debug("Déconnexion réussie");
+      logger.info("Déconnexion réussie");
     } catch (error) {
-      console.error("Erreur lors de la déconnexion:", error);
+      logger.error("Erreur lors de la déconnexion", error);
     }
   }, [reset, signOut]);
 
-  /**
-   * Ouverture des modales d'authentification
-   */
   const openSignIn = useCallback((): void => {
     window.dispatchEvent(new CustomEvent("openSigninModal"));
   }, []);
@@ -505,15 +440,8 @@ export default function HeaderDesktop({
     window.dispatchEvent(new CustomEvent("openSignupModal"));
   }, []);
 
-  // États de chargement
-  if (!isClient || !isLoaded) {
-    return <HeaderDesktopSkeleton />;
-  }
-
-  // Protection anti-doublon
-  if (!canRender) {
-    return null;
-  }
+  if (!isLoaded) return <HeaderDesktopSkeleton />;
+  if (!canRender) return null;
 
   return (
     <header
@@ -522,21 +450,20 @@ export default function HeaderDesktop({
         className
       )}
       style={{
-        backgroundColor: `${COLORS.BG_WHITE}F2`, // 95% opacity
+        backgroundColor: `${COLORS.BG_WHITE}F2`,
         borderColor: COLORS.BORDER,
       }}
     >
       <div className="container flex h-16 items-center justify-between px-6">
-        {/* Logo + Navigation */}
         <div className="flex items-center gap-8">
           <Link href="/" className="flex items-center space-x-2">
-            <img
+            <Image
               src="/logof2f.svg"
               alt="Farm To Fork"
               width={120}
               height={32}
               className="h-8 w-auto"
-              style={{ width: "auto" }}
+              priority
             />
             <span
               className="text-xl font-bold hidden sm:block"
@@ -545,21 +472,17 @@ export default function HeaderDesktop({
               Farm To Fork
             </span>
           </Link>
-
           <MainNavigation />
         </div>
 
-        {/* Actions droite */}
         <div className="flex items-center gap-4">
-          {/* Recherche ville (Mapbox) */}
           {showSearchInHeader && (
             <div className="hidden lg:flex items-center w-[380px] max-w-[40vw]">
               <MapboxCitySearch
                 variant="header"
                 placeholder="Rechercher une ville…"
-                className="mapbox-dropdown header-search" // ✅ Ajouter header-search
+                className="mapbox-dropdown header-search"
                 onCitySelect={() => {
-                  // ✅ NOUVEAU : Fermer la dropdown après sélection
                   setTimeout(() => {
                     const dropdowns =
                       document.querySelectorAll('[role="listbox"]');
@@ -567,9 +490,10 @@ export default function HeaderDesktop({
                       const parent = dropdown.closest(".mapbox-dropdown");
                       if (parent) {
                         parent.classList.add("closed");
-                        setTimeout(() => {
-                          parent.classList.remove("closed");
-                        }, 300);
+                        setTimeout(
+                          () => parent.classList.remove("closed"),
+                          300
+                        );
                       }
                     });
                   }, 150);
@@ -578,14 +502,10 @@ export default function HeaderDesktop({
             </div>
           )}
 
-          {/* Bouton devenir producteur */}
           <Link
             href="/onboarding/step-1"
             className="hidden md:flex items-center gap-1 text-sm font-medium px-3 py-2 rounded-lg transition-all"
-            style={{
-              color: COLORS.PRIMARY,
-              backgroundColor: "transparent",
-            }}
+            style={{ color: COLORS.PRIMARY, backgroundColor: "transparent" }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = COLORS.PRIMARY_BG;
               e.currentTarget.style.color = COLORS.PRIMARY_DARK;
@@ -599,7 +519,6 @@ export default function HeaderDesktop({
             Devenir producteur
           </Link>
 
-          {/* Authentification */}
           {!isSignedIn ? (
             <AuthButtons onSignIn={openSignIn} onSignUp={openSignUp} />
           ) : (
@@ -615,7 +534,4 @@ export default function HeaderDesktop({
   );
 }
 
-/**
- * Export des types pour utilisation externe
- */
 export type { HeaderDesktopProps, UserDisplayInfo };

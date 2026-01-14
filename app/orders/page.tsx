@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Package, ArrowRight, Calendar, MapPin, Truck } from "lucide-react";
@@ -42,78 +42,79 @@ export default function MyOrdersPage(): JSX.Element {
 
   const supabase = useSupabaseWithClerk();
 
-  useEffect(() => {
-    async function loadOrders() {
-      try {
-        setIsLoading(true);
+  // ✅ Extraire la logique de chargement dans useCallback pour éviter les dépendances cycliques
+  const loadOrders = useCallback(async () => {
+    try {
+      setIsLoading(true);
 
-        // Vérifier l'auth
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+      // Vérifier l'auth
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-        if (!user) {
-          toast.error("Vous devez être connecté");
-          router.push("/login");
-          return;
-        }
-
-        // Charger TOUTES les commandes de l'utilisateur (toutes fermes)
-        const response = await supabase
-          .from("orders")
-          .select(
-            "id, user_id, farm_id, items, total_price, delivery_mode, delivery_day, status, payment_status, created_at"
-          )
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false });
-
-        // ✅ Cast as any pour éviter les erreurs de types Supabase
-        const ordersData = response.data as any;
-        const ordersError = response.error;
-
-        if (ordersError) throw ordersError;
-
-        if (!ordersData || ordersData.length === 0) {
-          setOrders([]);
-          return;
-        }
-
-        // Charger les infos des fermes
-        const farmIds = Array.from(
-          new Set(ordersData.map((o: any) => Number(o.farm_id)))
-        );
-        const { data: farmsData } = await supabase
-          .from("listing")
-          .select("id, name")
-          .in("id", farmIds as number[]);
-
-        const farmsMap = new Map(farmsData?.map((f) => [f.id, f]) || []);
-
-        // Mapper avec type safety
-        const mappedOrders: OrderListItem[] = ordersData.map((order: any) => ({
-          id: order.id,
-          farm_id: order.farm_id,
-          total_price: order.total_price || 0,
-          delivery_mode: order.delivery_mode,
-          delivery_day: order.delivery_day || "",
-          status: order.status,
-          payment_status: order.payment_status,
-          created_at: order.created_at,
-          items: order.items || [],
-          farm: farmsMap.get(order.farm_id),
-        }));
-
-        setOrders(mappedOrders);
-      } catch (error) {
-        console.error("Erreur chargement commandes:", error);
-        toast.error("Impossible de charger vos commandes");
-      } finally {
-        setIsLoading(false);
+      if (!user) {
+        toast.error("Vous devez être connecté");
+        router.push("/login");
+        return;
       }
-    }
 
+      // Charger TOUTES les commandes de l'utilisateur (toutes fermes)
+      const response = await supabase
+        .from("orders")
+        .select(
+          "id, user_id, farm_id, items, total_price, delivery_mode, delivery_day, status, payment_status, created_at"
+        )
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      // ✅ Cast as any pour éviter les erreurs de types Supabase
+      const ordersData = response.data as any;
+      const ordersError = response.error;
+
+      if (ordersError) throw ordersError;
+
+      if (!ordersData || ordersData.length === 0) {
+        setOrders([]);
+        return;
+      }
+
+      // Charger les infos des fermes
+      const farmIds = Array.from(
+        new Set(ordersData.map((o: any) => Number(o.farm_id)))
+      );
+      const { data: farmsData } = await supabase
+        .from("listing")
+        .select("id, name")
+        .in("id", farmIds as number[]);
+
+      const farmsMap = new Map(farmsData?.map((f) => [f.id, f]) || []);
+
+      // Mapper avec type safety
+      const mappedOrders: OrderListItem[] = ordersData.map((order: any) => ({
+        id: order.id,
+        farm_id: order.farm_id,
+        total_price: order.total_price || 0,
+        delivery_mode: order.delivery_mode,
+        delivery_day: order.delivery_day || "",
+        status: order.status,
+        payment_status: order.payment_status,
+        created_at: order.created_at,
+        items: order.items || [],
+        farm: farmsMap.get(order.farm_id),
+      }));
+
+      setOrders(mappedOrders);
+    } catch (error) {
+      console.error("Erreur chargement commandes:", error);
+      toast.error("Impossible de charger vos commandes");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [supabase, router]); // ✅ Dépendances explicites
+
+  useEffect(() => {
     loadOrders();
-  }, [router]);
+  }, [loadOrders]); // ✅ Dépendance sur la fonction stable
 
   if (isLoading) {
     return (

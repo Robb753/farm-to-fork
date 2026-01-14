@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { MapPin, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { COLORS } from "@/lib/config";
+import { logger } from "@/lib/logger";
 
 interface AddressComponents {
   line1: string;
@@ -88,7 +89,7 @@ export default function AddressAutocompleteMapbox({
   const [cursor, setCursor] = useState<number>(-1);
   const [error, setError] = useState<string>("");
 
-  // ✅ FIX : Flag pour bloquer la recherche après sélection
+  // ✅ Flag pour bloquer la recherche après sélection
   const justSelected = useRef<boolean>(false);
 
   const abortRef = useRef<AbortController | null>(null);
@@ -102,7 +103,7 @@ export default function AddressAutocompleteMapbox({
     setIsClient(true);
   }, []);
 
-  // ✅ FIX : Ignorer les mises à jour de value juste après sélection
+  // ✅ Ignorer les mises à jour de value juste après sélection
   useEffect(() => {
     if (justSelected.current) {
       justSelected.current = false;
@@ -180,7 +181,7 @@ export default function AddressAutocompleteMapbox({
 
         const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
           trimmedQuery
-        )}.json?${searchParams}`;
+        )}.json?${searchParams.toString()}`;
 
         const response = await fetch(url, {
           signal: abortRef.current.signal,
@@ -214,15 +215,28 @@ export default function AddressAutocompleteMapbox({
         setOpen(mappedItems.length > 0);
         setCursor(-1);
 
-        console.debug(
-          `Recherche adresse "${trimmedQuery}": ${mappedItems.length} résultats`
-        );
+        logger.debug("AddressAutocompleteMapbox: résultats", {
+          query: trimmedQuery,
+          count: mappedItems.length,
+          country,
+        });
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") {
-          console.debug("Requête de recherche d'adresse annulée");
+          logger.debug("AddressAutocompleteMapbox: requête annulée", {
+            query: trimmedQuery,
+          });
           return;
         }
-        console.error("Erreur lors de la recherche d'adresse Mapbox:", err);
+
+        logger.error(
+          "AddressAutocompleteMapbox: erreur recherche Mapbox",
+          err,
+          {
+            query: trimmedQuery,
+            country,
+          }
+        );
+
         setError("Erreur lors de la recherche");
         setItems([]);
         setOpen(false);
@@ -233,17 +247,17 @@ export default function AddressAutocompleteMapbox({
     [country, parseAddressComponents]
   );
 
-  // ✅ FIX : Ne pas rechercher si justSelected est true
+  // ✅ Ne pas rechercher si justSelected est true
   useEffect(() => {
     if (justSelected.current) {
       return;
     }
 
-    const timeoutId = setTimeout(() => {
-      search(query);
+    const timeoutId = window.setTimeout(() => {
+      void search(query);
     }, 250);
 
-    return () => clearTimeout(timeoutId);
+    return () => window.clearTimeout(timeoutId);
   }, [query, search]);
 
   const handleSelect = useCallback(
@@ -252,7 +266,11 @@ export default function AddressAutocompleteMapbox({
         const [lng, lat] = item.center || [0, 0];
 
         if (!Number.isFinite(lng) || !Number.isFinite(lat)) {
-          console.error("Coordonnées invalides:", item);
+          logger.error(
+            "AddressAutocompleteMapbox: coordonnées invalides",
+            undefined,
+            { item }
+          );
           setError("Coordonnées d'adresse invalides");
           return;
         }
@@ -266,7 +284,7 @@ export default function AddressAutocompleteMapbox({
           address: item.address,
         };
 
-        // ✅ FIX : Activer le flag pour bloquer la prochaine recherche
+        // ✅ Activer le flag pour bloquer la prochaine recherche
         justSelected.current = true;
 
         // Fermer le dropdown
@@ -282,15 +300,18 @@ export default function AddressAutocompleteMapbox({
         onSelect(payload);
 
         // Retirer le focus
-        setTimeout(() => {
-          if (inputRef.current) {
-            inputRef.current.blur();
-          }
+        window.setTimeout(() => {
+          inputRef.current?.blur();
         }, 0);
 
-        console.debug("Adresse sélectionnée:", payload);
+        logger.debug("AddressAutocompleteMapbox: adresse sélectionnée", {
+          place_name: payload.place_name,
+          lng: payload.lng,
+          lat: payload.lat,
+          bbox: payload.bbox,
+        });
       } catch (err) {
-        console.error("Erreur lors de la sélection d'adresse:", err);
+        logger.error("AddressAutocompleteMapbox: erreur sélection", err);
         setError("Erreur lors de la sélection");
       }
     },

@@ -1,8 +1,7 @@
 "use client";
 
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useCallback, useMemo } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import vegetables from "@/app/_data/vegetables.json";
 import fruits from "@/app/_data/fruits.json";
@@ -49,11 +48,6 @@ interface ProductStats {
 }
 
 /**
- * Types de produits disponibles
- */
-type ProductType = "Légumes" | "Fruits" | "Produits laitiers";
-
-/**
  * Configuration des données de produits
  */
 const PRODUCT_DATA: ProductTypeData = {
@@ -72,30 +66,31 @@ const PRODUCT_ICONS: Record<string, string> = {
 };
 
 /**
- * Hook pour calculer les statistiques de sélection
+ * ✅ Fonction pure (pas un hook)
+ * Calcule les stats d’un type en fonction de la sélection actuelle
  */
-const useProductStats = (
+function getProductStats(
   type: string,
   selectedProducts: string[]
-): ProductStats => {
-  return useMemo(() => {
-    const products = PRODUCT_DATA[type] || [];
-    const productNames = products.map((p) => p.name);
-    const selectedCount = productNames.filter((name) =>
-      selectedProducts.includes(name)
-    ).length;
-    const totalCount = products.length;
-    const allSelected = selectedCount === totalCount && totalCount > 0;
-    const partiallySelected = selectedCount > 0 && selectedCount < totalCount;
+): ProductStats {
+  const products = PRODUCT_DATA[type] || [];
+  const productNames = products.map((p) => p.name);
 
-    return {
-      selectedCount,
-      totalCount,
-      allSelected,
-      partiallySelected,
-    };
-  }, [type, selectedProducts]);
-};
+  const selectedCount = productNames.filter((name) =>
+    selectedProducts.includes(name)
+  ).length;
+
+  const totalCount = products.length;
+  const allSelected = selectedCount === totalCount && totalCount > 0;
+  const partiallySelected = selectedCount > 0 && selectedCount < totalCount;
+
+  return {
+    selectedCount,
+    totalCount,
+    allSelected,
+    partiallySelected,
+  };
+}
 
 /**
  * Hook pour la gestion de la sélection de produits
@@ -308,26 +303,12 @@ const ProductItem: React.FC<ProductItemProps> = ({
 
 /**
  * Composant ProductSelector principal
- *
- * Features:
- * - Sélection multiple de produits par catégorie
- * - Gestion des états de sélection (tout/partiel/rien)
- * - Limite de sélection configurable
- * - Affichage des labels optionnel
- * - Design system cohérent
- * - Statistiques en temps réel
- * - Accessibilité complète
- * - Performance optimisée avec hooks
- *
- * @param props - Configuration du sélecteur
- * @returns Composant de sélection de produits
  */
 const ProductSelector: React.FC<ProductSelectorProps> = ({
   selectedTypes,
   selectedProducts,
   onChange,
   className = "",
-  selectionMode = "multiple",
   showLabels = true,
   maxSelection,
 }) => {
@@ -336,6 +317,15 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
     onChange,
     maxSelection
   );
+
+  // ✅ Pré-calcule des stats au top-level (pas dans le .map)
+  const statsByType = useMemo(() => {
+    const map: Record<string, ProductStats> = {};
+    selectedTypes.forEach((type) => {
+      map[type] = getProductStats(type, selectedProducts);
+    });
+    return map;
+  }, [selectedTypes, selectedProducts]);
 
   // État vide si aucun type sélectionné
   if (selectedTypes.length === 0) {
@@ -346,7 +336,12 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
     <div className={cn("space-y-6", className)}>
       {selectedTypes.map((type) => {
         const products = PRODUCT_DATA[type] || [];
-        const stats = useProductStats(type, selectedProducts);
+        const stats = statsByType[type] ?? {
+          selectedCount: 0,
+          totalCount: products.length,
+          allSelected: false,
+          partiallySelected: false,
+        };
 
         if (products.length === 0) {
           return (

@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import { COLORS, PATHS } from "@/lib/config";
+import { COLORS } from "@/lib/config";
 
 /**
  * Composant tunnel de redirection pour l'inscription producteur

@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { clerkClient, auth } from "@clerk/nextjs/server";
+import { logger } from "@/lib/logger";
 
 /**
  * Types pour la gestion des rôles utilisateurs
@@ -184,7 +185,9 @@ async function logRoleChange(data: {
   changedBy: string;
   reason?: string;
   timestamp: string;
-}): Promise<void> {}
+}): Promise<void> {
+  logger.info("Role change:", data);
+}
 
 /**
  * API Route pour mettre à jour le rôle d'un utilisateur

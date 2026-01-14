@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import Image from "next/image";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -21,19 +21,13 @@ import {
 import { cn } from "@/lib/utils";
 import type { Database } from "@/lib/types/database";
 
-// 🔒 SÉCURITÉ: Import des fonctions de sanitisation
 import { escapeHTML, sanitizeHTML } from "@/lib/utils/sanitize";
+import { useIsClient } from "@/app/hooks/useIsClient";
 
-/**
- * Type pour un listing avec ses images
- */
 type ListingWithImages = Database["public"]["Tables"]["listing"]["Row"] & {
   listingImages?: Database["public"]["Tables"]["listingImages"]["Row"][];
 };
 
-/**
- * Props du composant HeroSection
- */
 interface HeroSectionProps {
   listing: ListingWithImages;
   className?: string;
@@ -52,16 +46,11 @@ export default function HeroSection({
   className,
 }: HeroSectionProps): JSX.Element {
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
-  const [isClient, setIsClient] = useState<boolean>(false);
 
-  // Éviter les erreurs d'hydration en attendant le client
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
+  // ✅ hook toujours appelé, jamais conditionnel
+  const isClient = useIsClient();
 
-  /**
-   * Images de la galerie (images du listing + image de profil en fallback)
-   */
+  // ✅ hooks toujours au top (avant tout return)
   const galleryImages = useMemo(() => {
     const imgs = [
       ...(listing.listingImages?.map((img) => img.url).filter(Boolean) || []),
@@ -70,102 +59,14 @@ export default function HeroSection({
     return imgs;
   }, [listing.listingImages, listing.profileImage]);
 
-  // Image par défaut si aucune image
   const defaultImage = "/images/placeholder-farm.jpg";
-  const displayImages =
-    galleryImages.length > 0 ? galleryImages : [defaultImage];
 
-  /**
-   * Note statique pour éviter l'hydration mismatch
-   * À remplacer par une vraie note depuis la base de données
-   */
-  const staticRating = 4.6;
-  const staticReviewCount = 23;
+  const displayImages = useMemo(() => {
+    return galleryImages.length > 0 ? galleryImages : [defaultImage];
+  }, [galleryImages]);
 
-  /**
-   * Navigation dans la galerie
-   */
-  const nextImage = (): void => {
-    setCurrentImageIndex((prev) => (prev + 1) % displayImages.length);
-  };
-
-  const prevImage = (): void => {
-    setCurrentImageIndex(
-      (prev) => (prev - 1 + displayImages.length) % displayImages.length
-    );
-  };
-
-  /**
-   * Copie l'URL dans le clipboard
-   */
-  const copyToClipboard = (): void => {
-    navigator.clipboard.writeText(window.location.href);
-    // Ici tu pourrais ajouter un toast de confirmation
-  };
-
-  /**
-   * Gestion du partage
-   * 🔒 SÉCURITÉ: Données échappées avant partage
-   */
-  const handleShare = async (): Promise<void> => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: escapeHTML(listing.name || "Ferme locale"),
-          text: `Découvrez ${escapeHTML(
-            listing.name || "cette ferme"
-          )} - Ferme locale`,
-          url: window.location.href,
-        });
-      } catch {
-        copyToClipboard();
-      }
-    } else {
-      copyToClipboard();
-    }
-  };
-
-  /**
-   * Gestion des favoris
-   */
-  const handleFavorite = (): void => {};
-
-  /**
-   * Actions de contact
-   * 🔒 SÉCURITÉ: Validation du format téléphone
-   */
-  const handleContact = (): void => {
-    if (listing.phoneNumber) {
-      const cleanPhone = listing.phoneNumber.replace(/[^0-9+\s\-()]/g, "");
-      window.open(`tel:${cleanPhone}`, "_self");
-    } else if (listing.email) {
-      window.open(`mailto:${listing.email}`, "_self");
-    }
-  };
-
-  /**
-   * Ouverture du site web
-   * 🔒 SÉCURITÉ: Validation stricte de l'URL + noopener/noreferrer
-   */
-  const handleWebsite = (): void => {
-    if (!listing.website) return;
-
-    const safeUrl =
-      listing.website.startsWith("http://") ||
-      listing.website.startsWith("https://")
-        ? listing.website
-        : `https://${listing.website}`;
-
-    window.open(safeUrl, "_blank", "noopener,noreferrer");
-  };
-
-  /**
-   * Obtient les badges de certification
-   * ✅ FIX: certifications est un tableau
-   */
   const certificationBadges: CertBadge[] = useMemo(() => {
     const certs = listing.certifications;
-
     if (!certs || certs.length === 0) return [];
 
     const toBadge = (cert: Certification): CertBadge => {
@@ -195,7 +96,6 @@ export default function HeroSection({
             icon: "📍",
           };
         default:
-          // 🔒 SÉCURITÉ: Échapper les valeurs non-standard (au cas où)
           return {
             label: escapeHTML(String(cert)),
             color: "bg-gray-100 text-gray-700 border-gray-200",
@@ -207,6 +107,7 @@ export default function HeroSection({
     return certs.map(toBadge);
   }, [listing.certifications]);
 
+  // ✅ maintenant seulement on peut early return
   if (!isClient) {
     return (
       <div
@@ -222,10 +123,67 @@ export default function HeroSection({
     );
   }
 
+  const staticRating = 4.6;
+  const staticReviewCount = 23;
+
+  const nextImage = (): void => {
+    setCurrentImageIndex((prev) => (prev + 1) % displayImages.length);
+  };
+
+  const prevImage = (): void => {
+    setCurrentImageIndex(
+      (prev) => (prev - 1 + displayImages.length) % displayImages.length
+    );
+  };
+
+  const copyToClipboard = (): void => {
+    void navigator.clipboard.writeText(window.location.href);
+  };
+
+  const handleShare = async (): Promise<void> => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: escapeHTML(listing.name || "Ferme locale"),
+          text: `Découvrez ${escapeHTML(listing.name || "cette ferme")} - Ferme locale`,
+          url: window.location.href,
+        });
+        return;
+      } catch {
+        // fallback
+      }
+    }
+    copyToClipboard();
+  };
+
+  const handleFavorite = (): void => {};
+
+  const handleContact = (): void => {
+    if (listing.phoneNumber) {
+      const cleanPhone = listing.phoneNumber.replace(/[^0-9+\s\-()]/g, "");
+      window.open(`tel:${cleanPhone}`, "_self");
+      return;
+    }
+    if (listing.email) {
+      window.open(`mailto:${listing.email}`, "_self");
+    }
+  };
+
+  const handleWebsite = (): void => {
+    if (!listing.website) return;
+
+    const safeUrl =
+      listing.website.startsWith("http://") ||
+      listing.website.startsWith("https://")
+        ? listing.website
+        : `https://${listing.website}`;
+
+    window.open(safeUrl, "_blank", "noopener,noreferrer");
+  };
+
   return (
     <Card className={cn("overflow-hidden bg-white shadow-lg", className)}>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
-        {/* Galerie d'images */}
         <div className="relative aspect-[4/3] lg:aspect-square">
           <Image
             src={displayImages[currentImageIndex] || defaultImage}
@@ -238,7 +196,6 @@ export default function HeroSection({
             sizes="(max-width: 768px) 100vw, 50vw"
           />
 
-          {/* Navigation galerie */}
           {displayImages.length > 1 && (
             <>
               <button
@@ -256,7 +213,6 @@ export default function HeroSection({
                 <ChevronRight className="h-4 w-4" />
               </button>
 
-              {/* Indicateurs */}
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1">
                 {displayImages.map((_, index) => (
                   <button
@@ -275,7 +231,6 @@ export default function HeroSection({
             </>
           )}
 
-          {/* Actions flottantes */}
           <div className="absolute top-4 right-4 flex gap-2">
             <button
               onClick={handleFavorite}
@@ -294,7 +249,6 @@ export default function HeroSection({
           </div>
         </div>
 
-        {/* Informations de la ferme */}
         <div className="p-6 lg:p-8 flex flex-col justify-between">
           <div className="space-y-4">
             <div>
@@ -310,7 +264,6 @@ export default function HeroSection({
               )}
             </div>
 
-            {/* Note et avis (statiques) */}
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-1">
                 <div className="flex">
@@ -335,7 +288,6 @@ export default function HeroSection({
               </span>
             </div>
 
-            {/* Type de ferme */}
             {listing.typeferme && (
               <div className="flex items-center gap-2">
                 <Badge
@@ -348,7 +300,6 @@ export default function HeroSection({
               </div>
             )}
 
-            {/* Certifications */}
             {certificationBadges.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {certificationBadges.map((badge, index) => (
@@ -364,7 +315,6 @@ export default function HeroSection({
               </div>
             )}
 
-            {/* Description courte */}
             {listing.description && (
               <div
                 className="text-gray-600 text-sm leading-relaxed line-clamp-3 prose prose-sm max-w-none"
@@ -375,7 +325,6 @@ export default function HeroSection({
             )}
           </div>
 
-          {/* Actions de contact */}
           <div className="flex flex-col gap-3 mt-6">
             <div className="flex gap-2">
               {listing.phoneNumber && (

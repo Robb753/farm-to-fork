@@ -77,13 +77,6 @@ interface CitySearchResult {
   zoom?: number;
 }
 
-interface FetchListingsOptions {
-  page: number;
-  forceRefresh?: boolean;
-  bbox?: number[];
-  append?: boolean;
-}
-
 interface FarmCardProps {
   item: ListingItem;
   isFavorite: boolean;
@@ -532,9 +525,6 @@ export default function MobileListingMapView(): JSX.Element {
   const resetListings = useUnifiedStore(
     (state) => state.listingsActions.resetListings
   );
-  const setHoveredListingId = useUnifiedStore(
-    (state) => state.interactionsActions.setHoveredListing
-  );
 
   // user + favoris
   const { user } = useUser();
@@ -548,9 +538,9 @@ export default function MobileListingMapView(): JSX.Element {
 
   // ✅ local UI state
   const [showMap, setShowMap] = useState<boolean>(false);
-  const [quickSearch, setQuickSearch] = useState<string>("");
+  const [quickSearch, _setQuickSearch] = useState<string>("");
   const [searchCity, setSearchCity] = useState<string>("");
-  const [sortBy, setSortBy] = useState<"distance" | "rating" | "name">(
+  const [sortBy, _setSortBy] = useState<"distance" | "rating" | "name">(
     "distance"
   );
   const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
@@ -659,21 +649,6 @@ export default function MobileListingMapView(): JSX.Element {
     },
     [user, toggleFavorite]
   );
-
-  const handleSearchInArea = useCallback(() => {
-    fetchListings({ page: 1, forceRefresh: true })
-      .then((data) => {
-        if (Array.isArray(data) && data.length) {
-          toast.success(`${data.length} fermes trouvées dans cette zone`);
-        } else {
-          toast.info("Aucune ferme trouvée dans cette zone");
-        }
-      })
-      .catch((error) => {
-        console.error("Failed to search in area:", error);
-        toast.error("Impossible de rechercher dans cette zone");
-      });
-  }, [fetchListings]);
 
   const handleShowMap = useCallback(() => {
     setShowMap(true);

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "@/utils/icons";
 import { COLORS, FILTER_SECTIONS } from "@/lib/config";
@@ -77,7 +77,7 @@ export default function FiltersModal({
   open = false,
   onClose,
 }: FiltersModalProps): JSX.Element | null {
-  // ✅ MIGRATION: Sélecteurs optimisés du store unifié
+  // ✅ Store (selectors)
   const currentFilters = useUnifiedStore((state) => state.filters.current);
   const setFilters = useUnifiedStore(
     (state) => state.filtersActions.setFilters
@@ -90,15 +90,26 @@ export default function FiltersModal({
   const router = useRouter();
   const pathname = usePathname();
 
-  // ✅ Draft local pour édition avant application
-  const [draft, setDraft] = useState<FilterState>(currentFilters);
+  // ✅ Draft local (lazy init)
+  const [draft, setDraft] = useState<FilterState>(() => currentFilters);
 
   /**
-   * Synchronisation du draft avec le store quand la modale s'ouvre
+   * ✅ Fix ESLint react-hooks/set-state-in-effect
+   * - On capture un snapshot des filtres du store dans un ref
+   * - On sync le draft UNIQUEMENT au moment de l'ouverture (transition fermé -> ouvert)
    */
+  const currentFiltersRef = useRef<FilterState>(currentFilters);
   useEffect(() => {
-    if (open) setDraft(currentFilters);
-  }, [open, currentFilters]);
+    currentFiltersRef.current = currentFilters;
+  }, [currentFilters]);
+
+  const wasOpenRef = useRef(false);
+  useEffect(() => {
+    if (open && !wasOpenRef.current) {
+      setDraft(currentFiltersRef.current);
+    }
+    wasOpenRef.current = open;
+  }, [open]);
 
   /**
    * Bloque le scroll derrière la modale quand open = true
@@ -110,7 +121,6 @@ export default function FiltersModal({
     const originalOverflow = body.style.overflow;
     const originalPaddingRight = body.style.paddingRight;
 
-    // ✅ Calcul de la largeur de scrollbar pour éviter le saut
     const scrollbarWidth =
       window.innerWidth - document.documentElement.clientWidth;
 
@@ -142,9 +152,7 @@ export default function FiltersModal({
    */
   const activeCount = useMemo(() => {
     return Object.values(draft).reduce((acc, v: string[] | unknown) => {
-      if (Array.isArray(v)) {
-        return acc + v.length;
-      }
+      if (Array.isArray(v)) return acc + v.length;
       return acc;
     }, 0);
   }, [draft]);
@@ -159,7 +167,6 @@ export default function FiltersModal({
         : [];
       const exists = arr.includes(value);
       const next = exists ? arr.filter((x) => x !== value) : [...arr, value];
-
       return { ...prevDraft, [key]: next } as FilterState;
     });
   };
@@ -175,16 +182,11 @@ export default function FiltersModal({
   };
 
   /**
-   * ✅ MIGRATION: Application des filtres avec synchronisation automatique
-   *
-   * setFilters(draft) déclenche automatiquement applyFiltersAndBounds()
-   * qui synchronise carte + listings sans events custom
+   * Application des filtres + MAJ URL
    */
   const apply = (): void => {
-    // ✅ Synchronisation automatique
     setFilters(draft);
 
-    // MAJ URL (lat/lng/zoom conservés)
     const query = buildUrlSearch(searchParams, draft);
     router.replace(`${pathname}${query ? `?${query}` : ""}`, { scroll: false });
 
@@ -192,16 +194,14 @@ export default function FiltersModal({
   };
 
   /**
-   * ✅ MIGRATION: Effacement avec synchronisation automatique
+   * Effacement des filtres + MAJ URL
    */
   const clearAll = (): void => {
     const cleared = makeEmptyFilters();
 
-    // ✅ Synchronisation automatique
     resetFilters();
     setDraft(cleared);
 
-    // Nettoyer l'URL tout en gardant lat/lng/zoom
     const query = buildUrlSearch(searchParams, cleared);
     router.replace(`${pathname}${query ? `?${query}` : ""}`, { scroll: false });
 
@@ -226,7 +226,7 @@ export default function FiltersModal({
           "focus:outline-none"
         )}
         style={{
-          backgroundColor: `${COLORS.TEXT_PRIMARY}66`, // 40% opacity
+          backgroundColor: `${COLORS.TEXT_PRIMARY}66`,
         }}
         aria-label="Fermer les filtres"
         onClick={onClose}
@@ -244,14 +244,14 @@ export default function FiltersModal({
           borderColor: COLORS.BORDER,
         }}
       >
-        {/* ✅ Header avec glass effect */}
+        {/* ✅ Header */}
         <div
           className={cn(
             "sticky top-0 z-10 flex items-center justify-between gap-3",
             "px-6 py-4 border-b backdrop-blur-md"
           )}
           style={{
-            backgroundColor: `${COLORS.BG_WHITE}B3`, // 70% opacity
+            backgroundColor: `${COLORS.BG_WHITE}B3`,
             borderColor: COLORS.BORDER,
           }}
         >
@@ -308,9 +308,7 @@ export default function FiltersModal({
                       "text-xs transition-colors duration-200",
                       "hover:underline focus:outline-none focus:ring-1 focus:ring-green-500 rounded"
                     )}
-                    style={{
-                      color: COLORS.TEXT_MUTED,
-                    }}
+                    style={{ color: COLORS.TEXT_MUTED }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.color = COLORS.TEXT_SECONDARY;
                     }}
@@ -329,6 +327,7 @@ export default function FiltersModal({
                   const checked = (
                     draft[section.id as keyof FilterState] || []
                   ).includes(option.value);
+
                   return (
                     <button
                       key={`${section.id}-${option.value}`}
@@ -350,16 +349,14 @@ export default function FiltersModal({
                         color: checked ? COLORS.SUCCESS : COLORS.TEXT_SECONDARY,
                       }}
                       onMouseEnter={(e) => {
-                        if (!checked) {
+                        if (!checked)
                           e.currentTarget.style.backgroundColor =
                             COLORS.BG_GRAY;
-                        }
                       }}
                       onMouseLeave={(e) => {
-                        if (!checked) {
+                        if (!checked)
                           e.currentTarget.style.backgroundColor =
                             COLORS.BG_WHITE;
-                        }
                       }}
                       aria-pressed={checked}
                     >
@@ -393,7 +390,7 @@ export default function FiltersModal({
             "px-6 py-4 flex items-center justify-between"
           )}
           style={{
-            backgroundColor: `${COLORS.BG_WHITE}E6`, // 90% opacity
+            backgroundColor: `${COLORS.BG_WHITE}E6`,
             borderColor: COLORS.BORDER,
           }}
         >
@@ -443,7 +440,7 @@ export default function FiltersModal({
                   "rounded-full px-1.5 text-xs font-semibold"
                 )}
                 style={{
-                  backgroundColor: `${COLORS.BG_WHITE}40`, // 25% opacity
+                  backgroundColor: `${COLORS.BG_WHITE}40`,
                   color: COLORS.BG_WHITE,
                 }}
               >

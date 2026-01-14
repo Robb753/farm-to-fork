@@ -13,29 +13,17 @@ import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/lib/types/database";
 
-/**
- * Type pour un listing avec horaires d'ouverture
- */
 type ListingWithHours = Database["public"]["Tables"]["listing"]["Row"];
 
-/**
- * Props du composant OpeningHoursCard
- */
 interface OpeningHoursCardProps {
   listing?: ListingWithHours | null;
   className?: string;
 }
 
-/**
- * Interface pour les horaires d'ouverture
- */
 interface OpeningHours {
   [key: string]: string;
 }
 
-/**
- * Interface pour un jour avec ses détails
- */
 interface DayInfo {
   key: string;
   label: string;
@@ -46,9 +34,6 @@ interface DayInfo {
   isSpecial: boolean;
 }
 
-/**
- * Interface pour le statut d'ouverture actuel
- */
 interface OpenStatus {
   isCurrentlyOpen: boolean;
   nextChange: string | null;
@@ -56,9 +41,6 @@ interface OpenStatus {
   statusColor: "green" | "red" | "orange" | "gray";
 }
 
-/**
- * Horaires par défaut pour une ferme typique
- */
 const DEFAULT_HOURS: OpeningHours = {
   Monday: "Fermé",
   Tuesday: "9h00 - 18h00",
@@ -69,9 +51,6 @@ const DEFAULT_HOURS: OpeningHours = {
   Sunday: "Fermé",
 };
 
-/**
- * Correspondance jours anglais → français
- */
 const DAY_LABELS: Record<string, string> = {
   Monday: "Lundi",
   Tuesday: "Mardi",
@@ -82,9 +61,6 @@ const DAY_LABELS: Record<string, string> = {
   Sunday: "Dimanche",
 };
 
-/**
- * Ordre des jours de la semaine (Lundi = 0)
- */
 const DAY_ORDER = [
   "Monday",
   "Tuesday",
@@ -95,34 +71,68 @@ const DAY_ORDER = [
   "Sunday",
 ];
 
-/**
- * Composant d'affichage des horaires d'ouverture d'une ferme
- *
- * Features:
- * - Affichage des horaires avec jour actuel mis en évidence
- * - Calcul du statut d'ouverture en temps réel
- * - Prédiction de la prochaine ouverture/fermeture
- * - Gestion des horaires spéciaux et exceptions
- * - Design moderne avec badges de statut
- * - Support de formats d'horaires multiples
- *
- * @param listing - Données du listing avec horaires
- * @param className - Classes CSS additionnelles
- * @returns JSX.Element - Card des horaires d'ouverture
- */
+/* ------------------------------------------------------------------ */
+/* ✅ Helpers stables (hors composant) : pas de deps, pas de regex unsafe */
+/* ------------------------------------------------------------------ */
+
+function containsClosedWord(s: string): boolean {
+  return s.toLowerCase().includes("fermé");
+}
+
+/** Parse "9h00", "09:00", "9", "9h" => minutes depuis minuit */
+function parseTimeToMinutes(raw: string): number | null {
+  const t = raw.trim().toLowerCase().replace(/\s+/g, "");
+
+  // Normalise "9h00" / "9h" -> "9:00"
+  const normalized = t.includes("h") ? t.replace("h", ":") : t;
+
+  // Formats acceptés : "9", "09", "9:00", "09:00"
+  const [hhStr, mmStr] = normalized.split(":");
+  if (!hhStr) return null;
+
+  // Vérifs strictes sans regex “lourde”
+  const hh = Number(hhStr);
+  if (!Number.isInteger(hh) || hh < 0 || hh > 23) return null;
+
+  const mm = mmStr === undefined || mmStr === "" ? 0 : Number(mmStr);
+  if (!Number.isInteger(mm) || mm < 0 || mm > 59) return null;
+
+  return hh * 60 + mm;
+}
+
+/** Parse "9h00 - 18h00" / "09:00-17:30" / "9 - 18" */
+function parseHoursRange(
+  hoursString: string
+): { start: number; end: number } | null {
+  if (!hoursString || containsClosedWord(hoursString)) return null;
+
+  // Cherche un séparateur simple : "-", "–", "—"
+  const idx = hoursString.search(/[–—-]/);
+  if (idx === -1) return null;
+
+  const left = hoursString.slice(0, idx).trim();
+  const right = hoursString.slice(idx + 1).trim();
+
+  const start = parseTimeToMinutes(left);
+  const end = parseTimeToMinutes(right);
+
+  if (start === null || end === null) return null;
+  return { start, end };
+}
+
+function formatHhMmFromMinutes(totalMin: number): string {
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return `${h}h${m.toString().padStart(2, "0")}`;
+}
+
 export default function OpeningHoursCard({
   listing,
   className,
 }: OpeningHoursCardProps): JSX.Element {
-  /**
-   * Parse et normalise les horaires d'ouverture
-   */
   const openingHours: OpeningHours = useMemo(() => {
-    if (!listing?.opening_hours) {
-      return DEFAULT_HOURS;
-    }
+    if (!listing?.opening_hours) return DEFAULT_HOURS;
 
-    // Si c'est déjà un objet
     if (
       typeof listing.opening_hours === "object" &&
       listing.opening_hours !== null
@@ -130,7 +140,6 @@ export default function OpeningHoursCard({
       return { ...DEFAULT_HOURS, ...listing.opening_hours };
     }
 
-    // Si c'est une string JSON
     if (typeof listing.opening_hours === "string") {
       try {
         const parsed = JSON.parse(listing.opening_hours);
@@ -138,137 +147,94 @@ export default function OpeningHoursCard({
           return { ...DEFAULT_HOURS, ...parsed };
         }
       } catch {
-        // Parsing failed, use defaults
+        // ignore
       }
     }
 
     return DEFAULT_HOURS;
   }, [listing?.opening_hours]);
 
-  /**
-   * Obtient le jour actuel de la semaine
-   */
   const today = useMemo(() => {
     const now = new Date();
-    const dayIndex = now.getDay(); // 0 = Dimanche, 1 = Lundi, ...
-    // Convertir pour avoir Lundi = 0
-    const adjustedIndex = dayIndex === 0 ? 6 : dayIndex - 1;
+    const dayIndex = now.getDay(); // 0=Dimanche
+    const adjustedIndex = dayIndex === 0 ? 6 : dayIndex - 1; // Lundi=0
     return DAY_ORDER[adjustedIndex];
   }, []);
 
-  /**
-   * Parse les horaires pour déterminer si c'est ouvert maintenant
-   */
-  const parseHours = (
-    hoursString: string
-  ): { start: number; end: number } | null => {
-    if (!hoursString || hoursString.toLowerCase().includes("fermé")) {
-      return null;
-    }
-
-    // Regex pour capturer les horaires (ex: "9h00 - 18h00", "09:00-17:30")
-    const timeRegex = /(\d{1,2})[h:]?(\d{2})?\s*[-–]\s*(\d{1,2})[h:]?(\d{2})?/;
-    const match = hoursString.match(timeRegex);
-
-    if (!match) return null;
-
-    const startHour = parseInt(match[1]);
-    const startMin = parseInt(match[2] || "0");
-    const endHour = parseInt(match[3]);
-    const endMin = parseInt(match[4] || "0");
-
-    const start = startHour * 60 + startMin; // Minutes depuis minuit
-    const end = endHour * 60 + endMin;
-
-    return { start, end };
-  };
-
-  /**
-   * Calcule le statut d'ouverture actuel
-   */
   const openStatus: OpenStatus = useMemo(() => {
     const now = new Date();
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
     const todayHours = openingHours[today];
 
-    const parsedToday = parseHours(todayHours);
+    const parsedToday = parseHoursRange(todayHours);
 
     if (!parsedToday) {
-      // Fermé aujourd'hui, chercher le prochain jour d'ouverture
-      let nextOpenDay = null;
+      // Fermé aujourd’hui -> prochain jour d'ouverture
+      let nextOpenDayLabel: string | null = null;
+
       for (let i = 1; i <= 7; i++) {
         const nextDayIndex = (DAY_ORDER.indexOf(today) + i) % 7;
         const nextDay = DAY_ORDER[nextDayIndex];
         const nextDayHours = openingHours[nextDay];
 
-        if (parseHours(nextDayHours)) {
-          nextOpenDay = DAY_LABELS[nextDay];
+        if (parseHoursRange(nextDayHours)) {
+          nextOpenDayLabel = DAY_LABELS[nextDay];
           break;
         }
       }
 
       return {
         isCurrentlyOpen: false,
-        nextChange: nextOpenDay ? `Ouvert ${nextOpenDay}` : null,
+        nextChange: nextOpenDayLabel ? `Ouvert ${nextOpenDayLabel}` : null,
         statusText: "Fermé aujourd'hui",
         statusColor: "red",
       };
     }
 
-    // Ouvert aujourd'hui, vérifier l'heure actuelle
     if (
       currentMinutes >= parsedToday.start &&
       currentMinutes <= parsedToday.end
     ) {
-      const closingHour = Math.floor(parsedToday.end / 60);
-      const closingMin = parsedToday.end % 60;
-
       return {
         isCurrentlyOpen: true,
-        nextChange: `Ferme à ${closingHour}h${closingMin.toString().padStart(2, "0")}`,
+        nextChange: `Ferme à ${formatHhMmFromMinutes(parsedToday.end)}`,
         statusText: "Ouvert maintenant",
         statusColor: "green",
       };
-    } else if (currentMinutes < parsedToday.start) {
-      const openingHour = Math.floor(parsedToday.start / 60);
-      const openingMin = parsedToday.start % 60;
+    }
 
+    if (currentMinutes < parsedToday.start) {
       return {
         isCurrentlyOpen: false,
-        nextChange: `Ouvre à ${openingHour}h${openingMin.toString().padStart(2, "0")}`,
+        nextChange: `Ouvre à ${formatHhMmFromMinutes(parsedToday.start)}`,
         statusText: "Fermé actuellement",
         statusColor: "orange",
       };
-    } else {
-      // Fermé pour aujourd'hui, chercher demain
-      const tomorrowIndex = (DAY_ORDER.indexOf(today) + 1) % 7;
-      const tomorrow = DAY_ORDER[tomorrowIndex];
-      const tomorrowLabel = DAY_LABELS[tomorrow];
-
-      return {
-        isCurrentlyOpen: false,
-        nextChange: `Ouvre ${tomorrowLabel}`,
-        statusText: "Fermé pour aujourd'hui",
-        statusColor: "red",
-      };
     }
-  }, [openingHours, today, parseHours]);
 
-  /**
-   * Prépare les données des jours avec informations enrichies
-   */
+    const tomorrowIndex = (DAY_ORDER.indexOf(today) + 1) % 7;
+    const tomorrow = DAY_ORDER[tomorrowIndex];
+
+    return {
+      isCurrentlyOpen: false,
+      nextChange: `Ouvre ${DAY_LABELS[tomorrow]}`,
+      statusText: "Fermé pour aujourd'hui",
+      statusColor: "red",
+    };
+  }, [openingHours, today]);
+
   const daysInfo: DayInfo[] = useMemo(() => {
     return DAY_ORDER.map((day) => {
       const hours = openingHours[day];
-      const isToday = day === today;
-      const isClosed = !hours || hours.toLowerCase().includes("fermé");
+      const isTodayDay = day === today;
+      const isClosed = !hours || containsClosedWord(hours);
       const isSpecial = hours.includes("Sur RDV") || hours.includes("Variable");
 
       return {
         key: day,
         label: DAY_LABELS[day],
         hours,
-        isToday,
+        isToday: isTodayDay,
         isOpen: !isClosed,
         isClosed,
         isSpecial,
@@ -276,9 +242,6 @@ export default function OpeningHoursCard({
     });
   }, [openingHours, today]);
 
-  /**
-   * Obtient l'icône de statut selon l'état d'ouverture
-   */
   const getStatusIcon = (color: OpenStatus["statusColor"]) => {
     switch (color) {
       case "green":
@@ -292,9 +255,6 @@ export default function OpeningHoursCard({
     }
   };
 
-  /**
-   * Obtient les classes de couleur pour les badges
-   */
   const getStatusClasses = (color: OpenStatus["statusColor"]) => {
     switch (color) {
       case "green":
@@ -322,7 +282,6 @@ export default function OpeningHoursCard({
             Horaires d'ouverture
           </CardTitle>
 
-          {/* Badge de statut actuel */}
           <Badge
             variant="outline"
             className={cn(
@@ -335,7 +294,6 @@ export default function OpeningHoursCard({
           </Badge>
         </div>
 
-        {/* Prochaine ouverture/fermeture */}
         {openStatus.nextChange && (
           <p className="text-sm text-gray-600 mt-1 flex items-center gap-1">
             <Clock className="h-3 w-3" />
@@ -345,7 +303,6 @@ export default function OpeningHoursCard({
       </CardHeader>
 
       <CardContent className="space-y-3 pt-0">
-        {/* Liste des jours */}
         {daysInfo.map((day) => (
           <div
             key={day.key}
@@ -390,21 +347,19 @@ export default function OpeningHoursCard({
                 {day.hours}
               </span>
 
-              {/* Indicateur visuel */}
               {!day.isClosed && (
-                <div className="h-2 w-2 bg-green-400 rounded-full"></div>
+                <div className="h-2 w-2 bg-green-400 rounded-full" />
               )}
               {day.isClosed && (
-                <div className="h-2 w-2 bg-red-400 rounded-full"></div>
+                <div className="h-2 w-2 bg-red-400 rounded-full" />
               )}
               {day.isSpecial && (
-                <div className="h-2 w-2 bg-orange-400 rounded-full"></div>
+                <div className="h-2 w-2 bg-orange-400 rounded-full" />
               )}
             </div>
           </div>
         ))}
 
-        {/* Message informatif */}
         <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 mt-4">
           <p className="text-blue-800 text-xs text-center">
             💡 <strong>Conseil :</strong> Contactez la ferme pour confirmer les

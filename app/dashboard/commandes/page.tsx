@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import Link from "next/link";
-import { Package, Check, X, Clock } from "lucide-react";
+import { Package, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { COLORS } from "@/lib/config";
 import { useUser } from "@clerk/nextjs";
@@ -65,7 +64,7 @@ export default function FarmerOrdersPage(): JSX.Element {
     }
 
     loadFarmId();
-  }, [user?.id]);
+  }, [supabase, user?.id]);
 
   // Charger les commandes
   useEffect(() => {
@@ -100,7 +99,7 @@ export default function FarmerOrdersPage(): JSX.Element {
     if (farmId) {
       loadOrders();
     }
-  }, [farmId]);
+  }, [supabase, farmId]);
 
   // Actions sur les commandes
   const handleAccept = async (orderId: number) => {

@@ -30,14 +30,6 @@ interface NavigationParams {
   bbox?: [number, number, number, number] | null;
 }
 
-interface FetchListingsOptions {
-  page?: number;
-  append?: boolean;
-  forceRefresh?: boolean;
-  bounds?: any; // MapBounds du store
-  bbox?: number[]; // Format tableau uniquement
-}
-
 interface UseCitySearchControlProps {
   setSearchCity?: (city: string) => void;
 }

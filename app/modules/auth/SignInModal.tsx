@@ -74,15 +74,6 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps): JSX.
   };
 
   /**
-   * Gestion du clic sur le backdrop pour fermer la modale
-   */
-  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>): void => {
-    if (e.target === backdropRef.current) {
-      onClose?.();
-    }
-  };
-
-  /**
    * Gestion du mouseDown sur le backdrop (plus fiable que onClick)
    */
   const handleBackdropMouseDown = (e: React.MouseEvent<HTMLDivElement>): void => {

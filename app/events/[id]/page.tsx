@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import eventsData from "@/app/_data/eventsData.json";
 import Breadcrumb from "@/app/_components/Breadcrumb";
-import { COLORS, PATHS } from "@/lib/config";
+import { COLORS } from "@/lib/config";
 import { cn } from "@/lib/utils";
 
 /**

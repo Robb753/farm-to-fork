@@ -128,7 +128,7 @@ export default function FavoriteListings(): JSX.Element {
       setError({ message: errorMessage });
       setLoadingState("error");
     }
-  }, [favoriteIds]);
+  }, [favoriteIds, supabase]);
 
   /**
    * Effect pour charger les listings quand les IDs changent

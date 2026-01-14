@@ -11,7 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Sprout, Clock, Mail, Loader2, CheckCircle2 } from "lucide-react";
+import { Sprout, Clock, Loader2, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { ProgressIndicator } from "@/components/ui/progress-indicator";
 import { useSupabaseWithClerk } from "@/utils/supabase/client";

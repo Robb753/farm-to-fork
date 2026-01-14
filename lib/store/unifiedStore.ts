@@ -133,6 +133,8 @@ interface MapActions {
   setZoom: (zoom: number) => void;
   setMapLoading: (loading: boolean) => void;
   setMapError: (error: string | null) => void;
+  setApiLoaded: (loaded: boolean) => void;
+  setInstance: (instance: any | null) => void;
 }
 
 /**
@@ -363,6 +365,15 @@ export const useUnifiedStore = create<UnifiedStore>()(
             set((state) => ({
               map: { ...state.map, error },
             })),
+          setApiLoaded: (loaded) =>
+            set((state) => ({
+              map: { ...state.map, isApiLoaded: loaded },
+            })),
+
+          setInstance: (instance) =>
+            set((state) => ({
+              map: { ...state.map, instance },
+            })),
         },
 
         // ============================================================
@@ -491,7 +502,7 @@ export const useUnifiedStore = create<UnifiedStore>()(
           },
 
           resetFilters: () => {
-            set((state) => ({
+            set((_state) => ({
               filters: {
                 current: EMPTY_FILTERS,
                 applied: EMPTY_FILTERS,
@@ -676,6 +687,22 @@ export const useIsMapExpanded = () =>
 
 // Hooks pour les actions
 export const useMapActions = () => useUnifiedStore((state) => state.mapActions);
+
+// Hooks actions atomiques (stables)
+export const useSetMapCoordinates = () =>
+  useUnifiedStore((s) => s.mapActions.setCoordinates);
+
+export const useSetMapBounds = () =>
+  useUnifiedStore((s) => s.mapActions.setBounds);
+
+export const useSetMapZoom = () =>
+  useUnifiedStore((s) => s.mapActions.setZoom);
+
+export const useSetMapApiLoaded = () =>
+  useUnifiedStore((s) => s.mapActions.setApiLoaded);
+
+export const useSetMapInstance = () =>
+  useUnifiedStore((s) => s.mapActions.setInstance);
 
 export const useListingsActions = () =>
   useUnifiedStore((state) => state.listingsActions);

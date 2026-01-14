@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 /**
  * Type pour les valeurs de paramètres URL acceptées
@@ -76,7 +76,6 @@ interface UpdateExploreUrlFunction {
  */
 export function useUpdateExploreUrl(): UpdateExploreUrlFunction {
   const router = useRouter();
-  const pathname = usePathname();
   const searchParams = useSearchParams();
 
   return (updates: URLUpdates = {}): string | void => {

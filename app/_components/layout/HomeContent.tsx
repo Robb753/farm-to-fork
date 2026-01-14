@@ -49,7 +49,6 @@ const MapboxCitySearch = dynamic(
  */
 const HomeContent: React.FC<HomeContentProps> = ({
   className = "",
-  onViewMap,
 }) => {
   return (
     <div className={cn("", className)}>

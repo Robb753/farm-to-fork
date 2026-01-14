@@ -72,7 +72,7 @@ const VALIDATION_RULES = {
  * Regex pour validation
  */
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_REGEX = /^[\+]?[0-9\s\-\(\)]{7,20}$/;
+const PHONE_REGEX = /^[+]?[0-9\s\-()]{7,20}$/;
 const URL_REGEX = /^https?:\/\/.+/;
 
 /**
@@ -148,7 +148,7 @@ function validateAndSanitizeNotificationData(data: any): ValidationResult {
     );
   } else if (website && website.length > VALIDATION_RULES.MAX_WEBSITE_LENGTH) {
     errors.push(
-      `L\'URL du site web ne peut pas dépasser ${VALIDATION_RULES.MAX_WEBSITE_LENGTH} caractères`
+      `L'URL du site web ne peut pas dépasser ${VALIDATION_RULES.MAX_WEBSITE_LENGTH} caractères`
     );
   }
 

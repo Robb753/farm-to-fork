@@ -3,7 +3,7 @@ import { create } from "zustand";
 import { persist, subscribeWithSelector } from "zustand/middleware";
 import { toast } from "sonner";
 
-import type { Json, Database } from "@/lib/types/database";
+import type { Json, } from "@/lib/types/database";
 import type { SupabaseDbClient } from "@/lib/syncUserUtils";
 
 import {

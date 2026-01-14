@@ -77,22 +77,6 @@ interface ReviewStats {
   recentTrend: "up" | "down" | "stable";
 }
 
-/**
- * Composant d'affichage et de gestion des avis clients
- *
- * Features:
- * - Affichage des avis avec système de notation visuel
- * - Formulaire de soumission d'avis pour utilisateurs connectés
- * - Statistiques et analytics des avis
- * - Filtrage par note et type de visite
- * - Actions sociales (utile/inutile, signalement)
- * - Verification badges pour avis vérifiés
- * - Design responsive et moderne
- *
- * @param listing - Données du listing avec avis
- * @param className - Classes CSS additionnelles
- * @returns JSX.Element - Onglet des avis enrichi
- */
 export default function ReviewsTab({
   listing,
   className,
@@ -111,34 +95,29 @@ export default function ReviewsTab({
 
   // États pour les filtres
   const [filterRating, setFilterRating] = useState<number | null>(null);
-  const [sortBy, setSortBy] = useState<"recent" | "rating" | "helpful">(
+  const [sortBy, _setSortBy] = useState<"recent" | "rating" | "helpful">(
     "recent"
   );
+  const listingId = listing?.id ?? 1;
 
   /**
    * Parse les avis depuis la base de données ou génère des exemples
    */
-  const reviews: Review[] = useMemo(() => {
-    // Pour l'instant, utilise des avis d'exemple
-    // Une fois que tu auras des avis réels dans la DB, tu pourras les récupérer avec:
-    // const { data: reviewsData } = await supabase
-    //   .from('reviews')
-    //   .select('*')
-    //   .eq('listing_id', listing.id)
-    //   .eq('status', 'approved')
-    //   .order('created_at', { ascending: false });
 
-    return generateSampleReviews();
-  }, [listing?.id]);
+  const reviews: Review[] = useMemo(() => {
+    return generateSampleReviews(listingId);
+  }, [listingId]);
 
   /**
    * Génère des avis d'exemple pour la démo
    */
-  function generateSampleReviews(): Review[] {
-    const sampleReviews: Review[] = [
+  function generateSampleReviews(listingId: number): Review[] {
+    const now = Date.now();
+
+    return [
       {
         id: 1,
-        listing_id: listing?.id || 1,
+        listing_id: listingId,
         user_id: "user_123",
         rating: 5,
         title: null,
@@ -149,7 +128,7 @@ export default function ReviewsTab({
         is_verified: true,
         visit_type: "visit",
         purchased_products: ["Légumes", "Œufs"],
-        visit_date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000)
+        visit_date: new Date(now - 5 * 24 * 60 * 60 * 1000)
           .toISOString()
           .split("T")[0],
         helpful_count: 12,
@@ -159,19 +138,15 @@ export default function ReviewsTab({
         moderated_by: null,
         moderated_at: null,
         rejection_reason: null,
-        created_at: new Date(
-          Date.now() - 5 * 24 * 60 * 60 * 1000
-        ).toISOString(),
-        updated_at: new Date(
-          Date.now() - 5 * 24 * 60 * 60 * 1000
-        ).toISOString(),
+        created_at: new Date(now - 5 * 24 * 60 * 60 * 1000).toISOString(),
+        updated_at: new Date(now - 5 * 24 * 60 * 60 * 1000).toISOString(),
         ip_address: null,
         user_agent: null,
         source: "website",
       },
       {
         id: 2,
-        listing_id: listing?.id || 1,
+        listing_id: listingId,
         user_id: "user_456",
         rating: 4,
         title: null,
@@ -182,7 +157,7 @@ export default function ReviewsTab({
         is_verified: true,
         visit_type: "delivery",
         purchased_products: ["Légumes"],
-        visit_date: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000)
+        visit_date: new Date(now - 12 * 24 * 60 * 60 * 1000)
           .toISOString()
           .split("T")[0],
         helpful_count: 8,
@@ -192,19 +167,15 @@ export default function ReviewsTab({
         moderated_by: null,
         moderated_at: null,
         rejection_reason: null,
-        created_at: new Date(
-          Date.now() - 12 * 24 * 60 * 60 * 1000
-        ).toISOString(),
-        updated_at: new Date(
-          Date.now() - 12 * 24 * 60 * 60 * 1000
-        ).toISOString(),
+        created_at: new Date(now - 12 * 24 * 60 * 60 * 1000).toISOString(),
+        updated_at: new Date(now - 12 * 24 * 60 * 60 * 1000).toISOString(),
         ip_address: null,
         user_agent: null,
         source: "website",
       },
       {
         id: 3,
-        listing_id: listing?.id || 1,
+        listing_id: listingId,
         user_id: "user_789",
         rating: 5,
         title: null,
@@ -215,7 +186,7 @@ export default function ReviewsTab({
         is_verified: true,
         visit_type: "pickup",
         purchased_products: ["Fruits", "Légumes"],
-        visit_date: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000)
+        visit_date: new Date(now - 20 * 24 * 60 * 60 * 1000)
           .toISOString()
           .split("T")[0],
         helpful_count: 15,
@@ -225,19 +196,13 @@ export default function ReviewsTab({
         moderated_by: null,
         moderated_at: null,
         rejection_reason: null,
-        created_at: new Date(
-          Date.now() - 20 * 24 * 60 * 60 * 1000
-        ).toISOString(),
-        updated_at: new Date(
-          Date.now() - 20 * 24 * 60 * 60 * 1000
-        ).toISOString(),
+        created_at: new Date(now - 20 * 24 * 60 * 60 * 1000).toISOString(),
+        updated_at: new Date(now - 20 * 24 * 60 * 60 * 1000).toISOString(),
         ip_address: null,
         user_agent: null,
         source: "website",
       },
     ];
-
-    return sampleReviews;
   }
 
   /**

@@ -70,13 +70,15 @@ export default function BoutiqueTab({
 
     async function loadProducts() {
       if (!farmId) {
-        setProducts([]);
-        setIsLoading(false);
+        if (!cancelled) {
+          setProducts([]);
+          setIsLoading(false);
+        }
         return;
       }
 
       try {
-        setIsLoading(true);
+        if (!cancelled) setIsLoading(true);
 
         const { data, error } = await supabase
           .from("products")
@@ -114,14 +116,18 @@ export default function BoutiqueTab({
     return () => {
       cancelled = true;
     };
-  }, [farmId, farmName]);
+  }, [farmId, farmName, supabase, router]); // ✅ FIX ESLint (supabase) + safe
 
   // Vérif panier (tunnel fermé)
   useEffect(() => {
     if (cart.farmId && farmId && cart.farmId !== farmId) {
       // 🔒 SÉCURITÉ: Noms de fermes échappés avec fallback
       toast.error(
-        `Panier déjà lié à ${escapeHTML(cart.farmName || "une ferme")}. Videz-le pour acheter chez ${escapeHTML(farmName || "cette ferme")}.`,
+        `Panier déjà lié à ${escapeHTML(
+          cart.farmName || "une ferme"
+        )}. Videz-le pour acheter chez ${escapeHTML(
+          farmName || "cette ferme"
+        )}.`,
         { duration: 3500 }
       );
     }

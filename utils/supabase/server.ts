@@ -5,7 +5,6 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { z } from "zod";
 
 import { createOrderSchema } from "@/lib/validations/order";
 import type { CreateOrderResponse, OrderItem } from "@/lib/types/order";

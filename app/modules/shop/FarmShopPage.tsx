@@ -1,6 +1,12 @@
 "use client";
 
-import { useMemo, useEffect, useState, useCallback } from "react";
+import {
+  useMemo,
+  useEffect,
+  useState,
+  useCallback,
+  type CSSProperties,
+} from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -71,9 +77,11 @@ function formatPrice(p: Product) {
   return `${p.price.toFixed(2)} € / ${escapeHTML(p.unit || "unité")}`;
 }
 
+type BadgeTone = "green" | "amber" | "blue" | "gray";
+
 function productSignal(
   product: Product
-): { label: string; tone: "green" | "amber" | "blue" | "gray" } | null {
+): { label: string; tone: BadgeTone } | null {
   if (product.stock_status === "low_stock")
     return { label: "Stock limité", tone: "amber" };
   if (product.stock_status === "out_of_stock")
@@ -95,14 +103,8 @@ function productSignal(
   return null;
 }
 
-function Badge({
-  label,
-  tone,
-}: {
-  label: string;
-  tone: "green" | "amber" | "blue" | "gray";
-}) {
-  const styles: Record<typeof tone, React.CSSProperties> = {
+function Badge({ label, tone }: { label: string; tone: BadgeTone }) {
+  const styles: Record<BadgeTone, CSSProperties> = {
     green: {
       backgroundColor: "#EAF7EF",
       color: "#1A7F37",
@@ -239,22 +241,22 @@ export default function FarmShopPage(): JSX.Element {
       }
     }
 
-
     loadData();
 
     return () => {
       cancelled = true;
     };
-  }, [rawId, farmId, router]);
+  }, [rawId, farmId, router, supabase]); // ✅ FIX ESLint
 
   // Vérifier que le panier est compatible (tunnel fermé)
   useEffect(() => {
     if (Number.isNaN(farmId)) return;
 
     if (cart.farmId && cart.farmId !== farmId) {
-      // ✅ SÉCURISÉ
       toast.error(
-        `Vous avez déjà des produits de ${escapeHTML(cart.farmName || "une autre ferme")} dans votre panier. Videz-le pour acheter chez une autre ferme.`,
+        `Vous avez déjà des produits de ${escapeHTML(
+          cart.farmName || "une autre ferme"
+        )} dans votre panier. Videz-le pour acheter chez une autre ferme.`,
         { duration: 5000 }
       );
     }
@@ -280,7 +282,6 @@ export default function FarmShopPage(): JSX.Element {
       }
 
       addItem(product, 1);
-      // ✅ SÉCURISÉ
       toast.success(
         `${escapeHTML(product.name || "Produit")} ajouté au panier`
       );
@@ -704,12 +705,13 @@ function ProductCard({
     >
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
-          // ✅ SÉCURISÉ
+          {/* ✅ SÉCURISÉ */}
           <h3 className="font-bold text-lg mb-1 truncate">
             {escapeHTML(product.name)}
           </h3>
           {signal && <Badge label={signal.label} tone={signal.tone} />}
         </div>
+
         {priceLabel ? (
           <p
             className="text-lg font-semibold mb-2"
@@ -725,7 +727,8 @@ function ProductCard({
             Prix à définir
           </p>
         )}
-        // ✅ SÉCURISÉ
+
+        {/* ✅ SÉCURISÉ */}
         {product.description && (
           <div
             className="text-sm mb-2 line-clamp-2 prose prose-sm max-w-none"
@@ -734,6 +737,7 @@ function ProductCard({
             }}
           />
         )}
+
         <div className="flex items-center gap-2 text-sm">
           <span>{stockIcon}</span>
           <span style={{ color: COLORS.TEXT_SECONDARY }}>{stockText}</span>

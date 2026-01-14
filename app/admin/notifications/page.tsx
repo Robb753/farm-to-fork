@@ -1,7 +1,7 @@
 // app/admin/notifications/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Loader2, Inbox, Clock, CheckCircle, XCircle } from "@/utils/icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -25,9 +24,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { COLORS, PATHS, TABLES } from "@/lib/config";
+import { COLORS, PATHS } from "@/lib/config";
 import { cn } from "@/lib/utils";
 import { useSupabaseWithClerk } from "@/utils/supabase/client";
 
@@ -60,14 +58,8 @@ interface FarmerRequest {
   updated_at?: string;
 }
 
-/**
- * Type pour les statuts de demande
- */
 type RequestStatus = FarmerRequest["status"];
 
-/**
- * Interface pour les actions de validation
- */
 interface ValidationPayload {
   requestId: number;
   userId: string;
@@ -75,20 +67,9 @@ interface ValidationPayload {
   status: RequestStatus;
 }
 
-/**
- * Page d'administration des notifications et demandes producteurs
- *
- * Features:
- * - Gestion des demandes d'accès producteur
- * - Temps réel avec Supabase realtime
- * - ✅ Confirmations avant approbation/rejet
- * - Interface détaillée pour chaque demande
- * - Contrôle d'accès admin
- */
 export default function AdminNotificationsPage(): JSX.Element {
   const { user, isLoaded, isSignedIn } = useUser();
   const router = useRouter();
-
   const supabase = useSupabaseWithClerk();
 
   const [loading, setLoading] = useState<boolean>(true);
@@ -98,14 +79,34 @@ export default function AdminNotificationsPage(): JSX.Element {
     null
   );
 
-  // ✅ NOUVEAU : États pour les confirmations
   const [confirmingAction, setConfirmingAction] = useState<{
     request: FarmerRequest;
     action: "approve" | "reject";
   } | null>(null);
 
   /**
-   * Vérifie l'accès admin et initialise les données
+   * ✅ Récupère toutes les demandes d'accès producteur (stable pour exhaustive-deps)
+   */
+  const fetchNotifications = useCallback(async (): Promise<void> => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("farmer_requests")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setNotifications((data || []) as FarmerRequest[]);
+    } catch (error) {
+      console.error("Erreur de chargement:", error);
+      toast.error("Impossible de charger les notifications");
+    } finally {
+      setLoading(false);
+    }
+  }, [supabase]);
+
+  /**
+   * ✅ Vérifie l'accès admin et initialise les données + realtime
    */
   useEffect(() => {
     let channel: any = null;
@@ -118,7 +119,7 @@ export default function AdminNotificationsPage(): JSX.Element {
         return;
       }
 
-      const userRole = user.publicMetadata?.role;
+      const userRole = user?.publicMetadata?.role;
 
       if (userRole !== "admin") {
         toast.error("Cette page est réservée aux administrateurs");
@@ -127,9 +128,8 @@ export default function AdminNotificationsPage(): JSX.Element {
       }
 
       setIsChecking(false);
-      fetchNotifications();
+      await fetchNotifications();
 
-      // ✅ Canal temps réel pour les nouvelles demandes
       channel = supabase
         .channel("admin-notifications")
         .on(
@@ -139,7 +139,7 @@ export default function AdminNotificationsPage(): JSX.Element {
             schema: "public",
             table: "farmer_requests",
           },
-          (payload) => {
+          (_payload) => {
             fetchNotifications();
             toast.info("Nouvelle demande d'accès producteur reçue !");
           }
@@ -149,35 +149,12 @@ export default function AdminNotificationsPage(): JSX.Element {
 
     checkAccess();
 
-    // Cleanup function
     return () => {
       if (channel) {
         supabase.removeChannel(channel);
       }
     };
-  }, [isLoaded, isSignedIn, user, router]);
-
-  /**
-   * Récupère toutes les demandes d'accès producteur
-   */
-  const fetchNotifications = async (): Promise<void> => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("farmer_requests")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-
-      setNotifications((data || []) as FarmerRequest[]);
-    } catch (error) {
-      console.error("Erreur de chargement:", error);
-      toast.error("Impossible de charger les notifications");
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [isLoaded, isSignedIn, user, router, supabase, fetchNotifications]);
 
   /**
    * Affiche les détails d'une demande
@@ -187,7 +164,7 @@ export default function AdminNotificationsPage(): JSX.Element {
   };
 
   /**
-   * ✅ NOUVEAU : Demande de confirmation avant action
+   * Demande de confirmation avant action
    */
   const handleRequestAction = (
     request: FarmerRequest,
@@ -197,7 +174,7 @@ export default function AdminNotificationsPage(): JSX.Element {
   };
 
   /**
-   * ✅ MODIFIÉ : Action confirmée
+   * Action confirmée
    */
   const handleConfirmedAction = async (): Promise<void> => {
     if (!confirmingAction) return;
@@ -239,10 +216,9 @@ export default function AdminNotificationsPage(): JSX.Element {
           : "❌ Demande rejetée"
       );
 
-      // Fermer les modals et rafraîchir
       setConfirmingAction(null);
       setSelectedRequest(null);
-      fetchNotifications();
+      await fetchNotifications();
     } catch (err) {
       console.error("❌ Erreur complète lors de l'action:", err);
       const errorMessage =
@@ -462,7 +438,6 @@ export default function AdminNotificationsPage(): JSX.Element {
                             </Button>
                             {notif.status === "pending" && (
                               <>
-                                {/* ✅ Bouton Approuver avec confirmation */}
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -473,7 +448,6 @@ export default function AdminNotificationsPage(): JSX.Element {
                                 >
                                   Approuver
                                 </Button>
-                                {/* ✅ Bouton Rejeter avec confirmation */}
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -498,7 +472,7 @@ export default function AdminNotificationsPage(): JSX.Element {
         </CardContent>
       </Card>
 
-      {/* ✅ NOUVEAU : AlertDialog de confirmation d'action */}
+      {/* ✅ Confirm dialog */}
       <AlertDialog
         open={!!confirmingAction}
         onOpenChange={() => setConfirmingAction(null)}
@@ -517,6 +491,7 @@ export default function AdminNotificationsPage(): JSX.Element {
                 ? "✅ Approuver cette demande ?"
                 : "❌ Rejeter cette demande ?"}
             </AlertDialogTitle>
+
             <AlertDialogDescription>
               {confirmingAction?.action === "approve" ? (
                 <>
@@ -547,6 +522,7 @@ export default function AdminNotificationsPage(): JSX.Element {
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
+
           <AlertDialogFooter>
             <AlertDialogCancel>Annuler</AlertDialogCancel>
             <AlertDialogAction
@@ -568,7 +544,7 @@ export default function AdminNotificationsPage(): JSX.Element {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* ✅ Modal de détails (existant) */}
+      {/* ✅ Details dialog (inchangé) */}
       <AlertDialog
         open={!!selectedRequest}
         onOpenChange={() => setSelectedRequest(null)}
@@ -658,6 +634,7 @@ export default function AdminNotificationsPage(): JSX.Element {
                     {selectedRequest.location}
                   </p>
                 </div>
+
                 <div>
                   <h3
                     className="font-medium"
@@ -686,6 +663,7 @@ export default function AdminNotificationsPage(): JSX.Element {
                     )}
                   </p>
                 </div>
+
                 <div className="col-span-2">
                   <h3
                     className="font-medium"

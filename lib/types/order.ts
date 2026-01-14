@@ -1,5 +1,3 @@
-import type { Product } from "lib/store/cartStore";
-
 /**
  * Statuts possibles d'une commande
  */

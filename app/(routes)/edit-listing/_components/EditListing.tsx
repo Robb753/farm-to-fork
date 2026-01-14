@@ -308,12 +308,6 @@ type ListingData = {
   listingImages: Pick<DbListingImage, "url">[];
 };
 
-type MaybeArray<T> = T[] | null | undefined;
-function toDbEnumArray<T extends string>(value: MaybeArray<T>): T[] | null {
-  if (!value || value.length === 0) return null;
-  return value;
-}
-
 /**
  * Mappings UI -> DB
  */
@@ -382,44 +376,6 @@ const isValidProductionMethod = (value: string): value is ProductionMethodId =>
     "Agriculture raisonnée",
   ].includes(value);
 
-const isValidPurchaseMode = (value: string): value is PurchaseModeId =>
-  [
-    "Vente directe à la ferme",
-    "Marché local",
-    "Livraison à domicile",
-    "Point de vente collectif",
-    "Click & Collect",
-  ].includes(value);
-
-const isValidCertification = (value: string): value is CertificationId =>
-  ["Label AB", "Label Rouge", "AOC/AOP", "IGP", "Demeter", "HVE"].includes(
-    value
-  );
-
-const isValidAdditionalService = (
-  value: string
-): value is AdditionalServiceId =>
-  [
-    "Visite de la ferme",
-    "Ateliers de cuisine",
-    "Dégustation",
-    "Activités pour enfants",
-    "Événements pour professionnels",
-  ].includes(value);
-
-const isValidAvailability = (value: string): value is AvailabilityId =>
-  [
-    "Saisonnière",
-    "Toute l'année",
-    "Pré-commande",
-    "Sur abonnement",
-    "Événements spéciaux",
-  ].includes(value);
-
-/**
- * Helper: convertit en string[]
- * - supporte: array, json string '["a","b"]', string "a,b;c|d"
- */
 const toStringArray = (val: unknown): string[] => {
   if (Array.isArray(val))
     return val.filter((v): v is string => typeof v === "string");

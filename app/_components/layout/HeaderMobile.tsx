@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import {
   LogIn,
   Menu,
@@ -20,10 +21,9 @@ import { useUser, useClerk } from "@clerk/nextjs";
 import { AvatarImage } from "@/components/ui/OptimizedImage";
 import { useUserRole, useUserActions } from "@/lib/store/userStore";
 import { cn } from "@/lib/utils";
-
-import dynamic from "next/dynamic";
 import useCitySearchControl from "@/app/modules/maps/hooks/useCitySearchControl";
 import { COLORS } from "@/lib/config";
+import { logger } from "@/lib/logger";
 
 /**
  * Interfaces TypeScript pour HeaderMobile
@@ -55,14 +55,14 @@ type UserRole = "admin" | "farmer" | "user";
  */
 const MapboxCitySearch = dynamic(
   () => import("@/app/modules/maps/components/shared/MapboxCitySearch"),
-  { 
+  {
     ssr: false,
     loading: () => (
-      <div 
+      <div
         className="h-10 w-full rounded-full animate-pulse"
         style={{ backgroundColor: COLORS.BG_GRAY }}
       />
-    )
+    ),
   }
 );
 
@@ -71,7 +71,7 @@ const MapboxCitySearch = dynamic(
  */
 const useUserDisplayInfo = (): UserDisplayInfo => {
   const { user } = useUser();
-  const role = useUserRole();
+  const role = useUserRole() as UserRole;
 
   const getUserAvatarUrl = useCallback((): string => {
     return user?.imageUrl || "/default-avatar.png";
@@ -81,7 +81,7 @@ const useUserDisplayInfo = (): UserDisplayInfo => {
     if (!user) return "Utilisateur";
     if (user.fullName) return user.fullName;
     if (user.firstName) return user.firstName;
-    
+
     const email = user.primaryEmailAddress?.emailAddress;
     return email ? email.split("@")[0] : "Utilisateur";
   }, [user]);
@@ -108,7 +108,11 @@ const useUserDisplayInfo = (): UserDisplayInfo => {
 /**
  * Composant Modal mobile pour navigation
  */
-const MobileModal: React.FC<MobileModalProps> = ({ isOpen, onClose, children }) => {
+const MobileModal: React.FC<MobileModalProps> = ({
+  isOpen,
+  onClose,
+  children,
+}) => {
   useEffect(() => {
     if (typeof document !== "undefined") {
       document.body.style.overflow = isOpen ? "hidden" : "unset";
@@ -121,16 +125,19 @@ const MobileModal: React.FC<MobileModalProps> = ({ isOpen, onClose, children }) 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50" style={{ backgroundColor: COLORS.BG_WHITE }}>
+    <div
+      className="fixed inset-0 z-50"
+      style={{ backgroundColor: COLORS.BG_WHITE }}
+    >
       <div className="flex h-full flex-col">
-        <div 
+        <div
           className="flex items-center justify-between border-b p-4 shadow-sm"
           style={{
             backgroundColor: COLORS.BG_WHITE,
             borderColor: COLORS.BORDER,
           }}
         >
-          <h2 
+          <h2
             className="text-lg font-semibold"
             style={{ color: COLORS.TEXT_PRIMARY }}
           >
@@ -138,21 +145,22 @@ const MobileModal: React.FC<MobileModalProps> = ({ isOpen, onClose, children }) 
           </h2>
           <button
             onClick={onClose}
+            type="button"
             className="rounded-full p-2 transition-colors hover:bg-gray-100"
-            style={{
-              backgroundColor: "transparent",
-            }}
+            style={{ backgroundColor: "transparent" }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = COLORS.BG_GRAY;
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = "transparent";
             }}
+            aria-label="Fermer le menu"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div 
+
+        <div
           className="flex-1 overflow-y-auto"
           style={{ backgroundColor: COLORS.BG_GRAY }}
         >
@@ -172,7 +180,11 @@ interface UserMenuMobileProps {
   onSignOut: () => Promise<void>;
 }
 
-const UserMenuMobile: React.FC<UserMenuMobileProps> = ({ userInfo, role, onSignOut }) => {
+const UserMenuMobile: React.FC<UserMenuMobileProps> = ({
+  userInfo,
+  role,
+  onSignOut,
+}) => {
   const [isOpen, setIsOpen] = useState<boolean>(false);
 
   const menuItems = [
@@ -182,22 +194,41 @@ const UserMenuMobile: React.FC<UserMenuMobileProps> = ({ userInfo, role, onSignO
       label: "Mon profil",
       color: COLORS.TEXT_SECONDARY,
     },
-    ...(role === "admin" ? [{
-      href: "/admin",
-      icon: ListChecks,
-      label: "Administration",
-      color: COLORS.TEXT_SECONDARY,
-    }] : []),
-    ...(role === "farmer" ? [{
-      href: "/dashboard/farms",
-      icon: () => (
-        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <path d="M3 9L12 2L21 9V20C21 20.5304 20.7893 21.0391 20.4142 21.4142C20.0391 21.7893 19.5304 22 19 22H5C4.46957 22 3.96086 21.7893 3.58579 21.4142C3.21071 21.0391 3 20.5304 3 20V9Z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      ),
-      label: "Ma ferme",
-      color: COLORS.TEXT_SECONDARY,
-    }] : []),
+    ...(role === "admin"
+      ? [
+          {
+            href: "/admin",
+            icon: ListChecks,
+            label: "Administration",
+            color: COLORS.TEXT_SECONDARY,
+          },
+        ]
+      : []),
+    ...(role === "farmer"
+      ? [
+          {
+            href: "/dashboard/farms",
+            icon: () => (
+              <svg
+                className="w-5 h-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  d="M3 9L12 2L21 9V20C21 20.5304 20.7893 21.0391 20.4142 21.4142C20.0391 21.7893 19.5304 22 19 22H5C4.46957 22 3.96086 21.7893 3.58579 21.4142C3.21071 21.0391 3 20.5304 3 20V9Z"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            ),
+            label: "Ma ferme",
+            color: COLORS.TEXT_SECONDARY,
+          },
+        ]
+      : []),
     {
       href: "/user#favorites",
       icon: Heart,
@@ -214,8 +245,9 @@ const UserMenuMobile: React.FC<UserMenuMobileProps> = ({ userInfo, role, onSignO
 
   return (
     <div className="relative">
-      <button 
-        onClick={() => setIsOpen(!isOpen)}
+      <button
+        onClick={() => setIsOpen((v) => !v)}
+        type="button"
         className="flex items-center gap-2 rounded-lg border px-2 py-2 shadow-sm transition-colors"
         style={{
           borderColor: COLORS.BORDER,
@@ -227,6 +259,7 @@ const UserMenuMobile: React.FC<UserMenuMobileProps> = ({ userInfo, role, onSignO
         onMouseLeave={(e) => {
           e.currentTarget.style.backgroundColor = COLORS.BG_WHITE;
         }}
+        aria-label="Menu utilisateur"
       >
         <AvatarImage
           src={userInfo.avatarUrl}
@@ -235,32 +268,27 @@ const UserMenuMobile: React.FC<UserMenuMobileProps> = ({ userInfo, role, onSignO
           className="ring-1 ring-green-100"
           fallbackSrc="/default-avatar.png"
         />
-        <span 
+        <span
           className="hidden max-w-20 truncate text-sm font-medium xs:block"
           style={{ color: COLORS.TEXT_SECONDARY }}
         >
           {userInfo.displayName.split(" ")[0]}
         </span>
-        <ChevronDown 
-          className="hidden h-3 w-3 xs:block" 
+        <ChevronDown
+          className="hidden h-3 w-3 xs:block"
           style={{ color: COLORS.TEXT_MUTED }}
         />
       </button>
 
-      {/* Menu dropdown */}
       {isOpen && (
-        <div 
+        <div
           className="absolute right-0 mt-2 w-72 rounded-xl shadow-xl z-50 py-2"
           style={{
             backgroundColor: COLORS.BG_WHITE,
             border: `1px solid ${COLORS.BORDER}`,
           }}
         >
-          {/* Header utilisateur */}
-          <div 
-            className="p-3 border-b"
-            style={{ borderColor: COLORS.BORDER }}
-          >
+          <div className="p-3 border-b" style={{ borderColor: COLORS.BORDER }}>
             <div className="flex items-center gap-3">
               <AvatarImage
                 src={userInfo.avatarUrl}
@@ -270,19 +298,19 @@ const UserMenuMobile: React.FC<UserMenuMobileProps> = ({ userInfo, role, onSignO
                 fallbackSrc="/default-avatar.png"
               />
               <div className="min-w-0 flex-1">
-                <div 
+                <div
                   className="truncate font-medium"
                   style={{ color: COLORS.TEXT_PRIMARY }}
                 >
                   {userInfo.displayName}
                 </div>
-                <div 
+                <div
                   className="truncate text-sm"
                   style={{ color: COLORS.TEXT_MUTED }}
                 >
                   {userInfo.email}
                 </div>
-                <div 
+                <div
                   className="mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
                   style={{
                     backgroundColor: COLORS.PRIMARY_BG,
@@ -295,20 +323,19 @@ const UserMenuMobile: React.FC<UserMenuMobileProps> = ({ userInfo, role, onSignO
             </div>
           </div>
 
-          {/* Menu items */}
           <div className="py-1">
             {menuItems.map((item, index) => {
               const IconComponent = item.icon;
               return (
                 <Link
-                  key={index}
+                  key={`${item.href}-${index}`}
                   href={item.href}
                   className="flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors"
                   onClick={() => setIsOpen(false)}
                 >
-                  <IconComponent 
-                    className="w-5 h-5" 
-                    style={{ color: item.color }} 
+                  <IconComponent
+                    className="w-5 h-5"
+                    style={{ color: item.color }}
                   />
                   <span style={{ color: COLORS.TEXT_PRIMARY }}>
                     {item.label}
@@ -317,18 +344,17 @@ const UserMenuMobile: React.FC<UserMenuMobileProps> = ({ userInfo, role, onSignO
               );
             })}
 
-            {/* Séparateur */}
-            <div 
+            <div
               className="my-1 border-t"
               style={{ borderColor: COLORS.BORDER }}
             />
-            
-            {/* Déconnexion */}
+
             <button
               onClick={() => {
                 setIsOpen(false);
-                onSignOut();
+                void onSignOut();
               }}
+              type="button"
               className="flex items-center gap-3 px-4 py-2 hover:bg-red-50 transition-colors w-full text-left"
               style={{ color: COLORS.ERROR }}
             >
@@ -339,12 +365,8 @@ const UserMenuMobile: React.FC<UserMenuMobileProps> = ({ userInfo, role, onSignO
         </div>
       )}
 
-      {/* Overlay pour fermer le menu */}
       {isOpen && (
-        <div 
-          className="fixed inset-0 z-40"
-          onClick={() => setIsOpen(false)}
-        />
+        <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
       )}
     </div>
   );
@@ -354,19 +376,19 @@ const UserMenuMobile: React.FC<UserMenuMobileProps> = ({ userInfo, role, onSignO
  * Composant Skeleton pour le loading state
  */
 const HeaderMobileSkeleton: React.FC = () => (
-  <header 
+  <header
     className="fixed left-0 right-0 top-0 z-40 border-b backdrop-blur"
     style={{
-      backgroundColor: `${COLORS.BG_WHITE}F2`, // 95% opacity
+      backgroundColor: `${COLORS.BG_WHITE}F2`,
       borderColor: COLORS.BORDER,
     }}
   >
     <div className="flex items-center justify-between px-4 py-3">
-      <div 
+      <div
         className="h-8 w-32 animate-pulse rounded"
         style={{ backgroundColor: COLORS.BG_GRAY }}
       />
-      <div 
+      <div
         className="h-8 w-10 animate-pulse rounded-lg"
         style={{ backgroundColor: COLORS.BG_GRAY }}
       />
@@ -375,40 +397,22 @@ const HeaderMobileSkeleton: React.FC = () => (
 );
 
 /**
- * Composant HeaderMobile principal
- * 
- * Features:
- * - Responsive mobile-first design
- * - Recherche Mapbox intégrée
- * - Menu utilisateur custom (sans DropdownMenu)
- * - Modal mobile pour navigation
- * - Authentification Clerk
- * - Design system cohérent
- * - Gestion d'état robuste
- * - Loading states optimisés
- * 
- * @param props - Configuration du header mobile
- * @returns Header mobile complet
+ * HeaderMobile principal
  */
-export default function HeaderMobile({ 
+export default function HeaderMobile({
   showSearchInHeader = true,
-  className = ""
+  className = "",
 }: HeaderMobileProps): JSX.Element {
-  const { user, isSignedIn, isLoaded } = useUser();
+  const { isSignedIn, isLoaded } = useUser();
   const { signOut } = useClerk();
   const role = useUserRole() as UserRole;
   const { reset } = useUserActions();
 
   const [showMobileMenu, setShowMobileMenu] = useState<boolean>(false);
-  const [isClient, setIsClient] = useState<boolean>(false);
-  const [searchCity, setSearchCity] = useState<string>("");
-  
+  const [_searchCity, setSearchCity] = useState<string>("");
+
   const { handleCitySelect } = useCitySearchControl({ setSearchCity });
   const userInfo = useUserDisplayInfo();
-
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
 
   /**
    * Gestion de la déconnexion avec nettoyage du store
@@ -417,7 +421,7 @@ export default function HeaderMobile({
     try {
       reset();
       await signOut();
-      console.debug("Déconnexion mobile réussie");
+      logger.debug("Déconnexion mobile réussie");
     } catch (error) {
       console.error("Erreur lors de la déconnexion mobile:", error);
     }
@@ -436,34 +440,33 @@ export default function HeaderMobile({
     setShowMobileMenu(false);
   }, []);
 
-  // États de chargement
-  if (!isClient || !isLoaded) {
+  // Loading Clerk (remplace isClient)
+  if (!isLoaded) {
     return <HeaderMobileSkeleton />;
   }
 
   return (
     <>
-      {/* Header principal avec recherche intégrée */}
       <header
         className={cn(
           "fixed left-0 right-0 top-0 z-40 border-b backdrop-blur",
           className
         )}
         style={{
-          backgroundColor: `${COLORS.BG_WHITE}F2`, // 95% opacity
+          backgroundColor: `${COLORS.BG_WHITE}F2`,
           borderColor: COLORS.BORDER,
         }}
       >
         <div className="flex items-center gap-2 px-3 py-2 max-w-screen-sm mx-auto w-full">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 pl-1 shrink-0">
-            <img
+            <Image
               src="/logof2f.svg"
               alt="Farm To Fork"
               width={120}
               height={32}
               className="h-8 w-auto"
-              style={{ width: "auto" }}
+              priority
             />
             <span
               className="hidden xs:block text-base font-bold"
@@ -484,10 +487,11 @@ export default function HeaderMobile({
             </div>
           )}
 
-          {/* Actions à droite */}
+          {/* Actions */}
           {!isSignedIn ? (
             <button
               onClick={() => setShowMobileMenu(true)}
+              type="button"
               className="flex items-center gap-1 rounded-lg border px-2 py-2 shadow-sm transition-colors"
               style={{
                 borderColor: COLORS.BORDER,
@@ -526,6 +530,7 @@ export default function HeaderMobile({
 
               {/* Notifications */}
               <button
+                type="button"
                 className="relative rounded-lg p-2 transition-all"
                 style={{ color: COLORS.TEXT_SECONDARY }}
                 aria-label="Notifications"
@@ -545,7 +550,7 @@ export default function HeaderMobile({
                 />
               </button>
 
-              {/* Menu utilisateur custom */}
+              {/* Menu utilisateur */}
               <UserMenuMobile
                 userInfo={userInfo}
                 role={role}
@@ -562,7 +567,6 @@ export default function HeaderMobile({
         onClose={() => setShowMobileMenu(false)}
       >
         <div className="space-y-6 p-6">
-          {/* Section principale */}
           <div className="text-center">
             <div
               className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full"
@@ -581,10 +585,10 @@ export default function HeaderMobile({
             </p>
           </div>
 
-          {/* Boutons d'action */}
           <div className="space-y-3">
             <button
               onClick={openSignUp}
+              type="button"
               className="w-full rounded-lg px-4 py-3 font-medium transition-colors"
               style={{
                 backgroundColor: COLORS.PRIMARY,
@@ -605,6 +609,7 @@ export default function HeaderMobile({
 
             <button
               onClick={openSignIn}
+              type="button"
               className="w-full rounded-lg border px-4 py-3 font-medium transition-colors"
               style={{
                 borderColor: COLORS.PRIMARY,
@@ -625,7 +630,6 @@ export default function HeaderMobile({
             </button>
           </div>
 
-          {/* Navigation */}
           <div className="border-t pt-6" style={{ borderColor: COLORS.BORDER }}>
             <div className="space-y-3">
               <Link
@@ -692,13 +696,9 @@ export default function HeaderMobile({
         </div>
       </MobileModal>
 
-      {/* Spacer pour compenser le header fixe */}
       <div className="h-16" />
     </>
   );
 }
 
-/**
- * Export des types pour utilisation externe
- */
 export type { HeaderMobileProps, UserDisplayInfo };

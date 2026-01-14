@@ -1,7 +1,7 @@
 // app/(routes)/view-listing/_components/Details.tsx
 "use client";
 
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useMemo, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
   MapPin,
@@ -11,9 +11,7 @@ import {
   Clock,
   ShoppingBag,
   CalendarCheck,
-  Truck,
   Home,
-  Copy,
   ExternalLink,
   Heart,
   Eye,
@@ -22,7 +20,6 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/lib/types/database";
 
-// Import des composants
 import AgentDetail from "./AgentDetail";
 import SingleFarmMapbox from "@/app/modules/maps/components/SingleFarmMapbox";
 
@@ -33,17 +30,11 @@ type ListingDetail = Database["public"]["Tables"]["listing"]["Row"] & {
   listingImages?: Database["public"]["Tables"]["listingImages"]["Row"][];
 };
 
-/**
- * Props du composant Details
- */
 interface DetailsProps {
   listingDetail: ListingDetail | null;
   className?: string;
 }
 
-/**
- * Interface pour une caractéristique clé
- */
 interface KeyFeature {
   icon: React.ReactNode;
   label: string;
@@ -52,76 +43,104 @@ interface KeyFeature {
   isHighlight?: boolean;
 }
 
-/**
- * Interface pour les coordonnées
- */
 interface Coordinates {
   lat?: number;
   lng?: number;
 }
 
 /**
- * Composant de détails complets d'un listing de ferme
- *
- * Features:
- * - Affichage structuré de toutes les informations
- * - Système de partage multi-plateforme
- * - Caractéristiques clés avec icônes colorées
- * - Carte interactive avec Mapbox
- * - Analytics et tracking intégrés
- * - Design responsive et moderne
- *
- * @param listingDetail - Données complètes du listing
- * @param className - Classes CSS additionnelles
- * @returns JSX.Element - Interface détaillée complète
+ * Helpers purs (hors composant) = pas de hooks, pas de deps
  */
+function formatListValue(list: string[] | string | null | undefined): string {
+  if (!list) return "Non spécifié";
+
+  if (typeof list === "string") {
+    try {
+      const parsed = JSON.parse(list);
+      if (Array.isArray(parsed)) {
+        return parsed.length > 0 ? parsed.join(", ") : "Non spécifié";
+      }
+      return list || "Non spécifié";
+    } catch {
+      return list || "Non spécifié";
+    }
+  }
+
+  if (Array.isArray(list)) {
+    return list.length > 0 ? list.join(", ") : "Non spécifié";
+  }
+
+  return "Non spécifié";
+}
+
+function getCoordinatesFromListing(
+  listing: ListingDetail | null
+): Coordinates | null {
+  if (!listing) return null;
+
+  // Priorité 1: lat/lng directs
+  if (listing.lat && listing.lng) {
+    return { lat: listing.lat, lng: listing.lng };
+  }
+
+  // Priorité 2: objet coordinates (json / objet / array)
+  const coordsAny = listing.coordinates as unknown;
+
+  if (coordsAny && typeof coordsAny === "object") {
+    // Objet { lat, lng }
+    const c = coordsAny as { lat?: number; lng?: number } | number[];
+    if (!Array.isArray(c) && c.lat && c.lng) {
+      return { lat: c.lat, lng: c.lng };
+    }
+
+    // Array [lat, lng]
+    if (Array.isArray(c) && c.length >= 2) {
+      const lat = Number(c[0]);
+      const lng = Number(c[1]);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        return { lat, lng };
+      }
+    }
+  }
+
+  return null;
+}
+
+function getFeatureColorClasses(color: string, isHighlight = false): string {
+  const baseClasses: Record<string, string> = {
+    green: isHighlight
+      ? "bg-green-200 text-green-700"
+      : "bg-green-100 text-green-600",
+    blue: "bg-blue-100 text-blue-600",
+    purple: isHighlight
+      ? "bg-purple-200 text-purple-700"
+      : "bg-purple-100 text-purple-600",
+    orange: "bg-orange-100 text-orange-600",
+    indigo: "bg-indigo-100 text-indigo-600",
+    teal: "bg-teal-100 text-teal-600",
+    gray: "bg-gray-100 text-gray-600",
+  };
+
+  return baseClasses[color] ?? baseClasses.gray;
+}
+
 export default function Details({
   listingDetail,
   className,
 }: DetailsProps): JSX.Element | null {
-  const [isSharing, setIsSharing] = useState<boolean>(false);
-  const [shareCount, setShareCount] = useState<number>(0);
+  const [isSharing, setIsSharing] = useState(false);
+  const [shareCount, setShareCount] = useState(0);
 
-  // Early return si pas de données
-  if (!listingDetail) {
-    return null;
-  }
-
-  /**
-   * Formate intelligemment les listes d'attributs
-   */
-  const formatList = useCallback(
-    (list: string[] | string | null | undefined): string => {
-      if (!list) return "Non spécifié";
-
-      if (typeof list === "string") {
-        try {
-          // Essayer de parser si c'est un JSON string
-          const parsed = JSON.parse(list);
-          if (Array.isArray(parsed)) {
-            return parsed.length > 0 ? parsed.join(", ") : "Non spécifié";
-          }
-          return list;
-        } catch {
-          return list || "Non spécifié";
-        }
-      }
-
-      if (Array.isArray(list)) {
-        return list.length > 0 ? list.join(", ") : "Non spécifié";
-      }
-
-      return "Non spécifié";
-    },
-    []
+  // ✅ Hooks toujours appelés (pas de return avant)
+  const coordinates = useMemo(
+    () => getCoordinatesFromListing(listingDetail),
+    [listingDetail]
   );
 
-  /**
-   * Caractéristiques clés avec configuration avancée
-   */
   const keyFeatures: KeyFeature[] = useMemo(() => {
-    // ✅ On prépare proprement la valeur de certifications
-    const certificationsValue = formatList(listingDetail.certifications);
+    if (!listingDetail) return [];
+
+    const certificationsValue = formatListValue(listingDetail.certifications);
 
     const hasCertifications =
       !!listingDetail.certifications &&
@@ -132,14 +151,14 @@ export default function Details({
       {
         icon: <Leaf className="h-5 w-5" />,
         label: "Type de produits",
-        value: formatList(listingDetail.product_type),
+        value: formatListValue(listingDetail.product_type),
         color: "green",
         isHighlight: true,
       },
       {
         icon: <Home className="h-5 w-5" />,
         label: "Méthode de production",
-        value: formatList(listingDetail.production_method),
+        value: formatListValue(listingDetail.production_method),
         color: "blue",
       },
       {
@@ -147,85 +166,62 @@ export default function Details({
         label: "Certifications",
         value: certificationsValue || "Aucune certification",
         color: "purple",
-        // ✅ Ici c’est **toujours** un boolean
         isHighlight: hasCertifications,
       },
       {
         icon: <Clock className="h-5 w-5" />,
         label: "Disponibilité",
-        value: formatList(listingDetail.availability),
+        value: formatListValue(listingDetail.availability),
         color: "orange",
       },
       {
         icon: <ShoppingBag className="h-5 w-5" />,
         label: "Modes d'achat",
-        value: formatList(listingDetail.purchase_mode),
+        value: formatListValue(listingDetail.purchase_mode),
         color: "indigo",
       },
       {
         icon: <CalendarCheck className="h-5 w-5" />,
         label: "Services additionnels",
         value:
-          formatList(listingDetail.additional_services) ||
+          formatListValue(listingDetail.additional_services) ||
           "Aucun service additionnel",
         color: "teal",
       },
     ];
-  }, [listingDetail, formatList]);
-
-
-  /**
-   * Extrait les coordonnées de manière robuste
-   */
-  const getCoordinates = useCallback((): Coordinates | null => {
-    // Priorité 1: lat/lng directs
-    if (listingDetail.lat && listingDetail.lng) {
-      return { lat: listingDetail.lat, lng: listingDetail.lng };
-    }
-
-    // Priorité 2: objet coordinates
-    if (listingDetail.coordinates) {
-      if (typeof listingDetail.coordinates === "object") {
-        const coords = listingDetail.coordinates as any;
-        if (coords.lat && coords.lng) {
-          return { lat: coords.lat, lng: coords.lng };
-        }
-        if (Array.isArray(coords) && coords.length >= 2) {
-          return { lat: coords[0], lng: coords[1] };
-        }
-      }
-    }
-
-    return null;
   }, [listingDetail]);
 
   /**
    * Gère le partage multi-plateforme
    */
   const handleShare = useCallback(async (): Promise<void> => {
+    if (!listingDetail) return;
+
     setIsSharing(true);
 
     try {
+      const url = window.location.href;
+
       const shareData = {
         title: `${listingDetail.name || "Ferme locale"} | Farm To Fork`,
         text: `Découvrez ${listingDetail.name || "cette ferme locale"} - Produits frais et locaux`,
-        url: window.location.href,
+        url,
       };
 
-      // Utiliser l'API Web Share si disponible (mobile principalement)
-      if (
-        navigator.share &&
-        navigator.canShare &&
-        navigator.canShare(shareData)
-      ) {
-        await navigator.share(shareData);
+      const w = window as unknown as { gtag?: (...args: any[]) => void };
+      const canShare =
+        typeof navigator !== "undefined" &&
+        typeof navigator.share === "function" &&
+        typeof (navigator as any).canShare === "function" &&
+        (navigator as any).canShare(shareData);
 
+      if (canShare) {
+        await navigator.share(shareData);
         setShareCount((prev) => prev + 1);
         toast.success("Contenu partagé avec succès !");
 
-        // Analytics tracking
-        if (typeof window !== "undefined" && window.gtag) {
-          window.gtag("event", "share", {
+        if (typeof w.gtag === "function") {
+          w.gtag("event", "share", {
             event_category: "listing_interaction",
             event_label: "web_share_api",
             listing_id: listingDetail.id,
@@ -233,14 +229,12 @@ export default function Details({
           });
         }
       } else {
-        // Fallback: copier dans le presse-papier
-        await navigator.clipboard.writeText(window.location.href);
+        await navigator.clipboard.writeText(url);
         setShareCount((prev) => prev + 1);
         toast.success("Lien copié dans le presse-papier !");
 
-        // Analytics tracking
-        if (typeof window !== "undefined" && window.gtag) {
-          window.gtag("event", "share", {
+        if (typeof w.gtag === "function") {
+          w.gtag("event", "share", {
             event_category: "listing_interaction",
             event_label: "clipboard_copy",
             listing_id: listingDetail.id,
@@ -251,7 +245,6 @@ export default function Details({
     } catch (error) {
       console.error("Erreur lors du partage:", error);
 
-      // Fallback ultime
       try {
         await navigator.clipboard.writeText(window.location.href);
         toast.success("Lien copié dans le presse-papier !");
@@ -261,49 +254,32 @@ export default function Details({
     } finally {
       setIsSharing(false);
     }
-  }, [listingDetail.id, listingDetail.name]);
+  }, [listingDetail]);
 
   /**
-   * Couleurs pour les icônes des caractéristiques
+   * Ouvre Google Maps avec les coords (callback stable)
    */
-  const getFeatureColorClasses = useCallback(
-    (color: string, isHighlight: boolean = false) => {
-      const baseClasses = {
-        green: isHighlight
-          ? "bg-green-200 text-green-700"
-          : "bg-green-100 text-green-600",
-        blue: "bg-blue-100 text-blue-600",
-        purple: isHighlight
-          ? "bg-purple-200 text-purple-700"
-          : "bg-purple-100 text-purple-600",
-        orange: "bg-orange-100 text-orange-600",
-        indigo: "bg-indigo-100 text-indigo-600",
-        teal: "bg-teal-100 text-teal-600",
-      };
+  const handleOpenInMaps = useCallback(() => {
+    if (!coordinates?.lat || !coordinates?.lng) return;
 
-      return (
-        baseClasses[color as keyof typeof baseClasses] ||
-        "bg-gray-100 text-gray-600"
-      );
-    },
-    []
-  );
+    const url = `https://www.google.com/maps/search/?api=1&query=${coordinates.lat},${coordinates.lng}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  }, [coordinates?.lat, coordinates?.lng]);
 
-  const coordinates = getCoordinates();
+  // ✅ Early return après hooks
+  if (!listingDetail) return null;
 
   return (
     <div className={cn("space-y-8", className)}>
-      {/* En-tête avec nom, adresse et actions */}
+      {/* En-tête */}
       <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
         <div className="flex flex-col lg:flex-row justify-between items-start gap-4">
-          {/* Informations principales */}
           <div className="space-y-3 flex-1">
             <div className="flex items-start gap-3">
               <h1 className="font-bold text-3xl lg:text-4xl text-gray-900 leading-tight">
                 {listingDetail.name || "Ferme locale"}
               </h1>
 
-              {/* Badge de statut */}
               {listingDetail.active && (
                 <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full flex-shrink-0 mt-2">
                   ✅ Actif
@@ -318,7 +294,6 @@ export default function Details({
               </p>
             </div>
 
-            {/* Métadonnées rapides */}
             <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
               {listingDetail.created_at && (
                 <div className="flex items-center gap-1">
@@ -362,7 +337,7 @@ export default function Details({
             >
               {isSharing ? (
                 <>
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-green-600"></div>
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-green-600" />
                   Partage...
                 </>
               ) : (
@@ -376,7 +351,7 @@ export default function Details({
         </div>
       </div>
 
-      {/* Caractéristiques clés améliorées */}
+      {/* Caractéristiques clés */}
       <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
         <h2 className="font-bold text-2xl text-gray-900 mb-6">
           Caractéristiques clés
@@ -385,7 +360,7 @@ export default function Details({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {keyFeatures.map((feature, index) => (
             <div
-              key={index}
+              key={`${feature.label}-${index}`}
               className={cn(
                 "group relative bg-gray-50 rounded-xl p-5 border border-gray-200",
                 "hover:border-green-200 hover:shadow-md hover:bg-green-50/30",
@@ -399,7 +374,7 @@ export default function Details({
                     "p-3 rounded-full transition-colors",
                     getFeatureColorClasses(
                       feature.color || "gray",
-                      feature.isHighlight
+                      !!feature.isHighlight
                     )
                   )}
                 >
@@ -426,7 +401,7 @@ export default function Details({
         </div>
       </div>
 
-      {/* Description enrichie */}
+      {/* Description */}
       <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
         <h2 className="font-bold text-2xl text-gray-900 mb-6">
           À propos de cette ferme
@@ -447,25 +422,22 @@ export default function Details({
               Aucune description disponible pour cette ferme.
             </p>
             <p className="text-sm text-gray-400 mt-2">
-              Le producteur n'a pas encore ajouté de description détaillée.
+              Le producteur n&apos;a pas encore ajouté de description détaillée.
             </p>
           </div>
         )}
       </div>
 
-      {/* Carte interactive */}
+      {/* Carte */}
       <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
         <div className="flex items-center justify-between mb-6">
           <h2 className="font-bold text-2xl text-gray-900">Localisation</h2>
 
-          {coordinates && (
+          {coordinates?.lat && coordinates?.lng && (
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
-                const url = `https://www.google.com/maps/search/?api=1&query=${coordinates.lat},${coordinates.lng}`;
-                window.open(url, "_blank", "noopener,noreferrer");
-              }}
+              onClick={handleOpenInMaps}
               className="text-blue-600 hover:text-blue-700"
             >
               <ExternalLink className="h-4 w-4 mr-2" />
@@ -475,10 +447,10 @@ export default function Details({
         </div>
 
         <div className="rounded-xl overflow-hidden border border-gray-200 h-[450px]">
-          {coordinates ? (
+          {coordinates?.lat && coordinates?.lng ? (
             <SingleFarmMapbox
-              lat={coordinates.lat!}
-              lng={coordinates.lng!}
+              lat={coordinates.lat}
+              lng={coordinates.lng}
               name={listingDetail.name ?? undefined}
             />
           ) : (
@@ -491,14 +463,15 @@ export default function Details({
               </p>
               <p className="text-sm text-gray-400 text-center max-w-md">
                 Les coordonnées GPS de cette ferme ne sont pas encore
-                disponibles. Contactez le producteur pour plus d'informations.
+                disponibles. Contactez le producteur pour plus
+                d&apos;informations.
               </p>
             </div>
           )}
         </div>
       </div>
 
-      {/* Contact du producteur */}
+      {/* Contact */}
       <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
         <h2 className="font-bold text-2xl text-gray-900 mb-6">
           Contact du producteur

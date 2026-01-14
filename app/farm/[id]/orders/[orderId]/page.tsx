@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { CheckCircle, Package, MapPin, Truck, Calendar } from "lucide-react";
@@ -65,7 +65,8 @@ export default function FarmOrderConfirmationPage(): JSX.Element {
   const [order, setOrder] = useState<OrderWithFarm | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
+  // ✅ Extraire la logique de chargement dans useCallback
+  const loadOrder = useCallback(async () => {
     // ✅ CORRECTION 1: Redirection si IDs invalides
     if (Number.isNaN(farmId) || Number.isNaN(orderId)) {
       toast.error("Identifiants de commande invalides");
@@ -73,115 +74,115 @@ export default function FarmOrderConfirmationPage(): JSX.Element {
       return;
     }
 
-    async function loadOrder() {
-      try {
-        setIsLoading(true);
+    try {
+      setIsLoading(true);
 
-        // ✅ CORRECTION 2: Vérification de l'authentification
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+      // ✅ CORRECTION 2: Vérification de l'authentification
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-        if (!user) {
-          toast.error("Vous devez être connecté pour voir cette commande");
-          router.push("/login");
-          return;
-        }
-
-        // ✅ CORRECTION 3: Ajout du filtre user_id pour la sécurité
-        const response = await supabase
-          .from("orders")
-          .select("*")
-          .eq("id", orderId)
-          .eq("farm_id", farmId)
-          .eq("user_id", user.id) // 🔒 SÉCURITÉ: Vérifier que la commande appartient bien à l'utilisateur
-          .single();
-
-        // Cast explicite pour éviter les erreurs TypeScript avec jsonb
-        const orderData = response.data as any;
-        const orderError = response.error;
-
-        if (orderError) {
-          console.error("Erreur chargement commande:", orderError);
-
-          // ✅ AMÉLIORATION: Message d'erreur plus clair
-          if (orderError.code === "PGRST116") {
-            toast.error("Commande introuvable ou vous n'y avez pas accès");
-          } else {
-            toast.error("Erreur lors du chargement de la commande");
-          }
-
-          router.push("/orders");
-          return;
-        }
-
-        if (!orderData) {
-          toast.error("Commande introuvable");
-          router.push("/orders");
-          return;
-        }
-
-        // Charger les infos de la ferme
-        const farmResponse = await supabase
-          .from("listing")
-          .select("id, name, address, email, phone_number")
-          .eq("id", farmId)
-          .single();
-
-        // Cast explicite pour la ferme aussi
-        const farmData = farmResponse.data as any;
-        const farmError = farmResponse.error;
-
-        if (farmError) {
-          console.error("Erreur chargement ferme:", farmError);
-          // On continue même si la ferme n'est pas chargée
-        }
-
-        // ✅ AMÉLIORATION: Gérer delivery_address (jsonb dans Supabase)
-        let parsedDeliveryAddress = undefined;
-
-        if (orderData.delivery_address) {
-          // delivery_address est déjà un objet si c'est du jsonb
-          parsedDeliveryAddress = orderData.delivery_address;
-        }
-
-        // Mapper les données avec type safety
-        const mappedOrder: OrderWithFarm = {
-          id: orderData.id,
-          user_id: orderData.user_id,
-          farm_id: orderData.farm_id,
-          items: orderData.items || [],
-          total_price: orderData.total_price || 0,
-          delivery_mode: orderData.delivery_mode,
-          delivery_day: orderData.delivery_day || "",
-          delivery_address: parsedDeliveryAddress,
-          customer_notes: orderData.customer_notes || undefined,
-          status: orderData.status,
-          payment_status: orderData.payment_status,
-          created_at: orderData.created_at,
-          farm: farmData
-            ? {
-                id: farmData.id,
-                name: farmData.name,
-                address: farmData.address,
-                email: farmData.email || "",
-                phone_number: farmData.phone_number || undefined,
-              }
-            : undefined,
-        };
-
-        setOrder(mappedOrder);
-      } catch (error) {
-        console.error("Erreur inattendue chargement commande:", error);
-        toast.error("Une erreur inattendue s'est produite");
-        router.push("/orders");
-      } finally {
-        setIsLoading(false);
+      if (!user) {
+        toast.error("Vous devez être connecté pour voir cette commande");
+        router.push("/login");
+        return;
       }
-    }
 
+      // ✅ CORRECTION 3: Ajout du filtre user_id pour la sécurité
+      const response = await supabase
+        .from("orders")
+        .select("*")
+        .eq("id", orderId)
+        .eq("farm_id", farmId)
+        .eq("user_id", user.id) // 🔒 SÉCURITÉ: Vérifier que la commande appartient bien à l'utilisateur
+        .single();
+
+      // Cast explicite pour éviter les erreurs TypeScript avec jsonb
+      const orderData = response.data as any;
+      const orderError = response.error;
+
+      if (orderError) {
+        console.error("Erreur chargement commande:", orderError);
+
+        // ✅ AMÉLIORATION: Message d'erreur plus clair
+        if (orderError.code === "PGRST116") {
+          toast.error("Commande introuvable ou vous n'y avez pas accès");
+        } else {
+          toast.error("Erreur lors du chargement de la commande");
+        }
+
+        router.push("/orders");
+        return;
+      }
+
+      if (!orderData) {
+        toast.error("Commande introuvable");
+        router.push("/orders");
+        return;
+      }
+
+      // Charger les infos de la ferme
+      const farmResponse = await supabase
+        .from("listing")
+        .select("id, name, address, email, phone_number")
+        .eq("id", farmId)
+        .single();
+
+      // Cast explicite pour la ferme aussi
+      const farmData = farmResponse.data as any;
+      const farmError = farmResponse.error;
+
+      if (farmError) {
+        console.error("Erreur chargement ferme:", farmError);
+        // On continue même si la ferme n'est pas chargée
+      }
+
+      // ✅ AMÉLIORATION: Gérer delivery_address (jsonb dans Supabase)
+      let parsedDeliveryAddress = undefined;
+
+      if (orderData.delivery_address) {
+        // delivery_address est déjà un objet si c'est du jsonb
+        parsedDeliveryAddress = orderData.delivery_address;
+      }
+
+      // Mapper les données avec type safety
+      const mappedOrder: OrderWithFarm = {
+        id: orderData.id,
+        user_id: orderData.user_id,
+        farm_id: orderData.farm_id,
+        items: orderData.items || [],
+        total_price: orderData.total_price || 0,
+        delivery_mode: orderData.delivery_mode,
+        delivery_day: orderData.delivery_day || "",
+        delivery_address: parsedDeliveryAddress,
+        customer_notes: orderData.customer_notes || undefined,
+        status: orderData.status,
+        payment_status: orderData.payment_status,
+        created_at: orderData.created_at,
+        farm: farmData
+          ? {
+              id: farmData.id,
+              name: farmData.name,
+              address: farmData.address,
+              email: farmData.email || "",
+              phone_number: farmData.phone_number || undefined,
+            }
+          : undefined,
+      };
+
+      setOrder(mappedOrder);
+    } catch (error) {
+      console.error("Erreur inattendue chargement commande:", error);
+      toast.error("Une erreur inattendue s'est produite");
+      router.push("/orders");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [farmId, orderId, router, supabase]); // ✅ Dépendances explicites
+
+  useEffect(() => {
     loadOrder();
-  }, [farmId, orderId, router]);
+  }, [loadOrder]); // ✅ Dépendance sur la fonction stable
 
   // Loading state
   if (isLoading) {

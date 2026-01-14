@@ -315,8 +315,6 @@ const PRODUCT_UNITS = [
   { value: "basket", label: "Panier" },
 ];
 
-const supabase = useSupabaseWithClerk();
-
 // ==================== TYPES ====================
 
 interface PageProps {
@@ -428,24 +426,26 @@ const useProductForm = () => {
   };
 };
 
-// ==================== SERVICE ====================
+// ==================== SERVICE (factory) ====================
 
-class ProductService {
-  static async createProduct(
-    productData: ProductInsert
-  ): Promise<{ id: number }> {
-    const { data, error } = await supabase
-      .from("products")
-      .insert(productData)
-      .select("id")
-      .single();
+function createProductService(
+  supabaseClient: ReturnType<typeof useSupabaseWithClerk>
+) {
+  return {
+    async createProduct(productData: ProductInsert): Promise<{ id: number }> {
+      const { data, error } = await supabaseClient
+        .from("products")
+        .insert(productData)
+        .select("id")
+        .single();
 
-    if (error) throw error;
-    if (!data?.id)
-      throw new Error("Aucun ID retourné lors de la création du produit");
+      if (error) throw error;
+      if (!data?.id)
+        throw new Error("Aucun ID retourné lors de la création du produit");
 
-    return data;
-  }
+      return data;
+    },
+  };
 }
 
 // ==================== UI ====================
@@ -483,6 +483,10 @@ const FormValidation: React.FC<FormValidationProps> = ({
 export default function AddProductPage({ params }: PageProps) {
   const router = useRouter();
   const { user, isLoaded, isSignedIn } = useUser();
+
+  // ✅ FIX rules-of-hooks: hook appelé dans un composant
+  const supabase = useSupabaseWithClerk();
+  const productService = createProductService(supabase);
 
   const {
     formData,
@@ -547,7 +551,6 @@ export default function AddProductPage({ params }: PageProps) {
           throw new Error("Prix invalide");
         }
 
-        // ✅ description enrichie (comme tu faisais), mais propre
         const fullDescription = [
           formData.description.trim(),
           "",
@@ -561,8 +564,8 @@ export default function AddProductPage({ params }: PageProps) {
           .filter(Boolean)
           .join("\n");
 
-        // ✅ IMPORTANT: ton schema TS indique que farm_id est requis
-        // Dans ton cas, farm_id = listingId (tes FKs pointent vers listing.id)
+        const qty = Math.max(0, Number(formData.quantity) || 0);
+
         const productData: ProductInsert = {
           listing_id: listingId,
           farm_id: listingId,
@@ -573,31 +576,20 @@ export default function AddProductPage({ params }: PageProps) {
           price,
           unit: formData.unit,
 
-          // ✅ ton schema SQL: available boolean default true, mais ok de le set
           available: true,
 
-          // ✅ "draft/publish" => piloté par is_published (+ active)
           is_published: publish,
           active: publish,
 
-          // ✅ stock_status DOIT rester dans l'enum autorisé
-          // Ici on le calcule simplement avec la quantité
           stock_status:
-            Number(formData.quantity) <= 0
-              ? "out_of_stock"
-              : Number(formData.quantity) <= 5
-                ? "low_stock"
-                : "in_stock",
-
-          // ✅ si tu veux coller à ton SQL (stock_quantity existe et NOT NULL)
-          stock_quantity: Math.max(0, Number(formData.quantity) || 0),
+            qty <= 0 ? "out_of_stock" : qty <= 5 ? "low_stock" : "in_stock",
+          stock_quantity: qty,
 
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
 
-
-        await ProductService.createProduct(productData);
+        await productService.createProduct(productData);
 
         toast.success(
           publish
@@ -606,7 +598,6 @@ export default function AddProductPage({ params }: PageProps) {
         );
 
         setTimeout(() => {
-          // adapte selon ta route réelle (view-listing / shop / dashboard)
           router.push(`/view-listing/${listingId}`);
         }, 800);
       } catch (error) {
@@ -635,6 +626,7 @@ export default function AddProductPage({ params }: PageProps) {
       setLoading,
       user,
       listingId,
+      productService,
     ]
   );
 
@@ -690,330 +682,335 @@ export default function AddProductPage({ params }: PageProps) {
   return (
     <FarmerOnlySection>
       <div className="container max-w-2xl mx-auto py-12 px-4">
-      <Card
-        className="border-t-4 shadow-sm hover:shadow transition-shadow duration-300"
-        style={{ borderTopColor: COLORS.PRIMARY }}
-      >
-        <CardHeader>
-          <CardTitle
-            className="text-2xl font-bold"
-            style={{ color: COLORS.PRIMARY }}
-          >
-            Ajouter un nouveau produit
-          </CardTitle>
-          <CardDescription style={{ color: COLORS.TEXT_SECONDARY }}>
-            Sélectionnez votre produit dans notre base de données ou créez un
-            produit personnalisé
-          </CardDescription>
-        </CardHeader>
-
-        <CardContent>
-          <form className="space-y-6" onSubmit={(e) => handleSubmit(e, false)}>
-            {/* Catégorie principale */}
-            <div className="space-y-2">
-              <Label
-                htmlFor="category"
-                className="font-medium"
-                style={{ color: COLORS.TEXT_PRIMARY }}
-              >
-                Catégorie principale *
-              </Label>
-              <select
-                id="category"
-                value={formData.category}
-                onChange={(e) => handleSelectChange("category", e.target.value)}
-                className="w-full px-3 py-2 border rounded-md bg-white text-sm focus:outline-none focus:ring-2"
-                style={{
-                  borderColor: COLORS.BORDER,
-                  color: COLORS.TEXT_PRIMARY,
-                }}
-                required
-              >
-                <option value="">Sélectionnez une catégorie</option>
-                {PRODUCT_CATEGORIES.map((cat) => (
-                  <option key={cat.value} value={cat.value}>
-                    {cat.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Sous-catégorie */}
-            {formData.category && (
-              <div className="space-y-2">
-                <Label
-                  htmlFor="subcategory"
-                  className="font-medium"
-                  style={{ color: COLORS.TEXT_PRIMARY }}
-                >
-                  Sous-catégorie *
-                </Label>
-                <select
-                  id="subcategory"
-                  value={formData.subcategory}
-                  onChange={(e) =>
-                    handleSelectChange("subcategory", e.target.value)
-                  }
-                  className="w-full px-3 py-2 border rounded-md bg-white text-sm focus:outline-none focus:ring-2"
-                  style={{
-                    borderColor: COLORS.BORDER,
-                    color: COLORS.TEXT_PRIMARY,
-                  }}
-                  required
-                >
-                  <option value="">Sélectionnez une sous-catégorie</option>
-                  {availableSubcategories.map((sub) => (
-                    <option key={sub} value={sub}>
-                      {sub}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {/* Sélection du produit */}
-            {formData.subcategory && (
-              <div className="space-y-2">
-                <Label
-                  htmlFor="selectedProduct"
-                  className="font-medium"
-                  style={{ color: COLORS.TEXT_PRIMARY }}
-                >
-                  Produit *
-                </Label>
-                <select
-                  id="selectedProduct"
-                  value={formData.selectedProduct}
-                  onChange={(e) =>
-                    handleSelectChange("selectedProduct", e.target.value)
-                  }
-                  className="w-full px-3 py-2 border rounded-md bg-white text-sm focus:outline-none focus:ring-2"
-                  style={{
-                    borderColor: COLORS.BORDER,
-                    color: COLORS.TEXT_PRIMARY,
-                  }}
-                  required
-                >
-                  <option value="">Sélectionnez un produit</option>
-                  {availableProducts.map((product) => (
-                    <option key={product.name} value={product.name}>
-                      {product.name}
-                    </option>
-                  ))}
-                  <option value="custom">➕ Produit personnalisé</option>
-                </select>
-              </div>
-            )}
-
-            {/* Nom personnalisé */}
-            {formData.selectedProduct === "custom" && (
-              <div className="space-y-2">
-                <Label
-                  htmlFor="customName"
-                  className="font-medium"
-                  style={{ color: COLORS.TEXT_PRIMARY }}
-                >
-                  Nom du produit personnalisé *
-                </Label>
-                <Input
-                  id="customName"
-                  name="customName"
-                  value={formData.customName}
-                  onChange={handleChange}
-                  placeholder="Ex: Tomates cerises variété ancienne"
-                  required
-                />
-              </div>
-            )}
-
-            {/* Prix, Unité, Quantité */}
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label
-                  htmlFor="price"
-                  className="font-medium"
-                  style={{ color: COLORS.TEXT_PRIMARY }}
-                >
-                  Prix (€) *
-                </Label>
-                <Input
-                  id="price"
-                  name="price"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.price}
-                  onChange={handleChange}
-                  placeholder="0.00"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label
-                  htmlFor="unit"
-                  className="font-medium"
-                  style={{ color: COLORS.TEXT_PRIMARY }}
-                >
-                  Unité *
-                </Label>
-                <select
-                  id="unit"
-                  value={formData.unit}
-                  onChange={(e) => handleSelectChange("unit", e.target.value)}
-                  className="w-full px-3 py-2 border rounded-md bg-white text-sm focus:outline-none focus:ring-2"
-                  style={{
-                    borderColor: COLORS.BORDER,
-                    color: COLORS.TEXT_PRIMARY,
-                  }}
-                  required
-                >
-                  {PRODUCT_UNITS.map((unit) => (
-                    <option key={unit.value} value={unit.value}>
-                      {unit.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <Label
-                  htmlFor="quantity"
-                  className="font-medium"
-                  style={{ color: COLORS.TEXT_PRIMARY }}
-                >
-                  Quantité *
-                </Label>
-                <Input
-                  id="quantity"
-                  name="quantity"
-                  type="number"
-                  min="1"
-                  value={formData.quantity}
-                  onChange={handleChange}
-                  placeholder="10"
-                  required
-                />
-              </div>
-            </div>
-
-            {/* Description */}
-            <div className="space-y-2">
-              <Label
-                htmlFor="description"
-                className="font-medium"
-                style={{ color: COLORS.TEXT_PRIMARY }}
-              >
-                Description du produit *
-              </Label>
-              <Textarea
-                id="description"
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                placeholder="Décrivez votre produit (variété, méthode, fraîcheur, etc.)"
-                className="min-h-[120px]"
-                required
-              />
-            </div>
-
-            {/* Options de livraison */}
-            <div className="space-y-2">
-              <Label
-                htmlFor="delivery_options"
-                className="font-medium"
-                style={{ color: COLORS.TEXT_PRIMARY }}
-              >
-                Options de livraison
-              </Label>
-              <Textarea
-                id="delivery_options"
-                name="delivery_options"
-                value={formData.delivery_options}
-                onChange={handleChange}
-                placeholder="Ex: Livraison à domicile, récupération à la ferme..."
-                className="min-h-[80px]"
-              />
-            </div>
-
-            <FormValidation
-              isValid={isFormValid()}
-              requiredFields={requiredFields}
-            />
-          </form>
-        </CardContent>
-
-        <CardFooter
-          className="flex justify-between border-t pt-6"
-          style={{ borderColor: COLORS.BORDER }}
+        <Card
+          className="border-t-4 shadow-sm hover:shadow transition-shadow duration-300"
+          style={{ borderTopColor: COLORS.PRIMARY }}
         >
-          <Button
-            variant="outline"
-            onClick={() => router.back()}
-            disabled={loading}
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Retour
-          </Button>
+          <CardHeader>
+            <CardTitle
+              className="text-2xl font-bold"
+              style={{ color: COLORS.PRIMARY }}
+            >
+              Ajouter un nouveau produit
+            </CardTitle>
+            <CardDescription style={{ color: COLORS.TEXT_SECONDARY }}>
+              Sélectionnez votre produit dans notre base de données ou créez un
+              produit personnalisé
+            </CardDescription>
+          </CardHeader>
 
-          <div className="flex gap-3">
+          <CardContent>
+            <form
+              className="space-y-6"
+              onSubmit={(e) => handleSubmit(e, false)}
+            >
+              {/* Catégorie principale */}
+              <div className="space-y-2">
+                <Label
+                  htmlFor="category"
+                  className="font-medium"
+                  style={{ color: COLORS.TEXT_PRIMARY }}
+                >
+                  Catégorie principale *
+                </Label>
+                <select
+                  id="category"
+                  value={formData.category}
+                  onChange={(e) =>
+                    handleSelectChange("category", e.target.value)
+                  }
+                  className="w-full px-3 py-2 border rounded-md bg-white text-sm focus:outline-none focus:ring-2"
+                  style={{
+                    borderColor: COLORS.BORDER,
+                    color: COLORS.TEXT_PRIMARY,
+                  }}
+                  required
+                >
+                  <option value="">Sélectionnez une catégorie</option>
+                  {PRODUCT_CATEGORIES.map((cat) => (
+                    <option key={cat.value} value={cat.value}>
+                      {cat.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Sous-catégorie */}
+              {formData.category && (
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="subcategory"
+                    className="font-medium"
+                    style={{ color: COLORS.TEXT_PRIMARY }}
+                  >
+                    Sous-catégorie *
+                  </Label>
+                  <select
+                    id="subcategory"
+                    value={formData.subcategory}
+                    onChange={(e) =>
+                      handleSelectChange("subcategory", e.target.value)
+                    }
+                    className="w-full px-3 py-2 border rounded-md bg-white text-sm focus:outline-none focus:ring-2"
+                    style={{
+                      borderColor: COLORS.BORDER,
+                      color: COLORS.TEXT_PRIMARY,
+                    }}
+                    required
+                  >
+                    <option value="">Sélectionnez une sous-catégorie</option>
+                    {availableSubcategories.map((sub) => (
+                      <option key={sub} value={sub}>
+                        {sub}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Sélection du produit */}
+              {formData.subcategory && (
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="selectedProduct"
+                    className="font-medium"
+                    style={{ color: COLORS.TEXT_PRIMARY }}
+                  >
+                    Produit *
+                  </Label>
+                  <select
+                    id="selectedProduct"
+                    value={formData.selectedProduct}
+                    onChange={(e) =>
+                      handleSelectChange("selectedProduct", e.target.value)
+                    }
+                    className="w-full px-3 py-2 border rounded-md bg-white text-sm focus:outline-none focus:ring-2"
+                    style={{
+                      borderColor: COLORS.BORDER,
+                      color: COLORS.TEXT_PRIMARY,
+                    }}
+                    required
+                  >
+                    <option value="">Sélectionnez un produit</option>
+                    {availableProducts.map((product) => (
+                      <option key={product.name} value={product.name}>
+                        {product.name}
+                      </option>
+                    ))}
+                    <option value="custom">➕ Produit personnalisé</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Nom personnalisé */}
+              {formData.selectedProduct === "custom" && (
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="customName"
+                    className="font-medium"
+                    style={{ color: COLORS.TEXT_PRIMARY }}
+                  >
+                    Nom du produit personnalisé *
+                  </Label>
+                  <Input
+                    id="customName"
+                    name="customName"
+                    value={formData.customName}
+                    onChange={handleChange}
+                    placeholder="Ex: Tomates cerises variété ancienne"
+                    required
+                  />
+                </div>
+              )}
+
+              {/* Prix, Unité, Quantité */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="price"
+                    className="font-medium"
+                    style={{ color: COLORS.TEXT_PRIMARY }}
+                  >
+                    Prix (€) *
+                  </Label>
+                  <Input
+                    id="price"
+                    name="price"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.price}
+                    onChange={handleChange}
+                    placeholder="0.00"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="unit"
+                    className="font-medium"
+                    style={{ color: COLORS.TEXT_PRIMARY }}
+                  >
+                    Unité *
+                  </Label>
+                  <select
+                    id="unit"
+                    value={formData.unit}
+                    onChange={(e) => handleSelectChange("unit", e.target.value)}
+                    className="w-full px-3 py-2 border rounded-md bg-white text-sm focus:outline-none focus:ring-2"
+                    style={{
+                      borderColor: COLORS.BORDER,
+                      color: COLORS.TEXT_PRIMARY,
+                    }}
+                    required
+                  >
+                    {PRODUCT_UNITS.map((unit) => (
+                      <option key={unit.value} value={unit.value}>
+                        {unit.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="quantity"
+                    className="font-medium"
+                    style={{ color: COLORS.TEXT_PRIMARY }}
+                  >
+                    Quantité *
+                  </Label>
+                  <Input
+                    id="quantity"
+                    name="quantity"
+                    type="number"
+                    min="1"
+                    value={formData.quantity}
+                    onChange={handleChange}
+                    placeholder="10"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Description */}
+              <div className="space-y-2">
+                <Label
+                  htmlFor="description"
+                  className="font-medium"
+                  style={{ color: COLORS.TEXT_PRIMARY }}
+                >
+                  Description du produit *
+                </Label>
+                <Textarea
+                  id="description"
+                  name="description"
+                  value={formData.description}
+                  onChange={handleChange}
+                  placeholder="Décrivez votre produit (variété, méthode, fraîcheur, etc.)"
+                  className="min-h-[120px]"
+                  required
+                />
+              </div>
+
+              {/* Options de livraison */}
+              <div className="space-y-2">
+                <Label
+                  htmlFor="delivery_options"
+                  className="font-medium"
+                  style={{ color: COLORS.TEXT_PRIMARY }}
+                >
+                  Options de livraison
+                </Label>
+                <Textarea
+                  id="delivery_options"
+                  name="delivery_options"
+                  value={formData.delivery_options}
+                  onChange={handleChange}
+                  placeholder="Ex: Livraison à domicile, récupération à la ferme..."
+                  className="min-h-[80px]"
+                />
+              </div>
+
+              <FormValidation
+                isValid={isFormValid()}
+                requiredFields={requiredFields}
+              />
+            </form>
+          </CardContent>
+
+          <CardFooter
+            className="flex justify-between border-t pt-6"
+            style={{ borderColor: COLORS.BORDER }}
+          >
             <Button
               variant="outline"
-              disabled={loading || !isFormValid()}
-              onClick={(e) => handleSubmit(e, false)}
+              onClick={() => router.back()}
+              disabled={loading}
             >
-              {loading && !isPublishing ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="mr-2 h-4 w-4" />
-              )}
-              Enregistrer
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Retour
             </Button>
 
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  disabled={loading || !isFormValid()}
-                  style={{
-                    backgroundColor: COLORS.PRIMARY,
-                    color: COLORS.TEXT_WHITE,
-                  }}
-                >
-                  {loading && isPublishing ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Send className="mr-2 h-4 w-4" />
-                  )}
-                  Publier
-                </Button>
-              </AlertDialogTrigger>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                disabled={loading || !isFormValid()}
+                onClick={(e) => handleSubmit(e, false)}
+              >
+                {loading && !isPublishing ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="mr-2 h-4 w-4" />
+                )}
+                Enregistrer
+              </Button>
 
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Publier ce produit ?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Une fois publié, votre produit "{productName}" sera visible
-                    par tous les utilisateurs.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Annuler</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={(e) => handleSubmit(e, true)}
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    disabled={loading || !isFormValid()}
                     style={{
                       backgroundColor: COLORS.PRIMARY,
                       color: COLORS.TEXT_WHITE,
                     }}
                   >
-                    Confirmer et publier
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
-        </CardFooter>
-      </Card>
-    </div>
+                    {loading && isPublishing ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="mr-2 h-4 w-4" />
+                    )}
+                    Publier
+                  </Button>
+                </AlertDialogTrigger>
+
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Publier ce produit ?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Une fois publié, votre produit &quot;{productName}&quot;
+                      sera visible par tous les utilisateurs.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Annuler</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={(e) => handleSubmit(e, true)}
+                      style={{
+                        backgroundColor: COLORS.PRIMARY,
+                        color: COLORS.TEXT_WHITE,
+                      }}
+                    >
+                      Confirmer et publier
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          </CardFooter>
+        </Card>
+      </div>
     </FarmerOnlySection>
   );
 }

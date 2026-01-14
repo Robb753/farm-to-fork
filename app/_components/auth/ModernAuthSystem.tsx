@@ -1,5 +1,4 @@
 // app/_components/auth/ModernAuthSystem.tsx
-
 "use client";
 
 import React, {
@@ -9,17 +8,8 @@ import React, {
   MouseEvent,
   KeyboardEvent,
 } from "react";
-import { SignIn, SignUp } from "@clerk/nextjs";
-import {
-  X,
-  User,
-  Tractor,
-  ChevronRight,
-  Mail,
-  Phone,
-  MapPin,
-} from "lucide-react";
-import { useUser } from "@clerk/nextjs";
+import { SignIn, SignUp, useUser } from "@clerk/nextjs";
+import { X, User, Tractor, ChevronRight, Phone, MapPin } from "lucide-react";
 import { useUserActions } from "@/lib/store/userStore";
 import { COLORS, PATHS } from "@/lib/config";
 
@@ -62,19 +52,20 @@ const useAuthModal = (): AuthModalState => {
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isOpen) {
+        // OK : event handler (pas un effect qui setState)
         setIsOpen(false);
         setMode("welcome");
         setSelectedRole("user");
       }
     };
 
-    window.addEventListener("openSigninModal", handleOpenSignin);
-    window.addEventListener("openSignupModal", handleOpenSignup);
+    window.addEventListener("openSigninModal", handleOpenSignin as any);
+    window.addEventListener("openSignupModal", handleOpenSignup as any);
     document.addEventListener("keydown", handleKeyDown as any);
 
     return () => {
-      window.removeEventListener("openSigninModal", handleOpenSignin);
-      window.removeEventListener("openSignupModal", handleOpenSignup);
+      window.removeEventListener("openSigninModal", handleOpenSignin as any);
+      window.removeEventListener("openSignupModal", handleOpenSignup as any);
       document.removeEventListener("keydown", handleKeyDown as any);
     };
   }, [isOpen]);
@@ -89,63 +80,22 @@ const useAuthModal = (): AuthModalState => {
   };
 };
 
-// Composant principal du système d'auth
-export default function ModernAuthSystem() {
-  const { isOpen, mode, selectedRole, setIsOpen, setMode, setSelectedRole } =
-    useAuthModal();
+/* -------------------------------------------------------------------------- */
+/*                              Steps (outside)                               */
+/* -------------------------------------------------------------------------- */
 
-  const { user } = useUser();
-  const { setRole } = useUserActions();
+interface WelcomeStepProps {
+  onSelectUser: () => void;
+  onSelectFarmer: () => void;
+  onGoSignin: () => void;
+}
 
-  const [farmerRequestData, setFarmerRequestData] = useState<FarmerRequestData>(
-    {
-      farmName: "",
-      location: "",
-      phoneNumber: "",
-      description: "",
-    }
-  );
-
-  // Gérer la fermeture automatique après connexion/inscription
-  useEffect(() => {
-    if (user && isOpen) {
-      closeModal();
-    }
-  }, [user, isOpen]);
-
-  const closeModal = useCallback(() => {
-    setIsOpen(false);
-    setMode("welcome");
-    setSelectedRole("user");
-    setFarmerRequestData({
-      farmName: "",
-      location: "",
-      phoneNumber: "",
-      description: "",
-    });
-  }, [setIsOpen, setMode, setSelectedRole]);
-
-  const handleBackdropClick = useCallback(
-    (e: MouseEvent<HTMLDivElement>) => {
-      if (e.target === e.currentTarget) {
-        closeModal();
-      }
-    },
-    [closeModal]
-  );
-
-  const selectRole = useCallback(
-    (role: UserRole) => {
-      setSelectedRole(role);
-      setRole(role);
-    },
-    [setSelectedRole, setRole]
-  );
-
-  if (!isOpen) return null;
-
-  // Étape 1: Écran d'accueil avec choix du profil
-  const WelcomeStep = () => (
+function WelcomeStep({
+  onSelectUser,
+  onSelectFarmer,
+  onGoSignin,
+}: WelcomeStepProps) {
+  return (
     <div className="p-8 text-center">
       <div className="mb-8">
         <div
@@ -167,10 +117,7 @@ export default function ModernAuthSystem() {
 
       <div className="space-y-3 mb-8">
         <button
-          onClick={() => {
-            selectRole("user");
-            setMode("signup");
-          }}
+          onClick={onSelectUser}
           className="w-full p-4 border-2 rounded-xl transition-all text-left group"
           style={{
             borderColor: COLORS.BORDER,
@@ -208,10 +155,7 @@ export default function ModernAuthSystem() {
         </button>
 
         <button
-          onClick={() => {
-            selectRole("farmer");
-            setMode("farmer-request");
-          }}
+          onClick={onSelectFarmer}
           className="w-full p-4 border-2 rounded-xl transition-all text-left group"
           style={{
             borderColor: COLORS.BORDER,
@@ -257,7 +201,7 @@ export default function ModernAuthSystem() {
           Déjà un compte ?
         </p>
         <button
-          onClick={() => setMode("signin")}
+          onClick={onGoSignin}
           className="font-medium transition-colors"
           style={{ color: COLORS.PRIMARY }}
           onMouseEnter={(e) => {
@@ -272,9 +216,27 @@ export default function ModernAuthSystem() {
       </div>
     </div>
   );
+}
 
-  // Étape 2: Collecte des infos producteur
-  const FarmerRequestStep = () => (
+interface FarmerRequestStepProps {
+  farmerRequestData: FarmerRequestData;
+  setFarmerRequestData: React.Dispatch<React.SetStateAction<FarmerRequestData>>;
+  onBack: () => void;
+  onContinue: () => void;
+}
+
+function FarmerRequestStep({
+  farmerRequestData,
+  setFarmerRequestData,
+  onBack,
+  onContinue,
+}: FarmerRequestStepProps) {
+  const disabled =
+    !farmerRequestData.farmName ||
+    !farmerRequestData.location ||
+    !farmerRequestData.description;
+
+  return (
     <div className="p-8">
       <div className="mb-6 text-center">
         <div
@@ -442,7 +404,7 @@ export default function ModernAuthSystem() {
 
       <div className="flex gap-3 mt-8">
         <button
-          onClick={() => setMode("welcome")}
+          onClick={onBack}
           className="flex-1 px-4 py-3 border rounded-lg transition-colors"
           style={{
             borderColor: COLORS.BORDER,
@@ -458,13 +420,10 @@ export default function ModernAuthSystem() {
         >
           Retour
         </button>
+
         <button
-          onClick={() => setMode("signup")}
-          disabled={
-            !farmerRequestData.farmName ||
-            !farmerRequestData.location ||
-            !farmerRequestData.description
-          }
+          onClick={onContinue}
+          disabled={disabled}
           className="flex-1 px-4 py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           style={{
             backgroundColor: COLORS.PRIMARY,
@@ -486,132 +445,214 @@ export default function ModernAuthSystem() {
       </div>
     </div>
   );
+}
 
-  // Étape 3: Inscription Clerk
-  const SignupStep = () => {
-    // Empêcher l'affichage si déjà connecté
-    if (user) {
-      return null;
-    }
+interface SignupStepProps {
+  user: unknown;
+  selectedRole: UserRole;
+  farmerRequestData: FarmerRequestData;
+  onBack: () => void;
+}
 
-    return (
-      <div className="p-8">
-        <div className="mb-6 text-center">
-          <h2
-            className="text-xl font-bold mb-2"
-            style={{ color: COLORS.TEXT_PRIMARY }}
-          >
-            {selectedRole === "farmer"
-              ? "Créer votre compte producteur"
-              : "Créer votre compte"}
-          </h2>
-          <p className="text-sm" style={{ color: COLORS.TEXT_SECONDARY }}>
-            {selectedRole === "farmer"
-              ? "Dernière étape avant de pouvoir publier votre ferme"
-              : "Rejoignez la communauté Farm To Fork"}
-          </p>
-        </div>
+function SignupStep({
+  user,
+  selectedRole,
+  farmerRequestData,
+  onBack,
+}: SignupStepProps) {
+  if (user) return null;
 
-        <SignUp
-          routing="hash"
-          signInUrl="#/sign-in"
-          fallbackRedirectUrl={PATHS.HOME}
-          forceRedirectUrl={PATHS.HOME}
-          appearance={{
-            elements: {
-              formButtonPrimary: "bg-green-600 hover:bg-green-700",
-              card: "shadow-none border-0",
-              headerTitle: "hidden",
-              headerSubtitle: "hidden",
-              footerAction: "hidden",
-            },
-          }}
-          unsafeMetadata={{
-            role: selectedRole,
-            farmerData: selectedRole === "farmer" ? farmerRequestData : null,
-          }}
-        />
-
-        <div className="mt-4 text-center">
-          <button
-            onClick={() =>
-              setMode(selectedRole === "farmer" ? "farmer-request" : "welcome")
-            }
-            className="text-sm transition-colors"
-            style={{ color: COLORS.TEXT_SECONDARY }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = COLORS.TEXT_PRIMARY;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = COLORS.TEXT_SECONDARY;
-            }}
-          >
-            ← Retour
-          </button>
-        </div>
+  return (
+    <div className="p-8">
+      <div className="mb-6 text-center">
+        <h2
+          className="text-xl font-bold mb-2"
+          style={{ color: COLORS.TEXT_PRIMARY }}
+        >
+          {selectedRole === "farmer"
+            ? "Créer votre compte producteur"
+            : "Créer votre compte"}
+        </h2>
+        <p className="text-sm" style={{ color: COLORS.TEXT_SECONDARY }}>
+          {selectedRole === "farmer"
+            ? "Dernière étape avant de pouvoir publier votre ferme"
+            : "Rejoignez la communauté Farm To Fork"}
+        </p>
       </div>
-    );
-  };
 
-  // Étape 4: Connexion Clerk
-  const SigninStep = () => {
-    // Empêcher l'affichage si déjà connecté
-    if (user) {
-      return null;
-    }
+      <SignUp
+        routing="hash"
+        signInUrl="#/sign-in"
+        fallbackRedirectUrl={PATHS.HOME}
+        forceRedirectUrl={PATHS.HOME}
+        appearance={{
+          elements: {
+            formButtonPrimary: "bg-green-600 hover:bg-green-700",
+            card: "shadow-none border-0",
+            headerTitle: "hidden",
+            headerSubtitle: "hidden",
+            footerAction: "hidden",
+          },
+        }}
+        unsafeMetadata={{
+          role: selectedRole,
+          farmerData: selectedRole === "farmer" ? farmerRequestData : null,
+        }}
+      />
 
-    return (
-      <div className="p-6">
-        <div className="mb-6 text-center">
-          <h2
-            className="text-xl font-bold mb-2"
-            style={{ color: COLORS.TEXT_PRIMARY }}
-          >
-            Bon retour sur Farm To Fork
-          </h2>
-          <p className="text-sm" style={{ color: COLORS.TEXT_SECONDARY }}>
-            Connectez-vous pour accéder à votre espace
-          </p>
-        </div>
-
-        <SignIn
-          routing="hash"
-          signUpUrl="#/sign-up"
-          fallbackRedirectUrl={PATHS.HOME}
-          forceRedirectUrl={PATHS.HOME}
-          appearance={{
-            elements: {
-              formButtonPrimary: "bg-green-600 hover:bg-green-700",
-              card: "shadow-none border-0",
-              headerTitle: "hidden",
-              headerSubtitle: "hidden",
-              footerActionLink: "text-green-600 hover:text-green-700",
-              footerAction: "hidden",
-            },
+      <div className="mt-4 text-center">
+        <button
+          onClick={onBack}
+          className="text-sm transition-colors"
+          style={{ color: COLORS.TEXT_SECONDARY }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = COLORS.TEXT_PRIMARY;
           }}
-        />
-
-        <div className="mt-4 text-center">
-          <p className="text-sm mb-2" style={{ color: COLORS.TEXT_SECONDARY }}>
-            Pas encore de compte ?
-          </p>
-          <button
-            onClick={() => setMode("welcome")}
-            className="font-medium text-sm transition-colors"
-            style={{ color: COLORS.PRIMARY }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = COLORS.PRIMARY_DARK;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = COLORS.PRIMARY;
-            }}
-          >
-            Créer un compte
-          </button>
-        </div>
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = COLORS.TEXT_SECONDARY;
+          }}
+        >
+          ← Retour
+        </button>
       </div>
-    );
-  };
+    </div>
+  );
+}
+
+interface SigninStepProps {
+  user: unknown;
+  onGoWelcome: () => void;
+}
+
+function SigninStep({ user, onGoWelcome }: SigninStepProps) {
+  if (user) return null;
+
+  return (
+    <div className="p-6">
+      <div className="mb-6 text-center">
+        <h2
+          className="text-xl font-bold mb-2"
+          style={{ color: COLORS.TEXT_PRIMARY }}
+        >
+          Bon retour sur Farm To Fork
+        </h2>
+        <p className="text-sm" style={{ color: COLORS.TEXT_SECONDARY }}>
+          Connectez-vous pour accéder à votre espace
+        </p>
+      </div>
+
+      <SignIn
+        routing="hash"
+        signUpUrl="#/sign-up"
+        fallbackRedirectUrl={PATHS.HOME}
+        forceRedirectUrl={PATHS.HOME}
+        appearance={{
+          elements: {
+            formButtonPrimary: "bg-green-600 hover:bg-green-700",
+            card: "shadow-none border-0",
+            headerTitle: "hidden",
+            headerSubtitle: "hidden",
+            footerActionLink: "text-green-600 hover:text-green-700",
+            footerAction: "hidden",
+          },
+        }}
+      />
+
+      <div className="mt-4 text-center">
+        <p className="text-sm mb-2" style={{ color: COLORS.TEXT_SECONDARY }}>
+          Pas encore de compte ?
+        </p>
+        <button
+          onClick={onGoWelcome}
+          className="font-medium text-sm transition-colors"
+          style={{ color: COLORS.PRIMARY }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = COLORS.PRIMARY_DARK;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = COLORS.PRIMARY;
+          }}
+        >
+          Créer un compte
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                             ModernAuthSystem                               */
+/* -------------------------------------------------------------------------- */
+
+export default function ModernAuthSystem() {
+  const { isOpen, mode, selectedRole, setIsOpen, setMode, setSelectedRole } =
+    useAuthModal();
+
+  const { user } = useUser();
+  const { setRole } = useUserActions();
+
+  const [farmerRequestData, setFarmerRequestData] = useState<FarmerRequestData>(
+    {
+      farmName: "",
+      location: "",
+      phoneNumber: "",
+      description: "",
+    }
+  );
+
+  const closeModal = useCallback(() => {
+    setIsOpen(false);
+    setMode("welcome");
+    setSelectedRole("user");
+    setFarmerRequestData({
+      farmName: "",
+      location: "",
+      phoneNumber: "",
+      description: "",
+    });
+  }, [setIsOpen, setMode, setSelectedRole]);
+
+  const handleBackdropClick = useCallback(
+    (e: MouseEvent<HTMLDivElement>) => {
+      if (e.target === e.currentTarget) {
+        closeModal();
+      }
+    },
+    [closeModal]
+  );
+
+  const selectRole = useCallback(
+    (role: UserRole) => {
+      setSelectedRole(role);
+      setRole(role);
+    },
+    [setSelectedRole, setRole]
+  );
+
+  const goSignin = useCallback(() => setMode("signin"), [setMode]);
+  const goWelcome = useCallback(() => setMode("welcome"), [setMode]);
+
+  const onSelectUser = useCallback(() => {
+    selectRole("user");
+    setMode("signup");
+  }, [selectRole, setMode]);
+
+  const onSelectFarmer = useCallback(() => {
+    selectRole("farmer");
+    setMode("farmer-request");
+  }, [selectRole, setMode]);
+
+  const onFarmerBack = useCallback(() => setMode("welcome"), [setMode]);
+  const onFarmerContinue = useCallback(() => setMode("signup"), [setMode]);
+
+  const onSignupBack = useCallback(() => {
+    setMode(selectedRole === "farmer" ? "farmer-request" : "welcome");
+  }, [setMode, selectedRole]);
+
+  // ✅ IMPORTANT : pas d'effet qui ferme le modal.
+  // Si l'utilisateur est connecté, on n'affiche juste pas le modal.
+  if (!isOpen) return null;
+  if (user) return null;
 
   return (
     <div
@@ -627,9 +668,7 @@ export default function ModernAuthSystem() {
           <button
             onClick={closeModal}
             className="p-2 rounded-full transition-colors"
-            style={{
-              backgroundColor: `${COLORS.BG_WHITE}e6`, // 90% opacity
-            }}
+            style={{ backgroundColor: `${COLORS.BG_WHITE}e6` }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = COLORS.BG_GRAY;
             }}
@@ -644,10 +683,35 @@ export default function ModernAuthSystem() {
 
         {/* Contenu dynamique */}
         <div className="relative" style={{ backgroundColor: COLORS.BG_WHITE }}>
-          {mode === "welcome" && <WelcomeStep />}
-          {mode === "farmer-request" && <FarmerRequestStep />}
-          {mode === "signup" && <SignupStep />}
-          {mode === "signin" && <SigninStep />}
+          {mode === "welcome" && (
+            <WelcomeStep
+              onSelectUser={onSelectUser}
+              onSelectFarmer={onSelectFarmer}
+              onGoSignin={goSignin}
+            />
+          )}
+
+          {mode === "farmer-request" && (
+            <FarmerRequestStep
+              farmerRequestData={farmerRequestData}
+              setFarmerRequestData={setFarmerRequestData}
+              onBack={onFarmerBack}
+              onContinue={onFarmerContinue}
+            />
+          )}
+
+          {mode === "signup" && (
+            <SignupStep
+              user={user}
+              selectedRole={selectedRole}
+              farmerRequestData={farmerRequestData}
+              onBack={onSignupBack}
+            />
+          )}
+
+          {mode === "signin" && (
+            <SigninStep user={user} onGoWelcome={goWelcome} />
+          )}
         </div>
       </div>
     </div>

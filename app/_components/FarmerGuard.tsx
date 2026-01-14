@@ -2,11 +2,10 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
-import { useEffect, useState, ReactNode } from "react";
+import { useRouter, usePathname } from "next/navigation";
+import { useEffect, type ReactNode } from "react";
 import { COLORS } from "@/lib/config";
 
-// ✅ Types TypeScript
 interface FarmerGuardProps {
   children: ReactNode;
 }
@@ -14,48 +13,59 @@ interface FarmerGuardProps {
 export default function FarmerGuard({ children }: FarmerGuardProps) {
   const { user, isLoaded } = useUser();
   const router = useRouter();
-  const [authorized, setAuthorized] = useState(false);
+  const pathname = usePathname();
+
+  const role = user?.publicMetadata?.role;
+  const isFarmer = role === "farmer";
 
   useEffect(() => {
-    // Vérifier si les données utilisateur sont chargées
     if (!isLoaded) return;
 
-    // Si l'utilisateur n'est pas connecté, rediriger vers la page de connexion
+    // Not logged in → redirect to sign-in with redirect_url
     if (!user) {
-      router.push(
-        `/sign-in?redirect_url=${encodeURIComponent(window.location.href)}`
+      const redirectUrl =
+        typeof window !== "undefined" ? window.location.href : pathname || "/";
+      router.replace(
+        `/sign-in?redirect_url=${encodeURIComponent(redirectUrl)}`
       );
       return;
     }
 
-    // Vérifier le rôle de l'utilisateur
-    const userRole = user?.publicMetadata?.role;
-
-    if (userRole !== "farmer") {
-      // Rediriger vers la page d'erreur d'autorisation
-      router.push("/unauthorized");
-      return;
+    // Logged in but not farmer → unauthorized
+    if (!isFarmer) {
+      router.replace("/unauthorized");
     }
+  }, [isLoaded, user, isFarmer, router, pathname]);
 
-    // Si l'utilisateur est autorisé, afficher le contenu
-    setAuthorized(true);
-  }, [isLoaded, user, router]);
-
-  // Afficher un état de chargement pendant la vérification
-  if (!authorized) {
+  // Loading while Clerk is hydrating
+  if (!isLoaded) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div 
+        <div
           className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2"
-          style={{ 
+          style={{
             borderTopColor: COLORS.PRIMARY,
-            borderBottomColor: COLORS.PRIMARY 
+            borderBottomColor: COLORS.PRIMARY,
           }}
         />
       </div>
     );
   }
 
-  // Afficher le contenu protégé
+  // While redirecting (not logged or not farmer), keep a loader (no flash)
+  if (!user || !isFarmer) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div
+          className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2"
+          style={{
+            borderTopColor: COLORS.PRIMARY,
+            borderBottomColor: COLORS.PRIMARY,
+          }}
+        />
+      </div>
+    );
+  }
+
   return <>{children}</>;
 }

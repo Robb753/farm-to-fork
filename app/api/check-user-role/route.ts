@@ -1,7 +1,7 @@
 // app/api/check-user-role/route.ts
 import { clerkClient } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
-import { isValidUserRole, VALID_ROLES, type ClerkPublicMetadata, type ValidRole } from "@/lib/utils/userRole";
+import { VALID_ROLES, type ClerkPublicMetadata, type ValidRole } from "@/lib/utils/userRole";
 
 // Force dynamic pour éviter la mise en cache des données utilisateur
 export const dynamic = "force-dynamic";

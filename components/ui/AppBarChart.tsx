@@ -77,7 +77,6 @@ const CustomTooltip: React.FC<CustomTooltipProps> = ({
   active, 
   payload, 
   label,
-  colors = DEFAULT_COLORS 
 }) => {
   if (!active || !payload || !payload.length) {
     return null;

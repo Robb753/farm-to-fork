@@ -17,56 +17,40 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/lib/types/database";
 
-/**
- * Type pour un listing avec informations de contact
- */
 type ListingWithContact = Database["public"]["Tables"]["listing"]["Row"];
 
-/**
- * Props du composant ContactCard
- */
 interface ContactCardProps {
   listing: ListingWithContact | null;
   className?: string;
 }
 
-/**
- * Composant de carte de contact pour un listing
- *
- * Features:
- * - Affichage des informations de contact disponibles
- * - Actions interactives (appeler, envoyer email, copier)
- * - Validation et formatage des URLs/téléphones
- * - Design moderne avec animations
- * - Analytics tracking des interactions
- * - Gestion d'erreurs robuste
- *
- * @param listing - Données du listing avec contacts
- * @param className - Classes CSS additionnelles
- * @returns JSX.Element - Card de contact interactive
- */
 export default function ContactCard({
   listing,
   className,
 }: ContactCardProps): JSX.Element | null {
   const [isContacting, setIsContacting] = useState<boolean>(false);
 
-  // Ne pas afficher la card si aucun listing
-  if (!listing) {
-    return null;
-  }
+  // ✅ valeurs sûres (permet hooks même si listing=null)
+  const listingId = listing?.id ?? null;
+  const email = listing?.email ?? null;
+  const phoneNumber = listing?.phoneNumber ?? null;
+  const website = listing?.website ?? null;
+  const address = listing?.address ?? null;
+  const name = listing?.name ?? "listing";
 
   /**
    * Valide et formate un numéro de téléphone français
    */
   const formatPhoneNumber = useCallback((phone: string): string => {
-    // Nettoyer le numéro
     const cleaned = phone.replace(/\D/g, "");
 
-    // Format français standard
     if (cleaned.startsWith("33")) {
-      return `+33 ${cleaned.slice(2).replace(/(\d{1})(\d{2})(\d{2})(\d{2})(\d{2})/, "$1 $2 $3 $4 $5")}`;
-    } else if (cleaned.startsWith("0") && cleaned.length === 10) {
+      return `+33 ${cleaned
+        .slice(2)
+        .replace(/(\d{1})(\d{2})(\d{2})(\d{2})(\d{2})/, "$1 $2 $3 $4 $5")}`;
+    }
+
+    if (cleaned.startsWith("0") && cleaned.length === 10) {
       return cleaned.replace(
         /(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/,
         "$1 $2 $3 $4 $5"
@@ -81,12 +65,9 @@ export default function ContactCard({
    */
   const formatWebsiteUrl = useCallback((url: string): string => {
     if (!url) return "";
-
-    // Ajouter https:// si pas de protocole
     if (!url.startsWith("http://") && !url.startsWith("https://")) {
       return `https://${url}`;
     }
-
     return url;
   }, []);
 
@@ -99,104 +80,102 @@ export default function ContactCard({
         await navigator.clipboard.writeText(text);
         toast.success(`${label} copié dans le presse-papier`);
 
-        // Analytics tracking
-        if (typeof window !== "undefined" && window.gtag) {
+        if (typeof window !== "undefined" && window.gtag && listingId) {
           window.gtag("event", "copy_contact", {
             event_category: "contact_interaction",
             event_label: label.toLowerCase(),
-            listing_id: listing.id,
+            listing_id: listingId,
           });
         }
-      } catch (error) {
+      } catch {
         toast.error("Impossible de copier dans le presse-papier");
       }
     },
-    [listing.id]
+    [listingId]
   );
 
   /**
    * Gère l'appel téléphonique
    */
   const handlePhoneCall = useCallback((): void => {
-    if (!listing.phoneNumber) return;
+    if (!phoneNumber) return;
 
     try {
-      window.location.href = `tel:${listing.phoneNumber}`;
+      window.location.href = `tel:${phoneNumber}`;
 
-      // Analytics tracking
-      if (typeof window !== "undefined" && window.gtag) {
+      if (typeof window !== "undefined" && window.gtag && listingId) {
         window.gtag("event", "phone_call", {
           event_category: "contact_interaction",
-          listing_id: listing.id,
+          listing_id: listingId,
         });
       }
-    } catch (error) {
+    } catch {
       toast.error("Impossible d'initier l'appel");
     }
-  }, [listing.phoneNumber, listing.id]);
+  }, [phoneNumber, listingId]);
 
   /**
    * Gère l'envoi d'email
    */
   const handleEmail = useCallback((): void => {
-    const email = listing.email;
     if (!email) return;
 
     try {
-      const subject = `Question sur votre ferme "${listing.name || "listing"}"`;
-      const body = `Bonjour,\n\nJe suis intéressé(e) par votre ferme et j'aimerais obtenir plus d'informations.\n\nCordialement`;
+      const subject = `Question sur votre ferme "${name}"`;
+      const body =
+        "Bonjour,\n\nJe suis intéressé(e) par votre ferme et j'aimerais obtenir plus d'informations.\n\nCordialement";
 
-      const mailtoUrl = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      const mailtoUrl = `mailto:${email}?subject=${encodeURIComponent(
+        subject
+      )}&body=${encodeURIComponent(body)}`;
+
       window.location.href = mailtoUrl;
 
-      // Analytics tracking
-      if (typeof window !== "undefined" && window.gtag) {
+      if (typeof window !== "undefined" && window.gtag && listingId) {
         window.gtag("event", "email_contact", {
           event_category: "contact_interaction",
-          listing_id: listing.id,
+          listing_id: listingId,
         });
       }
-    } catch (error) {
+    } catch {
       toast.error("Impossible d'ouvrir le client de messagerie");
     }
-  }, [listing.email, listing.name, listing.id]);
+  }, [email, name, listingId]);
 
   /**
    * Gère l'ouverture du site web
    */
   const handleWebsiteClick = useCallback((): void => {
-    if (!listing.website) return;
+    if (!website) return;
 
     try {
-      const url = formatWebsiteUrl(listing.website);
+      const url = formatWebsiteUrl(website);
       window.open(url, "_blank", "noopener,noreferrer");
 
-      // Analytics tracking
-      if (typeof window !== "undefined" && window.gtag) {
+      if (typeof window !== "undefined" && window.gtag && listingId) {
         window.gtag("event", "website_visit", {
           event_category: "contact_interaction",
-          listing_id: listing.id,
+          listing_id: listingId,
           website_url: url,
         });
       }
-    } catch (error) {
+    } catch {
       toast.error("Impossible d'ouvrir le site web");
     }
-  }, [listing.website, listing.id, formatWebsiteUrl]);
+  }, [website, listingId, formatWebsiteUrl]);
 
   /**
-   * Action principale de contact (multiple options)
+   * Action principale de contact
    */
   const handleMainContact = useCallback(async (): Promise<void> => {
     setIsContacting(true);
 
     try {
-      // Prioriser email > téléphone > site web
-      if (listing.email) {
+      if (email) {
         handleEmail();
-      } else if (listing.phoneNumber) {
+      } else if (phoneNumber) {
         handlePhoneCall();
-      } else if (listing.website) {
+      } else if (website) {
         handleWebsiteClick();
       } else {
         toast.error("Aucun moyen de contact disponible");
@@ -204,20 +183,20 @@ export default function ContactCard({
     } finally {
       setTimeout(() => setIsContacting(false), 1000);
     }
-  }, [listing, handleEmail, handlePhoneCall, handleWebsiteClick]);
+  }, [
+    email,
+    phoneNumber,
+    website,
+    handleEmail,
+    handlePhoneCall,
+    handleWebsiteClick,
+  ]);
 
-  const email = listing.email;
-  const hasContactInfo = !!(
-    listing.address ||
-    listing.phoneNumber ||
-    email ||
-    listing.website
-  );
+  // ✅ maintenant seulement : retours conditionnels (APRES les hooks)
+  if (!listing) return null;
 
-  // Si aucune info de contact, ne pas afficher la card
-  if (!hasContactInfo) {
-    return null;
-  }
+  const hasContactInfo = !!(address || phoneNumber || email || website);
+  if (!hasContactInfo) return null;
 
   return (
     <Card
@@ -234,20 +213,17 @@ export default function ContactCard({
       </CardHeader>
 
       <CardContent className="space-y-4 pt-0">
-        {/* Adresse */}
-        {listing.address && (
+        {address && (
           <div className="group flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-50 transition-colors">
             <MapPin className="h-4 w-4 mt-1 text-green-600 flex-shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="font-medium text-gray-900">Adresse</p>
-              <p className="text-sm text-gray-600 leading-relaxed">
-                {listing.address}
-              </p>
+              <p className="text-sm text-gray-600 leading-relaxed">{address}</p>
             </div>
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => copyToClipboard(listing.address!, "Adresse")}
+              onClick={() => copyToClipboard(address, "Adresse")}
               className="opacity-0 group-hover:opacity-100 transition-opacity"
             >
               <Copy className="h-3 w-3" />
@@ -255,8 +231,7 @@ export default function ContactCard({
           </div>
         )}
 
-        {/* Téléphone */}
-        {listing.phoneNumber && (
+        {phoneNumber && (
           <>
             <Separator />
             <div className="group flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 transition-colors">
@@ -264,7 +239,7 @@ export default function ContactCard({
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-gray-900">Téléphone</p>
                 <p className="text-sm text-gray-600">
-                  {formatPhoneNumber(listing.phoneNumber)}
+                  {formatPhoneNumber(phoneNumber)}
                 </p>
               </div>
               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -279,9 +254,7 @@ export default function ContactCard({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() =>
-                    copyToClipboard(listing.phoneNumber!, "Numéro")
-                  }
+                  onClick={() => copyToClipboard(phoneNumber, "Numéro")}
                 >
                   <Copy className="h-3 w-3" />
                 </Button>
@@ -290,7 +263,6 @@ export default function ContactCard({
           </>
         )}
 
-        {/* Email */}
         {email && (
           <>
             <Separator />
@@ -321,8 +293,7 @@ export default function ContactCard({
           </>
         )}
 
-        {/* Site web */}
-        {listing.website && (
+        {website && (
           <>
             <Separator />
             <div className="group flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 transition-colors">
@@ -333,7 +304,7 @@ export default function ContactCard({
                   className="text-sm text-blue-600 truncate hover:underline cursor-pointer"
                   onClick={handleWebsiteClick}
                 >
-                  {listing.website}
+                  {website}
                 </p>
               </div>
               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -348,7 +319,7 @@ export default function ContactCard({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => copyToClipboard(listing.website!, "Site web")}
+                  onClick={() => copyToClipboard(website, "Site web")}
                 >
                   <Copy className="h-3 w-3" />
                 </Button>
@@ -359,7 +330,6 @@ export default function ContactCard({
 
         <Separator />
 
-        {/* Bouton de contact principal */}
         <Button
           onClick={handleMainContact}
           disabled={isContacting}
@@ -371,7 +341,7 @@ export default function ContactCard({
         >
           {isContacting ? (
             <>
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2"></div>
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
               Contact en cours...
             </>
           ) : (
@@ -382,7 +352,6 @@ export default function ContactCard({
           )}
         </Button>
 
-        {/* Message d'aide */}
         <p className="text-xs text-gray-500 text-center">
           Cliquez sur les icônes pour des actions rapides
         </p>

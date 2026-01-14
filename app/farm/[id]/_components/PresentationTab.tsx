@@ -18,13 +18,8 @@ import { useState, useMemo, useCallback, type ReactNode } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/lib/types/database";
-
-// 🔒 SÉCURITÉ: Import des fonctions de sanitisation
 import { escapeHTML, sanitizeHTML } from "@/lib/utils/sanitize";
 
-/**
- * Type pour un listing avec toutes ses données
- */
 type ListingWithDetails = Database["public"]["Tables"]["listing"]["Row"];
 
 interface PresentationTabProps {
@@ -46,18 +41,11 @@ interface FarmStats {
   productCount?: number;
 }
 
-/**
- * Helpers parsing robustes (enum[] / string / json string)
- */
 function normalizeToStringArray(value: unknown): string[] {
   if (!value) return [];
-
-  if (Array.isArray(value)) {
-    return value.map((v) => String(v)).filter(Boolean);
-  }
+  if (Array.isArray(value)) return value.map((v) => String(v)).filter(Boolean);
 
   if (typeof value === "string") {
-    // tenter JSON array
     try {
       const parsed = JSON.parse(value);
       if (Array.isArray(parsed))
@@ -68,29 +56,24 @@ function normalizeToStringArray(value: unknown): string[] {
     return [value].filter(Boolean);
   }
 
-  // enum simple / autre
   return [String(value)].filter(Boolean);
 }
 
-/**
- * Composant PresentationTab - Onglet présentation d'une ferme
- *
- * 🔒 SÉCURITÉ: Toutes les données utilisateur sont protégées contre XSS
- */
 export default function PresentationTab({
   listing,
   className,
 }: PresentationTabProps): JSX.Element | null {
   const [expandedDescription, setExpandedDescription] = useState(false);
-  const [shareCount, setShareCount] = useState(0); // tu peux l'afficher plus tard si tu veux
+  const [_shareCount, setShareCount] = useState(0);
 
-  if (!listing) return null;
+  // ✅ Toujours définir des valeurs stables même si listing est null
+  const listingId = listing?.id ?? 0;
+  const listingName = listing?.name ?? "Ferme locale";
+  const listingDescription = listing?.description ?? "";
 
-  /**
-   * Certifications enrichies (certification_enum[])
-   * 🔒 SÉCURITÉ: Nom custom échappé dans le cas default
-   */
   const certifications = useMemo<CertificationInfo[]>(() => {
+    if (!listing) return [];
+
     const certs = normalizeToStringArray(listing.certifications)
       .map((s) => s.trim())
       .filter(Boolean);
@@ -126,7 +109,6 @@ export default function PresentationTab({
       const key = cert.toLowerCase();
       return (
         certificationMap[key] || {
-          // 🔒 SÉCURITÉ: Échapper le nom custom
           name: escapeHTML(cert),
           icon: <Award className="h-3 w-3" />,
           color: "gray",
@@ -134,13 +116,11 @@ export default function PresentationTab({
         }
       );
     });
-  }, [listing.certifications]);
+  }, [listing]);
 
-  /**
-   * Méthodes de production
-   * 🔒 SÉCURITÉ: Nom custom échappé dans le cas default
-   */
   const productionMethods = useMemo(() => {
+    if (!listing) return [];
+
     const methods = normalizeToStringArray(listing.production_method)
       .map((s) => s.trim())
       .filter(Boolean);
@@ -157,7 +137,6 @@ export default function PresentationTab({
     return methods.map((method) => {
       const key = method.toLowerCase();
       return {
-        // 🔒 SÉCURITÉ: Échapper le nom custom
         name: escapeHTML(method),
         ...(methodMap[key] || {
           color: "gray",
@@ -165,14 +144,11 @@ export default function PresentationTab({
         }),
       };
     });
-  }, [listing.production_method]);
+  }, [listing]);
 
-  /**
-   * ✅ Stats: 100% déterministes (plus de Math.random)
-   * - foundedYear: listing.founded_year, sinon created_at (année), sinon undefined
-   * - le reste: uniquement si tu as des champs réels (sinon on ne "fake" pas)
-   */
   const farmStats = useMemo<FarmStats>(() => {
+    if (!listing) return {};
+
     const foundedFromDb =
       typeof (listing as any).founded_year === "number"
         ? (listing as any).founded_year
@@ -186,10 +162,8 @@ export default function PresentationTab({
       return d.getFullYear();
     })();
 
-    // IMPORTANT: pas d'invention de stats => pas de mismatch, et plus crédible.
     return {
       foundedYear: foundedFromDb ?? foundedFromCreatedAt,
-      // 🔒 SÉCURITÉ: Si ces champs existent, on les échappe dans le JSX
       farmSize: (listing as any).farm_size ?? undefined,
       employeeCount: (listing as any).employee_count ?? undefined,
       productCount: (listing as any).product_count ?? undefined,
@@ -197,47 +171,41 @@ export default function PresentationTab({
   }, [listing]);
 
   const shouldTruncateDescription = useMemo(() => {
-    return !!listing.description && listing.description.length > 300;
-  }, [listing.description]);
+    return listingDescription.length > 300;
+  }, [listingDescription]);
 
   const displayedDescription = useMemo(() => {
-    if (!listing.description) return "";
+    if (!listingDescription) return "";
     if (!shouldTruncateDescription || expandedDescription)
-      return listing.description;
-    return listing.description.substring(0, 300) + "...";
-  }, [listing.description, shouldTruncateDescription, expandedDescription]);
+      return listingDescription;
+    return listingDescription.substring(0, 300) + "...";
+  }, [listingDescription, shouldTruncateDescription, expandedDescription]);
 
   const toggleDescription = useCallback(() => {
     setExpandedDescription((prev) => {
       const next = !prev;
 
-      // Analytics (safe)
       const gtag = (globalThis as any)?.gtag;
       if (typeof gtag === "function") {
         gtag("event", "toggle_description", {
           event_category: "presentation_interaction",
           event_label: next ? "expand" : "collapse",
-          listing_id: listing.id,
+          listing_id: listingId,
         });
       }
 
       return next;
     });
-  }, [listing.id]);
+  }, [listingId]);
 
-  /**
-   * Gestion du partage
-   * 🔒 SÉCURITÉ: Données échappées avant partage
-   */
   const handleShare = useCallback(async () => {
     try {
-      // globalThis est safe SSR, mais la callback ne sera appelée que côté client.
       const url = typeof window !== "undefined" ? window.location.href : "";
-
-      // 🔒 SÉCURITÉ: Échapper nom et description
       const shareData = {
-        title: `${escapeHTML(listing.name || "Ferme locale")} | Présentation`,
-        text: `Découvrez ${escapeHTML(listing.name || "cette ferme")} - ${escapeHTML(listing.description?.substring(0, 100) || "")}...`,
+        title: `${escapeHTML(listingName)} | Présentation`,
+        text: `Découvrez ${escapeHTML(listingName)} - ${escapeHTML(
+          listingDescription.substring(0, 100)
+        )}...`,
         url,
       };
 
@@ -254,19 +222,18 @@ export default function PresentationTab({
 
       setShareCount((prev) => prev + 1);
 
-      // Analytics
       const gtag = (globalThis as any)?.gtag;
       if (typeof gtag === "function") {
         gtag("event", "share_presentation", {
           event_category: "presentation_interaction",
-          listing_id: listing.id,
+          listing_id: listingId,
         });
       }
     } catch (error) {
       console.error("Erreur lors du partage:", error);
       toast.error("Impossible de partager");
     }
-  }, [listing.id, listing.name, listing.description]);
+  }, [listingId, listingName, listingDescription]);
 
   const getBadgeClasses = useCallback((color: string) => {
     const colorMap: Record<string, string> = {
@@ -284,6 +251,9 @@ export default function PresentationTab({
     };
     return colorMap[color] || colorMap.gray;
   }, []);
+
+  // ✅ Maintenant on peut return conditionnellement : TOUS les hooks ont déjà été appelés
+  if (!listing) return null;
 
   if (
     !listing.description &&
@@ -307,7 +277,6 @@ export default function PresentationTab({
 
   return (
     <div className={cn("space-y-8", className)}>
-      {/* Header avec actions */}
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-900">Présentation</h2>
         <div className="flex gap-2">
@@ -323,7 +292,6 @@ export default function PresentationTab({
         </div>
       </div>
 
-      {/* Description */}
       {listing.description && (
         <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm">
           <div className="flex items-center gap-2 mb-4">
@@ -335,7 +303,6 @@ export default function PresentationTab({
             </h3>
           </div>
 
-          {/* 🔒 SÉCURITÉ: Description sanitisée (permet formatage basique) */}
           <div className="prose max-w-none">
             <div
               className="text-gray-700 leading-relaxed whitespace-pre-line prose prose-sm max-w-none"

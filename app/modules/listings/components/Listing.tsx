@@ -72,25 +72,6 @@ interface ListItemProps {
   onShowOnMap?: (item: ListingItem) => void;
 }
 
-// ✅ TRANSFORMATION SÉCURISÉE
-const transformSupabaseToListing = (item: any): any => {
-  return {
-    ...item,
-    lat: typeof item.lat === "number" ? item.lat : parseFloat(item.lat || 0),
-    lng: typeof item.lng === "number" ? item.lng : parseFloat(item.lng || 0),
-    availability:
-      item.availability === "open" || item.availability === "closed"
-        ? item.availability
-        : undefined,
-    product_type: Array.isArray(item.product_type) ? item.product_type : [],
-    certifications: Array.isArray(item.certifications)
-      ? item.certifications
-      : [],
-    active: item.active ?? true,
-    created_at: item.created_at ?? new Date().toISOString(),
-  };
-};
-
 /* ------------------------------
    UI Components - Beaux et Fonctionnels
 ------------------------------ */
@@ -545,8 +526,7 @@ export default function Listing({
 }: ListingProps): JSX.Element {
   // Store hooks
   const { visible: visibleListings = [] } = useListingsState();
-  const { setAllListings } = useListingsActions();
-  const { bounds: mapBounds } = useMapState();
+  const { bounds: _mapBounds } = useMapState();
   const { setCoordinates, setZoom } = useMapActions();
 
   // Interactions

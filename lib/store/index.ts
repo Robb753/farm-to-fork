@@ -1,11 +1,12 @@
-// lib/store/index.ts - VERSION MIGRÉE VERS STORE UNIFIÉ
-// Point d'entrée centralisé pour le store unifié
+// lib/store/index.ts
+// Point d'entrée centralisé pour le store unifié + compat
 
 // ==================== STORE UNIFIÉ ====================
 
-// ✅ Export du store unifié et tous ses hooks
 export {
   useUnifiedStore,
+
+  // Selectors
   useMapBounds,
   useMapCoordinates,
   useAllListings,
@@ -15,13 +16,22 @@ export {
   useCurrentFilters,
   useHasActiveFilters,
   useIsMapExpanded,
+
+  // Actions (groupées)
   useMapActions,
   useListingsActions,
   useFiltersActions,
   useUIActions,
+
+  // Actions atomiques (stables)
+  useSetMapCoordinates,
+  useSetMapBounds,
+  useSetMapZoom,
+  // (si tu l’ajoutes dans unifiedStore)
+  // useSetMapApiLoaded,
 } from "./unifiedStore";
 
-// ✅ Export des types du store unifié
+// ✅ Export des types du store unifié (inclure FilterState ici)
 export type {
   UnifiedStore,
   MapState,
@@ -34,153 +44,129 @@ export type {
   FiltersActions,
   InteractionsActions,
   UIActions,
+  FilterState,
   MapBounds,
   MapCoordinates,
   Listing,
 } from "./unifiedStore";
 
-// ==================== EXPORTS SUPPLÉMENTAIRES POUR EXPLORE.TSX ====================
+// ==================== IMPORTS INTERNES (compat hooks) ====================
 
+import { useUnifiedStore } from "./unifiedStore";
 import {
-  useUnifiedStore,
-  useCurrentFilters,
-  useFiltersActions,
   useAllListings,
   useFilteredListings,
   useVisibleListings,
   useIsListingsLoading,
   useMapBounds,
   useMapCoordinates,
-  type FilterState,
-  type Listing,
-  type MapBounds,
-  type MapCoordinates,
-  useIsMapExpanded,
 } from "./unifiedStore";
 
-// ✅ Export type LatLng (alias de MapCoordinates)
+import type { Listing, MapBounds, MapCoordinates } from "./unifiedStore";
+
+// ✅ Alias type LatLng (compat)
 export type LatLng = MapCoordinates;
 
-// ✅ Hook useListingsState compatible avec Explore.tsx
-export const useListingsState = () => {
-  return {
-    all: useAllListings(),
-    filtered: useFilteredListings(),
-    visible: useVisibleListings(),
-    isLoading: useIsListingsLoading(),
-    hasMore: useUnifiedStore((state) => state.listings.hasMore),
-    page: useUnifiedStore((state) => state.listings.page),
-    totalCount: useUnifiedStore((state) => state.listings.all.length), // ou depuis l'API
-    error: useUnifiedStore((state) => state.listings.error),
-  };
-};
+// ==================== HOOKS COMPAT (Explore.tsx etc.) ====================
 
-// ✅ Hook useMapState compatible avec Explore.tsx
-export const useMapState = () => {
-  return {
-    coordinates: useMapCoordinates(),
-    bounds: useMapBounds(),
-    zoom: useUnifiedStore((state) => state.map.zoom),
-    mapInstance: useUnifiedStore((state) => state.map.instance),
-    isLoading: useUnifiedStore((state) => state.map.isLoading),
-    error: useUnifiedStore((state) => state.map.error),
-  };
-};
+export const useListingsState = () => ({
+  all: useAllListings(),
+  filtered: useFilteredListings(),
+  visible: useVisibleListings(),
+  isLoading: useIsListingsLoading(),
+  hasMore: useUnifiedStore((s) => s.listings.hasMore),
+  page: useUnifiedStore((s) => s.listings.page),
+  totalCount: useUnifiedStore((s) => s.listings.all.length),
+  error: useUnifiedStore((s) => s.listings.error),
+});
+
+export const useMapState = () => ({
+  coordinates: useMapCoordinates(),
+  bounds: useMapBounds(),
+  zoom: useUnifiedStore((s) => s.map.zoom),
+  mapInstance: useUnifiedStore((s) => s.map.instance),
+  isLoading: useUnifiedStore((s) => s.map.isLoading),
+  isApiLoaded: useUnifiedStore((s) => s.map.isApiLoaded), // ✅
+  error: useUnifiedStore((s) => s.map.error),
+});
 
 // ==================== ALIAS DE COMPATIBILITÉ ====================
-// Pour les composants qui n'ont pas encore été migrés
 
 /**
- * @deprecated Utiliser useUnifiedStore((state) => state.filters.current)
- * Alias de compatibilité pour les anciens composants
+ * @deprecated Utiliser useCurrentFilters() / useUnifiedStore((s)=>s.filters.current)
  */
-export const useFiltersStoreState = () => {
-  const filters = useCurrentFilters();
-  return { filters };
-};
-
-export const useUIState = () => {
-  return {
-    isMapExpanded: useIsMapExpanded(),
-    isMobile: useUnifiedStore((state) => state.ui.isMobile),
-    isTablet: useUnifiedStore((state) => state.ui.isTablet),
-    isDesktop: useUnifiedStore((state) => state.ui.isDesktop),
-    isFiltersModalOpen: useUnifiedStore((state) => state.ui.isFiltersModalOpen),
-  };
-};
-
-export const useInteractionsState = () => {
-  return {
-    hoveredListingId: useUnifiedStore(
-      (state) => state.interactions.hoveredListingId
-    ),
-    selectedListingId: useUnifiedStore(
-      (state) => state.interactions.selectedListingId
-    ),
-    infoWindowOpen: useUnifiedStore(
-      (state) => state.interactions.infoWindowOpen
-    ),
-  };
-};
+export const useFiltersStoreState = () => ({
+  filters: useUnifiedStore((s) => s.filters.current),
+});
 
 /**
- * @deprecated Utiliser useFiltersActions() depuis unifiedStore
- * Alias de compatibilité pour les anciens composants
+ * @deprecated Utiliser useUIActions() / selectors dédiés
  */
-export const useFiltersStoreActions = useFiltersActions;
+export const useUIState = () => ({
+  isMapExpanded: useUnifiedStore((s) => s.ui.isMapExpanded),
+  isMobile: useUnifiedStore((s) => s.ui.isMobile),
+  isTablet: useUnifiedStore((s) => s.ui.isTablet),
+  isDesktop: useUnifiedStore((s) => s.ui.isDesktop),
+  isFiltersModalOpen: useUnifiedStore((s) => s.ui.isFiltersModalOpen),
+});
 
 /**
- * @deprecated Utiliser useUnifiedStore((state) => state.map)
- * Alias de compatibilité pour les anciens composants
+ * @deprecated Utiliser useUnifiedStore((s)=>s.interactions)
  */
-export const useMapStoreState = () => {
-  const coordinates = useUnifiedStore((state) => state.map.coordinates);
-  const bounds = useUnifiedStore((state) => state.map.bounds);
-  const zoom = useUnifiedStore((state) => state.map.zoom);
-  const isLoading = useUnifiedStore((state) => state.map.isLoading);
-  const error = useUnifiedStore((state) => state.map.error);
-
-  return { coordinates, bounds, zoom, isLoading, error };
-};
+export const useInteractionsState = () => ({
+  hoveredListingId: useUnifiedStore((s) => s.interactions.hoveredListingId),
+  selectedListingId: useUnifiedStore((s) => s.interactions.selectedListingId),
+  infoWindowOpen: useUnifiedStore((s) => s.interactions.infoWindowOpen),
+});
 
 /**
- * @deprecated Utiliser useMapActions() depuis unifiedStore
+ * @deprecated Utiliser useFiltersActions()
  */
-export const useMapStoreActions = () => {
-  return useUnifiedStore((state) => state.mapActions);
-};
+export const useFiltersStoreActions = () =>
+  useUnifiedStore((s) => s.filtersActions);
 
 /**
- * @deprecated Utiliser useUnifiedStore((state) => state.listings)
+ * @deprecated Utiliser useMapState()
  */
-export const useListingsStoreState = () => {
-  const all = useUnifiedStore((state) => state.listings.all);
-  const visible = useUnifiedStore((state) => state.listings.visible);
-  const filtered = useUnifiedStore((state) => state.listings.filtered);
-  const isLoading = useUnifiedStore((state) => state.listings.isLoading);
-  const error = useUnifiedStore((state) => state.listings.error);
-
-  return { all, visible, filtered, isLoading, error };
-};
-
-/**
- * @deprecated Utiliser useListingsActions() depuis unifiedStore
- */
-export const useListingsStoreActions = () => {
-  return useUnifiedStore((state) => state.listingsActions);
-};
+export const useMapStoreState = () => ({
+  coordinates: useUnifiedStore((s) => s.map.coordinates),
+  bounds: useUnifiedStore((s) => s.map.bounds),
+  zoom: useUnifiedStore((s) => s.map.zoom),
+  isLoading: useUnifiedStore((s) => s.map.isLoading),
+  isApiLoaded: useUnifiedStore((s) => s.map.isApiLoaded),
+  error: useUnifiedStore((s) => s.map.error),
+});
 
 /**
- * @deprecated Utiliser useUnifiedStore((state) => state.interactions)
+ * @deprecated Utiliser useMapActions()
  */
-export const useInteractionsActions = () => {
-  return useUnifiedStore((state) => state.interactionsActions);
-};
+export const useMapStoreActions = () => useUnifiedStore((s) => s.mapActions);
+
+/**
+ * @deprecated Utiliser useListingsState()
+ */
+export const useListingsStoreState = () => ({
+  all: useUnifiedStore((s) => s.listings.all),
+  visible: useUnifiedStore((s) => s.listings.visible),
+  filtered: useUnifiedStore((s) => s.listings.filtered),
+  isLoading: useUnifiedStore((s) => s.listings.isLoading),
+  error: useUnifiedStore((s) => s.listings.error),
+});
+
+/**
+ * @deprecated Utiliser useListingsActions()
+ */
+export const useListingsStoreActions = () =>
+  useUnifiedStore((s) => s.listingsActions);
+
+/**
+ * @deprecated Utiliser useUnifiedStore((s)=>s.interactionsActions)
+ */
+export const useInteractionsActions = () =>
+  useUnifiedStore((s) => s.interactionsActions);
 
 // ==================== STORES INDÉPENDANTS ====================
-// Ces stores ne font PAS partie du store unifié
 
-// Store utilisateur (userStore.ts)
 export {
   useUserStore,
   useUserProfile,
@@ -193,7 +179,6 @@ export {
   useIsFavorite,
 } from "./userStore";
 
-// Store des paramètres (settingsStore.ts)
 export {
   useSettingsStore,
   useCurrentLanguage,
@@ -201,45 +186,32 @@ export {
   useLanguageActions,
 } from "./settingsStore";
 
-// ==================== RE-EXPORT DU TYPE FilterState ====================
-// Pour compatibilité avec les composants existants
-export type { FilterState };
-
 // ==================== TYPE GUARDS ====================
 
-/**
- * Type guard pour vérifier si un objet est un Listing valide
- */
-export const isListingValid = (obj: any): obj is Listing => {
+export const isListingValid = (obj: unknown): obj is Listing => {
+  const o = obj as any;
   return (
-    obj &&
-    typeof obj === "object" &&
-    typeof obj.id === "number" &&
-    typeof obj.name === "string" &&
-    typeof obj.address === "string" &&
-    typeof obj.lat === "number" &&
-    typeof obj.lng === "number"
+    !!o &&
+    typeof o === "object" &&
+    typeof o.id === "number" &&
+    typeof o.name === "string" &&
+    typeof o.address === "string" &&
+    typeof o.lat === "number" &&
+    typeof o.lng === "number"
   );
 };
 
-/**
- * Type guard pour vérifier si un objet est des MapBounds valides
- */
-export const isMapBoundsValid = (obj: any): obj is MapBounds => {
+export const isMapBoundsValid = (obj: unknown): obj is MapBounds => {
+  const o = obj as any;
   return (
-    obj &&
-    typeof obj === "object" &&
-    typeof obj.north === "number" &&
-    typeof obj.south === "number" &&
-    typeof obj.east === "number" &&
-    typeof obj.west === "number"
+    !!o &&
+    typeof o === "object" &&
+    typeof o.north === "number" &&
+    typeof o.south === "number" &&
+    typeof o.east === "number" &&
+    typeof o.west === "number"
   );
 };
 
-// Export par défaut
-const storeIndex = {
-  isListingValid,
-  isMapBoundsValid,
-};
-
-export default storeIndex;
+// Export par défaut (optionnel, tu peux le supprimer si inutile)
+export default { isListingValid, isMapBoundsValid };

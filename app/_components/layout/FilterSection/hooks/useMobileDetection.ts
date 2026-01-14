@@ -1,129 +1,175 @@
-// FilterSection/hooks/useMobileDetection.ts
+"use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 import { BREAKPOINTS, DEBOUNCE_DELAYS } from "../utils/constants";
 
 /**
- * Hook pour la détection mobile optimisée
- *
- * Features:
- * - ✅ Détection responsive fiable
- * - ✅ Debounced resize pour les performances
- * - ✅ SSR safe (évite hydration mismatch)
- * - ✅ Cleanup automatique des event listeners
+ * ✅ External store: window.innerWidth (SSR-safe)
+ * - Pas de setState dans useEffect
+ * - Debounce du notify
  */
-export function useMobileDetection() {
-  const [isMobile, setIsMobile] = useState(false);
-  const [mounted, setMounted] = useState(false);
+function subscribeWindowWidth(onStoreChange: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
 
-  // ═══ Fonction de vérification mobile ═══
-  const checkMobile = useCallback(() => {
-    const width = window.innerWidth;
-    setIsMobile(width <= BREAKPOINTS.MOBILE);
-  }, []);
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
-  // ═══ Debounced resize handler ═══
-  const debouncedResize = useCallback(() => {
-    let timeoutId: ReturnType<typeof setTimeout>;
-
-    return () => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(checkMobile, DEBOUNCE_DELAYS.RESIZE);
-    };
-  }, [checkMobile]);
-
-  // ═══ Setup initial et event listeners ═══
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    setMounted(true);
-    checkMobile();
-
-    const handleResize = debouncedResize();
-    window.addEventListener("resize", handleResize);
-
-    return () => {
-      window.removeEventListener("resize", handleResize);
-    };
-  }, [checkMobile, debouncedResize]);
-
-  return {
-    isMobile,
-    mounted,
-    isTablet:
-      mounted &&
-      window.innerWidth <= BREAKPOINTS.TABLET &&
-      window.innerWidth > BREAKPOINTS.MOBILE,
-    isDesktop: mounted && window.innerWidth > BREAKPOINTS.TABLET,
+  const handler = () => {
+    if (timeoutId) clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => {
+      onStoreChange();
+    }, DEBOUNCE_DELAYS.RESIZE);
   };
+
+  window.addEventListener("resize", handler, { passive: true });
+
+  return () => {
+    if (timeoutId) clearTimeout(timeoutId);
+    window.removeEventListener("resize", handler);
+  };
+}
+
+function getWindowWidthSnapshot(): number {
+  return typeof window === "undefined" ? 0 : window.innerWidth;
+}
+
+function getWindowWidthServerSnapshot(): number {
+  return 0;
+}
+
+/**
+ * Hook pour la détection mobile optimisée (Compiler-friendly)
+ */
+export function useMobileDetection(): {
+  mounted: boolean;
+  width?: number;
+  isMobile: boolean;
+  isTablet: boolean;
+  isDesktop: boolean;
+} {
+  const width = useSyncExternalStore(
+    subscribeWindowWidth,
+    getWindowWidthSnapshot,
+    getWindowWidthServerSnapshot
+  );
+
+  const mounted = width !== 0;
+
+  const isMobile = mounted && width <= BREAKPOINTS.MOBILE;
+  const isTablet =
+    mounted && width <= BREAKPOINTS.TABLET && width > BREAKPOINTS.MOBILE;
+  const isDesktop = mounted && width > BREAKPOINTS.TABLET;
+
+  return useMemo(
+    () => ({
+      mounted,
+      width: mounted ? width : undefined,
+      isMobile,
+      isTablet,
+      isDesktop,
+    }),
+    [mounted, width, isMobile, isTablet, isDesktop]
+  );
+}
+
+/**
+ * ✅ External store: matchMedia(query) (SSR-safe)
+ * - Pas de setState dans useEffect
+ *
+ * On gère:
+ * - API moderne: addEventListener/removeEventListener
+ * - API legacy: addListener/removeListener (anciens Safari/WebViews)
+ */
+type MediaQueryListLegacy = MediaQueryList & {
+  addListener?: (
+    listener: (this: MediaQueryList, ev: MediaQueryListEvent) => any
+  ) => void;
+  removeListener?: (
+    listener: (this: MediaQueryList, ev: MediaQueryListEvent) => any
+  ) => void;
+};
+
+function subscribeMediaQuery(
+  query: string,
+  onStoreChange: () => void
+): () => void {
+  if (typeof window === "undefined") return () => {};
+
+  const mql = window.matchMedia(query) as MediaQueryListLegacy;
+  const handler = () => onStoreChange();
+
+  // ✅ API moderne
+  if (typeof mql.addEventListener === "function") {
+    mql.addEventListener("change", handler);
+    return () => {
+      mql.removeEventListener("change", handler);
+    };
+  }
+
+  // ✅ Fallback legacy
+  if (typeof mql.addListener === "function") {
+    mql.addListener(handler);
+    return () => {
+      mql.removeListener?.(handler);
+    };
+  }
+
+  // ✅ Ultra fallback: pas d'abonnement possible
+  return () => {};
+}
+
+function getMediaQuerySnapshot(query: string): boolean {
+  return typeof window === "undefined"
+    ? false
+    : window.matchMedia(query).matches;
+}
+
+function getMediaQueryServerSnapshot(): boolean {
+  return false;
 }
 
 /**
  * Hook pour la détection MediaQuery spécifique
  */
 export function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const media = window.matchMedia(query);
-
-    // Set initial value
-    setMatches(media.matches);
-
-    // Create event listener
-    const listener = (e: MediaQueryListEvent) => {
-      setMatches(e.matches);
-    };
-
-    // Add listener
-    if (media.addEventListener) {
-      media.addEventListener("change", listener);
-    } else {
-      // Fallback for older browsers
-      media.addListener(listener);
-    }
-
-    // Cleanup
-    return () => {
-      if (media.removeEventListener) {
-        media.removeEventListener("change", listener);
-      } else {
-        media.removeListener(listener);
-      }
-    };
-  }, [query]);
-
-  return matches;
+  return useSyncExternalStore(
+    (onStoreChange) => subscribeMediaQuery(query, onStoreChange),
+    () => getMediaQuerySnapshot(query),
+    getMediaQueryServerSnapshot
+  );
 }
 
 /**
  * Hook pour orientation (portrait/landscape)
  */
-export function useOrientation() {
+export function useOrientation(): {
+  isPortrait: boolean;
+  isLandscape: boolean;
+} {
   const isPortrait = useMediaQuery("(orientation: portrait)");
   const isLandscape = useMediaQuery("(orientation: landscape)");
 
-  return {
-    isPortrait,
-    isLandscape,
-  };
+  return useMemo(
+    () => ({ isPortrait, isLandscape }),
+    [isPortrait, isLandscape]
+  );
 }
 
 /**
  * Hook pour les preferences utilisateur
  */
-export function useUserPreferences() {
+export function useUserPreferences(): {
+  prefersReducedMotion: boolean;
+  prefersDarkMode: boolean;
+  prefersHighContrast: boolean;
+} {
   const prefersReducedMotion = useMediaQuery(
     "(prefers-reduced-motion: reduce)"
   );
   const prefersDarkMode = useMediaQuery("(prefers-color-scheme: dark)");
   const prefersHighContrast = useMediaQuery("(prefers-contrast: high)");
 
-  return {
-    prefersReducedMotion,
-    prefersDarkMode,
-    prefersHighContrast,
-  };
+  return useMemo(
+    () => ({ prefersReducedMotion, prefersDarkMode, prefersHighContrast }),
+    [prefersReducedMotion, prefersDarkMode, prefersHighContrast]
+  );
 }

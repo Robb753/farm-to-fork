@@ -1,6 +1,13 @@
 "use client";
 
-import React, { useState, useCallback, useRef, useEffect } from "react";
+import React, {
+  useState,
+  useCallback,
+  useRef,
+  useEffect,
+  useMemo,
+} from "react";
+import Image from "next/image";
 import { Trash2, Globe } from "@/utils/icons";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -53,11 +60,11 @@ const DEFAULT_CONFIG = {
     "image/jpg",
     "image/webp",
   ],
-  acceptString: "image/png, image/gif, image/jpeg, image/jpg, image/webp",
 };
 
 /**
  * Hook pour la gestion de l'état des fichiers
+ * ✅ Ici maxImages est vraiment utilisé (plus de "unused")
  */
 const useFileUpload = (
   setImages: (files: File[]) => void,
@@ -84,13 +91,13 @@ const useFileUpload = (
   );
 
   const simulateProgress = useCallback((): void => {
-    // Clear any existing interval before starting a new one
     if (progressIntervalRef.current) {
       clearInterval(progressIntervalRef.current);
     }
 
     setUploadProgress(0);
     let progress = 0;
+
     progressIntervalRef.current = setInterval(() => {
       progress += 10;
       setUploadProgress(progress);
@@ -102,6 +109,26 @@ const useFileUpload = (
       }
     }, 100);
   }, []);
+
+  // ✅ Si maxImages diminue, on clamp proprement (et on notifie le parent)
+  useEffect(() => {
+    if (currentFiles.length <= maxImages) return;
+
+    // revoke urls en trop
+    const toRemove = imagePreview.slice(maxImages);
+    toRemove.forEach((u) => URL.revokeObjectURL(u));
+
+    const clampedFiles = currentFiles.slice(0, maxImages);
+    setCurrentFiles(clampedFiles);
+    setImagePreview((prev) => prev.slice(0, maxImages));
+    setFileInfo((prev) => prev.slice(0, maxImages));
+    notifyParent(clampedFiles);
+
+    toast.info(
+      `Limite modifiée : ${maxImages} image${maxImages > 1 ? "s" : ""} max`
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [maxImages]); // notifyParent stable via useCallback, ok
 
   // Cleanup interval on unmount
   useEffect(() => {
@@ -137,7 +164,6 @@ class FileValidator {
     maxFileSize: number,
     acceptedTypes: string[]
   ): ValidationResult {
-    // Vérification du nombre maximum
     if (files.length + currentCount > maxImages) {
       return {
         isValid: false,
@@ -145,7 +171,6 @@ class FileValidator {
       };
     }
 
-    // Vérification de la taille des fichiers
     const oversizedFiles = files.filter(
       (file) => file.size > maxFileSize * 1024 * 1024
     );
@@ -156,7 +181,6 @@ class FileValidator {
       };
     }
 
-    // Vérification des types de fichiers
     const invalidTypeFiles = files.filter(
       (file) => !acceptedTypes.includes(file.type)
     );
@@ -184,6 +208,7 @@ class FileValidator {
 
 /**
  * Composant de prévisualisation d'image
+ * ✅ next/image au lieu de <img>
  */
 interface ImagePreviewProps {
   src: string;
@@ -199,18 +224,24 @@ const ImagePreview: React.FC<ImagePreviewProps> = ({
   onRemove,
 }) => (
   <div className="relative group">
-    <img
-      src={src}
-      className="rounded-lg object-cover h-[100px] w-[100px] shadow-sm transition-transform hover:scale-105"
-      alt={`Aperçu ${index + 1}`}
-      loading="lazy"
-    />
+    <div className="relative h-[100px] w-[100px]">
+      <Image
+        src={src}
+        alt={`Aperçu ${index + 1}`}
+        fill
+        className="rounded-lg object-cover shadow-sm transition-transform group-hover:scale-105"
+        sizes="100px"
+        unoptimized // ✅ car c'est un blob URL (ObjectURL)
+      />
+    </div>
+
     <p
       className="text-xs text-center mt-1 truncate"
       style={{ color: COLORS.TEXT_SECONDARY }}
     >
-      {fileInfo.size}
+      {fileInfo?.size}
     </p>
+
     <button
       type="button"
       onClick={() => onRemove(index)}
@@ -253,14 +284,14 @@ const ProgressBar: React.FC<ProgressBarProps> = ({ progress }) => (
  */
 interface DropzoneProps {
   onFileSelect: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  acceptedTypes: string;
+  acceptString: string;
   maxImages: number;
   maxFileSize: number;
 }
 
 const Dropzone: React.FC<DropzoneProps> = ({
   onFileSelect,
-  acceptedTypes,
+  acceptString,
   maxImages,
   maxFileSize,
 }) => (
@@ -286,7 +317,7 @@ const Dropzone: React.FC<DropzoneProps> = ({
       multiple
       className="hidden"
       onChange={onFileSelect}
-      accept={acceptedTypes}
+      accept={acceptString}
     />
 
     <div className="flex flex-col items-center justify-center pt-5 pb-6">
@@ -321,19 +352,6 @@ const Dropzone: React.FC<DropzoneProps> = ({
 
 /**
  * Composant FileUpload principal
- *
- * Features:
- * - Upload multiple de fichiers avec validation
- * - Prévisualisation des images avec suppression
- * - Barre de progression animée
- * - Gestion des images existantes
- * - Validation de taille et de type
- * - Design system cohérent
- * - Performance optimisée
- * - Accessibilité complète
- *
- * @param props - Configuration du composant
- * @returns Composant d'upload de fichiers
  */
 const FileUpload: React.FC<FileUploadProps> = ({
   setImages,
@@ -344,6 +362,9 @@ const FileUpload: React.FC<FileUploadProps> = ({
   className = "",
   showProgress = true,
 }) => {
+  // ✅ accept string basé sur acceptedTypes (pas un constant fixe)
+  const acceptString = useMemo(() => acceptedTypes.join(", "), [acceptedTypes]);
+
   const {
     imagePreview,
     setImagePreview,
@@ -356,16 +377,11 @@ const FileUpload: React.FC<FileUploadProps> = ({
     simulateProgress,
   } = useFileUpload(setImages, maxImages);
 
-  /**
-   * Gestion de l'upload de fichiers avec validation
-   */
   const handleFileUpload = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>): void => {
       const files = Array.from(event.target.files || []);
-
       if (files.length === 0) return;
 
-      // Validation des fichiers
       const validation = FileValidator.validateFiles(
         files,
         imagePreview.length,
@@ -380,23 +396,18 @@ const FileUpload: React.FC<FileUploadProps> = ({
         return;
       }
 
-      // Création des previews et infos
       const previews = files.map((file) => URL.createObjectURL(file));
       const info = FileValidator.createFileInfo(files);
       const newFiles = [...currentFiles, ...files];
 
-      // Mise à jour groupée des états
       setCurrentFiles(newFiles);
       setImagePreview((prev) => [...prev, ...previews]);
       setFileInfo((prev) => [...prev, ...info]);
 
-      // Notification au parent et progression
       notifyParent(newFiles);
-      if (showProgress) {
-        simulateProgress();
-      }
 
-      // Réinitialiser l'input
+      if (showProgress) simulateProgress();
+
       event.target.value = "";
 
       toast.success(
@@ -404,29 +415,24 @@ const FileUpload: React.FC<FileUploadProps> = ({
       );
     },
     [
+      acceptedTypes,
       currentFiles,
       imagePreview.length,
-      maxImages,
       maxFileSize,
-      acceptedTypes,
+      maxImages,
       notifyParent,
-      simulateProgress,
-      showProgress,
       setCurrentFiles,
-      setImagePreview,
       setFileInfo,
+      setImagePreview,
+      showProgress,
+      simulateProgress,
     ]
   );
 
-  /**
-   * Suppression d'une prévisualisation
-   */
   const removePreview = useCallback(
     (index: number): void => {
       const urlToRevoke = imagePreview[index];
-      if (urlToRevoke) {
-        URL.revokeObjectURL(urlToRevoke);
-      }
+      if (urlToRevoke) URL.revokeObjectURL(urlToRevoke);
 
       const newFiles = currentFiles.filter((_, i) => i !== index);
 
@@ -441,19 +447,14 @@ const FileUpload: React.FC<FileUploadProps> = ({
       currentFiles,
       imagePreview,
       notifyParent,
-      setImagePreview,
-      setFileInfo,
       setCurrentFiles,
+      setFileInfo,
+      setImagePreview,
     ]
   );
 
-  /**
-   * Réinitialisation complète
-   */
   const resetAll = useCallback((): void => {
-    imagePreview.forEach((url) => {
-      URL.revokeObjectURL(url);
-    });
+    imagePreview.forEach((url) => URL.revokeObjectURL(url));
 
     setImagePreview([]);
     setFileInfo([]);
@@ -464,19 +465,14 @@ const FileUpload: React.FC<FileUploadProps> = ({
   }, [
     imagePreview,
     notifyParent,
-    setImagePreview,
-    setFileInfo,
     setCurrentFiles,
+    setFileInfo,
+    setImagePreview,
   ]);
 
-  /**
-   * Nettoyage des URLs lors du démontage
-   */
   useEffect(() => {
     return () => {
-      imagePreview.forEach((url) => {
-        URL.revokeObjectURL(url);
-      });
+      imagePreview.forEach((url) => URL.revokeObjectURL(url));
     };
   }, [imagePreview]);
 
@@ -487,7 +483,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
         <div className="flex-1">
           <Dropzone
             onFileSelect={handleFileUpload}
-            acceptedTypes={DEFAULT_CONFIG.acceptString}
+            acceptString={acceptString}
             maxImages={maxImages}
             maxFileSize={maxFileSize}
           />
@@ -530,6 +526,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
           >
             Nouvelles images ({imagePreview.length})
           </h4>
+
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-10 gap-3">
             {imagePreview.map((src, index) => (
               <ImagePreview
@@ -553,17 +550,23 @@ const FileUpload: React.FC<FileUploadProps> = ({
           >
             Images actuelles ({imageList.length})
           </h4>
+
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-10 gap-3">
             {imageList.map((image, index) => (
               <div key={`existing-${index}`} className="relative">
-                <img
-                  src={image.url}
-                  width={100}
-                  height={100}
-                  className="rounded-lg object-cover h-[100px] w-[100px] shadow-sm"
-                  alt={`Image existante ${index + 1}`}
-                  loading="lazy"
-                />
+                <div className="relative h-[100px] w-[100px]">
+                  <Image
+                    src={image.url}
+                    alt={`Image existante ${index + 1}`}
+                    fill
+                    className="rounded-lg object-cover shadow-sm"
+                    sizes="100px"
+                    // ✅ si tes URLs viennent de Supabase Storage / remote,
+                    // tu peux enlever "unoptimized" SI next.config.js images.remotePatterns est configuré
+                    unoptimized
+                  />
+                </div>
+
                 <div
                   className="absolute top-1 left-1 px-1 py-0.5 rounded text-xs font-medium"
                   style={{
@@ -620,7 +623,4 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
 export default FileUpload;
 
-/**
- * Export des types pour utilisation externe
- */
 export type { FileUploadProps, FileInfo, ImageItem, ValidationResult };

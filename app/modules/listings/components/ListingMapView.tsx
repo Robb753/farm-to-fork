@@ -6,41 +6,22 @@ import React, {
   useCallback,
   useRef,
   useMemo,
+  useSyncExternalStore,
 } from "react";
 import dynamic from "next/dynamic";
 import { MapPin, List, Maximize2, Minimize2 } from "lucide-react";
-import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import FilterSection from "@/app/_components/layout/FilterSection/FilterSection";
 import Listing from "./Listing";
 import GlobalLoadingOverlay from "@/app/_components/ui/GlobalLoadingOverlay";
 import { COLORS } from "@/lib/config";
-import { useListingsActions, useListingsState, useMapState, useUIActions, useUIState } from "@/lib/store";
+import {
+  useListingsState,
+  useMapState,
+  useUIActions,
+  useUIState,
+} from "@/lib/store";
 
-/**
- * Interface pour les bounds de la carte
- */
-interface MapBounds {
-  ne: { lat: number; lng: number };
-  sw: { lat: number; lng: number };
-}
-
-/**
- * Interface pour les événements custom
- */
-interface CustomAreaEvent extends CustomEvent {
-  detail: boolean;
-}
-
-/**
- * Interface pour les options de fetchListings
- */
-interface FetchListingsOptions {
-  page: number;
-  forceRefresh?: boolean;
-  bounds?: MapBounds;
-  append?: boolean;
-}
 
 /**
  * Composants dynamiques avec loading states
@@ -56,32 +37,37 @@ const MapboxSection = dynamic(
 );
 
 /**
- * Hook pour détecter si on est sur mobile
+ * ✅ Hook hydration-safe pour détecter le mobile (sans setState dans useEffect)
  */
-const useIsMobile = (): boolean => {
-  const [isMobile, setIsMobile] = useState<boolean>(false);
-  
-  useEffect(() => {
-    const checkMobile = (): void => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
-  
-  return isMobile;
-};
+function subscribeToResize(callback: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener("resize", callback);
+  return () => window.removeEventListener("resize", callback);
+}
+
+function getIsMobileSnapshot(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.innerWidth < 768;
+}
+
+function getIsMobileServerSnapshot(): boolean {
+  return false;
+}
+
+function useIsMobile(): boolean {
+  return useSyncExternalStore(
+    subscribeToResize,
+    getIsMobileSnapshot,
+    getIsMobileServerSnapshot
+  );
+}
 
 /**
  * Composant principal pour la vue desktop (liste + carte)
- * 
+ *
  * Features:
  * - Split view responsive liste/carte
- * - Mode recherche manuel avec CTA
- * - Pagination infinie avec load more
+ * - Pagination infinie (désactivée ici car global)
  * - Contrôles d'expansion de carte
  * - Gestion des états de chargement
  * - Configuration centralisée des couleurs
@@ -91,22 +77,15 @@ const DesktopListingMapView = (): JSX.Element => {
   const {
     visible: visibleListings,
     isLoading,
-    hasMore,
-    page,
     totalCount,
   } = useListingsState();
-  const { setPage } = useListingsActions();
   const { isMapExpanded } = useUIState();
   const { setMapExpanded } = useUIActions();
 
-  // ✅ États locaux avec types appropriés
+  // ✅ États locaux
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [isMapMoving, setIsMapMoving] = useState<boolean>(false);
-  const moveTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  // ✅ UX simple et minimaliste : filtrage automatique activé dans Explore.tsx
-  // Plus besoin de bouton "Rechercher dans cette zone"
-  const MANUAL_SEARCH = false;
+  const moveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /**
    * Debounced setter pour l'état de mouvement de carte
@@ -116,7 +95,7 @@ const DesktopListingMapView = (): JSX.Element => {
       clearTimeout(moveTimerRef.current);
       moveTimerRef.current = null;
     }
-    
+
     if (val) {
       setIsMapMoving(true);
     } else {
@@ -128,7 +107,6 @@ const DesktopListingMapView = (): JSX.Element => {
 
   /**
    * Écoute des événements de déplacement de carte Mapbox
-   * ✅ Simplifié pour UX minimaliste - pas d'événements inutiles
    */
   useEffect(() => {
     if (!mapInstance) return;
@@ -143,7 +121,6 @@ const DesktopListingMapView = (): JSX.Element => {
       setMovingDebounced(false);
     };
 
-    // ✅ Événements de mouvement de carte
     const events = [
       { name: "movestart", handler: handleMapMoveStart },
       { name: "moveend", handler: handleMapMoveEnd },
@@ -169,42 +146,31 @@ const DesktopListingMapView = (): JSX.Element => {
    */
   useEffect(() => {
     const handleModalEvent = (e: CustomEvent): void => {
-      setIsModalOpen(e.detail === true);
+      setIsModalOpen((e as any).detail === true);
     };
 
     window.addEventListener("modalOpen", handleModalEvent as EventListener);
-    
+
     return () => {
-      window.removeEventListener("modalOpen", handleModalEvent as EventListener);
+      window.removeEventListener(
+        "modalOpen",
+        handleModalEvent as EventListener
+      );
     };
   }, []);
 
   /**
-   * Handler pour la pagination (load more)
-   */
-  const handleLoadMoreListings = useCallback((): void => {
-    // si tu veux garder un compteur de page pour plus tard :
-    setPage(page + 1);
-
-    // optionnel : feedback propre au lieu de spam console
-    toast.info("Mode global actif : toutes les fermes sont déjà chargées.");
-  }, [page, setPage]);
-
-  // ✅ Recherche manuelle supprimée - Le filtrage est maintenant automatique dans Explore.tsx
-  // L'affichage se met à jour instantanément quand on déplace la carte
-
-  /**
-   * Toggle de la taille de carte
+   * Toggle taille de carte
    */
   const toggleMapSize = useCallback((): void => {
     setMapExpanded(!isMapExpanded);
   }, [isMapExpanded, setMapExpanded]);
 
   /**
-   * État global de busy (chargement + mouvement de carte)
+   * État global busy (chargement + mouvement carte)
    */
   const globalBusy = useMemo(() => {
-    return isLoading || (MANUAL_SEARCH ? false : isMapMoving);
+    return isLoading || isMapMoving;
   }, [isLoading, isMapMoving]);
 
   /**
@@ -215,7 +181,7 @@ const DesktopListingMapView = (): JSX.Element => {
   }, [visibleListings]);
 
   /**
-   * Formatage des nombres avec locale
+   * Formatage des nombres
    */
   const formatNumber = useCallback((num: number): string => {
     return num.toLocaleString?.("fr-FR") ?? num.toString();
@@ -235,17 +201,13 @@ const DesktopListingMapView = (): JSX.Element => {
       {isModalOpen && (
         <div
           className="pointer-events-none fixed inset-0 z-20 backdrop-blur-sm"
-          style={{ backgroundColor: `${COLORS.BG_WHITE}99` }} // 60% opacity
+          style={{ backgroundColor: `${COLORS.BG_WHITE}99` }}
         />
       )}
 
-      {/* ✅ Section filtres avec sticky positioning */}
+      {/* ✅ Section filtres sticky */}
       <div
-        className={cn(
-          "sticky top-0 border-b shadow-sm",
-          // 🔹 Quand la modale est ouverte on garde un z-index élevé
-          isModalOpen && "z-40"
-        )}
+        className={cn("sticky top-0 border-b shadow-sm", isModalOpen && "z-40")}
         style={{
           backgroundColor: COLORS.BG_WHITE,
           borderColor: COLORS.BORDER,
@@ -286,7 +248,7 @@ const DesktopListingMapView = (): JSX.Element => {
             </span>
           </div>
 
-          {/* ✅ Container de listing avec opacity conditionnelle */}
+          {/* ✅ Container listing */}
           <div
             className={cn(
               "p-4 lg:p-6 transition-opacity duration-300",
@@ -311,7 +273,7 @@ const DesktopListingMapView = (): JSX.Element => {
         >
           <MapboxSection isMapExpanded={isMapExpanded} />
 
-          {/* ✅ Bouton d'agrandissement/réduction */}
+          {/* ✅ Bouton agrandir/réduire */}
           <div className="absolute right-4 top-4 z-20 flex flex-col gap-3">
             <button
               onClick={toggleMapSize}
@@ -320,7 +282,7 @@ const DesktopListingMapView = (): JSX.Element => {
                 "hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-green-500"
               )}
               style={{
-                backgroundColor: `${COLORS.BG_WHITE}F2`, // 95% opacity
+                backgroundColor: `${COLORS.BG_WHITE}F2`,
                 borderColor: COLORS.BORDER,
                 color: COLORS.TEXT_SECONDARY,
               }}
@@ -401,24 +363,11 @@ const DesktopListingMapView = (): JSX.Element => {
 };
 
 /**
- * Composant wrapper principal avec détection mobile
- * 
- * Features:
- * - Détection automatique mobile/desktop
- * - Hydration sécurisée
- * - Lazy loading des composants appropriés
+ * Wrapper principal (mobile vs desktop)
+ * ✅ Sans mounted state / sans setState dans useEffect
  */
-function ListingMapView(): JSX.Element | null {
+function ListingMapView(): JSX.Element {
   const isMobile = useIsMobile();
-  const [mounted, setMounted] = useState<boolean>(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  // ✅ Attendre l'hydration pour éviter les mismatches SSR
-  if (!mounted) return null;
-
   return isMobile ? <MobileListingMapView /> : <DesktopListingMapView />;
 }
 

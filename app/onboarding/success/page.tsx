@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
@@ -19,9 +19,8 @@ type Role = "user" | "farmer" | "admin";
 export default function SuccessPage() {
   const router = useRouter();
   const { user, isLoaded } = useUser();
-  const [isRedirecting, setIsRedirecting] = useState(false);
 
-  // Normalise le rôle (évite les undefined / casing)
+  // ✅ Normalise le rôle (évite les undefined / casing)
   const role = useMemo(() => {
     const raw = user?.publicMetadata?.role;
     if (typeof raw !== "string") return null;
@@ -33,41 +32,41 @@ export default function SuccessPage() {
     ) as Role | null;
   }, [user]);
 
+  // ✅ Détermine si on doit rediriger (valeur dérivée, pas un state)
+  const shouldRedirect = isLoaded && (!user || role !== "farmer");
+
+  // ✅ Gère les redirections
   useEffect(() => {
     if (!isLoaded) return;
 
     // Pas connecté -> sign-in
     if (!user) {
-      setIsRedirecting(true);
-      router.replace("/sign-in"); // replace = pas d'historique “inutilisable”
+      router.replace("/sign-in");
       return;
     }
 
     // Pas farmer -> home
     if (role !== "farmer") {
-      setIsRedirecting(true);
       router.replace("/");
       return;
     }
   }, [isLoaded, user, role, router]);
 
-  // Loader tant que: pas chargé OU redirection
-  if (!isLoaded || isRedirecting) {
+  // ✅ Affiche le loader tant que: pas chargé OU en redirection
+  if (!isLoaded || shouldRedirect) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-primary" />
           <p className="text-muted-foreground">
-            {isRedirecting ? "Redirection..." : "Chargement..."}
+            {!isLoaded ? "Chargement..." : "Redirection..."}
           </p>
         </div>
       </div>
     );
   }
 
-  // Safety: si jamais role null (cas edge), on évite de render
-  if (!user || role !== "farmer") return null;
-
+  // ✅ À ce stade, on est sûr que user existe et role === "farmer"
   return (
     <div className="min-h-screen bg-background p-4 py-12 flex items-center justify-center">
       <div className="max-w-2xl w-full">
@@ -132,14 +131,13 @@ export default function SuccessPage() {
               </Button>
             </div>
 
-            {/* NOTE: boutons de partage = UI only pour l’instant */}
+            {/* NOTE: boutons de partage = UI only pour l'instant */}
             <div className="pt-4 border-t">
               <p className="text-sm text-muted-foreground mb-3">
                 Partagez votre ferme avec votre communauté :
               </p>
               <div className="flex flex-wrap justify-center gap-2">
                 <Button variant="outline" size="sm" className="gap-2">
-                  {/* svg ok */}
                   <svg
                     className="w-4 h-4"
                     fill="currentColor"

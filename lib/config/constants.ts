@@ -108,7 +108,7 @@ export const FILTER_SECTIONS: FilterSection[] = [
     id: "certifications",
     title: "Certifications",
     options: CERTIFICATIONS.map((cert) => ({
-      id: cert.toLowerCase().replace(/[\/\s]+/g, "-"),
+      id: cert.toLowerCase().replace(/[/\s]+/g, "-"),
       label: cert,
       value: cert,
     })),

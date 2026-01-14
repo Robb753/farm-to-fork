@@ -14,38 +14,19 @@ import type { Database } from "@/lib/types/database";
  */
 type ListingWithLocation = Database["public"]["Tables"]["listing"]["Row"];
 
-/**
- * Props du composant MapCard
- */
 interface MapCardProps {
   listing: ListingWithLocation | null;
   className?: string;
 }
 
-/**
- * Interface pour les coordonnées normalisées
- */
 interface Coordinates {
   lat: number;
   lng: number;
   isValid: boolean;
 }
 
-/**
- * Composant de carte de localisation pour un listing
- *
- * Features:
- * - Affichage de carte interactive avec Mapbox
- * - Actions rapides (directions, partage de localisation)
- * - Gestion robuste des coordonnées multiples formats
- * - Fallback élégant si pas de coordonnées
- * - Intégration avec services externes (Google Maps, Apple Plans)
- * - Analytics et tracking des interactions
- *
- * @param listing - Données du listing avec localisation
- * @param className - Classes CSS additionnelles
- * @returns JSX.Element - Card de carte interactive
- */
+const DEFAULT_COORDS: Coordinates = { lat: 0, lng: 0, isValid: false };
+
 export default function MapCard({
   listing,
   className,
@@ -53,15 +34,10 @@ export default function MapCard({
   const [isLoadingDirections, setIsLoadingDirections] =
     useState<boolean>(false);
 
-  // Early return si pas de listing
-  if (!listing) {
-    return null;
-  }
-
-  /**
-   * Extrait et valide les coordonnées de manière robuste
-   */
+  // ✅ Hooks toujours appelés, même si listing est null
   const coordinates: Coordinates = useMemo(() => {
+    if (!listing) return DEFAULT_COORDS;
+
     let lat: number | null = null;
     let lng: number | null = null;
 
@@ -71,72 +47,53 @@ export default function MapCard({
       lng = listing.lng;
     }
     // Méthode 2: Objet coordinates
-    else if (listing.coordinates) {
-      if (typeof listing.coordinates === "object") {
-        const coords = listing.coordinates as any;
+    else if ((listing as any).coordinates) {
+      const raw = (listing as any).coordinates;
 
-        // Format objet {lat, lng}
+      if (typeof raw === "object" && raw !== null) {
+        const coords = raw as any;
+
         if (typeof coords.lat === "number" && typeof coords.lng === "number") {
           lat = coords.lat;
           lng = coords.lng;
-        }
-        // Format objet {latitude, longitude}
-        else if (
+        } else if (
           typeof coords.latitude === "number" &&
           typeof coords.longitude === "number"
         ) {
           lat = coords.latitude;
           lng = coords.longitude;
-        }
-        // Format tableau [lat, lng]
-        else if (Array.isArray(coords) && coords.length >= 2) {
+        } else if (Array.isArray(coords) && coords.length >= 2) {
           lat = typeof coords[0] === "number" ? coords[0] : null;
           lng = typeof coords[1] === "number" ? coords[1] : null;
         }
-      }
-      // Si c'est une string, essayer de parser
-      else if (typeof listing.coordinates === "string") {
+      } else if (typeof raw === "string") {
         try {
-          const parsed = JSON.parse(listing.coordinates);
+          const parsed = JSON.parse(raw);
           if (Array.isArray(parsed) && parsed.length >= 2) {
             lat = typeof parsed[0] === "number" ? parsed[0] : null;
             lng = typeof parsed[1] === "number" ? parsed[1] : null;
           }
         } catch {
-          // Parsing failed, keep null values
+          // ignore
         }
       }
     }
 
-    // Validation des coordonnées
     const isValidLat = lat !== null && lat >= -90 && lat <= 90;
     const isValidLng = lng !== null && lng >= -180 && lng <= 180;
     const isValid = isValidLat && isValidLng;
 
-    return {
-      lat: lat || 0,
-      lng: lng || 0,
-      isValid,
-    };
-  }, [listing.lat, listing.lng, listing.coordinates]);
+    return { lat: lat ?? 0, lng: lng ?? 0, isValid };
+  }, [listing]);
 
-  /**
-   * Génère l'URL Google Maps pour les directions
-   */
-  const getGoogleMapsUrl = useCallback((coords: Coordinates): string => {
-    return `https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}`;
+  const getGoogleMapsUrl = useCallback((lat: number, lng: number): string => {
+    return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
   }, []);
 
-  /**
-   * Génère l'URL Apple Plans pour les directions (iOS/macOS)
-   */
-  const getAppleMapsUrl = useCallback((coords: Coordinates): string => {
-    return `http://maps.apple.com/?daddr=${coords.lat},${coords.lng}`;
+  const getAppleMapsUrl = useCallback((lat: number, lng: number): string => {
+    return `http://maps.apple.com/?daddr=${lat},${lng}`;
   }, []);
 
-  /**
-   * Ouvre les directions selon la plateforme
-   */
   const handleGetDirections = useCallback(async (): Promise<void> => {
     if (!coordinates.isValid) {
       toast.error("Coordonnées non disponibles");
@@ -146,26 +103,19 @@ export default function MapCard({
     setIsLoadingDirections(true);
 
     try {
-      // Détecter la plateforme
       const userAgent = navigator.userAgent.toLowerCase();
       const isIOS = /iphone|ipad|ipod/.test(userAgent);
       const isMac = /mac/.test(userAgent);
 
-      let url: string;
+      const url =
+        isIOS || isMac
+          ? getAppleMapsUrl(coordinates.lat, coordinates.lng)
+          : getGoogleMapsUrl(coordinates.lat, coordinates.lng);
 
-      // Utiliser Apple Plans sur iOS/macOS, Google Maps sinon
-      if (isIOS || isMac) {
-        url = getAppleMapsUrl(coordinates);
-      } else {
-        url = getGoogleMapsUrl(coordinates);
-      }
-
-      // Ouvrir dans un nouvel onglet
       window.open(url, "_blank", "noopener,noreferrer");
 
-      // Analytics tracking
-      if (typeof window !== "undefined" && window.gtag) {
-        window.gtag("event", "get_directions", {
+      if (typeof window !== "undefined" && (window as any).gtag && listing) {
+        (window as any).gtag("event", "get_directions", {
           event_category: "map_interaction",
           listing_id: listing.id,
           listing_name: listing.name,
@@ -181,16 +131,14 @@ export default function MapCard({
       setIsLoadingDirections(false);
     }
   }, [
-    coordinates,
-    listing.id,
-    listing.name,
+    coordinates.isValid,
+    coordinates.lat,
+    coordinates.lng,
     getAppleMapsUrl,
     getGoogleMapsUrl,
+    listing,
   ]);
 
-  /**
-   * Copie les coordonnées dans le presse-papier
-   */
   const handleCopyCoordinates = useCallback(async (): Promise<void> => {
     if (!coordinates.isValid) {
       toast.error("Coordonnées non disponibles");
@@ -203,21 +151,17 @@ export default function MapCard({
 
       toast.success("Coordonnées copiées dans le presse-papier");
 
-      // Analytics tracking
-      if (typeof window !== "undefined" && window.gtag) {
-        window.gtag("event", "copy_coordinates", {
+      if (typeof window !== "undefined" && (window as any).gtag && listing) {
+        (window as any).gtag("event", "copy_coordinates", {
           event_category: "map_interaction",
           listing_id: listing.id,
         });
       }
-    } catch (error) {
+    } catch {
       toast.error("Impossible de copier les coordonnées");
     }
-  }, [coordinates, listing.id]);
+  }, [coordinates.isValid, coordinates.lat, coordinates.lng, listing]);
 
-  /**
-   * Partage la localisation
-   */
   const handleShareLocation = useCallback(async (): Promise<void> => {
     if (!coordinates.isValid) {
       toast.error("Localisation non disponible");
@@ -225,28 +169,32 @@ export default function MapCard({
     }
 
     try {
+      const name = listing?.name || "cette ferme";
+      const address = listing?.address || "coordonnées GPS";
+      const url = getGoogleMapsUrl(coordinates.lat, coordinates.lng);
+
       const shareData = {
-        title: `Localisation de ${listing.name || "cette ferme"}`,
-        text: `Retrouvez ${listing.name || "cette ferme"} à cette adresse : ${listing.address || "coordonnées GPS"}`,
-        url: getGoogleMapsUrl(coordinates),
+        title: `Localisation de ${name}`,
+        text: `Retrouvez ${name} à cette adresse : ${address}`,
+        url,
       };
 
-      if (
-        navigator.share &&
-        navigator.canShare &&
-        navigator.canShare(shareData)
-      ) {
-        await navigator.share(shareData);
+      const canNativeShare =
+        typeof navigator !== "undefined" &&
+        "share" in navigator &&
+        "canShare" in navigator &&
+        (navigator as any).canShare?.(shareData);
+
+      if (canNativeShare) {
+        await (navigator as any).share(shareData);
         toast.success("Localisation partagée avec succès");
       } else {
-        // Fallback: copier le lien Google Maps
-        await navigator.clipboard.writeText(getGoogleMapsUrl(coordinates));
+        await navigator.clipboard.writeText(url);
         toast.success("Lien de localisation copié");
       }
 
-      // Analytics tracking
-      if (typeof window !== "undefined" && window.gtag) {
-        window.gtag("event", "share_location", {
+      if (typeof window !== "undefined" && (window as any).gtag && listing) {
+        (window as any).gtag("event", "share_location", {
           event_category: "map_interaction",
           listing_id: listing.id,
         });
@@ -256,17 +204,16 @@ export default function MapCard({
       toast.error("Impossible de partager la localisation");
     }
   }, [
-    coordinates,
-    listing.id,
-    listing.name,
-    listing.address,
+    coordinates.isValid,
+    coordinates.lat,
+    coordinates.lng,
     getGoogleMapsUrl,
+    listing,
   ]);
 
-  // Ne pas afficher si pas de coordonnées valides
-  if (!coordinates.isValid) {
-    return null;
-  }
+  // ✅ Maintenant seulement, les early returns
+  if (!listing) return null;
+  if (!coordinates.isValid) return null;
 
   const name = listing.name || "Ferme locale";
 
@@ -284,20 +231,17 @@ export default function MapCard({
             Localisation
           </CardTitle>
 
-          {/* Coordonnées en petit */}
           <div className="text-xs text-gray-500 font-mono">
             {coordinates.lat.toFixed(4)}, {coordinates.lng.toFixed(4)}
           </div>
         </div>
 
-        {/* Adresse si disponible */}
         {listing.address && (
           <p className="text-sm text-gray-600 mt-1">{listing.address}</p>
         )}
       </CardHeader>
 
       <CardContent className="space-y-4 pt-0">
-        {/* Carte interactive */}
         <div className="relative group">
           <div className="aspect-[4/3] rounded-lg overflow-hidden border border-gray-200 bg-gray-100">
             <SingleFarmMapbox
@@ -307,7 +251,6 @@ export default function MapCard({
             />
           </div>
 
-          {/* Overlay avec actions au hover */}
           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg pointer-events-none">
             <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-auto">
               <Button
@@ -322,9 +265,7 @@ export default function MapCard({
           </div>
         </div>
 
-        {/* Actions rapides */}
         <div className="flex flex-col gap-2">
-          {/* Bouton directions */}
           <Button
             onClick={handleGetDirections}
             disabled={isLoadingDirections}
@@ -343,7 +284,6 @@ export default function MapCard({
             )}
           </Button>
 
-          {/* Actions secondaires */}
           <div className="flex gap-2">
             <Button
               variant="outline"
@@ -370,7 +310,6 @@ export default function MapCard({
           </div>
         </div>
 
-        {/* Info utile */}
         <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
           <p className="text-blue-800 text-xs text-center">
             💡 <strong>Astuce :</strong> Cliquez sur "Obtenir l'itinéraire" pour

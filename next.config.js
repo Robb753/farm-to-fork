@@ -201,7 +201,7 @@ module.exports = (phase) => {
     ...baseConfig,
 
     // Webpack --------------------------------------------------------------
-    webpack(config, { isServer, webpack }) {
+    webpack(config, { isServer }) {
       // Optimisations spécifiques au build client de production
       if (isProdBuild && !isServer) {
         config.optimization = {

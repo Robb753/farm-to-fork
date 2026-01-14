@@ -103,7 +103,7 @@ export default function OnboardingStatus() {
     };
 
     fetchRequest();
-  }, [user, isLoaded]);
+  }, [user, isLoaded, supabase]);
 
   /**
    * Obtient l'icône selon le statut

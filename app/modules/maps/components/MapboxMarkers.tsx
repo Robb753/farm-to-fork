@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import mapboxgl from "mapbox-gl";
 
 // ✅ Import du nouveau store unifié
 import { COLORS } from "@/lib/config";
 import { useListingsState, useMapState } from "@/lib/store";
 import type { Listing } from "@/lib/store";
+import { logger } from "@/lib/logger";
 
 /**
  * Interface pour les données de marqueur
@@ -60,25 +61,25 @@ export default function MapboxMarkers(): null {
         // Vérifier que la carte a un container DOM
         const container = map.getContainer();
         if (!container) {
-          console.debug("Carte sans container DOM");
+          logger.debug("Carte sans container DOM");
           return false;
         }
 
         // Vérifier que le container est dans le DOM
         if (!container.isConnected) {
-          console.debug("Container de carte non connecté au DOM");
+          logger.debug("Container de carte non connecté au DOM");
           return false;
         }
 
         // Vérifier que le style est chargé
         if (typeof map.isStyleLoaded === "function" && !map.isStyleLoaded()) {
-          console.debug("Style de carte non chargé");
+          logger.debug("Style de carte non chargé");
           return false;
         }
 
         // Vérifier que la carte n'est pas en cours de suppression
         if ((map as any)._removed) {
-          console.debug("Carte marquée comme supprimée");
+          logger.debug("Carte marquée comme supprimée");
           return false;
         }
 
@@ -107,7 +108,7 @@ export default function MapboxMarkers(): null {
           typeof listing.lng === "number" ? listing.lng : Number(listing.lng);
 
         if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-          console.debug(
+          logger.debug(
             `Coordonnées invalides pour listing ${listing.id}: lat=${listing.lat}, lng=${listing.lng}`
           );
           return null;
@@ -130,7 +131,7 @@ export default function MapboxMarkers(): null {
 
         // Éviter le point (0,0) qui est souvent une erreur
         if (lat === 0 && lng === 0) {
-          console.debug(
+          logger.debug(
             `Coordonnées (0,0) rejetées pour listing ${listing.id}`
           );
           return null;
@@ -220,23 +221,23 @@ export default function MapboxMarkers(): null {
   useEffect(() => {
     // Attendre que la carte soit complètement prête
     if (!isMapReady(mapInstance)) {
-      console.debug("Carte non prête, skip création marqueurs");
+      logger.debug("Carte non prête, skip création marqueurs");
       return;
     }
 
     if (!Array.isArray(visibleListings)) {
-      console.debug("Pas de listings visibles ou format invalide");
+      logger.debug("Pas de listings visibles ou format invalide");
       return;
     }
 
-    console.debug(
+    logger.debug(
       `🎯 Mise à jour des marqueurs: ${visibleListings.length} listings`
     );
 
     // ✅ Debug des premiers listings pour vérifier la structure
     if (visibleListings.length > 0) {
       const firstListing = visibleListings[0];
-      console.debug("📋 Structure du premier listing:", {
+      logger.debug("📋 Structure du premier listing:", {
         id: firstListing.id,
         name: firstListing.name,
         lat: firstListing.lat,
@@ -257,14 +258,14 @@ export default function MapboxMarkers(): null {
       const id = listing?.id;
 
       if (!id) {
-        console.debug("Listing sans ID, ignoré");
+        logger.debug("Listing sans ID, ignoré");
         errorCount++;
         return;
       }
 
       const coordinates = validateCoordinates(listing);
       if (!coordinates) {
-        console.debug(`❌ Coordonnées invalides pour listing ${id}:`, {
+        logger.debug(`❌ Coordonnées invalides pour listing ${id}:`, {
           lat: listing.lat,
           lng: listing.lng,
           name: listing.name,
@@ -286,7 +287,7 @@ export default function MapboxMarkers(): null {
           markersRef.current.set(id, { marker, listing });
           successCount++;
 
-          console.debug(
+          logger.debug(
             `✅ Marker créé pour listing ${id} (${listing.name}) à [${coordinates.lng}, ${coordinates.lat}]`
           );
         } else {
@@ -298,6 +299,11 @@ export default function MapboxMarkers(): null {
         console.error(`❌ Erreur création marker ${id}:`, error);
         errorCount++;
       }
+      logger.debug("MapboxMarkers: bilan update", {
+        successCount,
+        errorCount,
+        total: visibleListings.length,
+      });
     });
 
   }, [
@@ -316,7 +322,7 @@ export default function MapboxMarkers(): null {
     if (!mapInstance) return;
 
     const handleStyleLoad = (): void => {
-      console.debug("Style de carte chargé, recréation des marqueurs");
+      logger.debug("Style de carte chargé, recréation des marqueurs");
       // Recréer les marqueurs quand le style est chargé
       setTimeout(() => {
         if (visibleListings && visibleListings.length > 0) {
@@ -327,7 +333,7 @@ export default function MapboxMarkers(): null {
     };
 
     const handleMapLoad = (): void => {
-      console.debug("Carte complètement chargée");
+      logger.debug("Carte complètement chargée");
       handleStyleLoad();
     };
 
@@ -353,7 +359,7 @@ export default function MapboxMarkers(): null {
    */
   useEffect(() => {
     return () => {
-      console.debug("Nettoyage final des marqueurs");
+      logger.debug("Nettoyage final des marqueurs");
       cleanupMarkers();
     };
   }, [cleanupMarkers]);
