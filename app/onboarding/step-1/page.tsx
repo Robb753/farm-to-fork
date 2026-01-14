@@ -1,6 +1,8 @@
 // app/onboarding/step-1/page.tsx
 "use client";
 
+export const dynamic = 'force-dynamic';
+
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";

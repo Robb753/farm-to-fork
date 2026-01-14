@@ -13,8 +13,16 @@ export function useSupabaseWithClerk(): SupabaseClient<Database> {
 
   return useMemo(() => {
     return createClient<Database>(supabaseUrl, supabaseAnonKey, {
-      accessToken: async () =>
-        (await getToken({ template: "supabase" })) ?? null,
+      accessToken: async () => {
+        try {
+          const token = await getToken({ template: "supabase" });
+          return token ?? null;
+        } catch (error) {
+          // Pendant le build Next.js ou SSR, getToken() peut échouer car il n'y a pas de contexte d'auth
+          // C'est normal et attendu - on retourne simplement null
+          return null;
+        }
+      },
       auth: {
         autoRefreshToken: false,
         persistSession: false,
