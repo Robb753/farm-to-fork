@@ -1,6 +1,8 @@
 // app/admin/notifications/page.tsx
 "use client";
 
+export const dynamic = 'force-dynamic';
+
 import { useEffect, useState, useCallback } from "react";
 import { Loader2, Inbox, Clock, CheckCircle, XCircle } from "@/utils/icons";
 import { Badge } from "@/components/ui/badge";
