@@ -104,6 +104,7 @@ export function useAllListingsWithImages(
     setError(null);
 
     try {
+      // Récupère les fermes actives ET les fermes OSM non encore réclamées (active=false mais osm_id présent)
       const { data, error } = await supabase
         .from(TABLES.LISTING)
         .select(
@@ -112,7 +113,9 @@ export function useAllListingsWithImages(
             ${TABLES.LISTING_IMAGES}(id, url)
           `
         )
-        .eq(LISTING_COLUMNS.ACTIVE, true)
+        .or(
+          "active.eq.true,and(active.eq.false,osm_id.not.is.null,clerk_user_id.is.null)"
+        )
         .order(LISTING_COLUMNS.CREATED_AT, { ascending: false })
         .limit(limit);
 

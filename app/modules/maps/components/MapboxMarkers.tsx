@@ -174,6 +174,8 @@ export default function MapboxMarkers(): null {
    * Construit un DOM node safe pour la popup (pas de setHTML)
    */
   const buildPopupNode = useCallback((listing: Listing): HTMLElement => {
+    const isOsmUnclaimed = !!listing.osm_id && !listing.clerk_user_id;
+
     const wrapper = document.createElement("div");
     wrapper.style.cssText = `
       padding: 12px 16px;
@@ -184,6 +186,23 @@ export default function MapboxMarkers(): null {
       min-width: 200px;
       max-width: 280px;
     `;
+
+    // Badge OSM non revendiqué
+    if (isOsmUnclaimed) {
+      const badge = document.createElement("span");
+      badge.style.cssText = `
+        display: inline-block;
+        margin-bottom: 6px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: #fef3c7;
+        color: #92400e;
+        font-size: 11px;
+        font-weight: 600;
+      `;
+      badge.textContent = "Ferme pré-enregistrée";
+      wrapper.appendChild(badge);
+    }
 
     // Titre (nom de la ferme)
     const title = document.createElement("p");
@@ -227,6 +246,26 @@ export default function MapboxMarkers(): null {
       wrapper.appendChild(distance);
     }
 
+    // Lien de revendication pour les fermes OSM non réclamées
+    if (isOsmUnclaimed) {
+      const claimLink = document.createElement("a");
+      claimLink.href = `/farm/${String(listing.id)}/claim`;
+      claimLink.style.cssText = `
+        display: block;
+        margin-top: 10px;
+        padding: 6px 12px;
+        background: #d97706;
+        color: #ffffff;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        text-align: center;
+        text-decoration: none;
+      `;
+      claimLink.textContent = "Propriétaire ? Revendiquer →";
+      wrapper.appendChild(claimLink);
+    }
+
     return wrapper;
   }, []);
 
@@ -243,9 +282,16 @@ export default function MapboxMarkers(): null {
       handlers: any;
     } | null => {
       try {
+        // Ferme OSM non revendiquée → marqueur gris/ambre distinct
+        const isOsmUnclaimed = !!listing.osm_id && !listing.clerk_user_id;
+        const baseColor = isOsmUnclaimed ? "#d97706" : COLORS.PRIMARY;
+        const hoverColor = isOsmUnclaimed ? "#b45309" : COLORS.PRIMARY_DARK;
+
         // Créer l'élément DOM du marqueur
         const markerElement = document.createElement("div");
-        markerElement.className = "custom-marker";
+        markerElement.className = isOsmUnclaimed
+          ? "custom-marker custom-marker--osm"
+          : "custom-marker";
         markerElement.setAttribute("role", "button");
         markerElement.setAttribute(
           "aria-label",
@@ -256,26 +302,28 @@ export default function MapboxMarkers(): null {
         markerElement.style.cssText = `
           width: 28px;
           height: 28px;
-          background-color: ${COLORS.PRIMARY};
+          background-color: ${baseColor};
           border: 3px solid ${COLORS.BG_WHITE};
           border-radius: 50%;
           cursor: pointer;
           transition: all 0.2s ease;
           box-shadow: 0 2px 6px rgba(0,0,0,0.25);
-          opacity: 1;
+          opacity: ${isOsmUnclaimed ? "0.85" : "1"};
         `;
+        // Stocker la couleur de base pour pouvoir la restaurer depuis des handlers externes
+        markerElement.dataset.baseColor = baseColor;
 
         // Handlers d'interaction
         const handleMouseEnter = () => {
           markerElement.style.transform = "scale(1.25)";
-          markerElement.style.backgroundColor = COLORS.PRIMARY_DARK;
+          markerElement.style.backgroundColor = hoverColor;
           markerElement.style.boxShadow = "0 4px 10px rgba(0,0,0,0.35)";
           markerElement.style.zIndex = "1000";
         };
 
         const handleMouseLeave = () => {
           markerElement.style.transform = "scale(1)";
-          markerElement.style.backgroundColor = COLORS.PRIMARY;
+          markerElement.style.backgroundColor = baseColor;
           markerElement.style.boxShadow = "0 2px 6px rgba(0,0,0,0.25)";
           markerElement.style.zIndex = "1";
         };
@@ -489,11 +537,12 @@ export default function MapboxMarkers(): null {
 
       markersRef.current.forEach((markerData, id) => {
         const { element } = markerData;
+        const baseColor = element.dataset.baseColor ?? COLORS.PRIMARY;
 
         if (hoveredId === null) {
           // Reset all
           element.style.transform = "scale(1)";
-          element.style.backgroundColor = COLORS.PRIMARY;
+          element.style.backgroundColor = baseColor;
           element.style.boxShadow = "0 2px 6px rgba(0,0,0,0.25)";
           element.style.opacity = "1";
           element.style.zIndex = "1";
@@ -507,7 +556,7 @@ export default function MapboxMarkers(): null {
         } else {
           // Dim others
           element.style.transform = "scale(1)";
-          element.style.backgroundColor = COLORS.PRIMARY;
+          element.style.backgroundColor = baseColor;
           element.style.boxShadow = "0 2px 6px rgba(0,0,0,0.25)";
           element.style.opacity = "0.5";
           element.style.zIndex = "1";

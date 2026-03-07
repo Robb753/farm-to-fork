@@ -112,6 +112,9 @@ export interface Database {
 
           // SQL: text null + unique index where not null
           clerk_user_id: string | null;
+
+          /** Identifiant OSM — null pour les fermes créées manuellement */
+          osm_id: number | null;
         };
 
         Insert: {
@@ -172,6 +175,7 @@ export interface Database {
           orders_enabled?: boolean;
 
           clerk_user_id?: string | null;
+          osm_id?: number | null;
         };
 
         Update: {
@@ -232,6 +236,7 @@ export interface Database {
           orders_enabled?: boolean;
 
           clerk_user_id?: string | null;
+          osm_id?: number | null;
         };
 
         Relationships: [];
