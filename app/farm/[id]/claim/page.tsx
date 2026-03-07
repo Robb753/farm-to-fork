@@ -24,19 +24,19 @@ export default function ClaimFarmPage(): JSX.Element {
   const supabase = useSupabaseWithClerk();
 
   const [farm, setFarm] = useState<FarmInfo | null>(null);
-  const [state, setState] = useState<PageState>("loading");
+  const [pageState, setPageState] = useState<PageState>("loading");
   const [errorMsg, setErrorMsg] = useState<string>("");
 
   const idParam = params?.id;
 
   const loadFarm = useCallback(async () => {
     if (!idParam || typeof idParam !== "string") {
-      setState("not-found");
+      setPageState("not-found");
       return;
     }
     const parsedId = parseInt(idParam, 10);
     if (isNaN(parsedId)) {
-      setState("not-found");
+      setPageState("not-found");
       return;
     }
 
@@ -47,7 +47,7 @@ export default function ClaimFarmPage(): JSX.Element {
       .single();
 
     if (error || !data) {
-      setState("not-found");
+      setPageState("not-found");
       return;
     }
 
@@ -59,12 +59,12 @@ export default function ClaimFarmPage(): JSX.Element {
 
     if (data.clerk_user_id) {
       setErrorMsg("Cette ferme a déjà été revendiquée.");
-      setState("error");
+      setPageState("error");
       return;
     }
 
     setFarm(data as FarmInfo);
-    setState("ready");
+    setPageState("ready");
   }, [idParam, supabase, router]);
 
   useEffect(() => {
@@ -78,7 +78,7 @@ export default function ClaimFarmPage(): JSX.Element {
       return;
     }
 
-    setState("submitting");
+    setPageState("submitting");
 
     try {
       const res = await fetch("/api/claim-farm", {
@@ -91,19 +91,19 @@ export default function ClaimFarmPage(): JSX.Element {
 
       if (!res.ok || !json.success) {
         setErrorMsg(json.message ?? "Une erreur est survenue.");
-        setState("error");
+        setPageState("error");
         return;
       }
 
-      setState("success");
+      setPageState("success");
     } catch (err) {
       console.error("[CLAIM] Erreur réseau:", err);
       setErrorMsg("Erreur réseau. Veuillez réessayer.");
-      setState("error");
+      setPageState("error");
     }
   };
 
-  if (state === "loading") {
+  if (pageState === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50">
         <Loader2 className="h-8 w-8 animate-spin text-green-600" />
@@ -111,11 +111,11 @@ export default function ClaimFarmPage(): JSX.Element {
     );
   }
 
-  if (state === "not-found") {
+  if (pageState === "not-found") {
     notFound();
   }
 
-  if (state === "success") {
+  if (pageState === "success") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50 px-4">
         <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center space-y-4">
@@ -144,7 +144,7 @@ export default function ClaimFarmPage(): JSX.Element {
     );
   }
 
-  if (state === "error") {
+  if (pageState === "error") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50 px-4">
         <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center space-y-4">
@@ -163,7 +163,7 @@ export default function ClaimFarmPage(): JSX.Element {
     );
   }
 
-  // state === "ready"
+  // pageState === "ready"
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50 px-4">
       <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full space-y-6">
@@ -224,10 +224,10 @@ export default function ClaimFarmPage(): JSX.Element {
         ) : (
           <button
             onClick={handleClaim}
-            disabled={state === "submitting"}
+            disabled={pageState === "submitting"}
             className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-green-600 text-white font-semibold hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
           >
-            {state === "submitting" && <Loader2 className="h-4 w-4 animate-spin" />}
+            {pageState === "submitting" && <Loader2 className="h-4 w-4 animate-spin" />}
             Revendiquer cette ferme
           </button>
         )}
