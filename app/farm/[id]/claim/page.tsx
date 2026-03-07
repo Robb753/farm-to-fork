@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter, notFound } from "next/navigation";
 import Link from "next/link";
 import { Loader2, MapPin, ChevronLeft, CheckCircle } from "lucide-react";
@@ -15,7 +15,13 @@ interface FarmInfo {
   clerk_user_id: string | null;
 }
 
-type ClaimStep = "loading" | "ready" | "submitting" | "success" | "error" | "not-found";
+type ClaimStep =
+  | "loading"
+  | "ready"
+  | "submitting"
+  | "success"
+  | "error"
+  | "not-found";
 
 export default function ClaimFarmPage(): JSX.Element {
   const params = useParams();
@@ -25,54 +31,63 @@ export default function ClaimFarmPage(): JSX.Element {
 
   const [farm, setFarm] = useState<FarmInfo | null>(null);
   const [step, setStep] = useState<ClaimStep>("loading");
-  const [errorMsg, setErrorMsg] = useState<string>("");
+  const [errorMsg, setErrorMsg] = useState("");
 
   const idParam = params?.id;
 
-  const loadFarm = useCallback(async () => {
-    if (!idParam || typeof idParam !== "string") {
-      setStep("not-found");
-      return;
-    }
-    const parsedId = parseInt(idParam, 10);
-    if (isNaN(parsedId)) {
-      setStep("not-found");
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from("listing")
-      .select("id, name, address, osm_id, clerk_user_id")
-      .eq("id", parsedId)
-      .single();
-
-    if (error || !data) {
-      setStep("not-found");
-      return;
-    }
-
-    if (!data.osm_id) {
-      // Pas une ferme OSM → rediriger vers la page normale
-      router.replace(`/farm/${parsedId}`);
-      return;
-    }
-
-    if (data.clerk_user_id) {
-      setErrorMsg("Cette ferme a déjà été revendiquée.");
-      setStep("error");
-      return;
-    }
-
-    setFarm(data as FarmInfo);
-    setStep("ready");
-  }, [idParam, supabase, router]);
-
   useEffect(() => {
-    loadFarm();
-  }, [loadFarm]);
+    let cancelled = false;
+
+    async function run() {
+      if (!idParam || typeof idParam !== "string") {
+        if (!cancelled) setStep("not-found");
+        return;
+      }
+
+      const parsedId = parseInt(idParam, 10);
+      if (Number.isNaN(parsedId)) {
+        if (!cancelled) setStep("not-found");
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("listing")
+        .select("id, name, address, osm_id, clerk_user_id")
+        .eq("id", parsedId)
+        .single();
+
+      if (cancelled) return;
+
+      if (error || !data) {
+        setStep("not-found");
+        return;
+      }
+
+      if (!data.osm_id) {
+        router.replace(`/farm/${parsedId}`);
+        return;
+      }
+
+      if (data.clerk_user_id) {
+        setErrorMsg("Cette ferme a déjà été revendiquée.");
+        setStep("error");
+        return;
+      }
+
+      setFarm(data as FarmInfo);
+      setStep("ready");
+    }
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [idParam, supabase, router]);
 
   const handleClaim = async () => {
     if (!farm) return;
+
     if (!isUserLoaded || !user) {
       router.push(`/sign-in?redirect_url=/farm/${farm.id}/claim`);
       return;
@@ -120,7 +135,9 @@ export default function ClaimFarmPage(): JSX.Element {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50 px-4">
         <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center space-y-4">
           <CheckCircle className="h-14 w-14 text-green-600 mx-auto" />
-          <h1 className="text-2xl font-bold text-gray-900">Ferme revendiquée !</h1>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Ferme revendiquée !
+          </h1>
           <p className="text-gray-600">
             Votre ferme est maintenant liée à votre compte. Vous pouvez
             compléter votre fiche producteur depuis votre tableau de bord.
@@ -149,7 +166,9 @@ export default function ClaimFarmPage(): JSX.Element {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50 px-4">
         <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center space-y-4">
           <div className="text-4xl">⚠️</div>
-          <h1 className="text-xl font-bold text-gray-900">Impossible de revendiquer</h1>
+          <h1 className="text-xl font-bold text-gray-900">
+            Impossible de revendiquer
+          </h1>
           <p className="text-gray-600">{errorMsg}</p>
           <Link
             href="/explore"
@@ -163,11 +182,9 @@ export default function ClaimFarmPage(): JSX.Element {
     );
   }
 
-  // step === "ready"
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50 px-4">
       <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full space-y-6">
-        {/* Retour */}
         <Link
           href={`/farm/${farm?.id}`}
           className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 transition-colors"
@@ -176,7 +193,6 @@ export default function ClaimFarmPage(): JSX.Element {
           Voir la fiche ferme
         </Link>
 
-        {/* Titre */}
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-medium mb-3">
             <MapPin className="h-3 w-3" />
@@ -190,7 +206,6 @@ export default function ClaimFarmPage(): JSX.Element {
           </p>
         </div>
 
-        {/* Infos ferme */}
         <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 space-y-1">
           <p className="font-semibold text-gray-900 text-lg">
             {farm?.name ?? "Ferme sans nom"}
@@ -203,9 +218,10 @@ export default function ClaimFarmPage(): JSX.Element {
           )}
         </div>
 
-        {/* Ce qui se passe */}
         <div className="space-y-2 text-sm text-gray-600">
-          <p className="font-medium text-gray-700">Ce que cette action fait :</p>
+          <p className="font-medium text-gray-700">
+            Ce que cette action fait :
+          </p>
           <ul className="space-y-1 pl-4 list-disc">
             <li>Lie votre compte à cette fiche ferme</li>
             <li>Vous donne accès à un tableau de bord producteur</li>
@@ -213,7 +229,6 @@ export default function ClaimFarmPage(): JSX.Element {
           </ul>
         </div>
 
-        {/* CTA */}
         {!isUserLoaded || !user ? (
           <Link
             href={`/sign-in?redirect_url=/farm/${farm?.id}/claim`}
@@ -227,14 +242,16 @@ export default function ClaimFarmPage(): JSX.Element {
             disabled={step === "submitting"}
             className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-green-600 text-white font-semibold hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
           >
-            {step === "submitting" && <Loader2 className="h-4 w-4 animate-spin" />}
+            {step === "submitting" && (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            )}
             Revendiquer cette ferme
           </button>
         )}
 
         <p className="text-xs text-gray-400 text-center">
-          La ferme ne sera pas publiée automatiquement — vous devrez l&apos;activer
-          depuis votre tableau de bord.
+          La ferme ne sera pas publiée automatiquement — vous devrez
+          l&apos;activer depuis votre tableau de bord.
         </p>
       </div>
     </div>
