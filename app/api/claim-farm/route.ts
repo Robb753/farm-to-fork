@@ -100,7 +100,13 @@ export async function POST(
     );
   }
 
-  // 4. Vérifier que l'utilisateur n'a pas déjà une ferme
+  // 4. Vérifier que l'utilisateur n'a pas déjà une ferme + récupérer son email depuis Clerk
+  const clerkClientInstance = await clerkClient();
+  const clerkUser = await clerkClientInstance.users.getUser(userId);
+  const userEmail =
+    clerkUser.emailAddresses.find((e) => e.id === clerkUser.primaryEmailAddressId)
+      ?.emailAddress ?? clerkUser.emailAddresses[0]?.emailAddress ?? "";
+
   const { data: existingProfile } = await supabase
     .from("profiles")
     .select("farm_id, role")
@@ -139,6 +145,7 @@ export async function POST(
     .upsert(
       {
         user_id: userId,
+        email: userEmail,
         role: "farmer",
         farm_id: listingId,
         updated_at: timestamp,
@@ -151,10 +158,9 @@ export async function POST(
     // Non bloquant : le listing est déjà lié, on continue
   }
 
-  // 7. Mettre à jour le rôle dans Clerk
+  // 7. Mettre à jour le rôle dans Clerk (réutilise l'instance déjà créée)
   try {
-    const client = await clerkClient();
-    await client.users.updateUser(userId, {
+    await clerkClientInstance.users.updateUser(userId, {
       publicMetadata: {
         role: "farmer",
         roleUpdatedAt: timestamp,
