@@ -46,6 +46,11 @@ export interface Listing {
   created_at?: string;
   modified_at?: string;
   published_at?: string;
+  /** Identifiant OpenStreetMap — présent uniquement sur les fermes pré-enregistrées */
+  osm_id?: number | null;
+  /** Clerk user ID du propriétaire — null si ferme non encore revendiquée */
+  clerk_user_id?: string | null;
+  distance?: number | null;
 }
 
 /**

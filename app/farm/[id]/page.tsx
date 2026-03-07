@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronRight, Loader2 } from "lucide-react";
+import { ChevronRight, Loader2, MapPin } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Suspense, useState, useEffect, useCallback } from "react";
 import { useParams, notFound } from "next/navigation";
@@ -104,6 +104,7 @@ export default function FarmPage(): JSX.Element {
       setIsLoading(true);
 
       // Charger le listing avec ses images
+      // Charge les fermes actives ET les fermes OSM non revendiquées (pour permettre la revendication)
       const { data: listingData, error: listingError } = await supabase
         .from("listing")
         .select(
@@ -113,7 +114,9 @@ export default function FarmPage(): JSX.Element {
         `
         )
         .eq("id", parsedId)
-        .eq("active", true)
+        .or(
+          "active.eq.true,and(active.eq.false,osm_id.not.is.null,clerk_user_id.is.null)"
+        )
         .single();
 
       if (listingError) {
@@ -201,6 +204,24 @@ export default function FarmPage(): JSX.Element {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Section principale (Tabs & Hero) */}
           <main className="lg:col-span-2 space-y-6">
+            {/* Bannière de revendication pour les fermes OSM non réclamées */}
+            {listing.osm_id && !listing.clerk_user_id && (
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                <div className="flex items-center gap-2 text-amber-800 text-sm">
+                  <MapPin className="h-4 w-4 flex-shrink-0 text-amber-600" />
+                  <span>
+                    <strong>Propriétaire de cette ferme ?</strong> Cette fiche a été pré-enregistrée depuis OpenStreetMap et attend d&apos;être revendiquée.
+                  </span>
+                </div>
+                <Link
+                  href={`/farm/${listing.id}/claim`}
+                  className="flex-shrink-0 inline-flex items-center justify-center px-4 py-2 rounded-lg bg-amber-600 text-white text-sm font-medium hover:bg-amber-700 transition-colors"
+                >
+                  Revendiquer cette ferme
+                </Link>
+              </div>
+            )}
+
             {/* Fil d'Ariane amélioré */}
             <nav
               className="flex flex-wrap items-center gap-2 text-sm mb-2"
