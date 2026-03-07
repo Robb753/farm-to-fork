@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useCallback } from "react";
 import mapboxgl from "mapbox-gl";
+import "mapbox-gl/dist/mapbox-gl.css";
 
 import {
   useMapState,
@@ -14,9 +15,10 @@ import {
 import type { LatLng } from "@/lib/store/shared/types";
 import MapboxMarkers from "./MapboxMarkers";
 import { COLORS } from "@/lib/config";
-import { useSetMapApiLoaded, useSetMapInstance } from "@/lib/store/unifiedStore";
-
-mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || "";
+import {
+  useSetMapApiLoaded,
+  useSetMapInstance,
+} from "@/lib/store/unifiedStore";
 
 const MAPBOX_CONFIG = {
   style: "mapbox://styles/mapbox/streets-v12",
@@ -416,16 +418,19 @@ export default function MapboxSection({
   /* ---------------- init map (once) ---------------- */
 
   useEffect(() => {
-    const containerEl = containerRef.current; // ✅ capture ref pour cleanup
+    const containerEl = containerRef.current;
     if (!containerEl || mapRef.current) return;
 
     cleanContainer(containerEl);
     let destroyed = false;
 
-    // ✅ indique loading via store (pas de setState)
     setMapLoading(true);
 
     try {
+      // ✅ accessToken au moment de l'init (pas top-level)
+      const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || "";
+      mapboxgl.accessToken = token;
+
       const initialCoords = coordsRef.current;
       const initialZoom = zoomRef.current;
 
@@ -437,6 +442,12 @@ export default function MapboxSection({
         typeof initialZoom === "number" && initialZoom >= MAPBOX_CONFIG.minZoom
           ? initialZoom
           : MAPBOX_CONFIG.zoom;
+
+          if (!token) {
+            console.error("NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN manquant");
+            setMapLoading(false);
+            return;
+          }
 
       const map = new mapboxgl.Map({
         container: containerEl,
@@ -480,7 +491,6 @@ export default function MapboxSection({
 
           enforceFlatView(map);
 
-          // fallback coords si store vide
           if (!isValidCoords(coordsRef.current)) {
             const fb = mapboxToStoreCoords(MAPBOX_CONFIG.center);
             if (fb) {
@@ -550,7 +560,6 @@ export default function MapboxSection({
 
         if (containerEl) cleanContainer(containerEl);
 
-        // ✅ reset store flags
         setApiLoaded(false);
         setInstance(null);
         setMapLoading(true);

@@ -64,6 +64,14 @@ const initialCart: Cart = {
 };
 
 /**
+ * Anti double-clic (MVP-friendly):
+ * on bloque les ajouts répétés sur le même produit pendant ~350ms
+ * (évite les double-clics involontaires).
+ */
+const ADD_THROTTLE_MS = 350;
+const lastAddByProductId = new Map<number, number>();
+
+/**
  * Store Zustand pour le panier
  * Persisté dans localStorage
  */
@@ -76,6 +84,16 @@ export const useCartStore = create<CartStore>()(
        * Ajouter un produit au panier
        */
       addItem: (product: Product, quantity: number) => {
+        // ✅ Guard quantité
+        const qty = Number(quantity);
+        if (!Number.isFinite(qty) || qty <= 0) return;
+
+        // ✅ Anti double-clic (par produit)
+        const now = Date.now();
+        const last = lastAddByProductId.get(product.id) ?? 0;
+        if (now - last < ADD_THROTTLE_MS) return;
+        lastAddByProductId.set(product.id, now);
+
         set((state) => {
           // Si le panier est vide, initialiser avec la ferme
           if (!state.cart.farmId) {
@@ -84,7 +102,7 @@ export const useCartStore = create<CartStore>()(
                 ...state.cart,
                 farmId: product.farm_id,
                 farmName: product.farm_name,
-                items: [{ product, quantity }],
+                items: [{ product, quantity: qty }],
               },
             };
           }
@@ -97,13 +115,16 @@ export const useCartStore = create<CartStore>()(
 
           // Vérifier si le produit existe déjà
           const existingItemIndex = state.cart.items.findIndex(
-            (item) => item.product.id === product.id
+            (item) => item.product.id === product.id,
           );
 
           if (existingItemIndex > -1) {
             // Mettre à jour la quantité
             const newItems = [...state.cart.items];
-            newItems[existingItemIndex].quantity += quantity;
+            newItems[existingItemIndex] = {
+              ...newItems[existingItemIndex],
+              quantity: newItems[existingItemIndex].quantity + qty,
+            };
             return {
               cart: {
                 ...state.cart,
@@ -116,7 +137,7 @@ export const useCartStore = create<CartStore>()(
           return {
             cart: {
               ...state.cart,
-              items: [...state.cart.items, { product, quantity }],
+              items: [...state.cart.items, { product, quantity: qty }],
             },
           };
         });
@@ -128,7 +149,7 @@ export const useCartStore = create<CartStore>()(
       removeItem: (productId: number) => {
         set((state) => {
           const newItems = state.cart.items.filter(
-            (item) => item.product.id !== productId
+            (item) => item.product.id !== productId,
           );
 
           // Si le panier est vide, réinitialiser
@@ -153,7 +174,7 @@ export const useCartStore = create<CartStore>()(
           if (quantity <= 0) {
             // Si quantité = 0, retirer le produit
             const newItems = state.cart.items.filter(
-              (item) => item.product.id !== productId
+              (item) => item.product.id !== productId,
             );
 
             // Si le panier est vide, réinitialiser
@@ -170,7 +191,7 @@ export const useCartStore = create<CartStore>()(
           }
 
           const newItems = state.cart.items.map((item) =>
-            item.product.id === productId ? { ...item, quantity } : item
+            item.product.id === productId ? { ...item, quantity } : item,
           );
 
           return {
@@ -206,7 +227,10 @@ export const useCartStore = create<CartStore>()(
        */
       getTotalItems: () => {
         const state = get();
-        return state.cart.items.reduce((total, item) => total + item.quantity, 0);
+        return state.cart.items.reduce(
+          (total, item) => total + item.quantity,
+          0,
+        );
       },
 
       /**
@@ -216,7 +240,7 @@ export const useCartStore = create<CartStore>()(
         const state = get();
         return state.cart.items.reduce(
           (total, item) => total + item.product.price * item.quantity,
-          0
+          0,
         );
       },
 
@@ -230,6 +254,6 @@ export const useCartStore = create<CartStore>()(
     }),
     {
       name: "farm2fork-cart",
-    }
-  )
+    },
+  ),
 );

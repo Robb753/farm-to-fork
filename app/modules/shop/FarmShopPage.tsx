@@ -217,17 +217,21 @@ export default function FarmShopPage(): JSX.Element {
         if (productsError) throw productsError;
 
         const transformedProducts: Product[] = (productsData || []).map(
-          (p: any) => ({
-            id: p.id,
-            name: p.name ?? "Produit sans nom",
-            price: typeof p.price === "number" ? p.price : Number(p.price ?? 0),
-            unit: p.unit ?? "unité",
-            farm_id: farmId,
-            farm_name: safeFarmName, // ✅ string garanti
-            image_url: p.image_url ?? null,
-            stock_status: p.stock_status ?? "in_stock",
-            description: p.description ?? null,
-          })
+          (p: any) => {
+            const parsedPrice = Number(p.price);
+
+            return {
+              id: p.id,
+              name: p.name ?? "Produit sans nom",
+              price: Number.isFinite(parsedPrice) ? parsedPrice : 0,
+              unit: p.unit ?? "unité",
+              farm_id: farmId,
+              farm_name: safeFarmName,
+              image_url: p.image_url ?? null,
+              stock_status: p.stock_status ?? "in_stock",
+              description: p.description ?? null,
+            };
+          },
         );
 
         if (cancelled) return;

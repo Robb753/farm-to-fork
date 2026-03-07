@@ -3,7 +3,6 @@
 import { useEffect, useRef, useCallback } from "react";
 import mapboxgl from "mapbox-gl";
 
-// ✅ Import du nouveau store unifié
 import { COLORS } from "@/lib/config";
 import { useListingsState, useMapState } from "@/lib/store";
 import type { Listing } from "@/lib/store";
@@ -15,26 +14,31 @@ import { logger } from "@/lib/logger";
 interface MarkerData {
   marker: mapboxgl.Marker;
   listing: Listing;
+  element: HTMLDivElement;
+  handlers: {
+    mouseenter: () => void;
+    mouseleave: () => void;
+    click: () => void;
+  };
 }
 
 /**
- * Composant MapboxMarkers ultra-robuste avec vérifications complètes
+ * Composant MapboxMarkers
  *
- * Features:
- * - Vérification robuste de l'état de la carte
- * - Gestion d'erreurs complète avec try-catch
- * - Types TypeScript stricts pour la sécurité
- * - Marqueurs avec couleurs du design system
- * - Nettoyage automatique des ressources
- * - Logs détaillés pour le debugging
- * - Gestion des événements de style de carte
- *
- * @returns Composant null (marqueurs sont injectés dans la carte)
+ * Gestion complète et sécurisée des marqueurs sur la carte Mapbox :
+ * - Création/suppression automatique basée sur visibleListings
+ * - Validation robuste des coordonnées
+ * - Sécurité XSS (DOM-only, pas de setHTML)
+ * - Interactions utilisateur (hover, click)
+ * - Popups avec informations ferme
+ * - Cleanup mémoire complet
  */
 export default function MapboxMarkers(): null {
   const { mapInstance } = useMapState();
   const { visible: visibleListings } = useListingsState();
+
   const markersRef = useRef<Map<string | number, MarkerData>>(new Map());
+  const activePopupRef = useRef<mapboxgl.Popup | null>(null);
 
   /**
    * Nettoie tous les marqueurs de la carte
@@ -42,12 +46,34 @@ export default function MapboxMarkers(): null {
   const cleanupMarkers = useCallback((): void => {
     markersRef.current.forEach((markerData, id) => {
       try {
-        markerData.marker.remove();
+        const { marker, element, handlers } = markerData;
+
+        // Cleanup event listeners
+        element.removeEventListener("mouseenter", handlers.mouseenter);
+        element.removeEventListener("mouseleave", handlers.mouseleave);
+        element.removeEventListener("click", handlers.click);
+
+        // Remove marker
+        marker.remove();
       } catch (error) {
-        console.warn(`Erreur lors de la suppression du marker ${id}:`, error);
+        console.warn(
+          `Erreur lors de la suppression du marker ${String(id)}:`,
+          error,
+        );
       }
     });
+
     markersRef.current.clear();
+
+    // Cleanup active popup
+    if (activePopupRef.current) {
+      try {
+        activePopupRef.current.remove();
+        activePopupRef.current = null;
+      } catch (error) {
+        console.warn("Erreur suppression popup active:", error);
+      }
+    }
   }, []);
 
   /**
@@ -58,26 +84,22 @@ export default function MapboxMarkers(): null {
       if (!map) return false;
 
       try {
-        // Vérifier que la carte a un container DOM
         const container = map.getContainer();
         if (!container) {
           logger.debug("Carte sans container DOM");
           return false;
         }
 
-        // Vérifier que le container est dans le DOM
         if (!container.isConnected) {
           logger.debug("Container de carte non connecté au DOM");
           return false;
         }
 
-        // Vérifier que le style est chargé
         if (typeof map.isStyleLoaded === "function" && !map.isStyleLoaded()) {
           logger.debug("Style de carte non chargé");
           return false;
         }
 
-        // Vérifier que la carte n'est pas en cours de suppression
         if ((map as any)._removed) {
           logger.debug("Carte marquée comme supprimée");
           return false;
@@ -87,21 +109,20 @@ export default function MapboxMarkers(): null {
       } catch (error) {
         console.warn(
           "Erreur lors de la vérification de l'état de la carte:",
-          error
+          error,
         );
         return false;
       }
     },
-    []
+    [],
   );
 
   /**
-   * ✅ Valide les coordonnées d'un listing avec le nouveau format
+   * Valide les coordonnées d'un listing
    */
   const validateCoordinates = useCallback(
     (listing: Listing): { lat: number; lng: number } | null => {
       try {
-        // ✅ Utilise directement les propriétés lat/lng du type Listing
         const lat =
           typeof listing.lat === "number" ? listing.lat : Number(listing.lat);
         const lng =
@@ -109,30 +130,30 @@ export default function MapboxMarkers(): null {
 
         if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
           logger.debug(
-            `Coordonnées invalides pour listing ${listing.id}: lat=${listing.lat}, lng=${listing.lng}`
+            `Coordonnées invalides pour listing ${String(listing.id)}: lat=${String(
+              listing.lat,
+            )}, lng=${String(listing.lng)}`,
           );
           return null;
         }
 
-        // Validation des limites géographiques
         if (lat < -90 || lat > 90) {
           console.warn(
-            `Latitude hors limites pour listing ${listing.id}: ${lat}`
+            `Latitude hors limites pour listing ${String(listing.id)}: ${lat}`,
           );
           return null;
         }
 
         if (lng < -180 || lng > 180) {
           console.warn(
-            `Longitude hors limites pour listing ${listing.id}: ${lng}`
+            `Longitude hors limites pour listing ${String(listing.id)}: ${lng}`,
           );
           return null;
         }
 
-        // Éviter le point (0,0) qui est souvent une erreur
         if (lat === 0 && lng === 0) {
           logger.debug(
-            `Coordonnées (0,0) rejetées pour listing ${listing.id}`
+            `Coordonnées (0,0) rejetées pour listing ${String(listing.id)}`,
           );
           return null;
         }
@@ -140,14 +161,74 @@ export default function MapboxMarkers(): null {
         return { lat, lng };
       } catch (error) {
         console.error(
-          `Erreur lors de la validation des coordonnées pour listing ${listing.id}:`,
-          error
+          `Erreur lors de la validation des coordonnées pour listing ${String(listing.id)}:`,
+          error,
         );
         return null;
       }
     },
-    []
+    [],
   );
+
+  /**
+   * Construit un DOM node safe pour la popup (pas de setHTML)
+   */
+  const buildPopupNode = useCallback((listing: Listing): HTMLElement => {
+    const wrapper = document.createElement("div");
+    wrapper.style.cssText = `
+      padding: 12px 16px;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: ${COLORS.BG_WHITE};
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      min-width: 200px;
+      max-width: 280px;
+    `;
+
+    // Titre (nom de la ferme)
+    const title = document.createElement("p");
+    title.style.cssText = `
+      margin: 0 0 8px 0;
+      font-weight: 600;
+      font-size: 15px;
+      color: ${COLORS.TEXT_PRIMARY};
+      line-height: 1.4;
+    `;
+    title.textContent = listing.name || `Ferme #${String(listing.id)}`;
+    wrapper.appendChild(title);
+
+    // Adresse (optionnelle)
+    if (listing.address) {
+      const addr = document.createElement("p");
+      addr.style.cssText = `
+        margin: 0 0 4px 0;
+        font-size: 13px;
+        color: ${COLORS.TEXT_SECONDARY};
+        line-height: 1.4;
+      `;
+      addr.textContent = listing.address;
+      wrapper.appendChild(addr);
+    }
+
+    // Distance (optionnelle)
+    if (listing.distance !== undefined && listing.distance !== null) {
+      const distance = document.createElement("p");
+      distance.style.cssText = `
+        margin: 0;
+        font-size: 12px;
+        color: ${COLORS.TEXT_MUTED};
+        font-weight: 500;
+      `;
+      const distanceKm =
+        typeof listing.distance === "number"
+          ? listing.distance.toFixed(1)
+          : String(listing.distance);
+      distance.textContent = `📍 ${distanceKm} km`;
+      wrapper.appendChild(distance);
+    }
+
+    return wrapper;
+  }, []);
 
   /**
    * Crée un marqueur personnalisé pour un listing
@@ -155,71 +236,123 @@ export default function MapboxMarkers(): null {
   const createMarker = useCallback(
     (
       listing: Listing,
-      coordinates: { lat: number; lng: number }
-    ): mapboxgl.Marker | null => {
+      coordinates: { lat: number; lng: number },
+    ): {
+      marker: mapboxgl.Marker;
+      element: HTMLDivElement;
+      handlers: any;
+    } | null => {
       try {
-        // ✅ Marqueur avec couleur du design system
-        const marker = new mapboxgl.Marker({
-          color: COLORS.PRIMARY,
-          scale: 1,
-          draggable: false,
-        }).setLngLat([coordinates.lng, coordinates.lat]);
+        // Créer l'élément DOM du marqueur
+        const markerElement = document.createElement("div");
+        markerElement.className = "custom-marker";
+        markerElement.setAttribute("role", "button");
+        markerElement.setAttribute(
+          "aria-label",
+          `Ferme ${listing.name || listing.id}`,
+        );
+        markerElement.setAttribute("tabindex", "0");
 
-        // Optionnel : Popup avec informations du listing
-        if (listing.name) {
+        markerElement.style.cssText = `
+          width: 28px;
+          height: 28px;
+          background-color: ${COLORS.PRIMARY};
+          border: 3px solid ${COLORS.BG_WHITE};
+          border-radius: 50%;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+          opacity: 1;
+        `;
+
+        // Handlers d'interaction
+        const handleMouseEnter = () => {
+          markerElement.style.transform = "scale(1.25)";
+          markerElement.style.backgroundColor = COLORS.PRIMARY_DARK;
+          markerElement.style.boxShadow = "0 4px 10px rgba(0,0,0,0.35)";
+          markerElement.style.zIndex = "1000";
+        };
+
+        const handleMouseLeave = () => {
+          markerElement.style.transform = "scale(1)";
+          markerElement.style.backgroundColor = COLORS.PRIMARY;
+          markerElement.style.boxShadow = "0 2px 6px rgba(0,0,0,0.25)";
+          markerElement.style.zIndex = "1";
+        };
+
+        const handleClick = () => {
+          // Dispatch custom event pour communication inter-composants
+          window.dispatchEvent(
+            new CustomEvent("listingSelected", {
+              detail: { id: listing.id, fromMap: true },
+            }),
+          );
+
+          // Fermer popup active si existe
+          if (activePopupRef.current) {
+            activePopupRef.current.remove();
+            activePopupRef.current = null;
+          }
+
+          // Ouvrir nouvelle popup
+          const map = mapInstance;
+          if (!map) return;
+
           const popup = new mapboxgl.Popup({
-            offset: 25,
+            offset: 30,
             closeButton: true,
             closeOnClick: false,
             className: "listing-popup",
-          }).setHTML(`
-          <div style="
-            padding: 8px 12px;
-            font-family: system-ui, -apple-system, sans-serif;
-            background: ${COLORS.BG_WHITE};
-            border-radius: 6px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-          ">
-            <p style="
-              margin: 0;
-              font-weight: 600;
-              font-size: 14px;
-              color: ${COLORS.TEXT_PRIMARY};
-            ">${listing.name}</p>
-            ${
-              listing.address
-                ? `
-            <p style="
-              margin: 4px 0 0 0;
-              font-size: 12px;
-              color: ${COLORS.TEXT_SECONDARY};
-            ">${listing.address}</p>
-            `
-                : ""
+            maxWidth: "300px",
+          }).setDOMContent(buildPopupNode(listing));
+
+          popup.setLngLat([coordinates.lng, coordinates.lat]).addTo(map);
+
+          // Cleanup quand popup fermée
+          popup.on("close", () => {
+            if (activePopupRef.current === popup) {
+              activePopupRef.current = null;
             }
-          </div>
-        `);
+          });
 
-          marker.setPopup(popup);
-        }
+          activePopupRef.current = popup;
+        };
 
-        return marker;
+        // Attacher les événements
+        markerElement.addEventListener("mouseenter", handleMouseEnter);
+        markerElement.addEventListener("mouseleave", handleMouseLeave);
+        markerElement.addEventListener("click", handleClick);
+
+        // Créer le marqueur Mapbox
+        const marker = new mapboxgl.Marker({
+          element: markerElement,
+          anchor: "center",
+        }).setLngLat([coordinates.lng, coordinates.lat]);
+
+        return {
+          marker,
+          element: markerElement,
+          handlers: {
+            mouseenter: handleMouseEnter,
+            mouseleave: handleMouseLeave,
+            click: handleClick,
+          },
+        };
       } catch (error) {
         console.error(
-          `Erreur lors de la création du marker pour listing ${listing.id}:`,
-          error
+          `Erreur lors de la création du marker pour listing ${String(listing.id)}:`,
+          error,
         );
         return null;
       }
     },
-    []
+    [mapInstance, buildPopupNode],
   );
 
   /**
    * Création/mise à jour des marqueurs
    */
   useEffect(() => {
-    // Attendre que la carte soit complètement prête
     if (!isMapReady(mapInstance)) {
       logger.debug("Carte non prête, skip création marqueurs");
       return;
@@ -231,10 +364,9 @@ export default function MapboxMarkers(): null {
     }
 
     logger.debug(
-      `🎯 Mise à jour des marqueurs: ${visibleListings.length} listings`
+      `🎯 Mise à jour des marqueurs: ${visibleListings.length} listings`,
     );
 
-    // ✅ Debug des premiers listings pour vérifier la structure
     if (visibleListings.length > 0) {
       const firstListing = visibleListings[0];
       logger.debug("📋 Structure du premier listing:", {
@@ -247,65 +379,68 @@ export default function MapboxMarkers(): null {
       });
     }
 
-    // Nettoie les anciens marqueurs
+    // Cleanup anciens marqueurs
     cleanupMarkers();
 
     let successCount = 0;
     let errorCount = 0;
 
-    // Ajoute les nouveaux marqueurs
-    visibleListings.forEach((listing: Listing) => {
+    for (const listing of visibleListings) {
       const id = listing?.id;
 
       if (!id) {
         logger.debug("Listing sans ID, ignoré");
         errorCount++;
-        return;
+        continue;
       }
 
       const coordinates = validateCoordinates(listing);
       if (!coordinates) {
-        logger.debug(`❌ Coordonnées invalides pour listing ${id}:`, {
+        logger.debug(`❌ Coordonnées invalides pour listing ${String(id)}:`, {
           lat: listing.lat,
           lng: listing.lng,
           name: listing.name,
         });
         errorCount++;
-        return;
+        continue;
       }
 
       try {
-        const marker = createMarker(listing, coordinates);
-        if (!marker) {
+        const markerData = createMarker(listing, coordinates);
+        if (!markerData) {
           errorCount++;
-          return;
+          continue;
         }
 
-        // ✅ Vérification finale avant l'ajout
         if (isMapReady(mapInstance)) {
-          marker.addTo(mapInstance);
-          markersRef.current.set(id, { marker, listing });
+          markerData.marker.addTo(mapInstance);
+          markersRef.current.set(id, {
+            marker: markerData.marker,
+            listing,
+            element: markerData.element,
+            handlers: markerData.handlers,
+          });
           successCount++;
-
-          logger.debug(
-            `✅ Marker créé pour listing ${id} (${listing.name}) à [${coordinates.lng}, ${coordinates.lat}]`
-          );
         } else {
-          console.warn(`Carte non prête lors de l'ajout du marker ${id}`);
-          marker.remove(); // Nettoyage
+          console.warn(
+            `Carte non prête lors de l'ajout du marker ${String(id)}`,
+          );
+          markerData.marker.remove();
           errorCount++;
         }
       } catch (error) {
-        console.error(`❌ Erreur création marker ${id}:`, error);
+        console.error(`❌ Erreur création marker ${String(id)}:`, error);
         errorCount++;
       }
-      logger.debug("MapboxMarkers: bilan update", {
-        successCount,
-        errorCount,
-        total: visibleListings.length,
-      });
-    });
+    }
 
+    // Bilan de l'update
+    logger.debug("MapboxMarkers: bilan update", {
+      successCount,
+      errorCount,
+      total: visibleListings.length,
+      ratio: `${((successCount / visibleListings.length) * 100).toFixed(1)}%`,
+    });
   }, [
     mapInstance,
     visibleListings,
@@ -316,30 +451,20 @@ export default function MapboxMarkers(): null {
   ]);
 
   /**
-   * Écouter les événements de la carte pour recréer les marqueurs si nécessaire
+   * Écouter les événements de la carte pour cleanup si le style reload
    */
   useEffect(() => {
     if (!mapInstance) return;
 
     const handleStyleLoad = (): void => {
-      logger.debug("Style de carte chargé, recréation des marqueurs");
-      // Recréer les marqueurs quand le style est chargé
-      setTimeout(() => {
-        if (visibleListings && visibleListings.length > 0) {
-          cleanupMarkers();
-          // L'effet principal se déclenchera automatiquement
-        }
-      }, 100);
-    };
-
-    const handleMapLoad = (): void => {
-      logger.debug("Carte complètement chargée");
-      handleStyleLoad();
+      logger.debug("Style de carte chargé/changé, cleanup markers");
+      // Delay pour laisser le style se stabiliser
+      setTimeout(() => cleanupMarkers(), 100);
     };
 
     try {
       mapInstance.on("styledata", handleStyleLoad);
-      mapInstance.on("load", handleMapLoad);
+      mapInstance.on("load", handleStyleLoad);
     } catch (error) {
       console.error("Erreur lors de l'ajout des listeners de carte:", error);
     }
@@ -347,23 +472,65 @@ export default function MapboxMarkers(): null {
     return () => {
       try {
         mapInstance.off("styledata", handleStyleLoad);
-        mapInstance.off("load", handleMapLoad);
+        mapInstance.off("load", handleStyleLoad);
       } catch (error) {
         console.warn("Erreur lors de la suppression des listeners:", error);
       }
     };
-  }, [mapInstance, visibleListings, cleanupMarkers]);
+  }, [mapInstance, cleanupMarkers]);
+
+  /**
+   * Écouter les événements externes (hover from list)
+   */
+  useEffect(() => {
+    const handleListingHovered = (event: Event) => {
+      const e = event as CustomEvent<{ id: number | null }>;
+      const hoveredId = e.detail?.id;
+
+      markersRef.current.forEach((markerData, id) => {
+        const { element } = markerData;
+
+        if (hoveredId === null) {
+          // Reset all
+          element.style.transform = "scale(1)";
+          element.style.backgroundColor = COLORS.PRIMARY;
+          element.style.boxShadow = "0 2px 6px rgba(0,0,0,0.25)";
+          element.style.opacity = "1";
+          element.style.zIndex = "1";
+        } else if (id === hoveredId) {
+          // Highlight hovered
+          element.style.transform = "scale(1.25)";
+          element.style.backgroundColor = COLORS.PRIMARY_DARK;
+          element.style.boxShadow = "0 4px 10px rgba(0,0,0,0.35)";
+          element.style.opacity = "1";
+          element.style.zIndex = "1000";
+        } else {
+          // Dim others
+          element.style.transform = "scale(1)";
+          element.style.backgroundColor = COLORS.PRIMARY;
+          element.style.boxShadow = "0 2px 6px rgba(0,0,0,0.25)";
+          element.style.opacity = "0.5";
+          element.style.zIndex = "1";
+        }
+      });
+    };
+
+    window.addEventListener("listingHovered", handleListingHovered);
+
+    return () => {
+      window.removeEventListener("listingHovered", handleListingHovered);
+    };
+  }, []);
 
   /**
    * Nettoyage final lors du démontage du composant
    */
   useEffect(() => {
     return () => {
-      logger.debug("Nettoyage final des marqueurs");
+      logger.debug("🧹 Nettoyage final des marqueurs");
       cleanupMarkers();
     };
   }, [cleanupMarkers]);
 
-  // Ce composant ne rend rien (les marqueurs sont injectés dans la carte)
   return null;
 }

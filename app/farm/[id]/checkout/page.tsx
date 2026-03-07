@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Calendar, MapPin, Truck, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@clerk/nextjs";
 
 import { COLORS } from "@/lib/config";
 import { useCartStore } from "@/lib/store/cartStore";
@@ -15,7 +16,6 @@ import { logger } from "@/lib/logger";
 
 /**
  * Interface pour une ferme
- * ✅ On garde des strings "propres" côté UI
  */
 interface Farm {
   id: number;
@@ -33,6 +33,9 @@ interface Farm {
 export default function FarmCheckoutPage(): JSX.Element | null {
   const params = useParams();
   const router = useRouter();
+
+  // ✅ Clerk auth
+  const { userId, isLoaded } = useAuth();
 
   const supabase = useSupabaseWithClerk();
   const { createOrder } = useOrdersApi();
@@ -56,7 +59,6 @@ export default function FarmCheckoutPage(): JSX.Element | null {
   const [isRedirecting, setIsRedirecting] = useState(false);
 
   // ✅ FarmId utilisable dans les hooks (fallback)
-  // Important : on n'utilise PAS ce fallback pour requêter : on gate dans les effects.
   const farmId = effectiveFarmId ?? 0;
 
   const [farm, setFarm] = useState<Farm | null>(null);
@@ -74,17 +76,41 @@ export default function FarmCheckoutPage(): JSX.Element | null {
   });
 
   /**
+   * ✅ Helper : redirection "critique" => nettoyage panier + redirect
+   */
+  const criticalRedirect = useCallback(
+    (message: string, to: string) => {
+      setIsRedirecting(true);
+      toast.error(message);
+      clearCart(); // ✅ BUG #6 FIX
+      router.replace(to);
+    },
+    [clearCart, router],
+  );
+
+  /**
    * ✅ Guard farm invalide → redirect (sans casser les hooks)
    */
   useEffect(() => {
     if (effectiveFarmId === null) {
-      setIsRedirecting(true);
-      toast.error("Ferme invalide");
-      router.replace("/explore");
-    } else {
-      setIsRedirecting(false);
+      criticalRedirect("Ferme invalide", "/explore");
+      return;
     }
-  }, [effectiveFarmId, router]);
+    setIsRedirecting(false);
+  }, [effectiveFarmId, criticalRedirect]);
+
+  /**
+   * ✅ Guard auth : empêcher l’accès au checkout si non connecté
+   */
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    if (!userId) {
+      setIsRedirecting(true);
+      toast.error("Vous devez être connecté pour passer commande");
+      router.replace(`/sign-in?redirect_url=/farm/${farmId}/checkout`);
+    }
+  }, [isLoaded, userId, farmId, router]);
 
   /**
    * Charger les infos de la ferme
@@ -92,7 +118,6 @@ export default function FarmCheckoutPage(): JSX.Element | null {
   useEffect(() => {
     let isMounted = true;
 
-    // ✅ On ne fait rien tant qu'on n'a pas un farmId valide
     if (!effectiveFarmId) {
       setIsLoadingFarm(false);
       return () => {
@@ -106,19 +131,23 @@ export default function FarmCheckoutPage(): JSX.Element | null {
       try {
         const { data, error } = await supabase
           .from("listing")
-          .select("id, name, address")
+          .select("id, name, address, active")
           .eq("id", farmId)
-          .eq("active", true)
           .single();
 
         if (error || !data) {
-          toast.error("Ferme introuvable");
-          router.replace("/explore");
+          criticalRedirect("Ferme introuvable", "/explore");
+          return;
+        }
+
+        if (!data.active) {
+          criticalRedirect("Ferme non disponible", "/explore");
           return;
         }
 
         if (!isMounted) return;
 
+        // NOTE: ici tu mets des valeurs mock/placeholder pour MVP
         setFarm({
           id: data.id,
           name: data.name ?? "Ferme sans nom",
@@ -130,8 +159,7 @@ export default function FarmCheckoutPage(): JSX.Element | null {
         });
       } catch (err) {
         logger.error("Erreur chargement ferme:", err);
-        toast.error("Impossible de charger la ferme");
-        router.replace("/explore");
+        criticalRedirect("Impossible de charger la ferme", "/explore");
       } finally {
         if (isMounted) setIsLoadingFarm(false);
       }
@@ -142,20 +170,32 @@ export default function FarmCheckoutPage(): JSX.Element | null {
     return () => {
       isMounted = false;
     };
-  }, [effectiveFarmId, farmId, router, supabase]);
+  }, [effectiveFarmId, farmId, supabase, criticalRedirect]);
 
   /**
-   * Rediriger si panier vide (une fois la ferme chargée)
+   * ✅ BUG #6 FIX — Rediriger si panier vide (une fois la ferme chargée)
    */
   useEffect(() => {
-    // ✅ Ne rien faire tant qu'on n'a pas un farmId valide
     if (!effectiveFarmId) return;
 
+    // panier vide
     if (!isLoadingFarm && cart.items.length === 0) {
-      toast.error("Votre panier est vide");
-      router.replace(`/farm/${farmId}/shop`);
+      criticalRedirect("Votre panier est vide", `/farm/${farmId}/shop`);
+      return;
     }
-  }, [cart.items.length, farmId, isLoadingFarm, router, effectiveFarmId]);
+
+    // panier sur une autre ferme (état incohérent)
+    if (!isLoadingFarm && cart.farmId && cart.farmId !== effectiveFarmId) {
+      criticalRedirect("Panier invalide (ferme différente)", "/explore");
+    }
+  }, [
+    effectiveFarmId,
+    isLoadingFarm,
+    cart.items.length,
+    cart.farmId,
+    farmId,
+    criticalRedirect,
+  ]);
 
   // Calculs
   const subtotal = getTotalPrice();
@@ -180,6 +220,14 @@ export default function FarmCheckoutPage(): JSX.Element | null {
   const handleSubmit = useCallback(
     async (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
+
+      if (!userId) {
+        toast.error("Vous devez être connecté pour passer commande");
+        router.replace(
+          `/sign-in?redirect_url=/farm/${effectiveFarmId}/checkout`,
+        );
+        return;
+      }
 
       if (!effectiveFarmId) {
         toast.error("Ferme invalide");
@@ -211,7 +259,7 @@ export default function FarmCheckoutPage(): JSX.Element | null {
 
       try {
         const result = await createOrder({
-          farmId: effectiveFarmId, // ✅ number garanti ici
+          farmId: effectiveFarmId,
           items: cart.items.map((item) => ({
             productId: item.product.id,
             quantity: item.quantity,
@@ -231,11 +279,11 @@ export default function FarmCheckoutPage(): JSX.Element | null {
         }
 
         toast.error(
-          result.error || "Erreur lors de la création de la commande"
+          result.error || "Erreur lors de la création de la commande",
         );
         if (result.details) {
           result.details.forEach((detail) =>
-            toast.error(detail, { duration: 5000 })
+            toast.error(detail, { duration: 5000 }),
           );
         }
       } catch (err) {
@@ -246,6 +294,7 @@ export default function FarmCheckoutPage(): JSX.Element | null {
       }
     },
     [
+      userId,
       effectiveFarmId,
       cart.deliveryMode,
       cart.items,
@@ -255,12 +304,11 @@ export default function FarmCheckoutPage(): JSX.Element | null {
       createOrder,
       clearCart,
       router,
-    ]
+    ],
   );
 
   /**
    * ✅ Rendu “neutre” pendant redirection / id invalide
-   * (pas de hooks après ça, donc OK)
    */
   if (isRedirecting || effectiveFarmId === null) return null;
 
@@ -287,7 +335,6 @@ export default function FarmCheckoutPage(): JSX.Element | null {
   return (
     <div className="min-h-screen" style={{ backgroundColor: COLORS.BG_GRAY }}>
       <div className="max-w-3xl mx-auto px-4 py-8">
-        {/* Breadcrumb */}
         <Link
           href={`/farm/${farmId}/cart`}
           className="inline-flex items-center gap-2 mb-6 text-sm hover:underline"
@@ -297,7 +344,6 @@ export default function FarmCheckoutPage(): JSX.Element | null {
           Retour au panier
         </Link>
 
-        {/* En-tête */}
         <div className="mb-8">
           <h1
             className="text-3xl font-bold mb-2"
@@ -643,7 +689,7 @@ export default function FarmCheckoutPage(): JSX.Element | null {
           {/* Submit */}
           <button
             type="submit"
-            disabled={isCreatingOrder}
+            disabled={isCreatingOrder || !isLoaded}
             className="w-full py-4 px-6 rounded-lg font-bold text-lg transition-all duration-200 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
             style={{ backgroundColor: COLORS.PRIMARY, color: COLORS.BG_WHITE }}
           >

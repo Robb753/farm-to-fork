@@ -17,7 +17,7 @@ export function useSupabaseWithClerk(): SupabaseClient<Database> {
         try {
           const token = await getToken({ template: "supabase" });
           return token ?? null;
-        } catch (error) {
+        } catch (_error) {
           // Pendant le build Next.js ou SSR, getToken() peut échouer car il n'y a pas de contexte d'auth
           // C'est normal et attendu - on retourne simplement null
           return null;

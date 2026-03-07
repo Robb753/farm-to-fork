@@ -3,10 +3,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ============ Vendors ============ */
-/* Import Mapbox CSS AVANT nos overrides pour pouvoir surcharger proprement */
-@import "mapbox-gl/dist/mapbox-gl.css";
-
 /* ============ Base (variables + reset doux) ============ */
 @layer base {
   :root {

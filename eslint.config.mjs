@@ -20,6 +20,13 @@ export default [
       "coverage/**",
     ],
   },
+  {
+    files: ["eslint.config.mjs"],
+    plugins: { "@next/next": next },
+    rules: {
+      ...next.configs["core-web-vitals"].rules,
+    },
+  },
 
   // Base JS recommended (inclut no-undef etc.)
   js.configs.recommended,

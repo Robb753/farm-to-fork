@@ -2,32 +2,21 @@
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import mapboxgl from "mapbox-gl";
-import "mapbox-gl/dist/mapbox-gl.css";
+// ⚠️ Choisis UN seul endroit pour importer le CSS Mapbox.
+// Si tu l'importes déjà dans globals.css, supprime la ligne suivante.
+// import "mapbox-gl/dist/mapbox-gl.css";
+
 import { COLORS } from "@/lib/config";
 import { escapeHTML } from "@/lib/utils/sanitize";
 
-// Configuration du token Mapbox
-mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || "";
-
-/**
- * Interfaces TypeScript pour SingleFarmMapbox
- */
 interface SingleFarmMapboxProps {
-  /** Latitude de la ferme */
   lat: string | number;
-  /** Longitude de la ferme */
   lng: string | number;
-  /** Nom de la ferme à afficher */
   name?: string;
-  /** Classe CSS personnalisée */
   className?: string;
-  /** Style de carte Mapbox */
   mapStyle?: string;
-  /** Zoom initial */
   initialZoom?: number;
-  /** Afficher les contrôles de navigation */
   showControls?: boolean;
-  /** Callback appelé quand la carte est prête */
   onMapLoad?: (map: mapboxgl.Map) => void;
 }
 
@@ -36,9 +25,6 @@ interface Coordinates {
   longitude: number;
 }
 
-/**
- * Composant carte Mapbox pour afficher une ferme unique
- */
 const SingleFarmMapbox: React.FC<SingleFarmMapboxProps> = ({
   lat,
   lng,
@@ -49,62 +35,39 @@ const SingleFarmMapbox: React.FC<SingleFarmMapboxProps> = ({
   showControls = true,
   onMapLoad,
 }) => {
-  // Refs pour la gestion de la carte et du marqueur
+  const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || "";
+
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markerRef = useRef<mapboxgl.Marker | null>(null);
+
   const markerElementRef = useRef<HTMLDivElement | null>(null);
   const markerHandlersRef = useRef<{
     mouseenter: (() => void) | null;
     mouseleave: (() => void) | null;
   }>({ mouseenter: null, mouseleave: null });
 
-  // États locaux
-  const [isLoaded, setIsLoaded] = useState<boolean>(false);
-  const [hasError, setHasError] = useState<boolean>(false);
-  const [errorMessage, setErrorMessage] = useState<string>("");
+  const [isLoaded, setIsLoaded] = useState(false);
 
-  /**
-   * Valide et convertit les coordonnées
-   */
+  // ✅ Erreur "runtime" (Mapbox load fail, coords invalid, etc.)
+  // (Pas l’erreur "token manquant" => gérée en render)
+  const [runtimeError, setRuntimeError] = useState<string | null>(null);
+
   const validateCoordinates = useCallback(
-    (lat: string | number, lng: string | number): Coordinates | null => {
-      try {
-        const latitude = typeof lat === "string" ? parseFloat(lat) : lat;
-        const longitude = typeof lng === "string" ? parseFloat(lng) : lng;
+    (latV: string | number, lngV: string | number): Coordinates | null => {
+      const latitude = typeof latV === "string" ? parseFloat(latV) : latV;
+      const longitude = typeof lngV === "string" ? parseFloat(lngV) : lngV;
 
-        if (isNaN(latitude) || isNaN(longitude)) {
-          throw new Error(`Coordonnées invalides: lat=${lat}, lng=${lng}`);
-        }
-
-        if (latitude < -90 || latitude > 90) {
-          throw new Error(
-            `Latitude hors limites: ${latitude} (doit être entre -90 et 90)`
-          );
-        }
-
-        if (longitude < -180 || longitude > 180) {
-          throw new Error(
-            `Longitude hors limites: ${longitude} (doit être entre -180 et 180)`
-          );
-        }
-
-        return { latitude, longitude };
-      } catch (error) {
-        console.error("Erreur de validation des coordonnées:", error);
-        setHasError(true);
-        setErrorMessage(
-          error instanceof Error ? error.message : "Coordonnées invalides"
-        );
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude))
         return null;
-      }
+      if (latitude < -90 || latitude > 90) return null;
+      if (longitude < -180 || longitude > 180) return null;
+
+      return { latitude, longitude };
     },
-    []
+    [],
   );
 
-  /**
-   * Crée un marqueur personnalisé avec le design du système
-   */
   const createCustomMarker = useCallback((): HTMLDivElement => {
     const markerElement = document.createElement("div");
     markerElement.className = "custom-marker";
@@ -133,40 +96,32 @@ const SingleFarmMapbox: React.FC<SingleFarmMapboxProps> = ({
       </div>
     `;
 
-    // Create named event handlers for proper cleanup
     const handleMouseEnter = () => {
-      const div = markerElement.querySelector("div") as HTMLDivElement;
-      if (div) {
-        div.style.transform = "rotate(-45deg) scale(1.1)";
-        div.style.backgroundColor = COLORS.PRIMARY_DARK;
-      }
+      const div = markerElement.querySelector("div") as HTMLDivElement | null;
+      if (!div) return;
+      div.style.transform = "rotate(-45deg) scale(1.1)";
+      div.style.backgroundColor = COLORS.PRIMARY_DARK;
     };
 
     const handleMouseLeave = () => {
-      const div = markerElement.querySelector("div") as HTMLDivElement;
-      if (div) {
-        div.style.transform = "rotate(-45deg) scale(1)";
-        div.style.backgroundColor = COLORS.PRIMARY;
-      }
+      const div = markerElement.querySelector("div") as HTMLDivElement | null;
+      if (!div) return;
+      div.style.transform = "rotate(-45deg) scale(1)";
+      div.style.backgroundColor = COLORS.PRIMARY;
     };
 
-    // Store handlers and element for cleanup
     markerHandlersRef.current = {
       mouseenter: handleMouseEnter,
       mouseleave: handleMouseLeave,
     };
     markerElementRef.current = markerElement;
 
-    // Add event listeners
     markerElement.addEventListener("mouseenter", handleMouseEnter);
     markerElement.addEventListener("mouseleave", handleMouseLeave);
 
     return markerElement;
   }, []);
 
-  /**
-   * Crée un popup personnalisé (avec échappement XSS)
-   */
   const createCustomPopup = useCallback((farmName: string): mapboxgl.Popup => {
     const safeName = escapeHTML(farmName);
 
@@ -193,153 +148,169 @@ const SingleFarmMapbox: React.FC<SingleFarmMapboxProps> = ({
     `);
   }, []);
 
-  /**
-   * Initialise la carte Mapbox
-   */
+  // ✅ 1) Init map (once) — pas de setState sync dans l’effect hors callbacks
   useEffect(() => {
-    if (!mapContainer.current || mapRef.current) return;
+    if (!token) return;
+    if (!mapContainer.current) return;
+    if (mapRef.current) return;
 
-    const coordinates = validateCoordinates(lat, lng);
-    if (!coordinates) return;
-
-    const { latitude, longitude } = coordinates;
+    mapboxgl.accessToken = token;
 
     try {
-      // Initialiser la carte
       const map = new mapboxgl.Map({
         container: mapContainer.current,
         style: mapStyle,
-        center: [longitude, latitude],
+        center: [2.3522, 48.8566],
         zoom: initialZoom,
         minZoom: 3,
         maxZoom: 18,
-        attributionControl: false, // On l'ajoutera manuellement
+        attributionControl: false,
       });
 
       mapRef.current = map;
 
-      // Gestion des événements de carte
-      map.on("load", () => {
-        try {
-          setIsLoaded(true);
-          setHasError(false);
-
-          // Créer et ajouter le marqueur personnalisé
-          const markerElement = createCustomMarker();
-          const marker = new mapboxgl.Marker({
-            element: markerElement,
-            anchor: "bottom",
-          })
-            .setLngLat([longitude, latitude])
-            .addTo(map);
-
-          markerRef.current = marker;
-
-          // Ajouter un popup si un nom est fourni
-          if (name?.trim()) {
-            const popup = createCustomPopup(name.trim());
-            marker.setPopup(popup);
-          }
-
-          // Callback optionnel
-          onMapLoad?.(map);
-        } catch (error) {
-          console.error("Erreur lors du chargement de la carte:", error);
-          setHasError(true);
-          setErrorMessage("Erreur lors du chargement de la carte");
-        }
-      });
-
-      map.on("error", (e) => {
-        console.error("Erreur Mapbox:", e);
-        setHasError(true);
-        setErrorMessage("Erreur de chargement de la carte");
-      });
-
-      // Ajouter les contrôles si demandé
       if (showControls) {
-        // Contrôles de navigation
         map.addControl(
           new mapboxgl.NavigationControl({
             showCompass: true,
             showZoom: true,
             visualizePitch: true,
           }),
-          "top-right"
+          "top-right",
         );
-
-        // Contrôle d'échelle
         map.addControl(
-          new mapboxgl.ScaleControl({
-            maxWidth: 100,
-            unit: "metric",
-          }),
-          "bottom-left"
+          new mapboxgl.ScaleControl({ maxWidth: 100, unit: "metric" }),
+          "bottom-left",
         );
-
-        // Attribution
         map.addControl(
-          new mapboxgl.AttributionControl({
-            compact: true,
-          }),
-          "bottom-right"
+          new mapboxgl.AttributionControl({ compact: true }),
+          "bottom-right",
         );
       }
+
+      const onLoad = () => {
+        setIsLoaded(true);
+        setRuntimeError(null);
+        onMapLoad?.(map);
+      };
+
+      const onError = (e: any) => {
+        console.error("Erreur Mapbox:", e);
+        setRuntimeError("Erreur de chargement de la carte");
+      };
+
+      map.on("load", onLoad);
+      map.on("error", onError);
+
+      return () => {
+        try {
+          map.off("load", onLoad);
+          map.off("error", onError);
+        } catch {
+          // noop: listeners may already be detached during teardown
+        }
+
+        try {
+          if (
+            markerElementRef.current &&
+            markerHandlersRef.current.mouseenter &&
+            markerHandlersRef.current.mouseleave
+          ) {
+            markerElementRef.current.removeEventListener(
+              "mouseenter",
+              markerHandlersRef.current.mouseenter,
+            );
+            markerElementRef.current.removeEventListener(
+              "mouseleave",
+              markerHandlersRef.current.mouseleave,
+            );
+          }
+          markerHandlersRef.current = { mouseenter: null, mouseleave: null };
+          markerElementRef.current = null;
+
+          markerRef.current?.remove();
+          markerRef.current = null;
+
+          map.remove();
+          mapRef.current = null;
+        } catch (err) {
+          console.error("Erreur cleanup map:", err);
+        }
+      };
     } catch (error) {
-      console.error("Erreur lors de l'initialisation de la carte:", error);
-      setHasError(true);
-      setErrorMessage("Impossible d'initialiser la carte");
+      console.error("Erreur init map:", error);
+      queueMicrotask(() =>
+        setRuntimeError("Impossible d'initialiser la carte"),
+      );
+    }
+  }, [token, mapStyle, initialZoom, showControls, onMapLoad]);
+
+  // ✅ 2) Update marker / view quand coords changent
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const coords = validateCoordinates(lat, lng);
+
+    // helper pour respecter ESLint (pas de setState sync dans l'effet)
+    const setRuntimeErrorAsync = (msg: string | null) => {
+      queueMicrotask(() => setRuntimeError(msg));
+    };
+
+    if (!coords) {
+      setRuntimeErrorAsync(`Coordonnées invalides: lat=${lat}, lng=${lng}`);
+      return;
     }
 
-    // Nettoyage
-    return () => {
-      try {
-        // Remove event listeners before removing marker
-        if (
-          markerElementRef.current &&
-          markerHandlersRef.current.mouseenter &&
-          markerHandlersRef.current.mouseleave
-        ) {
-          markerElementRef.current.removeEventListener(
-            "mouseenter",
-            markerHandlersRef.current.mouseenter
-          );
-          markerElementRef.current.removeEventListener(
-            "mouseleave",
-            markerHandlersRef.current.mouseleave
-          );
-        }
-        if (markerRef.current) {
-          markerRef.current.remove();
-          markerRef.current = null;
-        }
-        if (mapRef.current) {
-          mapRef.current.remove();
-          mapRef.current = null;
-        }
-        markerElementRef.current = null;
-        markerHandlersRef.current = { mouseenter: null, mouseleave: null };
-      } catch (error) {
-        console.error("Erreur lors du nettoyage de la carte:", error);
+    const { latitude, longitude } = coords;
+
+    try {
+      setRuntimeErrorAsync(null);
+
+      map.easeTo({
+        center: [longitude, latitude],
+        zoom: initialZoom,
+        duration: 450,
+        essential: true,
+      });
+
+      if (!markerRef.current) {
+        const markerEl = createCustomMarker();
+        const marker = new mapboxgl.Marker({
+          element: markerEl,
+          anchor: "bottom",
+        })
+          .setLngLat([longitude, latitude])
+          .addTo(map);
+
+        markerRef.current = marker;
+      } else {
+        markerRef.current.setLngLat([longitude, latitude]);
       }
-    };
+
+      if (name?.trim()) {
+        markerRef.current.setPopup(createCustomPopup(name.trim()));
+      } else {
+        // Mapbox n'accepte pas "undefined" proprement ici -> on "unset" via any
+        markerRef.current.setPopup(undefined as any);
+      }
+    } catch (err) {
+      console.error("Erreur update map/marker:", err);
+      setRuntimeErrorAsync("Erreur lors de la mise à jour de la carte");
+    }
   }, [
     lat,
     lng,
     name,
-    mapStyle,
     initialZoom,
-    showControls,
     validateCoordinates,
     createCustomMarker,
     createCustomPopup,
-    onMapLoad,
   ]);
 
-  /**
-   * Vérification du token Mapbox
-   */
-  if (!process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN) {
+
+  // ✅ Token manquant => géré SANS effect (donc pas de setState in effect)
+  if (!token) {
     return (
       <div
         className={`flex items-center justify-center h-full text-center p-6 ${className}`}
@@ -364,10 +335,7 @@ const SingleFarmMapbox: React.FC<SingleFarmMapboxProps> = ({
     );
   }
 
-  /**
-   * Affichage en cas d'erreur
-   */
-  if (hasError) {
+  if (runtimeError) {
     return (
       <div
         className={`flex items-center justify-center h-full text-center p-6 ${className}`}
@@ -385,7 +353,7 @@ const SingleFarmMapbox: React.FC<SingleFarmMapboxProps> = ({
             Erreur de carte
           </div>
           <p className="text-sm" style={{ color: COLORS.TEXT_MUTED }}>
-            {errorMessage || "Impossible de charger la carte"}
+            {runtimeError}
           </p>
         </div>
       </div>
@@ -400,13 +368,10 @@ const SingleFarmMapbox: React.FC<SingleFarmMapboxProps> = ({
         style={{ minHeight: "300px" }}
       />
 
-      {/* Loading state */}
-      {!isLoaded && !hasError && (
+      {!isLoaded && (
         <div
           className="absolute inset-0 flex items-center justify-center"
-          style={{
-            backgroundColor: `${COLORS.BG_WHITE}BF`, // 75% opacity
-          }}
+          style={{ backgroundColor: `${COLORS.BG_WHITE}BF` }}
         >
           <div className="text-center">
             <div
@@ -426,6 +391,6 @@ const SingleFarmMapbox: React.FC<SingleFarmMapboxProps> = ({
       )}
     </div>
   );
-}; 
+};
 
 export default SingleFarmMapbox;
