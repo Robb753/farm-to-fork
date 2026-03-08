@@ -6,6 +6,16 @@ import Link from "next/link";
 import { Loader2, MapPin, ChevronLeft, CheckCircle } from "lucide-react";
 import { useSupabaseWithClerk } from "@/utils/supabase/client";
 import { useUser } from "@clerk/nextjs";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 interface FarmInfo {
   id: number;
@@ -133,30 +143,24 @@ export default function ClaimFarmPage(): JSX.Element {
   if (step === "success") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50 px-4">
-        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center space-y-4">
-          <CheckCircle className="h-14 w-14 text-green-600 mx-auto" />
-          <h1 className="text-2xl font-bold text-gray-900">
-            Ferme revendiquée !
-          </h1>
-          <p className="text-gray-600">
-            Votre ferme est maintenant liée à votre compte. Vous pouvez
-            compléter votre fiche producteur depuis votre tableau de bord.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center justify-center px-5 py-2.5 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 transition-colors"
-            >
-              Mon tableau de bord
-            </Link>
-            <Link
-              href={`/farm/${farm?.id}`}
-              className="inline-flex items-center justify-center px-5 py-2.5 rounded-lg border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 transition-colors"
-            >
-              Voir ma fiche ferme
-            </Link>
-          </div>
-        </div>
+        <Card className="max-w-md w-full text-center">
+          <CardHeader className="pb-2">
+            <CheckCircle className="h-14 w-14 text-green-600 mx-auto mb-2" />
+            <CardTitle>Ferme revendiquée !</CardTitle>
+            <CardDescription>
+              Votre ferme est maintenant liée à votre compte. Vous pouvez
+              compléter votre fiche producteur depuis votre tableau de bord.
+            </CardDescription>
+          </CardHeader>
+          <CardFooter className="flex flex-col sm:flex-row gap-3 justify-center pt-4">
+            <Button asChild>
+              <Link href="/dashboard">Mon tableau de bord</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href={`/farm/${farm?.id}`}>Voir ma fiche ferme</Link>
+            </Button>
+          </CardFooter>
+        </Card>
       </div>
     );
   }
@@ -164,96 +168,99 @@ export default function ClaimFarmPage(): JSX.Element {
   if (step === "error") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50 px-4">
-        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center space-y-4">
-          <div className="text-4xl">⚠️</div>
-          <h1 className="text-xl font-bold text-gray-900">
-            Impossible de revendiquer
-          </h1>
-          <p className="text-gray-600">{errorMsg}</p>
-          <Link
-            href="/explore"
-            className="inline-flex items-center justify-center px-5 py-2.5 rounded-lg border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 transition-colors"
-          >
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            Retour à la carte
-          </Link>
-        </div>
+        <Card className="max-w-md w-full text-center">
+          <CardHeader>
+            <div className="text-4xl mb-2">⚠️</div>
+            <CardTitle className="text-xl">Impossible de revendiquer</CardTitle>
+            <CardDescription>{errorMsg}</CardDescription>
+          </CardHeader>
+          <CardFooter className="justify-center">
+            <Button asChild variant="outline">
+              <Link href="/explore">
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Retour à la carte
+              </Link>
+            </Button>
+          </CardFooter>
+        </Card>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50 px-4">
-      <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full space-y-6">
-        <Link
-          href={`/farm/${farm?.id}`}
-          className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 transition-colors"
-        >
-          <ChevronLeft className="h-4 w-4 mr-1" />
-          Voir la fiche ferme
-        </Link>
-
-        <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-medium mb-3">
-            <MapPin className="h-3 w-3" />
+      <Card className="max-w-md w-full">
+        <CardHeader>
+          <Button asChild variant="ghost" size="sm" className="w-fit -ml-2 mb-2 text-muted-foreground">
+            <Link href={`/farm/${farm?.id}`}>
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Voir la fiche ferme
+            </Link>
+          </Button>
+          <Badge
+            variant="warning"
+            size="sm"
+            icon={<MapPin className="h-3 w-3" />}
+            className="w-fit mb-1"
+          >
             Ferme pré-enregistrée OSM
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            C&apos;est votre ferme ?
-          </h1>
-          <p className="text-gray-500 mt-1 text-sm">
+          </Badge>
+          <CardTitle>C&apos;est votre ferme ?</CardTitle>
+          <CardDescription>
             Revendiquez cette fiche pour la gérer et la compléter.
-          </p>
-        </div>
+          </CardDescription>
+        </CardHeader>
 
-        <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 space-y-1">
-          <p className="font-semibold text-gray-900 text-lg">
-            {farm?.name ?? "Ferme sans nom"}
-          </p>
-          {farm?.address && (
-            <p className="text-sm text-gray-500 flex items-start gap-1.5">
-              <MapPin className="h-3.5 w-3.5 mt-0.5 flex-shrink-0 text-gray-400" />
-              {farm.address}
+        <CardContent className="space-y-4">
+          <div className="rounded-xl border bg-muted/50 p-4 space-y-1">
+            <p className="font-semibold text-foreground text-lg">
+              {farm?.name ?? "Ferme sans nom"}
             </p>
-          )}
-        </div>
-
-        <div className="space-y-2 text-sm text-gray-600">
-          <p className="font-medium text-gray-700">
-            Ce que cette action fait :
-          </p>
-          <ul className="space-y-1 pl-4 list-disc">
-            <li>Lie votre compte à cette fiche ferme</li>
-            <li>Vous donne accès à un tableau de bord producteur</li>
-            <li>Vous permet de compléter et publier votre fiche</li>
-          </ul>
-        </div>
-
-        {!isUserLoaded || !user ? (
-          <Link
-            href={`/sign-in?redirect_url=/farm/${farm?.id}/claim`}
-            className="w-full inline-flex items-center justify-center px-5 py-3 rounded-xl bg-green-600 text-white font-semibold hover:bg-green-700 transition-colors"
-          >
-            Connexion pour revendiquer
-          </Link>
-        ) : (
-          <button
-            onClick={handleClaim}
-            disabled={step === "submitting"}
-            className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-green-600 text-white font-semibold hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-          >
-            {step === "submitting" && (
-              <Loader2 className="h-4 w-4 animate-spin" />
+            {farm?.address && (
+              <p className="text-sm text-muted-foreground flex items-start gap-1.5">
+                <MapPin className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                {farm.address}
+              </p>
             )}
-            Revendiquer cette ferme
-          </button>
-        )}
+          </div>
 
-        <p className="text-xs text-gray-400 text-center">
-          La ferme ne sera pas publiée automatiquement — vous devrez
-          l&apos;activer depuis votre tableau de bord.
-        </p>
-      </div>
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <p className="font-medium text-foreground">
+              Ce que cette action fait :
+            </p>
+            <ul className="space-y-1 pl-4 list-disc">
+              <li>Lie votre compte à cette fiche ferme</li>
+              <li>Vous donne accès à un tableau de bord producteur</li>
+              <li>Vous permet de compléter et publier votre fiche</li>
+            </ul>
+          </div>
+        </CardContent>
+
+        <CardFooter className="flex-col gap-3">
+          {!isUserLoaded || !user ? (
+            <Button asChild className="w-full bg-green-600 hover:bg-green-700">
+              <Link href={`/sign-in?redirect_url=/farm/${farm?.id}/claim`}>
+                Connexion pour revendiquer
+              </Link>
+            </Button>
+          ) : (
+            <Button
+              onClick={handleClaim}
+              disabled={step === "submitting"}
+              className="w-full bg-green-600 hover:bg-green-700"
+            >
+              {step === "submitting" && (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              )}
+              Revendiquer cette ferme
+            </Button>
+          )}
+          <p className="text-xs text-muted-foreground text-center">
+            La ferme ne sera pas publiée automatiquement — vous devrez
+            l&apos;activer depuis votre tableau de bord.
+          </p>
+        </CardFooter>
+      </Card>
     </div>
   );
 }
