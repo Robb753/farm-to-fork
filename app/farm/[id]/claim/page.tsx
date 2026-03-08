@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter, notFound } from "next/navigation";
 import Link from "next/link";
-import { Loader2, MapPin, ChevronLeft, CheckCircle } from "lucide-react";
+import { Loader2, MapPin, ChevronLeft, Clock } from "lucide-react";
 import { useSupabaseWithClerk } from "@/utils/supabase/client";
 import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
@@ -29,7 +29,7 @@ type ClaimStep =
   | "loading"
   | "ready"
   | "submitting"
-  | "success"
+  | "pending"
   | "error"
   | "not-found";
 
@@ -120,7 +120,7 @@ export default function ClaimFarmPage(): JSX.Element {
         return;
       }
 
-      setStep("success");
+      setStep("pending");
     } catch (err) {
       console.error("[CLAIM] Erreur réseau:", err);
       setErrorMsg("Erreur réseau. Veuillez réessayer.");
@@ -140,24 +140,25 @@ export default function ClaimFarmPage(): JSX.Element {
     notFound();
   }
 
-  if (step === "success") {
+  if (step === "pending") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50 px-4">
         <Card className="max-w-md w-full text-center">
           <CardHeader className="pb-2">
-            <CheckCircle className="h-14 w-14 text-green-600 mx-auto mb-2" />
-            <CardTitle>Ferme revendiquée !</CardTitle>
+            <Clock className="h-14 w-14 text-amber-500 mx-auto mb-2" />
+            <CardTitle>Demande soumise !</CardTitle>
             <CardDescription>
-              Votre ferme est maintenant liée à votre compte. Vous pouvez
-              compléter votre fiche producteur depuis votre tableau de bord.
+              Votre demande de revendication pour{" "}
+              <strong>{farm?.name ?? "cette ferme"}</strong> a bien été enregistrée.
+              Un administrateur va l&apos;examiner et vous serez notifié par e-mail.
             </CardDescription>
           </CardHeader>
-          <CardFooter className="flex flex-col sm:flex-row gap-3 justify-center pt-4">
-            <Button asChild>
-              <Link href="/dashboard">Mon tableau de bord</Link>
-            </Button>
+          <CardFooter className="justify-center pt-4">
             <Button asChild variant="outline">
-              <Link href={`/farm/${farm?.id}`}>Voir ma fiche ferme</Link>
+              <Link href={`/farm/${farm?.id}`}>
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Retour à la fiche ferme
+              </Link>
             </Button>
           </CardFooter>
         </Card>
@@ -191,7 +192,12 @@ export default function ClaimFarmPage(): JSX.Element {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50 px-4">
       <Card className="max-w-md w-full">
         <CardHeader>
-          <Button asChild variant="ghost" size="sm" className="w-fit -ml-2 mb-2 text-muted-foreground">
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="w-fit -ml-2 mb-2 text-muted-foreground"
+          >
             <Link href={`/farm/${farm?.id}`}>
               <ChevronLeft className="h-4 w-4 mr-1" />
               Voir la fiche ferme
@@ -207,7 +213,8 @@ export default function ClaimFarmPage(): JSX.Element {
           </Badge>
           <CardTitle>C&apos;est votre ferme ?</CardTitle>
           <CardDescription>
-            Revendiquez cette fiche pour la gérer et la compléter.
+            Soumettez une demande de revendication — un administrateur l&apos;examinera
+            avant activation.
           </CardDescription>
         </CardHeader>
 
@@ -225,13 +232,11 @@ export default function ClaimFarmPage(): JSX.Element {
           </div>
 
           <div className="space-y-2 text-sm text-muted-foreground">
-            <p className="font-medium text-foreground">
-              Ce que cette action fait :
-            </p>
+            <p className="font-medium text-foreground">Ce que cette action fait :</p>
             <ul className="space-y-1 pl-4 list-disc">
-              <li>Lie votre compte à cette fiche ferme</li>
-              <li>Vous donne accès à un tableau de bord producteur</li>
-              <li>Vous permet de compléter et publier votre fiche</li>
+              <li>Soumet une demande de revendication à l&apos;équipe</li>
+              <li>Après validation, vous accédez à un tableau de bord producteur</li>
+              <li>Vous pouvez compléter et publier votre fiche</li>
             </ul>
           </div>
         </CardContent>
@@ -252,12 +257,11 @@ export default function ClaimFarmPage(): JSX.Element {
               {step === "submitting" && (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               )}
-              Revendiquer cette ferme
+              Soumettre ma demande
             </Button>
           )}
           <p className="text-xs text-muted-foreground text-center">
-            La ferme ne sera pas publiée automatiquement — vous devrez
-            l&apos;activer depuis votre tableau de bord.
+            La ferme ne sera activée qu&apos;après validation par notre équipe.
           </p>
         </CardFooter>
       </Card>

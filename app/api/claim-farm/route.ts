@@ -1,5 +1,6 @@
 // app/api/claim-farm/route.ts
-// Permet à un utilisateur authentifié de revendiquer une ferme pré-enregistrée depuis OSM
+// Soumet une demande de revendication d'une ferme OSM.
+// La demande est créée en statut "pending" et validée par un admin.
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
@@ -11,13 +12,14 @@ export const dynamic = "force-dynamic";
 
 interface ClaimFarmBody {
   listingId: number;
+  message?: string;
 }
 
 interface ApiResponse {
   success: boolean;
   message: string;
   error?: string;
-  listingId?: number;
+  requestId?: number;
 }
 
 function createSupabaseClient() {
@@ -32,8 +34,6 @@ function createSupabaseClient() {
 export async function POST(
   req: NextRequest
 ): Promise<NextResponse<ApiResponse>> {
-  const timestamp = new Date().toISOString();
-
   // 1. Auth
   const { userId } = await auth();
   if (!userId) {
@@ -67,7 +67,7 @@ export async function POST(
   // 3. Vérifier que le listing est bien une ferme OSM non encore revendiquée
   const { data: listing, error: listingError } = await supabase
     .from("listing")
-    .select("id, osm_id, clerk_user_id, name, address")
+    .select("id, osm_id, clerk_user_id, name")
     .eq("id", listingId)
     .single();
 
@@ -83,7 +83,7 @@ export async function POST(
       {
         success: false,
         error: "Non éligible",
-        message: "Seules les fermes pré-enregistrées depuis OSM peuvent être revendiquées via cette voie",
+        message: "Seules les fermes pré-enregistrées depuis OSM peuvent être revendiquées",
       },
       { status: 400 }
     );
@@ -100,81 +100,76 @@ export async function POST(
     );
   }
 
-  // 4. Vérifier que l'utilisateur n'a pas déjà une ferme + récupérer son email depuis Clerk
+  // 4. Vérifier qu'il n'y a pas déjà une demande en cours de cet utilisateur pour cette ferme
+  const { data: existingRequest } = await supabase
+    .from("listing_claim_requests")
+    .select("id, status")
+    .eq("listing_id", listingId)
+    .eq("user_id", userId)
+    .single();
+
+  if (existingRequest) {
+    if (existingRequest.status === "pending") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Demande en cours",
+          message: "Vous avez déjà une demande en attente pour cette ferme",
+        },
+        { status: 409 }
+      );
+    }
+    if (existingRequest.status === "approved") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Demande déjà approuvée",
+          message: "Votre demande de revendication a déjà été approuvée",
+        },
+        { status: 409 }
+      );
+    }
+    // Si rejected, on supprime l'ancienne entrée pour permettre une nouvelle soumission
+    await supabase
+      .from("listing_claim_requests")
+      .delete()
+      .eq("id", existingRequest.id);
+  }
+
+  // 5. Récupérer les infos utilisateur depuis Clerk
   const clerkClientInstance = await clerkClient();
   const clerkUser = await clerkClientInstance.users.getUser(userId);
   const userEmail =
     clerkUser.emailAddresses.find((e) => e.id === clerkUser.primaryEmailAddressId)
       ?.emailAddress ?? clerkUser.emailAddresses[0]?.emailAddress ?? "";
+  const userName =
+    [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ").trim() || null;
 
-  const { data: existingProfile } = await supabase
-    .from("profiles")
-    .select("farm_id, role")
-    .eq("user_id", userId)
+  // 6. Créer la demande de revendication (statut pending)
+  const { data: newRequest, error: insertError } = await supabase
+    .from("listing_claim_requests")
+    .insert({
+      listing_id: listingId,
+      user_id: userId,
+      user_email: userEmail,
+      user_name: userName,
+      message: body.message?.trim() || null,
+      status: "pending",
+    })
+    .select("id")
     .single();
 
-  if (existingProfile?.farm_id) {
+  if (insertError || !newRequest) {
+    console.error("[CLAIM-FARM] Erreur création demande:", insertError);
     return NextResponse.json(
-      {
-        success: false,
-        error: "Ferme déjà associée",
-        message: "Vous avez déjà une ferme liée à votre compte",
-      },
-      { status: 409 }
-    );
-  }
-
-  // 5. Revendiquer le listing : lier le clerk_user_id
-  const { error: updateError } = await supabase
-    .from("listing")
-    .update({ clerk_user_id: userId, updated_at: timestamp })
-    .eq("id", listingId)
-    .is("clerk_user_id", null); // garde-fou : uniquement si encore libre
-
-  if (updateError) {
-    console.error("[CLAIM-FARM] Erreur update listing:", updateError);
-    return NextResponse.json(
-      { success: false, error: "Erreur BDD", message: "Impossible de revendiquer la ferme" },
+      { success: false, error: "Erreur BDD", message: "Impossible de soumettre la demande" },
       { status: 500 }
     );
   }
 
-  // 6. Créer ou mettre à jour le profil avec role='farmer' et farm_id
-  const { error: profileError } = await supabase
-    .from("profiles")
-    .upsert(
-      {
-        user_id: userId,
-        email: userEmail,
-        role: "farmer",
-        farm_id: listingId,
-        updated_at: timestamp,
-      },
-      { onConflict: "user_id" }
-    );
-
-  if (profileError) {
-    console.error("[CLAIM-FARM] Erreur upsert profile:", profileError);
-    // Non bloquant : le listing est déjà lié, on continue
-  }
-
-  // 7. Mettre à jour le rôle dans Clerk (réutilise l'instance déjà créée)
-  try {
-    await clerkClientInstance.users.updateUser(userId, {
-      publicMetadata: {
-        role: "farmer",
-        roleUpdatedAt: timestamp,
-        claimedFarmId: listingId,
-      },
-    });
-  } catch (clerkError) {
-    console.error("[CLAIM-FARM] Erreur Clerk update:", clerkError);
-    // Non bloquant : le listing et le profil sont déjà mis à jour
-  }
-
   return NextResponse.json({
     success: true,
-    message: `La ferme "${listing.name ?? "Sans nom"}" a été revendiquée avec succès`,
-    listingId,
+    message: `Demande soumise pour la ferme "${listing.name ?? "Sans nom"}". Un administrateur va examiner votre demande.`,
+    requestId: newRequest.id,
   });
 }

@@ -724,6 +724,59 @@ export interface Database {
         ];
       };
 
+      listing_claim_requests: {
+        Row: {
+          id: number;
+          listing_id: number;
+          user_id: string;
+          user_email: string;
+          user_name: string | null;
+          message: string | null;
+          status: "pending" | "approved" | "rejected";
+          admin_note: string | null;
+          reviewed_by: string | null;
+          reviewed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: number;
+          listing_id: number;
+          user_id: string;
+          user_email: string;
+          user_name?: string | null;
+          message?: string | null;
+          status?: "pending" | "approved" | "rejected";
+          admin_note?: string | null;
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: number;
+          listing_id?: number;
+          user_id?: string;
+          user_email?: string;
+          user_name?: string | null;
+          message?: string | null;
+          status?: "pending" | "approved" | "rejected";
+          admin_note?: string | null;
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "listing_claim_requests_listing_id_fkey";
+            columns: ["listing_id"];
+            referencedRelation: "listing";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+
       review_reports: {
         Row: {
           id: number;
@@ -808,6 +861,8 @@ export type Review = Database["public"]["Tables"]["reviews"]["Row"];
 export type ReviewVote = Database["public"]["Tables"]["review_votes"]["Row"];
 export type ReviewReport =
   Database["public"]["Tables"]["review_reports"]["Row"];
+export type ListingClaimRequest =
+  Database["public"]["Tables"]["listing_claim_requests"]["Row"];
 
 // Inserts
 export type ProfileInsert = Database["public"]["Tables"]["profiles"]["Insert"];
@@ -823,6 +878,8 @@ export type ReviewVoteInsert =
   Database["public"]["Tables"]["review_votes"]["Insert"];
 export type ReviewReportInsert =
   Database["public"]["Tables"]["review_reports"]["Insert"];
+export type ListingClaimRequestInsert =
+  Database["public"]["Tables"]["listing_claim_requests"]["Insert"];
 
 // Updates
 export type ProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"];
@@ -838,6 +895,8 @@ export type ReviewVoteUpdate =
   Database["public"]["Tables"]["review_votes"]["Update"];
 export type ReviewReportUpdate =
   Database["public"]["Tables"]["review_reports"]["Update"];
+export type ListingClaimRequestUpdate =
+  Database["public"]["Tables"]["listing_claim_requests"]["Update"];
 
 // Enum helpers
 export type UserRole = Database["public"]["Enums"]["user_role"];
