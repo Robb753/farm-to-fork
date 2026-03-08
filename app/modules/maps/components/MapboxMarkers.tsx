@@ -174,7 +174,7 @@ export default function MapboxMarkers(): null {
    * Construit un DOM node safe pour la popup (pas de setHTML)
    */
   const buildPopupNode = useCallback((listing: Listing): HTMLElement => {
-    const isOsmUnclaimed = !!listing.osm_id && !listing.clerk_user_id;
+    const isUnclaimed = !listing.active && !listing.clerk_user_id;
 
     const wrapper = document.createElement("div");
     wrapper.style.cssText = `
@@ -187,8 +187,8 @@ export default function MapboxMarkers(): null {
       max-width: 280px;
     `;
 
-    // Badge OSM non revendiqué
-    if (isOsmUnclaimed) {
+    // Badge ferme non revendiquée
+    if (isUnclaimed) {
       const badge = document.createElement("span");
       badge.style.cssText = `
         display: inline-block;
@@ -246,8 +246,8 @@ export default function MapboxMarkers(): null {
       wrapper.appendChild(distance);
     }
 
-    // Lien de revendication pour les fermes OSM non réclamées
-    if (isOsmUnclaimed) {
+    // Lien de revendication pour les fermes non revendiquées
+    if (isUnclaimed) {
       const claimLink = document.createElement("a");
       claimLink.href = `/farm/${String(listing.id)}/claim`;
       claimLink.style.cssText = `
@@ -282,15 +282,15 @@ export default function MapboxMarkers(): null {
       handlers: any;
     } | null => {
       try {
-        // Ferme OSM non revendiquée → marqueur gris/ambre distinct
-        const isOsmUnclaimed = !!listing.osm_id && !listing.clerk_user_id;
-        const baseColor = isOsmUnclaimed ? "#d97706" : COLORS.PRIMARY;
-        const hoverColor = isOsmUnclaimed ? "#b45309" : COLORS.PRIMARY_DARK;
+        // Ferme non revendiquée → marqueur ambre distinct
+        const isUnclaimed = !listing.active && !listing.clerk_user_id;
+        const baseColor = isUnclaimed ? "#d97706" : COLORS.PRIMARY;
+        const hoverColor = isUnclaimed ? "#b45309" : COLORS.PRIMARY_DARK;
 
         // Créer l'élément DOM du marqueur
         const markerElement = document.createElement("div");
-        markerElement.className = isOsmUnclaimed
-          ? "custom-marker custom-marker--osm"
+        markerElement.className = isUnclaimed
+          ? "custom-marker custom-marker--unclaimed"
           : "custom-marker";
         markerElement.setAttribute("role", "button");
         markerElement.setAttribute(
@@ -308,7 +308,7 @@ export default function MapboxMarkers(): null {
           cursor: pointer;
           transition: all 0.2s ease;
           box-shadow: 0 2px 6px rgba(0,0,0,0.25);
-          opacity: ${isOsmUnclaimed ? "0.85" : "1"};
+          opacity: ${isUnclaimed ? "0.85" : "1"};
         `;
         // Stocker la couleur de base pour pouvoir la restaurer depuis des handlers externes
         markerElement.dataset.baseColor = baseColor;
