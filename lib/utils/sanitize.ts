@@ -7,8 +7,9 @@ export function sanitizeHTML(dirty: string): string {
   });
 }
 
-export function escapeHTML(text: string): string {
-  return text
+export function escapeHTML(text: string | null | undefined): string {
+  if (text == null) return "";
+  return String(text)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
