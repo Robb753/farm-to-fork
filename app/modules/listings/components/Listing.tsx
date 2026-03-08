@@ -48,6 +48,8 @@ interface ListingItem {
   images?: string[];
   created_at?: string;
   updated_at?: string;
+  active?: boolean;
+  clerk_user_id?: string | null;
 }
 
 /**
@@ -342,6 +344,24 @@ const ListItem = React.memo<ListItemProps>(
           {/* Content Section */}
           <div className="flex-1 p-4 flex flex-col justify-between min-w-0">
             <div>
+              {!item.active && !item.clerk_user_id && (
+                <div className="mb-2">
+                  <span
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border"
+                    style={{
+                      backgroundColor: "#fef3c7",
+                      color: "#92400e",
+                      borderColor: "#fde68a",
+                    }}
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                    </svg>
+                    Non revendiquée
+                  </span>
+                </div>
+              )}
+
               <div className="flex items-start justify-between mb-2">
                 <h2
                   className={cn(
