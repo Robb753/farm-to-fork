@@ -1,5 +1,5 @@
 // app/api/admin/claims/route.ts
-// GET  — liste toutes les demandes de revendication (admin uniquement)
+// GET — liste toutes les demandes de revendication (admin uniquement)
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
@@ -9,10 +9,17 @@ import type { Database } from "@/lib/types/database";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+type ClaimStatus = "pending" | "approved" | "rejected";
+type StatusFilter = ClaimStatus | "all";
+
 function createSupabaseClient() {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error("Variables Supabase manquantes");
+
+  if (!url || !key) {
+    throw new Error("Variables Supabase manquantes");
+  }
+
   return createClient<Database>(url, key, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
@@ -28,24 +35,45 @@ async function isAdmin(userId: string): Promise<boolean> {
   }
 }
 
+function parseStatus(value: string | null): StatusFilter {
+  if (
+    value === "pending" ||
+    value === "approved" ||
+    value === "rejected" ||
+    value === "all"
+  ) {
+    return value;
+  }
+
+  return "pending";
+}
+
 export async function GET(req: NextRequest) {
   const { userId } = await auth();
+
   if (!userId) {
-    return NextResponse.json({ success: false, message: "Non authentifié" }, { status: 401 });
+    return NextResponse.json(
+      { success: false, message: "Non authentifié" },
+      { status: 401 },
+    );
   }
 
   if (!(await isAdmin(userId))) {
-    return NextResponse.json({ success: false, message: "Accès refusé" }, { status: 403 });
+    return NextResponse.json(
+      { success: false, message: "Accès refusé" },
+      { status: 403 },
+    );
   }
 
   const { searchParams } = new URL(req.url);
-  const status = searchParams.get("status") ?? "pending";
+  const status = parseStatus(searchParams.get("status"));
 
   const supabase = createSupabaseClient();
 
-  const query = supabase
+  let query = supabase
     .from("listing_claim_requests")
-    .select(`
+    .select(
+      `
       id,
       listing_id,
       user_id,
@@ -58,11 +86,12 @@ export async function GET(req: NextRequest) {
       reviewed_at,
       created_at,
       listing ( id, name, address, osm_id )
-    `)
+    `,
+    )
     .order("created_at", { ascending: false });
 
   if (status !== "all") {
-    query.eq("status", status);
+    query = query.eq("status", status);
   }
 
   const { data, error } = await query;
@@ -70,8 +99,11 @@ export async function GET(req: NextRequest) {
   if (error) {
     console.error("[ADMIN/CLAIMS] Erreur fetch:", error);
     return NextResponse.json(
-      { success: false, message: "Erreur lors de la récupération des demandes" },
-      { status: 500 }
+      {
+        success: false,
+        message: "Erreur lors de la récupération des demandes",
+      },
+      { status: 500 },
     );
   }
 
