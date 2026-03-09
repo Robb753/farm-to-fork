@@ -116,9 +116,7 @@ function validateUpdateRoleData(data: any): ValidationResult {
  * Fonction pour vérifier les permissions de l'utilisateur qui fait la requête
  */
 async function checkUserPermissions(
-  requestingUserId: string,
-  targetUserId: string,
-  newRole: UserRole
+  requestingUserId: string
 ): Promise<{
   hasPermission: boolean;
   error?: string;
@@ -130,39 +128,15 @@ async function checkUserPermissions(
     const requestingUserRole =
       (requestingUser.publicMetadata?.role as UserRole) || "user";
 
-    // Règles de permissions :
-    // 1. Les admins peuvent changer tous les rôles
-    // 2. Les utilisateurs peuvent seulement devenir farmers (auto-promotion)
-    // 3. Personne ne peut s'auto-promouvoir admin
-
-    if (requestingUserRole === "admin") {
-      return { hasPermission: true }; // Les admins peuvent tout faire
-    }
-
-    if (requestingUserId === targetUserId) {
-      // Auto-modification
-      if (newRole === "farmer" && requestingUserRole === "user") {
-        return { hasPermission: true }; // User -> Farmer autorisé
-      }
-      if (newRole === "admin") {
-        return {
-          hasPermission: false,
-          error: "Vous ne pouvez pas vous auto-promouvoir administrateur",
-        };
-      }
-    } else {
-      // Modification d'un autre utilisateur
+    // Seuls les admins peuvent changer un rôle
+    if (requestingUserRole !== "admin") {
       return {
         hasPermission: false,
-        error:
-          "Vous n'avez pas les permissions pour modifier le rôle d'un autre utilisateur",
+        error: "Seuls les administrateurs peuvent modifier les rôles",
       };
     }
 
-    return {
-      hasPermission: false,
-      error: "Action non autorisée",
-    };
+    return { hasPermission: true };
   } catch (error) {
     console.error(
       "[PERMISSIONS] Erreur lors de la vérification des permissions:",
@@ -320,11 +294,7 @@ export async function POST(
     }
 
     // Vérification des permissions
-    const permissionCheck = await checkUserPermissions(
-      requestingUserId,
-      userId,
-      role
-    );
+    const permissionCheck = await checkUserPermissions(requestingUserId);
     if (!permissionCheck.hasPermission) {
       return NextResponse.json(
         {
