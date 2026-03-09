@@ -9,9 +9,9 @@ import { MAPBOX_CONFIG } from "@/lib/config";
 import type { LatLng } from "@/lib/store";
 import {
   useListingsActions,
-  useListingsState,
+  useAllListings,
   useMapActions,
-  useMapState,
+  useMapBounds,
   useFiltersActions,
   useCurrentFilters,
 } from "@/lib/store";
@@ -36,9 +36,9 @@ export default function Explore(): JSX.Element {
   });
 
   const { setAllListings, setFilteredListings } = useListingsActions();
-  const { all } = useListingsState();
+  const all = useAllListings();
 
-  const { bounds } = useMapState();
+  const bounds = useMapBounds();
   const { setCoordinates, setZoom } = useMapActions();
 
   const filters = useCurrentFilters();

@@ -236,6 +236,22 @@ export async function POST(
 
     const { userId, role, reason } = validation.sanitizedData!;
 
+    // Vérification des permissions en premier (avant toute lecture de données)
+    const permissionCheck = await checkUserPermissions(requestingUserId);
+    if (!permissionCheck.hasPermission) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Permissions insuffisantes",
+          message:
+            permissionCheck.error ||
+            "Vous n'avez pas les permissions pour effectuer cette action",
+          timestamp,
+        },
+        { status: 403 }
+      );
+    }
+
     // ⚠️ Récupération du client Clerk
     const client = await clerkClient();
 
@@ -291,22 +307,6 @@ export async function POST(
           updatedAt: timestamp,
         },
       });
-    }
-
-    // Vérification des permissions
-    const permissionCheck = await checkUserPermissions(requestingUserId);
-    if (!permissionCheck.hasPermission) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Permissions insuffisantes",
-          message:
-            permissionCheck.error ||
-            "Vous n'avez pas les permissions pour effectuer cette action",
-          timestamp,
-        },
-        { status: 403 }
-      );
     }
 
     // Mise à jour du rôle dans Clerk

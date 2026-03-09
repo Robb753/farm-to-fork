@@ -16,10 +16,11 @@ import Listing from "./Listing";
 import GlobalLoadingOverlay from "@/app/_components/ui/GlobalLoadingOverlay";
 import { COLORS } from "@/lib/config";
 import {
-  useListingsState,
-  useMapState,
+  useVisibleListings,
+  useIsListingsLoading,
+  useIsMapExpanded,
   useUIActions,
-  useUIState,
+  useUnifiedStore,
 } from "@/lib/store";
 
 
@@ -73,13 +74,11 @@ function useIsMobile(): boolean {
  * - Configuration centralisée des couleurs
  */
 const DesktopListingMapView = (): JSX.Element => {
-  const { mapInstance } = useMapState();
-  const {
-    visible: visibleListings,
-    isLoading,
-    totalCount,
-  } = useListingsState();
-  const { isMapExpanded } = useUIState();
+  const mapInstance = useUnifiedStore((s) => s.map.instance);
+  const visibleListings = useVisibleListings();
+  const isLoading = useIsListingsLoading();
+  const totalCount = useUnifiedStore((s) => s.listings.all.length);
+  const isMapExpanded = useIsMapExpanded();
   const { setMapExpanded } = useUIActions();
 
   // ✅ États locaux

@@ -14,13 +14,12 @@ import { cn } from "@/lib/utils";
 // 🔒 SÉCURITÉ: Import des fonctions de sanitisation
 import { escapeHTML, sanitizeHTML } from "@/lib/utils/sanitize";
 
-// ✅ IMPORTS CORRECTS : Store avec pagination corrigée
 import {
-  useInteractionsState,
+  useVisibleListings,
   useListingsActions,
-  useListingsState,
   useMapActions,
-  useMapState,
+  useMapBounds,
+  useUnifiedStore,
 } from "@/lib/store";
 import { useUserFavorites, useUserActions } from "@/lib/store/userStore";
 
@@ -545,12 +544,12 @@ export default function Listing({
   isLoading = false,
 }: ListingProps): JSX.Element {
   // Store hooks
-  const { visible: visibleListings = [] } = useListingsState();
-  const { bounds: _mapBounds } = useMapState();
+  const visibleListings = useVisibleListings();
+  const _mapBounds = useMapBounds();
   const { setCoordinates, setZoom } = useMapActions();
 
   // Interactions
-  const { hoveredListingId } = useInteractionsState();
+  const hoveredListingId = useUnifiedStore((s) => s.interactions.hoveredListingId);
   const { setHoveredListingId, setOpenInfoWindowId, clearSelection } =
     useListingsActions();
 

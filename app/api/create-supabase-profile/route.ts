@@ -1,6 +1,6 @@
 // app/api/create-profile/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { clerkClient } from "@clerk/nextjs/server";
+import { auth, clerkClient } from "@clerk/nextjs/server";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
 
@@ -9,7 +9,7 @@ import type { Database } from "@/lib/types/database";
  */
 interface CreateProfileRequestBody {
   userId: string;
-  role: "user" | "farmer" | "admin";
+  role: "user" | "farmer";
 }
 
 /**
@@ -27,9 +27,11 @@ interface CreateProfileResponse {
 }
 
 /**
- * Rôles autorisés pour la création de profil
+ * Rôles autorisés pour la création de profil via cette route.
+ * "admin" est exclu : ce rôle est uniquement attribuable via /api/update-user-role
+ * par un administrateur authentifié.
  */
-const VALID_ROLES = ["user", "farmer", "admin"] as const;
+const VALID_ROLES = ["user", "farmer"] as const;
 type ValidRole = (typeof VALID_ROLES)[number];
 
 /**
@@ -62,6 +64,22 @@ export async function POST(
   request: NextRequest
 ): Promise<NextResponse<CreateProfileResponse>> {
   try {
+    // ==========================================
+    // AUTH : vérifier que l'appelant est connecté
+    // ==========================================
+    const { userId: callerUserId } = await auth();
+
+    if (!callerUserId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Non authentifié",
+          message: "Vous devez être connecté pour effectuer cette action",
+        },
+        { status: 401 }
+      );
+    }
+
     // Parse et validation du corps de requête
     let body: CreateProfileRequestBody;
 
@@ -113,6 +131,18 @@ export async function POST(
           message: "L'ID utilisateur doit être un ID Clerk valide",
         },
         { status: 400 }
+      );
+    }
+
+    // Vérifier que l'appelant crée uniquement son propre profil
+    if (userId !== callerUserId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Interdit",
+          message: "Vous ne pouvez créer que votre propre profil",
+        },
+        { status: 403 }
       );
     }
 
