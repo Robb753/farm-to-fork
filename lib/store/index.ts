@@ -31,7 +31,7 @@ export {
   // useSetMapApiLoaded,
 } from "./unifiedStore";
 
-// ✅ Export des types du store unifié (inclure FilterState ici)
+// ✅ Export des types du store unifié
 export type {
   UnifiedStore,
   MapState,
@@ -50,7 +50,8 @@ export type {
   Listing,
 } from "./unifiedStore";
 
-import type { MapCoordinates } from "./unifiedStore";
+// ✅ Import local des types utilisés dans ce fichier
+import type { MapCoordinates, MapBounds, Listing } from "./unifiedStore";
 
 // Alias type LatLng (utilisé dans quelques composants externes)
 export type LatLng = MapCoordinates;
@@ -79,10 +80,9 @@ export {
 // ==================== TYPE GUARDS ====================
 
 export const isListingValid = (obj: unknown): obj is Listing => {
-  const o = obj as any;
+  const o = obj as Record<string, unknown>;
   return (
     !!o &&
-    typeof o === "object" &&
     typeof o.id === "number" &&
     typeof o.name === "string" &&
     typeof o.address === "string" &&
@@ -92,10 +92,9 @@ export const isListingValid = (obj: unknown): obj is Listing => {
 };
 
 export const isMapBoundsValid = (obj: unknown): obj is MapBounds => {
-  const o = obj as any;
+  const o = obj as Record<string, unknown>;
   return (
     !!o &&
-    typeof o === "object" &&
     typeof o.north === "number" &&
     typeof o.south === "number" &&
     typeof o.east === "number" &&

@@ -133,7 +133,6 @@ const AuthSync: React.FC = () => {
       cancelled = true;
     };
   // userId et userUpdatedAt remplacent `user` (objet instable) comme dépendances.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoaded, isSignedIn, userId, userUpdatedAt, syncUser, logoutReset, setReady, setRole]);
 
   return null;
