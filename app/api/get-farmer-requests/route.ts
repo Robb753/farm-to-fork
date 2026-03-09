@@ -1,6 +1,7 @@
 // app/api/get-farmer-requests/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { auth, clerkClient } from "@clerk/nextjs/server";
 import type { Database } from "@/lib/types/database";
 
 /**
@@ -186,6 +187,25 @@ export async function GET(
   req: NextRequest
 ): Promise<NextResponse<GetFarmerRequestsResponse>> {
   try {
+    // Vérification authentification et rôle admin
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json(
+        { error: "Non authentifié", message: "Vous devez être connecté" },
+        { status: 401 }
+      );
+    }
+
+    const client = await clerkClient();
+    const requestingUser = await client.users.getUser(userId);
+    const userRole = requestingUser.publicMetadata?.role as string | undefined;
+    if (userRole !== "admin") {
+      return NextResponse.json(
+        { error: "Accès refusé", message: "Réservé aux administrateurs" },
+        { status: 403 }
+      );
+    }
+
     // Extraction et validation des paramètres de query
     const { searchParams } = new URL(req.url);
     const validation = validateFarmerRequestParams(searchParams);
