@@ -57,17 +57,26 @@ const AuthSync: React.FC = () => {
   const { syncUser, setReady, setRole, logoutReset } = useUserActions();
 
   const syncingRef = useRef<boolean>(false);
+  // Ref pour toujours avoir accès à l'objet user le plus récent dans l'effet,
+  // sans en faire une dépendance instable (Clerk renvoie un nouvel objet à chaque render).
+  const userRef = useRef(user);
+  userRef.current = user;
+
+  // Primitives stables extraites de user pour contrôler quand l'effet se relance.
+  const userId = user?.id;
+  const userUpdatedAt = user?.updatedAt?.getTime();
 
   useEffect(() => {
     if (!isLoaded) return;
 
     let cancelled = false;
+    const currentUser = userRef.current;
 
     const run = async () => {
       // ======================
       // CAS DÉCONNECTÉ
       // ======================
-      if (!isSignedIn || !user) {
+      if (!isSignedIn || !currentUser) {
         try {
           await logoutReset?.();
         } finally {
@@ -88,27 +97,26 @@ const AuthSync: React.FC = () => {
 
       try {
         const email =
-          user.primaryEmailAddress?.emailAddress ??
-          user.emailAddresses?.[0]?.emailAddress ??
+          currentUser.primaryEmailAddress?.emailAddress ??
+          currentUser.emailAddresses?.[0]?.emailAddress ??
           null;
 
         const publicMetadata: ClerkUserDTO["publicMetadata"] =
-          (user.publicMetadata ?? {}) as ClerkUserDTO["publicMetadata"];
+          (currentUser.publicMetadata ?? {}) as ClerkUserDTO["publicMetadata"];
 
         const dto: ClerkUserDTO = {
-          id: user.id,
-          firstName: user.firstName ?? null,
-          lastName: user.lastName ?? null,
+          id: currentUser.id,
+          firstName: currentUser.firstName ?? null,
+          lastName: currentUser.lastName ?? null,
           email,
-          imageUrl: user.imageUrl ?? null,
-          username: user.username ?? null,
+          imageUrl: currentUser.imageUrl ?? null,
+          username: currentUser.username ?? null,
           publicMetadata,
         };
 
         await syncUser(dto);
 
         if (!cancelled) {
-          // si syncUser gère déjà setReady(true), tu peux enlever cette ligne
           setReady(true);
         }
       } catch (error) {
@@ -124,7 +132,9 @@ const AuthSync: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [isLoaded, isSignedIn, user, syncUser, logoutReset, setReady, setRole]);
+  // userId et userUpdatedAt remplacent `user` (objet instable) comme dépendances.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded, isSignedIn, userId, userUpdatedAt, syncUser, logoutReset, setReady, setRole]);
 
   return null;
 };

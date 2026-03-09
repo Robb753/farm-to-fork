@@ -349,9 +349,7 @@ export const useUserStore = create<UserState>()(
               await updateClerkRole(user.id, resolvedRole);
             }
 
-            await syncProfileToSupabase(supabase, user, resolvedRole, {
-              createListing: resolvedRole === "farmer",
-            });
+            await syncProfileToSupabase(supabase, user, resolvedRole);
 
             await get().loadFavorites(user.id);
 

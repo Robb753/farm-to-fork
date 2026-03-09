@@ -3,23 +3,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
 import type { ClerkUserDTO } from "@/lib/store/userStore";
 
-/**
- * Types pour la synchronisation utilisateur
- */
-interface SyncProfileOptions {
-  createListing?: boolean;
-}
-
-/**
- * Interface for PostgreSQL error with code property
- */
-interface PostgresError {
-  code?: string;
-  message?: string;
-  details?: string;
-  hint?: string;
-}
-
 export type AllowedRole = "user" | "farmer" | "admin";
 export type SupabaseDbClient = SupabaseClient<Database>;
 
@@ -70,14 +53,16 @@ export const updateClerkRole = async (
 };
 
 /**
- * ✅ Synchronise le profil utilisateur avec Supabase (upsert)
- * IMPORTANT: supabase est passé en paramètre (pas de hook ici).
+ * Synchronise le profil utilisateur avec Supabase (upsert).
+ *
+ * Note : la création du listing farmer est gérée exclusivement par le
+ * flow d'onboarding (api/onboarding/create-listing) via clerk_user_id.
+ * Elle n'a pas lieu ici.
  */
 export const syncProfileToSupabase = async (
   supabase: SupabaseDbClient,
   user: ClerkUserDTO,
-  role: AllowedRole,
-  options: SyncProfileOptions = {}
+  role: AllowedRole
 ): Promise<boolean> => {
   if (!user?.id) throw new Error("Utilisateur non défini");
 
@@ -90,9 +75,8 @@ export const syncProfileToSupabase = async (
     const email = getEmailFromUser(user);
     if (!email) throw new Error("Email non disponible");
 
-    // ⚠️ ne pas écraser favorites à chaque upsert
-    // -> on ne met favorites: [] que si on est sûr de créer un profil
-    // -> Supabase upsert ne sait pas "coalesce", donc on fait un read léger d'abord.
+    // Ne pas écraser favorites à chaque upsert :
+    // on lit d'abord pour savoir si le profil existe déjà.
     const { data: existing, error: existingError } = await supabase
       .from("profiles")
       .select("user_id")
@@ -100,30 +84,16 @@ export const syncProfileToSupabase = async (
       .maybeSingle();
 
     if (existingError) {
-      // pas bloquant, mais on log
       console.warn("Warn read profile before upsert:", existingError);
     }
 
-    const profileData: any = {
+    const profileData = {
       user_id: user.id,
       email,
       role,
       updated_at: new Date().toISOString(),
-      ...(existing ? {} : { favorites: [] }), // ✅ only set on create
+      ...(existing ? {} : { favorites: [] }),
     };
-
-    // ✅ Seulement ajouter farm_id si farmer + demande de création listing
-    if (role === "farmer" && options.createListing) {
-      try {
-        const listingId = await ensureFarmerListing(supabase, user.id);
-        profileData.farm_id = listingId;
-      } catch (listingError) {
-        console.warn(
-          "Impossible de créer le listing, profil sans farm_id:",
-          listingError
-        );
-      }
-    }
 
     const { error } = await supabase
       .from("profiles")
@@ -138,100 +108,6 @@ export const syncProfileToSupabase = async (
   } catch (error) {
     console.error("Erreur sync Supabase:", error);
     throw error;
-  }
-};
-
-/**
- * Queue de création de listings pour éviter les conflits
- */
-let isCreatingListing = false;
-const listingCreationQueue: Array<{
-  userId: string;
-  resolve: (id: number) => void;
-  reject: (error: Error) => void;
-}> = [];
-
-/**
- * ✅ Crée (si besoin) un listing "placeholder" pour un farmer et renvoie son id
- * - identifie le listing par createdBy = userId
- * - gère les conflits et évite les créations simultanées
- */
-export const ensureFarmerListing = async (
-  supabase: SupabaseDbClient,
-  userId: string
-): Promise<number> => {
-  if (!userId) return Promise.reject(new Error("UserId manquant"));
-
-  if (isCreatingListing) {
-    return new Promise((resolve, reject) => {
-      listingCreationQueue.push({ userId, resolve, reject });
-    });
-  }
-
-  isCreatingListing = true;
-
-  try {
-    // 1) Vérifier si un listing existe déjà
-    const { data: existingListing, error: checkError } = await supabase
-      .from("listing")
-      .select("id")
-      .eq("createdBy", userId)
-      .maybeSingle();
-
-    if (checkError) throw checkError;
-    if (existingListing?.id) return existingListing.id;
-
-    // 2) Créer un listing minimal
-    const { data: newListing, error: createError } = await supabase
-      .from("listing")
-      .insert({
-        name: `Ferme de ${userId.substring(0, 8)}`,
-        address: "À compléter",
-        lat: 46.2276,
-        lng: 2.2137,
-        createdBy: userId,
-        active: false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .select("id")
-      .single();
-
-    if (createError) {
-      const pgError = createError as PostgresError;
-
-      // 23505 = unique violation (constraint unique sur createdBy)
-      if (pgError.code === "23505") {
-        const { data: conflictListing, error: conflictError } = await supabase
-          .from("listing")
-          .select("id")
-          .eq("createdBy", userId)
-          .maybeSingle();
-
-        if (conflictError) throw conflictError;
-        if (conflictListing?.id) return conflictListing.id;
-
-        throw new Error("Listing existant mais non récupéré");
-      }
-
-      throw createError;
-    }
-
-    if (!newListing?.id) throw new Error("Listing créé mais id manquant");
-    return newListing.id;
-  } catch (error) {
-    console.error("Erreur ensureFarmerListing:", error);
-    throw error;
-  } finally {
-    isCreatingListing = false;
-
-    // Traiter le prochain élément de la queue
-    if (listingCreationQueue.length > 0) {
-      const next = listingCreationQueue.shift()!;
-      ensureFarmerListing(supabase, next.userId)
-        .then(next.resolve)
-        .catch(next.reject);
-    }
   }
 };
 
