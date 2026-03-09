@@ -49,8 +49,7 @@ const isPublicRoute = createRouteMatcher([
   "/sign-up(.*)", // Pages d'inscription
   "/api/public(.*)", // APIs publiques
   "/api/webhooks(.*)", // Webhooks (Clerk, Stripe, etc.)
-  "/api/auth(.*)", // ✅ AJOUT: APIs d'authentification (éviter les boucles)
-  "/api/onboarding(.*)", // ✅ NOUVEAU: APIs onboarding (pour les tests)
+  "/api/auth(.*)", // APIs d'authentification (éviter les boucles)
 ]);
 
 const isAdminRoute = createRouteMatcher(["/admin(.*)"]);

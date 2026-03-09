@@ -8,6 +8,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createOrderSchema } from "@/lib/validations/order";
 import type { CreateOrderResponse, OrderItem } from "@/lib/types/order";
 import type { Database, Json } from "@/lib/types/database";
+import { rateLimit, getClientIp, RATE_LIMITS } from "@/lib/rateLimit";
 
 // ------------------------------------------------------
 // Security helpers (Origin/Referer guard)
@@ -199,6 +200,20 @@ export async function POST(
       return NextResponse.json(
         { success: false, error: "Token invalide (sub manquant)" },
         { status: 401 },
+      );
+    }
+
+    // ==========================================
+    // 1b) RATE LIMITING (par userId)
+    // ==========================================
+    const rl = rateLimit(`orders:${clerkUserId}`, RATE_LIMITS.orders);
+    if (!rl.success) {
+      return NextResponse.json(
+        { success: false, error: "Trop de requêtes. Réessayez dans un moment." },
+        {
+          status: 429,
+          headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) },
+        },
       );
     }
 
