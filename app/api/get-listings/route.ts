@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
+import { apiOk, apiError } from "@/lib/api/response";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -16,10 +17,11 @@ interface ListingBasic {
 }
 
 interface GetListingsResponse {
+  success: boolean;
   listings?: ListingBasic[];
   error?: string;
   message?: string;
-  count?: number; // total rows in DB matching filters
+  count?: number;
   pagination?: {
     total: number;
     page: number;
@@ -112,14 +114,7 @@ export async function GET(
     const { isValid, errors, params } = validateListingParams(searchParams);
 
     if (!isValid) {
-      return NextResponse.json(
-        {
-          error: "Paramètres de requête invalides",
-          message: errors.join(", "),
-          timestamp,
-        },
-        { status: 400 }
-      );
+      return apiError("Paramètres de requête invalides", 400, errors);
     }
 
     const supabase = createSupabaseClient();
@@ -134,14 +129,7 @@ export async function GET(
     const { count: total, error: headError } = await countQuery;
     if (headError) {
       console.error("[GET-LISTINGS] Count error:", headError);
-      return NextResponse.json(
-        {
-          error: "Erreur lors du comptage",
-          message: "Impossible d'accéder à la base de données",
-          timestamp,
-        },
-        { status: 500 }
-      );
+      return apiError("Erreur lors du comptage", 500);
     }
 
     const totalCount = total ?? 0;
@@ -149,26 +137,16 @@ export async function GET(
     // If offset is beyond total, short-circuit with empty page
     if (params.offset >= totalCount && totalCount > 0) {
       const page = Math.floor(params.offset / params.limit);
-      return NextResponse.json(
+      return apiOk(
         {
-          listings: [],
+          listings: [] as ListingBasic[],
           count: totalCount,
           message: "Aucun résultat pour cette page (offset au-delà du total).",
           timestamp,
-          pagination: {
-            total: totalCount,
-            page,
-            limit: params.limit,
-            hasMore: false,
-          },
+          pagination: { total: totalCount, page, limit: params.limit, hasMore: false },
         },
-        {
-          status: 200,
-          headers: {
-            "Content-Type": "application/json",
-            "Cache-Control": "public, max-age=30, stale-while-revalidate=300",
-          },
-        }
+        200,
+        { "Cache-Control": "public, max-age=30, stale-while-revalidate=300" },
       );
     }
 
@@ -187,20 +165,13 @@ export async function GET(
     const { data, error } = await dataQuery;
     if (error) {
       console.error("[GET-LISTINGS] Data error:", error);
-      return NextResponse.json(
-        {
-          error: "Erreur lors de la récupération des listings",
-          message: "Impossible d'accéder à la base de données",
-          timestamp,
-        },
-        { status: 500 }
-      );
+      return apiError("Erreur lors de la récupération des listings", 500);
     }
 
     const currentPage = Math.floor(params.offset / params.limit);
     const hasMore = params.offset + params.limit < totalCount;
 
-    return NextResponse.json(
+    return apiOk(
       {
         listings: (data ?? []) as ListingBasic[],
         count: totalCount,
@@ -213,25 +184,16 @@ export async function GET(
           hasMore,
         },
       },
-      {
-        status: 200,
-        headers: {
-          "Content-Type": "application/json",
-          "Cache-Control": "public, max-age=30, stale-while-revalidate=300",
-        },
-      }
+      200,
+      { "Cache-Control": "public, max-age=30, stale-while-revalidate=300" },
     );
   } catch (err) {
     console.error("[GET-LISTINGS] Erreur serveur critique:", err);
     const isDev = process.env.NODE_ENV === "development";
-    return NextResponse.json(
-      {
-        error: "Erreur serveur lors de la récupération des listings",
-        message: "Une erreur inattendue s'est produite",
-        timestamp,
-        details: isDev && err instanceof Error ? err.message : undefined,
-      },
-      { status: 500 }
+    return apiError(
+      "Erreur serveur lors de la récupération des listings",
+      500,
+      isDev && err instanceof Error ? err.message : undefined,
     );
   }
 }

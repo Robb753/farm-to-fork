@@ -9,6 +9,7 @@ import { createOrderSchema } from "@/lib/validations/order";
 import type { CreateOrderResponse, OrderItem } from "@/lib/types/order";
 import type { Database, Json } from "@/lib/types/database";
 import { rateLimit, getClientIp, RATE_LIMITS } from "@/lib/rateLimit";
+import { getJwtSub } from "@/lib/api/jwt";
 
 // ------------------------------------------------------
 // Security helpers (Origin/Referer guard)
@@ -112,31 +113,6 @@ function getBearerToken(req: NextRequest): string | null {
   return token || null;
 }
 
-/**
- * On lit "sub" du JWT sans vérifier la signature.
- * -> OK ici car Supabase vérifie la signature côté DB/RLS.
- */
-function getJwtSub(token: string): string | null {
-  try {
-    const [, payload] = token.split(".");
-    if (!payload) return null;
-
-    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = base64.padEnd(
-      base64.length + ((4 - (base64.length % 4)) % 4),
-      "=",
-    );
-
-    const json = Buffer.from(padded, "base64").toString("utf8");
-    const data = JSON.parse(json) as { sub?: unknown };
-
-    return typeof data.sub === "string" && data.sub.length > 0
-      ? data.sub
-      : null;
-  } catch {
-    return null;
-  }
-}
 
 function supabaseFromToken(token: string) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
