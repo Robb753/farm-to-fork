@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { COLORS } from "@/lib/config";
-import { useCartStore, type Product } from "@/lib/store/cartStore";
+import { useCartStore, useCartTotalItems, useCartTotalPrice, type Product } from "@/lib/store/cartStore";
 import { toast } from "sonner";
 import { escapeHTML, sanitizeHTML } from "@/lib/utils/sanitize";
 import { useSupabaseWithClerk } from "@/utils/supabase/client";
@@ -161,8 +161,8 @@ export default function FarmShopPage(): JSX.Element {
   const cart = useCartStore((s) => s.cart);
   const addItem = useCartStore((s) => s.addItem);
   const canAddToCart = useCartStore((s) => s.canAddToCart);
-  const getTotalItems = useCartStore((s) => s.getTotalItems);
-  const getTotalPrice = useCartStore((s) => s.getTotalPrice);
+  const totalItems = useCartTotalItems();
+  const totalPrice = useCartTotalPrice();
 
   // 🔧 pulse helper
   const pulseMiniCart = useCallback(() => {
@@ -294,8 +294,6 @@ export default function FarmShopPage(): JSX.Element {
     [farmId, addItem, canAddToCart, pulseMiniCart]
   );
 
-  const totalItems = getTotalItems();
-  const totalPrice = getTotalPrice();
 
   const productCounts = useMemo(() => {
     const c: Record<FilterKey, number> = {

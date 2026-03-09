@@ -47,9 +47,7 @@ interface CartStore {
   setDeliveryMode: (mode: "pickup" | "delivery") => void;
   clearCart: () => void;
 
-  // Getters
-  getTotalItems: () => number;
-  getTotalPrice: () => number;
+  // Getter (paramétré — ne peut pas être un selector externe statique)
   canAddToCart: (farmId: number) => boolean;
 }
 
@@ -223,28 +221,6 @@ export const useCartStore = create<CartStore>()(
       },
 
       /**
-       * Obtenir le nombre total d'articles
-       */
-      getTotalItems: () => {
-        const state = get();
-        return state.cart.items.reduce(
-          (total, item) => total + item.quantity,
-          0,
-        );
-      },
-
-      /**
-       * Obtenir le prix total
-       */
-      getTotalPrice: () => {
-        const state = get();
-        return state.cart.items.reduce(
-          (total, item) => total + item.product.price * item.quantity,
-          0,
-        );
-      },
-
-      /**
        * Vérifier si on peut ajouter un produit au panier
        */
       canAddToCart: (farmId: number) => {
@@ -257,3 +233,15 @@ export const useCartStore = create<CartStore>()(
     },
   ),
 );
+
+/**
+ * Selectors externes — chaque composant ne se re-render que si la valeur calculée change,
+ * et non sur n'importe quel changement du store.
+ */
+export const useCartTotalItems = () =>
+  useCartStore((s) => s.cart.items.reduce((sum, item) => sum + item.quantity, 0));
+
+export const useCartTotalPrice = () =>
+  useCartStore((s) =>
+    s.cart.items.reduce((sum, item) => sum + item.product.price * item.quantity, 0)
+  );

@@ -152,10 +152,43 @@ const baseConfig = {
 
   // Headers de sécurité ----------------------------------------------------
   async headers() {
+    const csp = [
+      "default-src 'self'",
+      // Clerk injecte des scripts inline — unsafe-inline inévitable avec leur SDK
+      "script-src 'self' 'unsafe-inline' https://*.clerk.com https://*.clerk.accounts.dev",
+      "style-src 'self' 'unsafe-inline' https://api.mapbox.com",
+      [
+        "connect-src 'self'",
+        "https://*.supabase.co",
+        "wss://*.supabase.co",
+        "https://api.clerk.com",
+        "https://*.clerk.com",
+        "https://*.clerk.accounts.dev",
+        "https://api.mapbox.com",
+        "https://events.mapbox.com",
+        "https://*.tiles.mapbox.com",
+      ].join(" "),
+      [
+        "img-src 'self' data: blob:",
+        "https://img.clerk.com",
+        "https://images.clerk.dev",
+        "https://reukdkgdlvgdvyuwuaub.supabase.co",
+        "https://lh3.googleusercontent.com",
+        "https://*.ggpht.com",
+      ].join(" "),
+      "font-src 'self' data:",
+      // Mapbox GL et Clerk utilisent des Web Workers
+      "worker-src blob:",
+      // Clerk Turnstile (protection anti-bot)
+      "frame-src https://challenges.cloudflare.com https://*.clerk.accounts.dev",
+      "frame-ancestors 'none'",
+    ].join("; ");
+
     return [
       {
         source: "/(.*)",
         headers: [
+          { key: "Content-Security-Policy", value: csp },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "X-Frame-Options", value: "DENY" },
           { key: "X-XSS-Protection", value: "1; mode=block" },
