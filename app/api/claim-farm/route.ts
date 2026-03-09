@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import type { Database } from "@/lib/types/database";
+import { rateLimit, RATE_LIMITS } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,6 +41,18 @@ export async function POST(
     return NextResponse.json(
       { success: false, error: "Non authentifié", message: "Connexion requise" },
       { status: 401 }
+    );
+  }
+
+  // 1b. Rate limiting (par userId)
+  const rl = rateLimit(`claim-farm:${userId}`, RATE_LIMITS.claimFarm);
+  if (!rl.success) {
+    return NextResponse.json(
+      { success: false, error: "Trop de requêtes", message: "Réessayez dans un moment." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) },
+      }
     );
   }
 

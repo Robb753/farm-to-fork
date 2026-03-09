@@ -1,6 +1,7 @@
 // app/api/get-all-users/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { auth, clerkClient } from "@clerk/nextjs/server";
 import type { Database } from "@/lib/types/database";
 
 // Force dynamic pour éviter la mise en cache
@@ -73,6 +74,24 @@ export async function GET(
   req: NextRequest
 ): Promise<NextResponse<GetAllUsersResponse>> {
   try {
+    // ==================== AUTH + ADMIN CHECK ====================
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json(
+        { error: "Non authentifié" },
+        { status: 401 }
+      );
+    }
+
+    const client = await clerkClient();
+    const callerUser = await client.users.getUser(userId);
+    if (callerUser.publicMetadata?.role !== "admin") {
+      return NextResponse.json(
+        { error: "Accès refusé" },
+        { status: 403 }
+      );
+    }
+
     // Extraction des paramètres de query
     const { searchParams } = new URL(req.url);
 

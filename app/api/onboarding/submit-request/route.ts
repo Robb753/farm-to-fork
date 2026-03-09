@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import type { Database } from "@/lib/types/database";
+import { rateLimit, RATE_LIMITS } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -50,6 +51,22 @@ export async function POST(
           message: "Vous devez être connecté pour soumettre une demande",
         },
         { status: 401 }
+      );
+    }
+
+    // Rate limiting (par userId — limite les soumissions répétées)
+    const rl = rateLimit(`onboarding:${clerkUserId}`, RATE_LIMITS.onboarding);
+    if (!rl.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Trop de requêtes",
+          message: "Vous avez soumis trop de demandes. Réessayez dans quelques minutes.",
+        },
+        {
+          status: 429,
+          headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) },
+        }
       );
     }
 
