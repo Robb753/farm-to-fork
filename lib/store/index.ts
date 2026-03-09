@@ -1,5 +1,5 @@
 // lib/store/index.ts
-// Point d'entrée centralisé pour le store unifié + compat
+// Point d'entrée centralisé pour le store unifié
 
 // ==================== STORE UNIFIÉ ====================
 
@@ -50,120 +50,10 @@ export type {
   Listing,
 } from "./unifiedStore";
 
-// ==================== IMPORTS INTERNES (compat hooks) ====================
+import type { MapCoordinates } from "./unifiedStore";
 
-import { useUnifiedStore } from "./unifiedStore";
-import {
-  useAllListings,
-  useFilteredListings,
-  useVisibleListings,
-  useIsListingsLoading,
-  useMapBounds,
-  useMapCoordinates,
-} from "./unifiedStore";
-
-import type { Listing, MapBounds, MapCoordinates } from "./unifiedStore";
-
-// ✅ Alias type LatLng (compat)
+// Alias type LatLng (utilisé dans quelques composants externes)
 export type LatLng = MapCoordinates;
-
-// ==================== HOOKS COMPAT (Explore.tsx etc.) ====================
-
-export const useListingsState = () => ({
-  all: useAllListings(),
-  filtered: useFilteredListings(),
-  visible: useVisibleListings(),
-  isLoading: useIsListingsLoading(),
-  hasMore: useUnifiedStore((s) => s.listings.hasMore),
-  page: useUnifiedStore((s) => s.listings.page),
-  totalCount: useUnifiedStore((s) => s.listings.all.length),
-  error: useUnifiedStore((s) => s.listings.error),
-});
-
-export const useMapState = () => ({
-  coordinates: useMapCoordinates(),
-  bounds: useMapBounds(),
-  zoom: useUnifiedStore((s) => s.map.zoom),
-  mapInstance: useUnifiedStore((s) => s.map.instance),
-  isLoading: useUnifiedStore((s) => s.map.isLoading),
-  isApiLoaded: useUnifiedStore((s) => s.map.isApiLoaded), // ✅
-  error: useUnifiedStore((s) => s.map.error),
-});
-
-// ==================== ALIAS DE COMPATIBILITÉ ====================
-
-/**
- * @deprecated Utiliser useCurrentFilters() / useUnifiedStore((s)=>s.filters.current)
- */
-export const useFiltersStoreState = () => ({
-  filters: useUnifiedStore((s) => s.filters.current),
-});
-
-/**
- * @deprecated Utiliser useUIActions() / selectors dédiés
- */
-export const useUIState = () => ({
-  isMapExpanded: useUnifiedStore((s) => s.ui.isMapExpanded),
-  isMobile: useUnifiedStore((s) => s.ui.isMobile),
-  isTablet: useUnifiedStore((s) => s.ui.isTablet),
-  isDesktop: useUnifiedStore((s) => s.ui.isDesktop),
-  isFiltersModalOpen: useUnifiedStore((s) => s.ui.isFiltersModalOpen),
-});
-
-/**
- * @deprecated Utiliser useUnifiedStore((s)=>s.interactions)
- */
-export const useInteractionsState = () => ({
-  hoveredListingId: useUnifiedStore((s) => s.interactions.hoveredListingId),
-  selectedListingId: useUnifiedStore((s) => s.interactions.selectedListingId),
-  infoWindowOpen: useUnifiedStore((s) => s.interactions.infoWindowOpen),
-});
-
-/**
- * @deprecated Utiliser useFiltersActions()
- */
-export const useFiltersStoreActions = () =>
-  useUnifiedStore((s) => s.filtersActions);
-
-/**
- * @deprecated Utiliser useMapState()
- */
-export const useMapStoreState = () => ({
-  coordinates: useUnifiedStore((s) => s.map.coordinates),
-  bounds: useUnifiedStore((s) => s.map.bounds),
-  zoom: useUnifiedStore((s) => s.map.zoom),
-  isLoading: useUnifiedStore((s) => s.map.isLoading),
-  isApiLoaded: useUnifiedStore((s) => s.map.isApiLoaded),
-  error: useUnifiedStore((s) => s.map.error),
-});
-
-/**
- * @deprecated Utiliser useMapActions()
- */
-export const useMapStoreActions = () => useUnifiedStore((s) => s.mapActions);
-
-/**
- * @deprecated Utiliser useListingsState()
- */
-export const useListingsStoreState = () => ({
-  all: useUnifiedStore((s) => s.listings.all),
-  visible: useUnifiedStore((s) => s.listings.visible),
-  filtered: useUnifiedStore((s) => s.listings.filtered),
-  isLoading: useUnifiedStore((s) => s.listings.isLoading),
-  error: useUnifiedStore((s) => s.listings.error),
-});
-
-/**
- * @deprecated Utiliser useListingsActions()
- */
-export const useListingsStoreActions = () =>
-  useUnifiedStore((s) => s.listingsActions);
-
-/**
- * @deprecated Utiliser useUnifiedStore((s)=>s.interactionsActions)
- */
-export const useInteractionsActions = () =>
-  useUnifiedStore((s) => s.interactionsActions);
 
 // ==================== STORES INDÉPENDANTS ====================
 

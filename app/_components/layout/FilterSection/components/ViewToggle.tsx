@@ -3,7 +3,7 @@
 import React from "react";
 import { MapPin, List } from "lucide-react";
 import { CSS_CLASSES } from "../utils/constants";
-import { useUIActions, useUIState } from "@/lib/store";
+import { useUIActions, useIsMapExpanded } from "@/lib/store";
 
 /**
  * Composant pour basculer entre vue liste et vue carte
@@ -16,7 +16,7 @@ import { useUIActions, useUIState } from "@/lib/store";
  * - ✅ Performance optimisée
  */
 const ViewToggle: React.FC = () => {
-  const { isMapExpanded } = useUIState();
+  const isMapExpanded = useIsMapExpanded();
   const { setMapExpanded } = useUIActions();
 
   return (

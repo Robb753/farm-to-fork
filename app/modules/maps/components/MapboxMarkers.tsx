@@ -4,7 +4,7 @@ import { useEffect, useRef, useCallback } from "react";
 import mapboxgl from "mapbox-gl";
 
 import { COLORS } from "@/lib/config";
-import { useListingsState, useMapState } from "@/lib/store";
+import { useVisibleListings, useUnifiedStore } from "@/lib/store";
 import type { Listing } from "@/lib/store";
 import { logger } from "@/lib/logger";
 
@@ -34,8 +34,8 @@ interface MarkerData {
  * - Cleanup mémoire complet
  */
 export default function MapboxMarkers(): null {
-  const { mapInstance } = useMapState();
-  const { visible: visibleListings } = useListingsState();
+  const mapInstance = useUnifiedStore((s) => s.map.instance);
+  const visibleListings = useVisibleListings();
 
   const markersRef = useRef<Map<string | number, MarkerData>>(new Map());
   const activePopupRef = useRef<mapboxgl.Popup | null>(null);

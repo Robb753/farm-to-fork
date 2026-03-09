@@ -2,7 +2,7 @@
 
 import { useCallback } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { useListingsActions, useMapActions, useMapState } from "@/lib/store";
+import { useListingsActions, useMapActions, useUnifiedStore } from "@/lib/store";
 import { logger } from "@/lib/logger";
 
 /**
@@ -60,7 +60,7 @@ export default function useCitySearchControl({
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const { mapInstance } = useMapState();
+  const mapInstance = useUnifiedStore((s) => s.map.instance);
   const { setCoordinates, setZoom } = useMapActions();
   const { fetchListings } = useListingsActions();
 

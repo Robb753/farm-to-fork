@@ -5,7 +5,7 @@ import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 
 import {
-  useMapState,
+  useMapCoordinates,
   useSetMapCoordinates,
   useSetMapBounds,
   useSetMapZoom,
@@ -120,7 +120,8 @@ export default function MapboxSection({
   const setInstance = useSetMapInstance();
   const setMapLoading = useUnifiedStore((s) => s.mapActions.setMapLoading);
 
-  const { coordinates, zoom } = useMapState();
+  const coordinates = useMapCoordinates();
+  const zoom = useUnifiedStore((s) => s.map.zoom);
 
   // ✅ actions atomiques (stables)
   const setCoordinates = useSetMapCoordinates();
