@@ -346,7 +346,7 @@ export const useUserStore = create<UserState>()(
 
             // Clerk publicMetadata role doit refléter la vérité DB
             if (user.publicMetadata?.role !== resolvedRole) {
-              await updateClerkRole(user.id, resolvedRole);
+              await updateClerkRole();
             }
 
             await syncProfileToSupabase(supabase, user, resolvedRole);
@@ -395,7 +395,7 @@ export const useUserStore = create<UserState>()(
             const resolvedRole = await determineUserRole(supabase, user);
             setRole(resolvedRole);
 
-            await updateClerkRole(user.id, resolvedRole);
+            await updateClerkRole();
             await syncProfileToSupabase(supabase, user, resolvedRole);
 
             await get().loadFavorites(user.id);

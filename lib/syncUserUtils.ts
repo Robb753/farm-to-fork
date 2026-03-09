@@ -15,39 +15,24 @@ export const getEmailFromUser = (user: ClerkUserDTO | null): string | null => {
 };
 
 /**
- * Met à jour le rôle utilisateur dans Clerk via API
+ * Synchronise le metadata Clerk de l'utilisateur connecté avec son rôle en DB.
+ * Le rôle est relu côté serveur depuis Supabase — rien n'est envoyé par le client.
  */
-export const updateClerkRole = async (
-  userId: string,
-  role: AllowedRole
-): Promise<boolean> => {
+export const updateClerkRole = async (): Promise<boolean> => {
   try {
-    const response = await fetch("/api/update-user-role", {
+    const response = await fetch("/api/sync-my-role", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "no-cache",
-      },
-      body: JSON.stringify({ userId, role }),
+      headers: { "Cache-Control": "no-cache" },
     });
 
     if (!response.ok) {
-      console.error(
-        `Échec de la mise à jour du rôle. Statut: ${response.status}`
-      );
-      try {
-        const data = await response.json();
-        console.error("Détails de l'erreur:", data);
-      } catch (parseError) {
-        console.error("Impossible de parser la réponse d'erreur:", parseError);
-        console.error("Status text:", response.statusText);
-      }
+      console.error(`[SYNC-MY-ROLE] Échec. Statut: ${response.status}`);
       return false;
     }
 
     return true;
   } catch (error) {
-    console.error("Erreur mise à jour rôle Clerk:", error);
+    console.error("[SYNC-MY-ROLE] Erreur:", error);
     return false;
   }
 };
