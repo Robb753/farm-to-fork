@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { COLORS } from "@/lib/config";
-import { useCartStore } from "@/lib/store/cartStore";
+import { useCartStore, useCartTotalPrice } from "@/lib/store/cartStore";
 import { toast } from "sonner";
 import { useSupabaseWithClerk } from "@/utils/supabase/client";
 
@@ -63,7 +63,7 @@ export default function CartPage(): JSX.Element {
   const updateQuantity = useCartStore((s) => s.updateQuantity);
   const setDeliveryMode = useCartStore((s) => s.setDeliveryMode);
   const clearCart = useCartStore((s) => s.clearCart);
-  const getTotalPrice = useCartStore((s) => s.getTotalPrice);
+  const subtotal = useCartTotalPrice();
 
   // Charger les infos de la ferme
   useEffect(() => {
@@ -166,7 +166,6 @@ export default function CartPage(): JSX.Element {
     return farm.delivery_price ?? 5;
   }, [farm?.delivery_available, farm?.delivery_price]);
 
-  const subtotal = getTotalPrice();
   const total =
     cart.deliveryMode === "delivery" ? subtotal + deliveryPrice : subtotal;
 

@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { COLORS } from "@/lib/config";
-import { useCartStore, type Product } from "@/lib/store/cartStore";
+import { useCartStore, useCartTotalItems, useCartTotalPrice, type Product } from "@/lib/store/cartStore";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,8 +56,8 @@ export default function BoutiqueTab({
   const updateQuantity = useCartStore((state) => state.updateQuantity);
   const removeItem = useCartStore((state) => state.removeItem); // ✅ IMPORTANT
   const canAddToCart = useCartStore((state) => state.canAddToCart);
-  const getTotalItems = useCartStore((state) => state.getTotalItems);
-  const getTotalPrice = useCartStore((state) => state.getTotalPrice);
+  const totalItems = useCartTotalItems();
+  const totalPrice = useCartTotalPrice();
 
   const farmId = listing?.id;
   const farmName = listing?.name || "Ferme";
@@ -260,8 +260,6 @@ export default function BoutiqueTab({
     );
   }
 
-  const totalItems = getTotalItems();
-  const totalPrice = getTotalPrice();
 
   return (
     <div className={cn("space-y-4", className)}>

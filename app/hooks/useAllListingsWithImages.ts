@@ -108,10 +108,9 @@ export function useAllListingsWithImages(
       const { data, error } = await supabase
         .from(TABLES.LISTING)
         .select(
-          `
-            *,
-            ${TABLES.LISTING_IMAGES}(id, url)
-          `
+          `id, name, address, lat, lng, active, clerk_user_id, osm_id,
+           availability, product_type, certifications, created_at,
+           ${TABLES.LISTING_IMAGES}(id, url)`
         )
         .or("active.eq.true,clerk_user_id.is.null")
         .order(LISTING_COLUMNS.CREATED_AT, { ascending: false })
@@ -162,29 +161,34 @@ export function useListingsInBounds(
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Extraire les primitives pour éviter qu'un objet bounds recréé à chaque
+  // render du parent ne déclenche un re-fetch inutile.
+  const b = toSWNE(bounds);
+  const swLat = b?.sw.lat;
+  const swLng = b?.sw.lng;
+  const neLat = b?.ne.lat;
+  const neLng = b?.ne.lng;
+
   const fetchInBounds = useCallback(async (): Promise<void> => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const b = toSWNE(bounds);
-
       let query = supabase
         .from(TABLES.LISTING)
         .select(
-          `
-            *,
-            ${TABLES.LISTING_IMAGES}(id, url)
-          `
+          `id, name, address, lat, lng, active, clerk_user_id, osm_id,
+           availability, product_type, certifications, created_at,
+           ${TABLES.LISTING_IMAGES}(id, url)`
         )
         .eq(LISTING_COLUMNS.ACTIVE, true);
 
-      if (b) {
+      if (swLat !== undefined && swLng !== undefined && neLat !== undefined && neLng !== undefined) {
         query = query
-          .gte("lat", b.sw.lat)
-          .lte("lat", b.ne.lat)
-          .gte("lng", b.sw.lng)
-          .lte("lng", b.ne.lng);
+          .gte("lat", swLat)
+          .lte("lat", neLat)
+          .gte("lng", swLng)
+          .lte("lng", neLng);
       }
 
       const { data, error } = await query
@@ -200,7 +204,7 @@ export function useListingsInBounds(
     } finally {
       setIsLoading(false);
     }
-  }, [supabase, bounds, limit]);
+  }, [supabase, swLat, swLng, neLat, neLng, limit]);
 
   useEffect(() => {
     if (autoFetch) fetchInBounds();

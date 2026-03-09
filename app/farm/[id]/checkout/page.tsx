@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { useAuth } from "@clerk/nextjs";
 
 import { COLORS } from "@/lib/config";
-import { useCartStore } from "@/lib/store/cartStore";
+import { useCartStore, useCartTotalPrice } from "@/lib/store/cartStore";
 import type { DeliveryAddress } from "@/lib/types/order";
 import { useSupabaseWithClerk } from "@/utils/supabase/client";
 import { useOrdersApi } from "@/lib/api/orders";
@@ -42,7 +42,7 @@ export default function FarmCheckoutPage(): JSX.Element | null {
 
   const cart = useCartStore((s) => s.cart);
   const clearCart = useCartStore((s) => s.clearCart);
-  const getTotalPrice = useCartStore((s) => s.getTotalPrice);
+  const subtotal = useCartTotalPrice();
 
   const urlFarmId = params?.id ? Number(params.id) : NaN;
 
@@ -198,7 +198,6 @@ export default function FarmCheckoutPage(): JSX.Element | null {
   ]);
 
   // Calculs
-  const subtotal = getTotalPrice();
 
   const deliveryPrice = useMemo(() => {
     if (!farm?.delivery_available || cart.deliveryMode !== "delivery") return 0;
