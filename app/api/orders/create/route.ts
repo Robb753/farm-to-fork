@@ -8,7 +8,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createOrderSchema } from "@/lib/validations/order";
 import type { CreateOrderResponse, OrderItem } from "@/lib/types/order";
 import type { Database, Json } from "@/lib/types/database";
-import { rateLimit, getClientIp, RATE_LIMITS } from "@/lib/rateLimit";
+import { rateLimit, RATE_LIMITS } from "@/lib/rateLimit";
 import { getJwtSub } from "@/lib/api/jwt";
 
 // ------------------------------------------------------
