@@ -1,24 +1,20 @@
 /**
  * Tests for POST /api/sync-my-role
  *
- * The route has exactly 5 sequential gates — every test targets one:
+ * The route has 5 sequential gates — failure at any gate short-circuits everything
+ * downstream. Tests are ordered and named to make that contract explicit.
  *
- *   Gate 1 · Clerk session        auth() → userId present?
- *   Gate 2 · Server config        SUPABASE_URL + SERVICE_ROLE_KEY set?
- *   Gate 3 · Supabase role read   profiles.role exists and is trusted?
- *   Gate 4 · Role validation      role ∈ ALLOWED_ROLES ("user"|"farmer"|"admin")?
- *   Gate 5 · Clerk write          clerkClient().users.updateUser(userId, …) succeeds?
- *
- * Security invariants verified explicitly:
- *   · Role always comes from Supabase (source of truth), never from the request
- *   · updateUser is called with the session userId, not any client-supplied value
- *   · publicMetadata is set to exactly { role } — nothing else is overwritten
- *   · Service-role key is used for the Supabase client (bypasses RLS)
+ * Gate 1 · Clerk session auth      auth() → userId truthy?
+ * Gate 2 · Server config           SUPABASE_URL + SERVICE_ROLE_KEY present?
+ * Gate 3 · DB read                 profiles row found, no query error?
+ * Gate 4 · Role validation         role ∈ ["user","farmer","admin"]?
+ * Gate 5 · Clerk write             clerkClient().users.updateUser() succeeds?
+ * Gate 6 · Happy path              { success: true, role }
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// ─── Module mocks (hoisted before imports) ────────────────────────────────
+// ─── Module mocks (hoisted before all imports) ─────────────────────────────
 
 vi.mock("@clerk/nextjs/server", () => ({
   auth: vi.fn(),
@@ -29,7 +25,7 @@ vi.mock("@supabase/supabase-js", () => ({
   createClient: vi.fn(),
 }));
 
-// ─── Imports (resolved after mocks) ──────────────────────────────────────
+// ─── Imports ──────────────────────────────────────────────────────────────
 
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { createClient } from "@supabase/supabase-js";
@@ -43,55 +39,54 @@ const mockCreateClient = vi.mocked(createClient);
 
 const USER_ID = "user_clerk_abc123";
 
-// ─── Mock factories ───────────────────────────────────────────────────────
+// ─── Mock factory ─────────────────────────────────────────────────────────
 
 /**
- * Creates a Supabase client mock whose .from("profiles") chain
- * ends with .maybeSingle() returning the given response.
- *
- * Chain shape in the route:
+ * The route's Supabase query chain:
  *   supabase.from("profiles").select("role").eq("user_id", userId).maybeSingle()
+ *
+ * We capture the query builder so tests can assert on .select() and .eq() calls.
  */
+let capturedQueryBuilder: {
+  select: ReturnType<typeof vi.fn>;
+  eq: ReturnType<typeof vi.fn>;
+  maybeSingle: ReturnType<typeof vi.fn>;
+};
+
 function makeSupabaseMock(profileResult: { data: unknown; error: unknown }) {
-  const queryBuilder = {
+  capturedQueryBuilder = {
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     maybeSingle: vi.fn().mockResolvedValue(profileResult),
   };
-  return { from: vi.fn().mockReturnValue(queryBuilder) };
+  return { from: vi.fn().mockReturnValue(capturedQueryBuilder) } as ReturnType<typeof createClient>;
 }
 
-/** Returns the inner query builder created by makeSupabaseMock, for call assertions. */
-function getQueryBuilder() {
-  // mockCreateClient was called once; its return value is our mock supabase client.
-  return (mockCreateClient.mock.results[0]?.value as ReturnType<typeof makeSupabaseMock>)
-    ?.from.mock.results[0]?.value;
+function setupSupabase(profileResult: { data: unknown; error: unknown }) {
+  mockCreateClient.mockReturnValue(makeSupabaseMock(profileResult));
 }
 
-// ─── Default updateUser spy (swapped per-test when needed) ────────────────
+// ─── Shared Clerk spy ──────────────────────────────────────────────────────
 
 let mockUpdateUser: ReturnType<typeof vi.fn>;
 
 // ─── Global setup ─────────────────────────────────────────────────────────
 
 beforeEach(() => {
-  // Environment
   vi.stubEnv("SUPABASE_URL", "https://test.supabase.co");
   vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "test-service-role-key");
 
-  // Clerk session — authenticated user by default
+  // Default: authenticated user
   mockAuth.mockResolvedValue({ userId: USER_ID } as Awaited<ReturnType<typeof auth>>);
 
-  // Clerk client — updateUser succeeds by default
+  // Default: Clerk write succeeds
   mockUpdateUser = vi.fn().mockResolvedValue({});
   mockClerkClient.mockResolvedValue({
     users: { updateUser: mockUpdateUser },
   } as unknown as Awaited<ReturnType<typeof clerkClient>>);
 
-  // Supabase — profile with "user" role by default
-  mockCreateClient.mockReturnValue(
-    makeSupabaseMock({ data: { role: "user" }, error: null }) as ReturnType<typeof createClient>,
-  );
+  // Default: valid profile with role "user"
+  setupSupabase({ data: { role: "user" }, error: null });
 });
 
 afterEach(() => {
@@ -106,34 +101,51 @@ describe("POST /api/sync-my-role", () => {
   // ══════════════════════════════════════════════════════════════════════════
   // Gate 1 — Clerk session / authentication
   // ══════════════════════════════════════════════════════════════════════════
-  describe("security — authentication (Gate 1)", () => {
+  describe("Gate 1 — authentication", () => {
 
-    it("returns 401 when auth() yields no userId (unauthenticated session)", async () => {
+    it("returns 401 when auth() resolves with userId = null", async () => {
+      // Nominal Clerk case for unauthenticated sessions
       mockAuth.mockResolvedValue({ userId: null } as Awaited<ReturnType<typeof auth>>);
 
       const res = await POST();
       const body = await res.json();
 
       expect(res.status).toBe(401);
-      expect(body.success).toBe(false);
-      expect(body.error).toBe("Non authentifié");
+      expect(body).toEqual({ success: false, error: "Non authentifié" });
     });
 
-    it("does not reach Supabase or Clerk when userId is absent", async () => {
-      // Verify short-circuit: no DB call, no Clerk write on unauthenticated requests
+    it("returns 401 when auth() resolves with userId = undefined", async () => {
+      // Defensive: documents that any falsy userId is rejected, not just null
+      mockAuth.mockResolvedValue({ userId: undefined } as Awaited<ReturnType<typeof auth>>);
+
+      const res = await POST();
+
+      expect(res.status).toBe(401);
+    });
+
+    it("does NOT call createClient when userId is absent", async () => {
+      // DB must not be reached before auth is confirmed
       mockAuth.mockResolvedValue({ userId: null } as Awaited<ReturnType<typeof auth>>);
 
       await POST();
 
       expect(mockCreateClient).not.toHaveBeenCalled();
-      expect(mockUpdateUser).not.toHaveBeenCalled();
+    });
+
+    it("does NOT call clerkClient when userId is absent", async () => {
+      // Clerk write must not be reached before auth is confirmed
+      mockAuth.mockResolvedValue({ userId: null } as Awaited<ReturnType<typeof auth>>);
+
+      await POST();
+
+      expect(mockClerkClient).not.toHaveBeenCalled();
     });
   });
 
   // ══════════════════════════════════════════════════════════════════════════
   // Gate 2 — Server configuration
   // ══════════════════════════════════════════════════════════════════════════
-  describe("security — server configuration (Gate 2)", () => {
+  describe("Gate 2 — server configuration", () => {
 
     it("returns 500 when SUPABASE_URL is missing", async () => {
       vi.stubEnv("SUPABASE_URL", "");
@@ -142,8 +154,7 @@ describe("POST /api/sync-my-role", () => {
       const body = await res.json();
 
       expect(res.status).toBe(500);
-      expect(body.success).toBe(false);
-      expect(body.error).toBe("Configuration serveur manquante");
+      expect(body).toEqual({ success: false, error: "Configuration serveur manquante" });
     });
 
     it("returns 500 when SUPABASE_SERVICE_ROLE_KEY is missing", async () => {
@@ -153,7 +164,7 @@ describe("POST /api/sync-my-role", () => {
       const body = await res.json();
 
       expect(res.status).toBe(500);
-      expect(body.error).toBe("Configuration serveur manquante");
+      expect(body).toEqual({ success: false, error: "Configuration serveur manquante" });
     });
 
     it("returns 500 when both Supabase env vars are missing", async () => {
@@ -165,17 +176,25 @@ describe("POST /api/sync-my-role", () => {
       expect(res.status).toBe(500);
     });
 
-    it("does not attempt a Supabase query when env vars are absent", async () => {
+    it("does NOT call createClient when env vars are absent", async () => {
+      // Must not attempt to build a client with empty credentials
       vi.stubEnv("SUPABASE_URL", "");
 
       await POST();
 
-      // createClient itself must not be called with empty/undefined credentials
       expect(mockCreateClient).not.toHaveBeenCalled();
     });
 
-    it("creates the Supabase client using the SERVICE_ROLE_KEY (not the anon key)", async () => {
-      // The service role key is required to bypass RLS on the profiles table
+    it("does NOT call clerkClient when env vars are absent", async () => {
+      vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "");
+
+      await POST();
+
+      expect(mockClerkClient).not.toHaveBeenCalled();
+    });
+
+    it("creates the Supabase client with SERVICE_ROLE_KEY, not the anon key", async () => {
+      // Service role key is required to bypass RLS on the profiles table
       await POST();
 
       expect(mockCreateClient).toHaveBeenCalledWith(
@@ -187,84 +206,74 @@ describe("POST /api/sync-my-role", () => {
   });
 
   // ══════════════════════════════════════════════════════════════════════════
-  // Gate 3 — Supabase role lookup
+  // Gate 3 — Supabase DB read
   // ══════════════════════════════════════════════════════════════════════════
-  describe("supabase — role lookup (Gate 3)", () => {
+  describe("Gate 3 — database read", () => {
 
     it("returns 404 when Supabase returns a query error", async () => {
-      mockCreateClient.mockReturnValue(
-        makeSupabaseMock({ data: null, error: { message: "connection refused" } }) as ReturnType<typeof createClient>,
-      );
+      // Covers network failures, RLS violations, schema mismatches
+      setupSupabase({ data: null, error: { message: "connection refused" } });
 
       const res = await POST();
       const body = await res.json();
 
       expect(res.status).toBe(404);
-      expect(body.success).toBe(false);
-      expect(body.error).toBe("Profil introuvable");
+      expect(body).toEqual({ success: false, error: "Profil introuvable" });
     });
 
-    it("returns 404 when the profile row does not exist (maybeSingle → null)", async () => {
-      // maybeSingle() returns { data: null, error: null } when no row matches
-      mockCreateClient.mockReturnValue(
-        makeSupabaseMock({ data: null, error: null }) as ReturnType<typeof createClient>,
-      );
+    it("returns 404 when maybeSingle() returns null data with no error (row absent)", async () => {
+      // maybeSingle() returns { data: null, error: null } when no row matches —
+      // distinct from a DB error, but the route treats both as "profile not found"
+      setupSupabase({ data: null, error: null });
 
       const res = await POST();
       const body = await res.json();
 
       expect(res.status).toBe(404);
-      expect(body.error).toBe("Profil introuvable");
+      expect(body).toEqual({ success: false, error: "Profil introuvable" });
     });
 
-    it("queries profiles filtered by the authenticated userId, not any external input", async () => {
-      // Security: userId must come from auth(), never from the request body
+    it("does NOT call clerkClient when the profile is missing", async () => {
+      // A missing profile must never trigger a Clerk write
+      setupSupabase({ data: null, error: null });
+
       await POST();
 
-      const qb = getQueryBuilder();
-      expect(qb.eq).toHaveBeenCalledWith("user_id", USER_ID);
+      expect(mockClerkClient).not.toHaveBeenCalled();
+    });
+
+    it("filters the query by the session userId — never by an external input", async () => {
+      // Security: userId comes exclusively from auth(), the POST() fn takes no arguments
+      await POST();
+
+      expect(capturedQueryBuilder.eq).toHaveBeenCalledWith("user_id", USER_ID);
     });
 
     it("selects only the 'role' column (minimal data exposure)", async () => {
       await POST();
 
-      const qb = getQueryBuilder();
-      expect(qb.select).toHaveBeenCalledWith("role");
-    });
-
-    it("does not call Clerk updateUser when the profile is missing", async () => {
-      mockCreateClient.mockReturnValue(
-        makeSupabaseMock({ data: null, error: null }) as ReturnType<typeof createClient>,
-      );
-
-      await POST();
-
-      expect(mockUpdateUser).not.toHaveBeenCalled();
+      expect(capturedQueryBuilder.select).toHaveBeenCalledWith("role");
     });
   });
 
   // ══════════════════════════════════════════════════════════════════════════
-  // Gate 4 — Role validation (allowlist)
+  // Gate 4 — Role validation
   // ══════════════════════════════════════════════════════════════════════════
-  describe("security — role validation (Gate 4)", () => {
+  describe("Gate 4 — role validation", () => {
 
-    it("returns 400 when profile.role is null (unset in DB)", async () => {
-      mockCreateClient.mockReturnValue(
-        makeSupabaseMock({ data: { role: null }, error: null }) as ReturnType<typeof createClient>,
-      );
+    it("returns 400 when profile.role is null", async () => {
+      // Unset role in DB must not be synced to Clerk
+      setupSupabase({ data: { role: null }, error: null });
 
       const res = await POST();
       const body = await res.json();
 
       expect(res.status).toBe(400);
-      expect(body.success).toBe(false);
-      expect(body.error).toBe("Rôle invalide en base de données");
+      expect(body).toEqual({ success: false, error: "Rôle invalide en base de données" });
     });
 
     it("returns 400 when profile.role is an empty string", async () => {
-      mockCreateClient.mockReturnValue(
-        makeSupabaseMock({ data: { role: "" }, error: null }) as ReturnType<typeof createClient>,
-      );
+      setupSupabase({ data: { role: "" }, error: null });
 
       const res = await POST();
 
@@ -272,94 +281,82 @@ describe("POST /api/sync-my-role", () => {
     });
 
     it("returns 400 for an unknown role value ('superadmin')", async () => {
-      mockCreateClient.mockReturnValue(
-        makeSupabaseMock({ data: { role: "superadmin" }, error: null }) as ReturnType<typeof createClient>,
-      );
+      // Any value not in the explicit allowlist is rejected
+      setupSupabase({ data: { role: "superadmin" }, error: null });
 
       const res = await POST();
       const body = await res.json();
 
       expect(res.status).toBe(400);
-      expect(body.error).toBe("Rôle invalide en base de données");
+      expect(body).toEqual({ success: false, error: "Rôle invalide en base de données" });
     });
 
-    it("returns 400 for an uppercase role ('ADMIN') — allowlist is case-sensitive", async () => {
-      // Prevents case-folding bypasses; only lowercase values are allowed
-      mockCreateClient.mockReturnValue(
-        makeSupabaseMock({ data: { role: "ADMIN" }, error: null }) as ReturnType<typeof createClient>,
-      );
+    it("returns 400 for an uppercase role ('ADMIN') — allowlist check is case-sensitive", async () => {
+      // ALLOWED_ROLES.includes() is strict: "ADMIN" !== "admin"
+      // Prevents case-folding bypass from bad DB imports or migrations
+      setupSupabase({ data: { role: "ADMIN" }, error: null });
 
       const res = await POST();
 
       expect(res.status).toBe(400);
     });
 
-    it("returns 400 for a role with whitespace padding ('  user  ')", async () => {
-      mockCreateClient.mockReturnValue(
-        makeSupabaseMock({ data: { role: "  user  " }, error: null }) as ReturnType<typeof createClient>,
-      );
+    it("returns 400 for a whitespace-padded role ('  user  ')", async () => {
+      // No implicit trim — only exact allowlist values are accepted
+      setupSupabase({ data: { role: "  user  " }, error: null });
 
       const res = await POST();
 
       expect(res.status).toBe(400);
     });
 
-    it("does not call Clerk updateUser when the role is invalid", async () => {
-      // Invalid role must be blocked before any write to Clerk
-      mockCreateClient.mockReturnValue(
-        makeSupabaseMock({ data: { role: "hacker" }, error: null }) as ReturnType<typeof createClient>,
-      );
+    it("does NOT call clerkClient when the role is invalid", async () => {
+      // An invalid role must be fully blocked before any write to Clerk
+      setupSupabase({ data: { role: "hacker" }, error: null });
 
       await POST();
 
-      expect(mockUpdateUser).not.toHaveBeenCalled();
+      expect(mockClerkClient).not.toHaveBeenCalled();
     });
   });
 
   // ══════════════════════════════════════════════════════════════════════════
   // Gate 5 — Clerk write
   // ══════════════════════════════════════════════════════════════════════════
-  describe("clerk — updateUser behavior (Gate 5)", () => {
+  describe("Gate 5 — Clerk write", () => {
 
-    it("returns 500 when clerkClient() factory itself throws", async () => {
+    it("returns 500 when clerkClient() factory throws (SDK unavailable)", async () => {
+      // The factory itself can fail before updateUser is even reached
       mockClerkClient.mockRejectedValue(new Error("Clerk SDK unavailable"));
 
       const res = await POST();
       const body = await res.json();
 
       expect(res.status).toBe(500);
-      expect(body.success).toBe(false);
-      expect(body.error).toBe("Impossible de synchroniser le rôle Clerk");
+      expect(body).toEqual({ success: false, error: "Impossible de synchroniser le rôle Clerk" });
     });
 
     it("returns 500 when updateUser() throws (e.g. Clerk API rate limit)", async () => {
+      // updateUser fails after the client is obtained — distinct failure point
       mockUpdateUser.mockRejectedValue(new Error("429 Too Many Requests"));
-      mockClerkClient.mockResolvedValue({
-        users: { updateUser: mockUpdateUser },
-      } as unknown as Awaited<ReturnType<typeof clerkClient>>);
 
       const res = await POST();
       const body = await res.json();
 
       expect(res.status).toBe(500);
-      expect(body.error).toBe("Impossible de synchroniser le rôle Clerk");
+      expect(body).toEqual({ success: false, error: "Impossible de synchroniser le rôle Clerk" });
     });
 
-    it("calls updateUser with the session userId, not any value from the request", async () => {
-      // Core security invariant: the target of the Clerk update is the authenticated user
+    it("calls updateUser with the session userId, not any client-supplied value", async () => {
+      // The target of the Clerk update must be the authenticated user only
       await POST();
 
-      expect(mockUpdateUser).toHaveBeenCalledWith(
-        USER_ID,
-        expect.any(Object),
-      );
+      expect(mockUpdateUser).toHaveBeenCalledWith(USER_ID, expect.any(Object));
     });
 
-    it("sets publicMetadata to exactly { role } — no other metadata fields are touched", async () => {
-      // Prevents accidental overwrite of other metadata (e.g. isAdmin flags, Stripe IDs)
-      mockCreateClient.mockReturnValue(
-        makeSupabaseMock({ data: { role: "farmer" }, error: null }) as ReturnType<typeof createClient>,
-      );
+    it("sets publicMetadata to exactly { role } — no other fields added or overwritten", async () => {
+      // Prevents accidental overwrite of other metadata (Stripe IDs, feature flags, etc.)
+      setupSupabase({ data: { role: "farmer" }, error: null });
 
       await POST();
 
@@ -368,41 +365,38 @@ describe("POST /api/sync-my-role", () => {
       });
     });
 
-    it("propagates the exact role string from DB to Clerk (no transformation)", async () => {
-      for (const role of ["user", "farmer", "admin"] as const) {
-        vi.clearAllMocks();
-        mockUpdateUser = vi.fn().mockResolvedValue({});
-        mockClerkClient.mockResolvedValue({
-          users: { updateUser: mockUpdateUser },
-        } as unknown as Awaited<ReturnType<typeof clerkClient>>);
-        mockCreateClient.mockReturnValue(
-          makeSupabaseMock({ data: { role }, error: null }) as ReturnType<typeof createClient>,
-        );
-
-        await POST();
-
-        expect(mockUpdateUser).toHaveBeenCalledWith(USER_ID, {
-          publicMetadata: { role },
-        });
-      }
-    });
-
     it("calls updateUser exactly once per request (no duplicate writes)", async () => {
       await POST();
 
       expect(mockUpdateUser).toHaveBeenCalledTimes(1);
     });
+
+    it.each(["user", "farmer", "admin"] as const)(
+      "propagates role '%s' from DB to Clerk without transformation",
+      async (role) => {
+        // Each role uses a fresh updateUser spy to avoid cross-iteration interference
+        const localUpdateUser = vi.fn().mockResolvedValue({});
+        mockClerkClient.mockResolvedValue({
+          users: { updateUser: localUpdateUser },
+        } as unknown as Awaited<ReturnType<typeof clerkClient>>);
+        setupSupabase({ data: { role }, error: null });
+
+        await POST();
+
+        expect(localUpdateUser).toHaveBeenCalledWith(USER_ID, {
+          publicMetadata: { role },
+        });
+      },
+    );
   });
 
   // ══════════════════════════════════════════════════════════════════════════
-  // Happy path — response shape and content
+  // Gate 6 — Happy path
   // ══════════════════════════════════════════════════════════════════════════
-  describe("happy path", () => {
+  describe("Gate 6 — happy path", () => {
 
-    it("returns 200 with { success: true, role } for a 'user' profile", async () => {
-      mockCreateClient.mockReturnValue(
-        makeSupabaseMock({ data: { role: "user" }, error: null }) as ReturnType<typeof createClient>,
-      );
+    it("returns 200 with { success: true, role: 'user' }", async () => {
+      setupSupabase({ data: { role: "user" }, error: null });
 
       const res = await POST();
       const body = await res.json();
@@ -411,10 +405,8 @@ describe("POST /api/sync-my-role", () => {
       expect(body).toEqual({ success: true, role: "user" });
     });
 
-    it("returns 200 with { success: true, role } for a 'farmer' profile", async () => {
-      mockCreateClient.mockReturnValue(
-        makeSupabaseMock({ data: { role: "farmer" }, error: null }) as ReturnType<typeof createClient>,
-      );
+    it("returns 200 with { success: true, role: 'farmer' }", async () => {
+      setupSupabase({ data: { role: "farmer" }, error: null });
 
       const res = await POST();
       const body = await res.json();
@@ -423,10 +415,8 @@ describe("POST /api/sync-my-role", () => {
       expect(body).toEqual({ success: true, role: "farmer" });
     });
 
-    it("returns 200 with { success: true, role } for an 'admin' profile", async () => {
-      mockCreateClient.mockReturnValue(
-        makeSupabaseMock({ data: { role: "admin" }, error: null }) as ReturnType<typeof createClient>,
-      );
+    it("returns 200 with { success: true, role: 'admin' }", async () => {
+      setupSupabase({ data: { role: "admin" }, error: null });
 
       const res = await POST();
       const body = await res.json();
@@ -435,27 +425,21 @@ describe("POST /api/sync-my-role", () => {
       expect(body).toEqual({ success: true, role: "admin" });
     });
 
-    it("response role matches the Supabase value, not any pre-existing Clerk metadata", async () => {
-      // If Clerk metadata is stale, the response still reflects the DB truth
-      mockCreateClient.mockReturnValue(
-        makeSupabaseMock({ data: { role: "admin" }, error: null }) as ReturnType<typeof createClient>,
-      );
+    it("response role reflects the DB value, not any pre-existing Clerk metadata", async () => {
+      // Clerk is the destination, not the source; the DB is always authoritative
+      setupSupabase({ data: { role: "admin" }, error: null });
 
       const res = await POST();
       const body = await res.json();
 
-      // Role in the response = what was read from DB
       expect(body.role).toBe("admin");
     });
 
-    it("is idempotent: calling twice returns the same result without error", async () => {
+    it("is idempotent — two calls each complete with 200 and updateUser is called once per call", async () => {
+      // Documents that a client retry triggers a full re-sync, not a cached result
       mockCreateClient
-        .mockReturnValueOnce(
-          makeSupabaseMock({ data: { role: "farmer" }, error: null }) as ReturnType<typeof createClient>,
-        )
-        .mockReturnValueOnce(
-          makeSupabaseMock({ data: { role: "farmer" }, error: null }) as ReturnType<typeof createClient>,
-        );
+        .mockReturnValueOnce(makeSupabaseMock({ data: { role: "farmer" }, error: null }))
+        .mockReturnValueOnce(makeSupabaseMock({ data: { role: "farmer" }, error: null }));
 
       const res1 = await POST();
       const res2 = await POST();
@@ -463,6 +447,8 @@ describe("POST /api/sync-my-role", () => {
       expect(res1.status).toBe(200);
       expect(res2.status).toBe(200);
       expect((await res2.json()).role).toBe("farmer");
+      // updateUser must have been called once per POST(), not zero or more
+      expect(mockUpdateUser).toHaveBeenCalledTimes(2);
     });
   });
 });
