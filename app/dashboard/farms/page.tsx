@@ -44,6 +44,8 @@ import { toast } from "sonner";
 import { COLORS, TABLES } from "@/lib/config";
 import { cn } from "@/lib/utils";
 import type { Listing } from "@/lib/types";
+import type { Database } from "@/lib/types/database";
+type Product = Database["public"]["Tables"]["products"]["Row"];
 
 // 🔒 SÉCURITÉ
 import { escapeHTML, sanitizeHTML } from "@/lib/utils/sanitize";
@@ -88,6 +90,8 @@ export default function FarmerDashboard(): JSX.Element {
     "pending" | "approved" | "rejected" | null
   >(null);
   const [checkingRequest, setCheckingRequest] = useState<boolean>(true);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [productsLoading, setProductsLoading] = useState<boolean>(false);
   const router = useRouter();
 
   const supabase = useSupabaseWithClerk();
@@ -198,6 +202,21 @@ export default function FarmerDashboard(): JSX.Element {
     fetchListing();
   }, [isLoaded, isSignedIn, email, router, checkingRequest, farmerRequestStatus, user, supabase]);
 
+  useEffect(() => {
+    if (!listing) return;
+    const fetchProducts = async (): Promise<void> => {
+      setProductsLoading(true);
+      const { data } = await supabase
+        .from("products")
+        .select("*")
+        .eq("listing_id", listing.id)
+        .order("created_at", { ascending: false });
+      setProducts(data || []);
+      setProductsLoading(false);
+    };
+    fetchProducts();
+  }, [listing, supabase]);
+
   /**
    * Supprime la fiche ferme après confirmation
    * ✅ Sécurisé : delete par id + createdBy
@@ -229,6 +248,35 @@ export default function FarmerDashboard(): JSX.Element {
       console.error("Erreur lors de la suppression:", err);
       toast.error("Une erreur inattendue s'est produite.");
     }
+  };
+
+  const handleProductToggle = async (productId: number, currentPublished: boolean): Promise<void> => {
+    const { error } = await supabase
+      .from("products")
+      .update({ is_published: !currentPublished, active: !currentPublished })
+      .eq("id", productId);
+    if (error) {
+      toast.error("Erreur lors de la mise à jour du produit");
+      return;
+    }
+    setProducts((prev) =>
+      prev.map((p) =>
+        p.id === productId
+          ? { ...p, is_published: !currentPublished, active: !currentPublished }
+          : p
+      )
+    );
+    toast.success(!currentPublished ? "Produit publié" : "Produit dépublié");
+  };
+
+  const handleProductDelete = async (productId: number): Promise<void> => {
+    const { error } = await supabase.from("products").delete().eq("id", productId);
+    if (error) {
+      toast.error("Erreur lors de la suppression du produit");
+      return;
+    }
+    setProducts((prev) => prev.filter((p) => p.id !== productId));
+    toast.success("Produit supprimé");
   };
 
   // ✅ État de chargement global
@@ -916,6 +964,134 @@ export default function FarmerDashboard(): JSX.Element {
             </AlertDialog>
           </div>
         </div>
+      </div>
+
+      {/* Mes produits */}
+      <div
+        className="mt-6 rounded-lg shadow-md border overflow-hidden"
+        style={{ backgroundColor: COLORS.BG_WHITE, borderColor: COLORS.BORDER }}
+      >
+        <div
+          className="px-6 py-4 border-b flex items-center justify-between"
+          style={{
+            background: `linear-gradient(to right, ${COLORS.PRIMARY_BG}, ${COLORS.BG_GRAY})`,
+            borderBottomColor: COLORS.BORDER,
+          }}
+        >
+          <div>
+            <h2 className="text-xl font-semibold" style={{ color: COLORS.PRIMARY_DARK }}>
+              Mes produits{products.length > 0 && ` (${products.length})`}
+            </h2>
+            <p className="text-sm mt-1" style={{ color: COLORS.TEXT_SECONDARY }}>
+              Gérez votre catalogue produits
+            </p>
+          </div>
+          <Button asChild style={{ backgroundColor: COLORS.PRIMARY, color: COLORS.BG_WHITE }}>
+            <Link href={`/add-product/${listing.id}`}>
+              <Plus className="h-4 w-4 mr-2" />
+              Ajouter un produit
+            </Link>
+          </Button>
+        </div>
+
+        {productsLoading ? (
+          <div className="p-6 text-center">
+            <Loader2 className="w-6 h-6 animate-spin mx-auto" style={{ color: COLORS.PRIMARY }} />
+          </div>
+        ) : products.length === 0 ? (
+          <div className="p-8 text-center">
+            <p className="mb-4" style={{ color: COLORS.TEXT_MUTED }}>
+              Vous n&apos;avez pas encore de produits.
+            </p>
+            <Button asChild style={{ backgroundColor: COLORS.PRIMARY, color: COLORS.BG_WHITE }}>
+              <Link href={`/add-product/${listing.id}`}>
+                <Plus className="h-4 w-4 mr-2" />
+                Ajouter mon premier produit
+              </Link>
+            </Button>
+          </div>
+        ) : (
+          <ul className="divide-y" style={{ borderColor: COLORS.BORDER }}>
+            {products.map((product) => (
+              <li key={product.id} className="px-6 py-4 flex items-center gap-4">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium truncate" style={{ color: COLORS.TEXT_PRIMARY }}>
+                    {product.name}
+                  </p>
+                  <p className="text-sm mt-0.5" style={{ color: COLORS.TEXT_SECONDARY }}>
+                    {product.price != null
+                      ? `${product.price} € / ${product.unit ?? "unité"}`
+                      : "Prix non défini"}
+                    {" · "}
+                    <span
+                      style={{
+                        color:
+                          product.stock_status === "in_stock"
+                            ? COLORS.SUCCESS
+                            : product.stock_status === "low_stock"
+                            ? COLORS.WARNING
+                            : COLORS.ERROR,
+                      }}
+                    >
+                      {product.stock_status === "in_stock"
+                        ? "En stock"
+                        : product.stock_status === "low_stock"
+                        ? "Stock faible"
+                        : "Épuisé"}
+                    </span>
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span
+                    className={cn(
+                      "px-2 py-1 rounded-full text-xs font-medium",
+                      product.is_published ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
+                    )}
+                  >
+                    {product.is_published ? "Publié" : "Brouillon"}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleProductToggle(product.id, product.is_published)}
+                  >
+                    {product.is_published ? "Dépublier" : "Publier"}
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        style={{ borderColor: COLORS.ERROR, color: COLORS.ERROR }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle style={{ color: COLORS.ERROR }}>
+                          Supprimer ce produit ?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Cette action est définitive. Le produit &quot;{product.name}&quot; sera supprimé.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Annuler</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => handleProductDelete(product.id)}
+                          style={{ backgroundColor: COLORS.ERROR, color: COLORS.BG_WHITE }}
+                        >
+                          Confirmer la suppression
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );

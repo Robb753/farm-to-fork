@@ -45,6 +45,7 @@ const isPublicRoute = createRouteMatcher([
   "/explore(.*)", // Exploration des producteurs (lecture seule)
   "/farm/:farmId", // Fiche ferme publique (sans les sous-routes checkout, cart, orders, claim)
   "/discover(.*)", // Pages de découverte (statiques/marketing, pas de données sensibles)
+  "/about(.*)", // Pages institutionnelles (mission, comment ça marche, durabilité)
   "/legal(.*)", // Pages légales
   "/sign-in(.*)", // Pages de connexion
   "/sign-up(.*)", // Pages d'inscription

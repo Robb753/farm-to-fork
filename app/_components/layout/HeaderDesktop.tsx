@@ -13,6 +13,7 @@ import {
   MapPin,
   Bell,
   Settings,
+  Package,
 } from "lucide-react";
 import { useUser, useClerk } from "@clerk/nextjs";
 import { AvatarImage } from "@/components/ui/OptimizedImage";
@@ -227,6 +228,12 @@ const UserMenu: React.FC<UserMenuProps> = ({ userInfo, role, onSignOut }) => {
           },
         ]
       : []),
+    {
+      href: "/orders",
+      icon: Package,
+      label: "Mes commandes",
+      color: COLORS.TEXT_SECONDARY,
+    },
     {
       href: "/user#favorites",
       icon: Heart,
