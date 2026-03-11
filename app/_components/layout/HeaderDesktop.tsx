@@ -131,7 +131,7 @@ const MainNavigation: React.FC = () => (
     </Link>
 
     <Link
-      href="/discover/producteurs"
+      href="/explore"
       className="text-sm font-medium transition-colors hover:text-green-600"
       style={{ color: COLORS.TEXT_SECONDARY }}
     >
@@ -139,7 +139,7 @@ const MainNavigation: React.FC = () => (
     </Link>
 
     <Link
-      href="/discover/produits"
+      href="/explore"
       className="text-sm font-medium transition-colors hover:text-green-600"
       style={{ color: COLORS.TEXT_SECONDARY }}
     >

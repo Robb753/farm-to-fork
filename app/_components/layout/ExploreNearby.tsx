@@ -116,7 +116,7 @@ function ExploreNearby(): JSX.Element {
         "Découvrez les marchés et les événements saisonniers près de chez vous.",
       badge: "À la une",
       badgeColorClass: "text-teal-600",
-      href: "/discover/marches",
+      href: "/explore",
       icon: (
         <svg
           className="h-6 w-6"
@@ -140,7 +140,7 @@ function ExploreNearby(): JSX.Element {
         "Les meilleurs produits de votre région, directement du producteur.",
       badge: "Populaire",
       badgeColorClass: "text-rose-600",
-      href: "/discover/produits",
+      href: "/explore",
       icon: (
         <svg
           className="h-6 w-6"
@@ -164,7 +164,7 @@ function ExploreNearby(): JSX.Element {
         "Rencontrez les agriculteurs passionnés près de chez vous.",
       badge: "Nouveau",
       badgeColorClass: "text-amber-600",
-      href: "/discover/producteurs",
+      href: "/explore",
       icon: (
         <svg
           className="h-6 w-6"
