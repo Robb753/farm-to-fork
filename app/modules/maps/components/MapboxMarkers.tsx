@@ -8,6 +8,8 @@ import { useVisibleListings, useUnifiedStore } from "@/lib/store";
 import type { Listing } from "@/lib/store";
 import { logger } from "@/lib/logger";
 
+type ListingId = NonNullable<Listing["id"]>;
+
 /**
  * Interface pour les données de marqueur
  */
@@ -39,14 +41,10 @@ export default function MapboxMarkers(): null {
   const visibleListings = useVisibleListings();
   const applyFiltersAndBounds = useUnifiedStore((s) => s.applyFiltersAndBounds);
 
-  const markersRef = useRef<Map<string | number, MarkerData>>(new Map());
+  const markersRef = useRef<Map<ListingId, MarkerData>>(new Map());
   const activePopupRef = useRef<mapboxgl.Popup | null>(null);
 
-  // Stable ref to the current map instance — used inside createMarker so it
-  // doesn't appear in the useCallback dep array (avoids recreating createMarker
-  // and re-running the markers effect every time the map initialises).
   const mapInstanceRef = useRef<mapboxgl.Map | null>(mapInstance);
-  // Tracks the previous mapInstance to detect a full map swap.
   const prevMapInstanceRef = useRef<mapboxgl.Map | null>(null);
 
   useEffect(() => {
@@ -71,13 +69,15 @@ export default function MapboxMarkers(): null {
         );
       }
     });
+
     markersRef.current.clear();
 
     if (activePopupRef.current) {
       try {
         activePopupRef.current.remove();
         activePopupRef.current = null;
-      } catch {
+      } catch (error) {
+        logger.warn("Erreur lors de la suppression de la popup active", error);
         activePopupRef.current = null;
       }
     }
@@ -89,20 +89,25 @@ export default function MapboxMarkers(): null {
   const isMapReady = useCallback(
     (map: mapboxgl.Map | null): map is mapboxgl.Map => {
       if (!map) return false;
+
       try {
         const container = map.getContainer();
+
         if (!container?.isConnected) {
           logger.debug("Container de carte non connecté au DOM");
           return false;
         }
+
         if (typeof map.isStyleLoaded === "function" && !map.isStyleLoaded()) {
           logger.debug("Style de carte non chargé");
           return false;
         }
-        if ((map as any)._removed) {
+
+        if ((map as { _removed?: boolean })._removed) {
           logger.debug("Carte marquée comme supprimée");
           return false;
         }
+
         return true;
       } catch {
         return false;
@@ -231,8 +236,6 @@ export default function MapboxMarkers(): null {
 
   /**
    * Crée un marqueur personnalisé pour un listing.
-   * Utilise mapInstanceRef (pas mapInstance) pour rester stable entre les
-   * re-renders déclenchés par l'initialisation de la carte.
    */
   const createMarker = useCallback(
     (
@@ -241,7 +244,7 @@ export default function MapboxMarkers(): null {
     ): {
       marker: mapboxgl.Marker;
       element: HTMLDivElement;
-      handlers: any;
+      handlers: MarkerData["handlers"];
     } | null => {
       try {
         const isUnclaimed = !listing.active && !listing.clerk_user_id;
@@ -287,9 +290,12 @@ export default function MapboxMarkers(): null {
 
         const handleClick = () => {
           window.dispatchEvent(
-            new CustomEvent("listingSelected", {
-              detail: { id: listing.id, fromMap: true },
-            }),
+            new CustomEvent<{ id: ListingId; fromMap: boolean }>(
+              "listingSelected",
+              {
+                detail: { id: listing.id as ListingId, fromMap: true },
+              },
+            ),
           );
 
           if (activePopupRef.current) {
@@ -297,8 +303,6 @@ export default function MapboxMarkers(): null {
             activePopupRef.current = null;
           }
 
-          // Read from ref — not from the captured closure — so we always use
-          // the current map instance without mapInstance in the dep array.
           const map = mapInstanceRef.current;
           if (!map) return;
 
@@ -347,18 +351,11 @@ export default function MapboxMarkers(): null {
         return null;
       }
     },
-    // mapInstance intentionally omitted — accessed via mapInstanceRef.current
     [buildPopupNode],
   );
 
   /**
-   * Mise à jour incrémentale des marqueurs (diff par ID).
-   *
-   * - Si mapInstance a changé (nouveau map) → wipe complet puis recréation.
-   * - Sinon → supprime les marqueurs dont l'ID a disparu de visibleListings,
-   *   ajoute ceux qui sont nouveaux, ignore les existants.
-   *
-   * Évite les centaines de mutations DOM à chaque déplacement de carte.
+   * Mise à jour incrémentale des marqueurs
    */
   useEffect(() => {
     if (!isMapReady(mapInstance)) {
@@ -368,35 +365,41 @@ export default function MapboxMarkers(): null {
 
     if (!Array.isArray(visibleListings)) return;
 
-    // Full wipe when the map instance is replaced (e.g. map reinit).
-    // Old markers belong to the previous map and cannot be reused.
     if (prevMapInstanceRef.current !== mapInstance) {
       cleanupMarkers();
       prevMapInstanceRef.current = mapInstance;
     }
 
-    const incomingIds = new Set(
-      visibleListings.map((l) => l?.id).filter(Boolean),
+    const incomingIds = new Set<ListingId>(
+      visibleListings
+        .map((listing) => listing?.id)
+        .filter((id): id is ListingId => id != null),
     );
 
-    // — Remove stale markers (no longer in visibleListings) —
     for (const [id, markerData] of markersRef.current) {
       if (!incomingIds.has(id)) {
         const { marker, element, handlers } = markerData;
+
         element.removeEventListener("mouseenter", handlers.mouseenter);
         element.removeEventListener("mouseleave", handlers.mouseleave);
         element.removeEventListener("click", handlers.click);
+
         try {
           marker.remove();
-        } catch {}
+        } catch (error) {
+          logger.warn(`Erreur suppression marker ${String(id)}`, error);
+        }
+
         markersRef.current.delete(id);
       }
     }
 
-    // — Add new markers (not yet in markersRef) —
     for (const listing of visibleListings) {
       const id = listing?.id;
-      if (!id || markersRef.current.has(id)) continue;
+
+      if (id === null || id === undefined || markersRef.current.has(id)) {
+        continue;
+      }
 
       const coordinates = validateCoordinates(listing);
       if (!coordinates) {
@@ -419,7 +422,12 @@ export default function MapboxMarkers(): null {
         console.error(`Erreur ajout marker ${String(id)}:`, error);
         try {
           markerData.marker.remove();
-        } catch {}
+        } catch (removeError) {
+          logger.warn(
+            `Erreur rollback suppression marker ${String(id)}`,
+            removeError,
+          );
+        }
       }
     }
 
@@ -436,21 +444,15 @@ export default function MapboxMarkers(): null {
   ]);
 
   /**
-   * Après un rechargement de style Mapbox, wipe les marqueurs et force un
-   * recalcul de visibleListings via applyFiltersAndBounds() pour que l'effet
-   * principal les recrée sur le nouveau style.
+   * Après un rechargement de style Mapbox
    */
   useEffect(() => {
     if (!mapInstance) return;
 
     const handleStyleLoad = (): void => {
-      setTimeout(() => {
+      window.setTimeout(() => {
         cleanupMarkers();
-        // Reset prevMapInstanceRef so the next run of the markers effect
-        // treats this as a fresh map and recreates all markers.
         prevMapInstanceRef.current = null;
-        // Produces a new visibleListings array reference → triggers the
-        // markers effect to re-add all markers on the new style.
         applyFiltersAndBounds();
       }, 100);
     };
@@ -464,7 +466,9 @@ export default function MapboxMarkers(): null {
     return () => {
       try {
         mapInstance.off("styledata", handleStyleLoad);
-      } catch {}
+      } catch (error) {
+        logger.warn("Erreur suppression listener styledata", error);
+      }
     };
   }, [mapInstance, cleanupMarkers, applyFiltersAndBounds]);
 
@@ -473,8 +477,8 @@ export default function MapboxMarkers(): null {
    */
   useEffect(() => {
     const handleListingHovered = (event: Event) => {
-      const e = event as CustomEvent<{ id: number | null }>;
-      const hoveredId = e.detail?.id;
+      const e = event as CustomEvent<{ id: ListingId | null }>;
+      const hoveredId = e.detail?.id ?? null;
 
       markersRef.current.forEach((markerData, id) => {
         const { element } = markerData;
@@ -503,6 +507,7 @@ export default function MapboxMarkers(): null {
     };
 
     window.addEventListener("listingHovered", handleListingHovered);
+
     return () => {
       window.removeEventListener("listingHovered", handleListingHovered);
     };

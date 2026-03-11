@@ -3,7 +3,6 @@ const withBundleAnalyzer = require("@next/bundle-analyzer")({
   enabled: process.env.ANALYZE === "true",
 });
 
-
 /** @type {import('next').NextConfig} */
 const baseConfig = {
   // Images -----------------------------------------------------------------
@@ -20,40 +19,19 @@ const baseConfig = {
       { protocol: "https", hostname: "*.ggpht.com" },
     ],
     formats: ["image/avif", "image/webp"],
-    minimumCacheTTL: 60 * 60 * 24 * 365, // 1 an
+    minimumCacheTTL: 60 * 60 * 24 * 365,
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
   },
 
-  // ✅ NOUVEAU : Rewrites pour gérer les routes Clerk
+  // Rewrites ---------------------------------------------------------------
   async rewrites() {
-    return [
-      /** @type {import('next').NextConfig}  {
-        source: "/sign-in/:path*",
-        destination: "/",
-      },
-      {
-        source: "/sign-up/:path*",
-        destination: "/",
-      },
-      // Gestion des routes d'authentification Clerk
-      {
-        source: "/sso-callback",
-        destination: "/",
-      },
-      {
-        source: "/verify",
-        destination: "/",
-      },*/
-    ];
+    return [];
   },
 
-  // ✅ NOUVEAU : Redirections pour nettoyer les URLs et migration /farm
+  // Redirections -----------------------------------------------------------
   async redirects() {
     return [
-      // ============================================
-      // Redirections view-listing → farm
-      // ============================================
       {
         source: "/view-listing/:id",
         destination: "/farm/:id",
@@ -69,10 +47,6 @@ const baseConfig = {
         destination: "/farm/:id/cart",
         permanent: true,
       },
-
-      // ============================================
-      // Redirections shop → farm
-      // ============================================
       {
         source: "/shop/:farmId",
         destination: "/farm/:farmId",
@@ -88,10 +62,6 @@ const baseConfig = {
         destination: "/farm/:farmId/cart",
         permanent: true,
       },
-
-      // ============================================
-      // Redirections commandes
-      // ============================================
       {
         source: "/shop/commande/:orderId",
         destination: "/order/:orderId/confirmation",
@@ -102,10 +72,6 @@ const baseConfig = {
         destination: "/order/:orderId",
         permanent: true,
       },
-
-      // ============================================
-      // Autres redirections
-      // ============================================
       {
         source: "/producteurs",
         destination: "/discover/producteurs",
@@ -119,10 +85,10 @@ const baseConfig = {
     ];
   },
 
-  // 🔧 CORRIGÉ : Packages externes pour Next.js 15 -----------------------
+  // Next.js 15 -------------------------------------------------------------
   serverExternalPackages: ["@supabase/supabase-js"],
 
-  // Expérimental -----------------------------------------------------------
+  // Experimental -----------------------------------------------------------
   experimental: {
     optimizePackageImports: [
       "@radix-ui/react-dropdown-menu",
@@ -152,10 +118,19 @@ const baseConfig = {
 
   // Headers de sécurité ----------------------------------------------------
   async headers() {
+    const isDev = process.env.NODE_ENV === "development";
+
+    const scriptSrc = [
+      "'self'",
+      "'unsafe-inline'",
+      ...(isDev ? ["'unsafe-eval'"] : []),
+      "https://*.clerk.com",
+      "https://*.clerk.accounts.dev",
+    ].join(" ");
+
     const csp = [
       "default-src 'self'",
-      // Clerk injecte des scripts inline — unsafe-inline inévitable avec leur SDK
-      "script-src 'self' 'unsafe-inline' https://*.clerk.com https://*.clerk.accounts.dev",
+      `script-src ${scriptSrc}`,
       "style-src 'self' 'unsafe-inline' https://api.mapbox.com",
       [
         "connect-src 'self'",
@@ -164,6 +139,7 @@ const baseConfig = {
         "https://api.clerk.com",
         "https://*.clerk.com",
         "https://*.clerk.accounts.dev",
+        "https://clerk-telemetry.com",
         "https://api.mapbox.com",
         "https://events.mapbox.com",
         "https://*.tiles.mapbox.com",
@@ -177,9 +153,7 @@ const baseConfig = {
         "https://*.ggpht.com",
       ].join(" "),
       "font-src 'self' data:",
-      // Mapbox GL et Clerk utilisent des Web Workers
-      "worker-src blob:",
-      // Clerk Turnstile (protection anti-bot)
+      "worker-src 'self' blob:",
       "frame-src https://challenges.cloudflare.com https://*.clerk.accounts.dev",
       "frame-ancestors 'none'",
     ].join("; ");
@@ -226,7 +200,7 @@ const baseConfig = {
 };
 
 // -------------------------------------------------------------------------
-// Export principal (avec phases et bundle-analyzer) ------------------------
+// Export principal --------------------------------------------------------
 // -------------------------------------------------------------------------
 module.exports = (phase) => {
   const isProdBuild = phase === PHASE_PRODUCTION_BUILD;
@@ -234,9 +208,7 @@ module.exports = (phase) => {
   return withBundleAnalyzer({
     ...baseConfig,
 
-    // Webpack --------------------------------------------------------------
     webpack(config, { isServer }) {
-      // Optimisations spécifiques au build client de production
       if (isProdBuild && !isServer) {
         config.optimization = {
           ...config.optimization,
@@ -280,7 +252,6 @@ module.exports = (phase) => {
         };
       }
 
-      // Forcer une seule version de React (exactes uniquement)
       config.resolve.alias = {
         ...config.resolve.alias,
         react$: require.resolve("react"),
@@ -288,7 +259,6 @@ module.exports = (phase) => {
         "react/jsx-runtime$": require.resolve("react/jsx-runtime"),
       };
 
-      // Supprimer les polyfills inutiles côté client
       if (!isServer) {
         config.resolve.fallback = {
           ...config.resolve.fallback,
