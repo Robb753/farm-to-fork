@@ -598,7 +598,7 @@ export default function AddProductPage({ params }: PageProps) {
         );
 
         setTimeout(() => {
-          router.push(`/view-listing/${listingId}`);
+          router.push(`/farm/${listingId}`);
         }, 800);
       } catch (error) {
         console.error("Erreur lors de l'ajout du produit:", error);
