@@ -16,6 +16,7 @@ import {
   MapPin,
   Bell,
   Settings,
+  Package,
 } from "lucide-react";
 import { useUser, useClerk } from "@clerk/nextjs";
 import { AvatarImage } from "@/components/ui/OptimizedImage";
@@ -229,6 +230,12 @@ const UserMenuMobile: React.FC<UserMenuMobileProps> = ({
           },
         ]
       : []),
+    {
+      href: "/orders",
+      icon: Package,
+      label: "Mes commandes",
+      color: COLORS.TEXT_SECONDARY,
+    },
     {
       href: "/user#favorites",
       icon: Heart,
