@@ -9,11 +9,7 @@ import { MAPBOX_CONFIG } from "@/lib/config";
 import type { LatLng } from "@/lib/store";
 import {
   useListingsActions,
-  useAllListings,
   useMapActions,
-  useMapBounds,
-  useFiltersActions,
-  useCurrentFilters,
 } from "@/lib/store";
 
 const ListingMapView = dynamic(
@@ -35,14 +31,9 @@ export default function Explore(): JSX.Element {
     autoFetch: true,
   });
 
-  const { setAllListings, setFilteredListings } = useListingsActions();
-  const all = useAllListings();
+  const { setAllListings } = useListingsActions();
 
-  const bounds = useMapBounds();
   const { setCoordinates, setZoom } = useMapActions();
-
-  const filters = useCurrentFilters();
-  const { filterListings } = useFiltersActions();
 
   const lastUrlViewRef = useRef<{
     lat: number;
@@ -118,14 +109,6 @@ export default function Explore(): JSX.Element {
       setAllListings(normalized);
     }
   }, [listings, isLoading, error, setAllListings]);
-
-  // ✅ Filtrage 100% store-driven (bounds + filtres métier)
-  useEffect(() => {
-    if (!all || all.length === 0) return;
-
-    const filtered = filterListings(all, bounds);
-    setFilteredListings(filtered);
-  }, [all, bounds, filters, filterListings, setFilteredListings]);
 
   return <ListingMapView />;
 }
