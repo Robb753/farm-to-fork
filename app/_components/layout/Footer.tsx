@@ -123,11 +123,11 @@ const SOCIAL_LINKS: SocialLinkProps[] = [
 const FOOTER_SECTIONS = {
   discover: {
     title: "Découvrir",
-    href: "/explore",
+    href: "/discover",
     links: [
-      { href: "/explore", label: "Producteurs" },
-      { href: "/explore", label: "Produits" },
-      { href: "/explore", label: "Marchés" },
+      { href: "/discover/producteurs", label: "Producteurs" },
+      { href: "/discover/produits", label: "Produits" },
+      { href: "/discover/marches", label: "Marchés" },
     ],
   },
   about: {
