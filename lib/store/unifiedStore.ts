@@ -346,10 +346,12 @@ export const useUnifiedStore = create<UnifiedStore>()(
               map: { ...state.map, coordinates: coords },
             })),
 
-          setBounds: (bounds) =>
+          setBounds: (bounds) => {
             set((state) => ({
               map: { ...state.map, bounds },
-            })),
+            }));
+            get().applyFiltersAndBounds();
+          },
 
           setZoom: (zoom) =>
             set((state) => ({
