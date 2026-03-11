@@ -26,7 +26,8 @@ interface MarkerData {
  * Composant MapboxMarkers
  *
  * Gestion complète et sécurisée des marqueurs sur la carte Mapbox :
- * - Création/suppression automatique basée sur visibleListings
+ * - Mise à jour incrémentale (diff par ID) — pas de wipe total à chaque pan
+ * - mapInstanceRef évite que createMarker soit une dépendance instable
  * - Validation robuste des coordonnées
  * - Sécurité XSS (DOM-only, pas de setHTML)
  * - Interactions utilisateur (hover, click)
@@ -36,9 +37,21 @@ interface MarkerData {
 export default function MapboxMarkers(): null {
   const mapInstance = useUnifiedStore((s) => s.map.instance);
   const visibleListings = useVisibleListings();
+  const applyFiltersAndBounds = useUnifiedStore((s) => s.applyFiltersAndBounds);
 
   const markersRef = useRef<Map<string | number, MarkerData>>(new Map());
   const activePopupRef = useRef<mapboxgl.Popup | null>(null);
+
+  // Stable ref to the current map instance — used inside createMarker so it
+  // doesn't appear in the useCallback dep array (avoids recreating createMarker
+  // and re-running the markers effect every time the map initialises).
+  const mapInstanceRef = useRef<mapboxgl.Map | null>(mapInstance);
+  // Tracks the previous mapInstance to detect a full map swap.
+  const prevMapInstanceRef = useRef<mapboxgl.Map | null>(null);
+
+  useEffect(() => {
+    mapInstanceRef.current = mapInstance;
+  }, [mapInstance]);
 
   /**
    * Nettoie tous les marqueurs de la carte
@@ -47,13 +60,9 @@ export default function MapboxMarkers(): null {
     markersRef.current.forEach((markerData, id) => {
       try {
         const { marker, element, handlers } = markerData;
-
-        // Cleanup event listeners
         element.removeEventListener("mouseenter", handlers.mouseenter);
         element.removeEventListener("mouseleave", handlers.mouseleave);
         element.removeEventListener("click", handlers.click);
-
-        // Remove marker
         marker.remove();
       } catch (error) {
         console.warn(
@@ -62,16 +71,14 @@ export default function MapboxMarkers(): null {
         );
       }
     });
-
     markersRef.current.clear();
 
-    // Cleanup active popup
     if (activePopupRef.current) {
       try {
         activePopupRef.current.remove();
         activePopupRef.current = null;
-      } catch (error) {
-        console.warn("Erreur suppression popup active:", error);
+      } catch {
+        activePopupRef.current = null;
       }
     }
   }, []);
@@ -82,35 +89,22 @@ export default function MapboxMarkers(): null {
   const isMapReady = useCallback(
     (map: mapboxgl.Map | null): map is mapboxgl.Map => {
       if (!map) return false;
-
       try {
         const container = map.getContainer();
-        if (!container) {
-          logger.debug("Carte sans container DOM");
-          return false;
-        }
-
-        if (!container.isConnected) {
+        if (!container?.isConnected) {
           logger.debug("Container de carte non connecté au DOM");
           return false;
         }
-
         if (typeof map.isStyleLoaded === "function" && !map.isStyleLoaded()) {
           logger.debug("Style de carte non chargé");
           return false;
         }
-
         if ((map as any)._removed) {
           logger.debug("Carte marquée comme supprimée");
           return false;
         }
-
         return true;
-      } catch (error) {
-        console.warn(
-          "Erreur lors de la vérification de l'état de la carte:",
-          error,
-        );
+      } catch {
         return false;
       }
     },
@@ -128,42 +122,13 @@ export default function MapboxMarkers(): null {
         const lng =
           typeof listing.lng === "number" ? listing.lng : Number(listing.lng);
 
-        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-          logger.debug(
-            `Coordonnées invalides pour listing ${String(listing.id)}: lat=${String(
-              listing.lat,
-            )}, lng=${String(listing.lng)}`,
-          );
-          return null;
-        }
-
-        if (lat < -90 || lat > 90) {
-          console.warn(
-            `Latitude hors limites pour listing ${String(listing.id)}: ${lat}`,
-          );
-          return null;
-        }
-
-        if (lng < -180 || lng > 180) {
-          console.warn(
-            `Longitude hors limites pour listing ${String(listing.id)}: ${lng}`,
-          );
-          return null;
-        }
-
-        if (lat === 0 && lng === 0) {
-          logger.debug(
-            `Coordonnées (0,0) rejetées pour listing ${String(listing.id)}`,
-          );
-          return null;
-        }
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+        if (lat < -90 || lat > 90) return null;
+        if (lng < -180 || lng > 180) return null;
+        if (lat === 0 && lng === 0) return null;
 
         return { lat, lng };
-      } catch (error) {
-        console.error(
-          `Erreur lors de la validation des coordonnées pour listing ${String(listing.id)}:`,
-          error,
-        );
+      } catch {
         return null;
       }
     },
@@ -187,7 +152,6 @@ export default function MapboxMarkers(): null {
       max-width: 280px;
     `;
 
-    // Badge ferme non revendiquée
     if (isUnclaimed) {
       const badge = document.createElement("span");
       badge.style.cssText = `
@@ -204,7 +168,6 @@ export default function MapboxMarkers(): null {
       wrapper.appendChild(badge);
     }
 
-    // Titre (nom de la ferme)
     const title = document.createElement("p");
     title.style.cssText = `
       margin: 0 0 8px 0;
@@ -216,7 +179,6 @@ export default function MapboxMarkers(): null {
     title.textContent = listing.name || `Ferme #${String(listing.id)}`;
     wrapper.appendChild(title);
 
-    // Adresse (optionnelle)
     if (listing.address) {
       const addr = document.createElement("p");
       addr.style.cssText = `
@@ -229,7 +191,6 @@ export default function MapboxMarkers(): null {
       wrapper.appendChild(addr);
     }
 
-    // Distance (optionnelle)
     if (listing.distance !== undefined && listing.distance !== null) {
       const distance = document.createElement("p");
       distance.style.cssText = `
@@ -246,7 +207,6 @@ export default function MapboxMarkers(): null {
       wrapper.appendChild(distance);
     }
 
-    // Lien de revendication pour les fermes non revendiquées
     if (isUnclaimed) {
       const claimLink = document.createElement("a");
       claimLink.href = `/farm/${String(listing.id)}/claim`;
@@ -270,7 +230,9 @@ export default function MapboxMarkers(): null {
   }, []);
 
   /**
-   * Crée un marqueur personnalisé pour un listing
+   * Crée un marqueur personnalisé pour un listing.
+   * Utilise mapInstanceRef (pas mapInstance) pour rester stable entre les
+   * re-renders déclenchés par l'initialisation de la carte.
    */
   const createMarker = useCallback(
     (
@@ -282,12 +244,10 @@ export default function MapboxMarkers(): null {
       handlers: any;
     } | null => {
       try {
-        // Ferme non revendiquée → marqueur ambre distinct
         const isUnclaimed = !listing.active && !listing.clerk_user_id;
         const baseColor = isUnclaimed ? "#d97706" : COLORS.PRIMARY;
         const hoverColor = isUnclaimed ? "#b45309" : COLORS.PRIMARY_DARK;
 
-        // Créer l'élément DOM du marqueur
         const markerElement = document.createElement("div");
         markerElement.className = isUnclaimed
           ? "custom-marker custom-marker--unclaimed"
@@ -298,7 +258,6 @@ export default function MapboxMarkers(): null {
           `Ferme ${listing.name || listing.id}`,
         );
         markerElement.setAttribute("tabindex", "0");
-
         markerElement.style.cssText = `
           width: 28px;
           height: 28px;
@@ -310,10 +269,8 @@ export default function MapboxMarkers(): null {
           box-shadow: 0 2px 6px rgba(0,0,0,0.25);
           opacity: ${isUnclaimed ? "0.85" : "1"};
         `;
-        // Stocker la couleur de base pour pouvoir la restaurer depuis des handlers externes
         markerElement.dataset.baseColor = baseColor;
 
-        // Handlers d'interaction
         const handleMouseEnter = () => {
           markerElement.style.transform = "scale(1.25)";
           markerElement.style.backgroundColor = hoverColor;
@@ -329,21 +286,20 @@ export default function MapboxMarkers(): null {
         };
 
         const handleClick = () => {
-          // Dispatch custom event pour communication inter-composants
           window.dispatchEvent(
             new CustomEvent("listingSelected", {
               detail: { id: listing.id, fromMap: true },
             }),
           );
 
-          // Fermer popup active si existe
           if (activePopupRef.current) {
             activePopupRef.current.remove();
             activePopupRef.current = null;
           }
 
-          // Ouvrir nouvelle popup
-          const map = mapInstance;
+          // Read from ref — not from the captured closure — so we always use
+          // the current map instance without mapInstance in the dep array.
+          const map = mapInstanceRef.current;
           if (!map) return;
 
           const popup = new mapboxgl.Popup({
@@ -356,7 +312,6 @@ export default function MapboxMarkers(): null {
 
           popup.setLngLat([coordinates.lng, coordinates.lat]).addTo(map);
 
-          // Cleanup quand popup fermée
           popup.on("close", () => {
             if (activePopupRef.current === popup) {
               activePopupRef.current = null;
@@ -366,12 +321,10 @@ export default function MapboxMarkers(): null {
           activePopupRef.current = popup;
         };
 
-        // Attacher les événements
         markerElement.addEventListener("mouseenter", handleMouseEnter);
         markerElement.addEventListener("mouseleave", handleMouseLeave);
         markerElement.addEventListener("click", handleClick);
 
-        // Créer le marqueur Mapbox
         const marker = new mapboxgl.Marker({
           element: markerElement,
           anchor: "center",
@@ -394,101 +347,85 @@ export default function MapboxMarkers(): null {
         return null;
       }
     },
-    [mapInstance, buildPopupNode],
+    // mapInstance intentionally omitted — accessed via mapInstanceRef.current
+    [buildPopupNode],
   );
 
   /**
-   * Création/mise à jour des marqueurs
+   * Mise à jour incrémentale des marqueurs (diff par ID).
+   *
+   * - Si mapInstance a changé (nouveau map) → wipe complet puis recréation.
+   * - Sinon → supprime les marqueurs dont l'ID a disparu de visibleListings,
+   *   ajoute ceux qui sont nouveaux, ignore les existants.
+   *
+   * Évite les centaines de mutations DOM à chaque déplacement de carte.
    */
   useEffect(() => {
     if (!isMapReady(mapInstance)) {
-      logger.debug("Carte non prête, skip création marqueurs");
+      cleanupMarkers();
       return;
     }
 
-    if (!Array.isArray(visibleListings)) {
-      logger.debug("Pas de listings visibles ou format invalide");
-      return;
+    if (!Array.isArray(visibleListings)) return;
+
+    // Full wipe when the map instance is replaced (e.g. map reinit).
+    // Old markers belong to the previous map and cannot be reused.
+    if (prevMapInstanceRef.current !== mapInstance) {
+      cleanupMarkers();
+      prevMapInstanceRef.current = mapInstance;
     }
 
-    logger.debug(
-      `🎯 Mise à jour des marqueurs: ${visibleListings.length} listings`,
+    const incomingIds = new Set(
+      visibleListings.map((l) => l?.id).filter(Boolean),
     );
 
-    if (visibleListings.length > 0) {
-      const firstListing = visibleListings[0];
-      logger.debug("📋 Structure du premier listing:", {
-        id: firstListing.id,
-        name: firstListing.name,
-        lat: firstListing.lat,
-        lng: firstListing.lng,
-        type_lat: typeof firstListing.lat,
-        type_lng: typeof firstListing.lng,
-      });
+    // — Remove stale markers (no longer in visibleListings) —
+    for (const [id, markerData] of markersRef.current) {
+      if (!incomingIds.has(id)) {
+        const { marker, element, handlers } = markerData;
+        element.removeEventListener("mouseenter", handlers.mouseenter);
+        element.removeEventListener("mouseleave", handlers.mouseleave);
+        element.removeEventListener("click", handlers.click);
+        try {
+          marker.remove();
+        } catch {}
+        markersRef.current.delete(id);
+      }
     }
 
-    // Cleanup anciens marqueurs
-    cleanupMarkers();
-
-    let successCount = 0;
-    let errorCount = 0;
-
+    // — Add new markers (not yet in markersRef) —
     for (const listing of visibleListings) {
       const id = listing?.id;
-
-      if (!id) {
-        logger.debug("Listing sans ID, ignoré");
-        errorCount++;
-        continue;
-      }
+      if (!id || markersRef.current.has(id)) continue;
 
       const coordinates = validateCoordinates(listing);
       if (!coordinates) {
-        logger.debug(`❌ Coordonnées invalides pour listing ${String(id)}:`, {
-          lat: listing.lat,
-          lng: listing.lng,
-          name: listing.name,
-        });
-        errorCount++;
+        logger.debug(`Coordonnées invalides pour listing ${String(id)}`);
         continue;
       }
 
-      try {
-        const markerData = createMarker(listing, coordinates);
-        if (!markerData) {
-          errorCount++;
-          continue;
-        }
+      const markerData = createMarker(listing, coordinates);
+      if (!markerData) continue;
 
-        if (isMapReady(mapInstance)) {
-          markerData.marker.addTo(mapInstance);
-          markersRef.current.set(id, {
-            marker: markerData.marker,
-            listing,
-            element: markerData.element,
-            handlers: markerData.handlers,
-          });
-          successCount++;
-        } else {
-          console.warn(
-            `Carte non prête lors de l'ajout du marker ${String(id)}`,
-          );
-          markerData.marker.remove();
-          errorCount++;
-        }
+      try {
+        markerData.marker.addTo(mapInstance);
+        markersRef.current.set(id, {
+          marker: markerData.marker,
+          listing,
+          element: markerData.element,
+          handlers: markerData.handlers,
+        });
       } catch (error) {
-        console.error(`❌ Erreur création marker ${String(id)}:`, error);
-        errorCount++;
+        console.error(`Erreur ajout marker ${String(id)}:`, error);
+        try {
+          markerData.marker.remove();
+        } catch {}
       }
     }
 
-    // Bilan de l'update
-    logger.debug("MapboxMarkers: bilan update", {
-      successCount,
-      errorCount,
-      total: visibleListings.length,
-      ratio: `${((successCount / visibleListings.length) * 100).toFixed(1)}%`,
-    });
+    logger.debug(
+      `MapboxMarkers: ${markersRef.current.size} marqueurs actifs / ${visibleListings.length} visibles`,
+    );
   }, [
     mapInstance,
     visibleListings,
@@ -499,33 +436,37 @@ export default function MapboxMarkers(): null {
   ]);
 
   /**
-   * Écouter les événements de la carte pour cleanup si le style reload
+   * Après un rechargement de style Mapbox, wipe les marqueurs et force un
+   * recalcul de visibleListings via applyFiltersAndBounds() pour que l'effet
+   * principal les recrée sur le nouveau style.
    */
   useEffect(() => {
     if (!mapInstance) return;
 
     const handleStyleLoad = (): void => {
-      logger.debug("Style de carte chargé/changé, cleanup markers");
-      // Delay pour laisser le style se stabiliser
-      setTimeout(() => cleanupMarkers(), 100);
+      setTimeout(() => {
+        cleanupMarkers();
+        // Reset prevMapInstanceRef so the next run of the markers effect
+        // treats this as a fresh map and recreates all markers.
+        prevMapInstanceRef.current = null;
+        // Produces a new visibleListings array reference → triggers the
+        // markers effect to re-add all markers on the new style.
+        applyFiltersAndBounds();
+      }, 100);
     };
 
     try {
       mapInstance.on("styledata", handleStyleLoad);
-      mapInstance.on("load", handleStyleLoad);
     } catch (error) {
-      console.error("Erreur lors de l'ajout des listeners de carte:", error);
+      console.error("Erreur ajout listener styledata:", error);
     }
 
     return () => {
       try {
         mapInstance.off("styledata", handleStyleLoad);
-        mapInstance.off("load", handleStyleLoad);
-      } catch (error) {
-        console.warn("Erreur lors de la suppression des listeners:", error);
-      }
+      } catch {}
     };
-  }, [mapInstance, cleanupMarkers]);
+  }, [mapInstance, cleanupMarkers, applyFiltersAndBounds]);
 
   /**
    * Écouter les événements externes (hover from list)
@@ -540,21 +481,18 @@ export default function MapboxMarkers(): null {
         const baseColor = element.dataset.baseColor ?? COLORS.PRIMARY;
 
         if (hoveredId === null) {
-          // Reset all
           element.style.transform = "scale(1)";
           element.style.backgroundColor = baseColor;
           element.style.boxShadow = "0 2px 6px rgba(0,0,0,0.25)";
           element.style.opacity = "1";
           element.style.zIndex = "1";
         } else if (id === hoveredId) {
-          // Highlight hovered
           element.style.transform = "scale(1.25)";
           element.style.backgroundColor = COLORS.PRIMARY_DARK;
           element.style.boxShadow = "0 4px 10px rgba(0,0,0,0.35)";
           element.style.opacity = "1";
           element.style.zIndex = "1000";
         } else {
-          // Dim others
           element.style.transform = "scale(1)";
           element.style.backgroundColor = baseColor;
           element.style.boxShadow = "0 2px 6px rgba(0,0,0,0.25)";
@@ -565,7 +503,6 @@ export default function MapboxMarkers(): null {
     };
 
     window.addEventListener("listingHovered", handleListingHovered);
-
     return () => {
       window.removeEventListener("listingHovered", handleListingHovered);
     };
@@ -576,7 +513,6 @@ export default function MapboxMarkers(): null {
    */
   useEffect(() => {
     return () => {
-      logger.debug("🧹 Nettoyage final des marqueurs");
       cleanupMarkers();
     };
   }, [cleanupMarkers]);
