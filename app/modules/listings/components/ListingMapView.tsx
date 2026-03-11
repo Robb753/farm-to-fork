@@ -4,7 +4,6 @@ import React, {
   useEffect,
   useState,
   useCallback,
-  useRef,
   useMemo,
   useSyncExternalStore,
 } from "react";
@@ -74,7 +73,6 @@ function useIsMobile(): boolean {
  * - Configuration centralisée des couleurs
  */
 const DesktopListingMapView = (): JSX.Element => {
-  const mapInstance = useUnifiedStore((s) => s.map.instance);
   const visibleListings = useVisibleListings();
   const isLoading = useIsListingsLoading();
   const totalCount = useUnifiedStore((s) => s.listings.all.length);
@@ -83,62 +81,6 @@ const DesktopListingMapView = (): JSX.Element => {
 
   // ✅ États locaux
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-  const [isMapMoving, setIsMapMoving] = useState<boolean>(false);
-  const moveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  /**
-   * Debounced setter pour l'état de mouvement de carte
-   */
-  const setMovingDebounced = useCallback((val: boolean): void => {
-    if (moveTimerRef.current) {
-      clearTimeout(moveTimerRef.current);
-      moveTimerRef.current = null;
-    }
-
-    if (val) {
-      setIsMapMoving(true);
-    } else {
-      moveTimerRef.current = setTimeout(() => {
-        setIsMapMoving(false);
-      }, 250);
-    }
-  }, []);
-
-  /**
-   * Écoute des événements de déplacement de carte Mapbox
-   */
-  useEffect(() => {
-    if (!mapInstance) return;
-
-    const handleMapMoveStart = (e: any): void => {
-      if (e?.originalEvent) {
-        setMovingDebounced(true);
-      }
-    };
-
-    const handleMapMoveEnd = (): void => {
-      setMovingDebounced(false);
-    };
-
-    const events = [
-      { name: "movestart", handler: handleMapMoveStart },
-      { name: "moveend", handler: handleMapMoveEnd },
-      { name: "dragstart", handler: handleMapMoveStart },
-      { name: "dragend", handler: handleMapMoveEnd },
-      { name: "zoomstart", handler: handleMapMoveStart },
-      { name: "zoomend", handler: handleMapMoveEnd },
-    ] as const;
-
-    events.forEach(({ name, handler }) => {
-      mapInstance.on(name, handler);
-    });
-
-    return () => {
-      events.forEach(({ name, handler }) => {
-        mapInstance.off(name, handler);
-      });
-    };
-  }, [mapInstance, setMovingDebounced]);
 
   /**
    * Écoute des événements de modale globale
@@ -166,11 +108,10 @@ const DesktopListingMapView = (): JSX.Element => {
   }, [isMapExpanded, setMapExpanded]);
 
   /**
-   * État global busy (chargement + mouvement carte)
+   * État global busy (chargement réseau uniquement — le mouvement de carte
+   * ne doit pas faire clignoter l'overlay)
    */
-  const globalBusy = useMemo(() => {
-    return isLoading || isMapMoving;
-  }, [isLoading, isMapMoving]);
+  const globalBusy = useMemo(() => isLoading, [isLoading]);
 
   /**
    * Compteur de résultats affichés
@@ -191,10 +132,7 @@ const DesktopListingMapView = (): JSX.Element => {
       className="relative flex flex-col"
       style={{ backgroundColor: COLORS.BG_WHITE }}
     >
-      <GlobalLoadingOverlay
-        active={globalBusy}
-        label={isMapMoving ? "Déplacement de la carte..." : "Mise à jour..."}
-      />
+      <GlobalLoadingOverlay active={globalBusy} label="Mise à jour..." />
 
       {/* ✅ Overlay pour modale */}
       {isModalOpen && (
