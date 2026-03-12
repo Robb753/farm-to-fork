@@ -2,7 +2,6 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef } from "react";
-import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAllListingsWithImages } from "@/app/hooks/useAllListingsWithImages";
 import { MAPBOX_CONFIG } from "@/lib/config";
@@ -11,11 +10,7 @@ import {
   useListingsActions,
   useMapActions,
 } from "@/lib/store";
-
-const ListingMapView = dynamic(
-  () => import("../../modules/listings/components/ListingMapView"),
-  { ssr: false, loading: () => null }
-);
+import ListingMapView from "../../modules/listings/components/ListingMapView";
 
 const approx = (a: number, b: number, eps: number = 1e-6): boolean =>
   Math.abs(a - b) <= eps;

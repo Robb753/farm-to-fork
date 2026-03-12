@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import HeaderMobile from "./HeaderMobile";
 import HeaderDesktop from "./HeaderDesktop";
 import HeaderErrorBoundary from "./HeaderErrorBoundary";
 
 interface HeaderProps {
-  showSearchInHeader?: boolean;
   className?: string;
 }
 
@@ -29,11 +29,10 @@ function useIsMobile() {
   return isMobile;
 }
 
-export default function Header({
-  showSearchInHeader = true,
-  className = "",
-}: HeaderProps): JSX.Element {
+export default function Header({ className = "" }: HeaderProps): JSX.Element {
   const isMobile = useIsMobile();
+  const pathname = usePathname();
+  const showSearchInHeader = pathname !== "/";
 
   return (
     <HeaderErrorBoundary className={className}>

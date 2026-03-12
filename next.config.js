@@ -247,6 +247,13 @@ module.exports = (phase) => {
                 priority: 15,
                 reuseExistingChunk: true,
               },
+              mapbox: {
+                test: /[\\/]node_modules[\\/](mapbox-gl)[\\/]/,
+                name: "mapbox",
+                priority: 35,
+                chunks: "all",
+                reuseExistingChunk: true,
+              },
             },
           },
         };
