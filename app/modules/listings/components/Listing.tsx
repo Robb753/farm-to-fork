@@ -16,8 +16,11 @@ import { escapeHTML, sanitizeHTML } from "@/lib/utils/sanitize";
 
 import {
   useVisibleListings,
-  useListingsActions,
-  useMapActions,
+  useSetMapCoordinates,
+  useSetMapZoom,
+  useSetHoveredListingId,
+  useSetOpenInfoWindowId,
+  useClearSelection,
   useMapBounds,
   useUnifiedStore,
 } from "@/lib/store";
@@ -546,12 +549,14 @@ export default function Listing({
   // Store hooks
   const visibleListings = useVisibleListings();
   const _mapBounds = useMapBounds();
-  const { setCoordinates, setZoom } = useMapActions();
+  const setCoordinates = useSetMapCoordinates();
+  const setZoom = useSetMapZoom();
 
   // Interactions
   const hoveredListingId = useUnifiedStore((s) => s.interactions.hoveredListingId);
-  const { setHoveredListingId, setOpenInfoWindowId, clearSelection } =
-    useListingsActions();
+  const setHoveredListingId = useSetHoveredListingId();
+  const setOpenInfoWindowId = useSetOpenInfoWindowId();
+  const clearSelection = useClearSelection();
 
   // Favoris
   const favorites = useUserFavorites();

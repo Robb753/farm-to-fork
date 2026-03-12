@@ -2,7 +2,7 @@
 
 import { useCallback } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { useListingsActions, useMapActions, useUnifiedStore } from "@/lib/store";
+import { useSetMapCoordinates, useSetMapZoom, useFetchListings, useUnifiedStore } from "@/lib/store";
 import { logger } from "@/lib/logger";
 
 /**
@@ -61,8 +61,9 @@ export default function useCitySearchControl({
   const searchParams = useSearchParams();
 
   const mapInstance = useUnifiedStore((s) => s.map.instance);
-  const { setCoordinates, setZoom } = useMapActions();
-  const { fetchListings } = useListingsActions();
+  const setCoordinates = useSetMapCoordinates();
+  const setZoom = useSetMapZoom();
+  const fetchListings = useFetchListings();
 
   /**
    * Anime la carte vers un centre avec un zoom donné

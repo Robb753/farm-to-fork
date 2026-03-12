@@ -18,7 +18,7 @@ import {
   useVisibleListings,
   useIsListingsLoading,
   useIsMapExpanded,
-  useUIActions,
+  useSetMapExpanded,
   useUnifiedStore,
 } from "@/lib/store";
 
@@ -77,7 +77,7 @@ const DesktopListingMapView = (): JSX.Element => {
   const isLoading = useIsListingsLoading();
   const totalCount = useUnifiedStore((s) => s.listings.all.length);
   const isMapExpanded = useIsMapExpanded();
-  const { setMapExpanded } = useUIActions();
+  const setMapExpanded = useSetMapExpanded();
 
   // ✅ États locaux
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);

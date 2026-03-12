@@ -17,18 +17,23 @@ export {
   useHasActiveFilters,
   useIsMapExpanded,
 
-  // Actions (groupées)
-  useMapActions,
-  useListingsActions,
+  // Actions groupées (déconseillé pour les nouveaux usages — préférer les atomiques)
   useFiltersActions,
-  useUIActions,
 
-  // Actions atomiques (stables)
+  // Actions atomiques — map
   useSetMapCoordinates,
   useSetMapBounds,
   useSetMapZoom,
-  // (si tu l’ajoutes dans unifiedStore)
-  // useSetMapApiLoaded,
+
+  // Actions atomiques — listings
+  useSetAllListings,
+  useSetHoveredListingId,
+  useSetOpenInfoWindowId,
+  useClearSelection,
+  useFetchListings,
+
+  // Actions atomiques — ui
+  useSetMapExpanded,
 } from "./unifiedStore";
 
 // ✅ Export des types du store unifié

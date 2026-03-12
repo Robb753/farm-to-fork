@@ -646,11 +646,11 @@ export const useUnifiedStore = create<UnifiedStore>()(
         name: "farm2fork-unified",
         partialize: (state) => ({
           // Persister uniquement certains états
+          // map.coordinates et map.zoom sont volontairement exclus : l'URL
+          // (?lat=&lng=&zoom=) est la source de vérité et écrase le store au
+          // chargement. Les persister déclencherait un JSON.stringify à chaque
+          // moveend (updateStorePosition n'est pas déboncé).
           filters: state.filters,
-          map: {
-            coordinates: state.map.coordinates,
-            zoom: state.map.zoom,
-          },
           ui: {
             isMapExpanded: state.ui.isMapExpanded,
           },
@@ -720,6 +720,27 @@ export const useFiltersActions = () =>
   useUnifiedStore((state) => state.filtersActions);
 
 export const useUIActions = () => useUnifiedStore((state) => state.uiActions);
+
+// Hooks actions atomiques — listings
+export const useSetAllListings = () =>
+  useUnifiedStore((s) => s.listingsActions.setAllListings);
+
+export const useSetHoveredListingId = () =>
+  useUnifiedStore((s) => s.listingsActions.setHoveredListingId);
+
+export const useSetOpenInfoWindowId = () =>
+  useUnifiedStore((s) => s.listingsActions.setOpenInfoWindowId);
+
+export const useClearSelection = () =>
+  useUnifiedStore((s) => s.listingsActions.clearSelection);
+
+// Hooks actions atomiques — ui
+export const useSetMapExpanded = () =>
+  useUnifiedStore((s) => s.uiActions.setMapExpanded);
+
+// Hooks actions atomiques — listings (fetch)
+export const useFetchListings = () =>
+  useUnifiedStore((s) => s.listingsActions.fetchListings);
 
 // ====================================================================
 // EXPORTS
