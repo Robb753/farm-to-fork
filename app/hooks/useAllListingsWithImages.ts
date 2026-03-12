@@ -1,7 +1,7 @@
 // hooks/useAllListingsWithImages.ts
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { toast } from "sonner";
 import { TABLES, LISTING_COLUMNS } from "@/lib/config";
 import type { Listing } from "@/lib/types";
@@ -81,6 +81,7 @@ interface UseAllListingsWithImagesResult {
 interface UseAllListingsWithImagesOptions {
   limit?: number;
   autoFetch?: boolean;
+  onSuccess?: (listings: Listing[]) => void;
 }
 
 /**
@@ -91,7 +92,12 @@ interface UseAllListingsWithImagesOptions {
 export function useAllListingsWithImages(
   options: UseAllListingsWithImagesOptions = {}
 ): UseAllListingsWithImagesResult {
-  const { limit = 200, autoFetch = true } = options;
+  const { limit = 200, autoFetch = true, onSuccess } = options;
+
+  // Keep a fresh ref so the callback never goes stale inside fetchAllListings
+  // without adding it to useCallback deps (which would re-create the fetch fn).
+  const onSuccessRef = useRef(onSuccess);
+  onSuccessRef.current = onSuccess;
 
   const supabase = useSupabaseWithClerk();
 
@@ -120,6 +126,7 @@ export function useAllListingsWithImages(
 
       const transformed = (data || []).map(parseListingCoords);
       setListings(transformed);
+      onSuccessRef.current?.(transformed);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erreur inconnue";
       console.error("Erreur lors de la récupération des listings:", err);

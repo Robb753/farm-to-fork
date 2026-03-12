@@ -1,8 +1,5 @@
 // app/ClientLayout.tsx
-"use client";
-
 import React from "react";
-import { usePathname } from "next/navigation";
 import ClientProviders from "./ClientProviders";
 import Header from "./_components/layout/Header";
 import Footer from "./_components/layout/Footer";
@@ -35,18 +32,15 @@ interface ClientLayoutProps {
  * @param props - Configuration du layout
  * @returns Layout client complet
  */
-export default function ClientLayout({ 
-  children, 
-  className = "" 
+export default function ClientLayout({
+  children,
+  className = ""
 }: ClientLayoutProps): JSX.Element {
-  const pathname = usePathname();
-  const isHome = pathname === "/";
-
   return (
     <ClientProviders>
       <div className={`min-h-screen flex flex-col ${className}`}>
-        {/* Header avec logique conditionnelle pour la recherche */}
-        <Header showSearchInHeader={!isHome} />
+        {/* Header — showSearchInHeader computed internally via usePathname */}
+        <Header />
         
         {/* Contenu principal */}
         <main className="flex-1">
