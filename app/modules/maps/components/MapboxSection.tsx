@@ -98,6 +98,7 @@ export default function MapboxSection({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const userInteractingRef = useRef<boolean>(false);
+  const boundsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ✅ Store-driven flags (plus de useState local)
   const isApiLoaded = useUnifiedStore((s) => s.map.isApiLoaded);
@@ -305,7 +306,8 @@ export default function MapboxSection({
 
       const handleMoveEnd = () => {
         try {
-          updateStoreBounds(map);
+          if (boundsTimerRef.current) clearTimeout(boundsTimerRef.current);
+          boundsTimerRef.current = setTimeout(() => updateStoreBounds(map), 150);
           updateStorePosition(map);
           setTimeout(() => {
             userInteractingRef.current = false;
@@ -323,21 +325,22 @@ export default function MapboxSection({
       map.on("style.load", handleStyleLoad);
       map.on("load", handleMapLoad);
       map.on("movestart", handleMoveStart);
-      map.on("zoomstart", handleMoveStart);
       map.on("moveend", handleMoveEnd);
-      map.on("zoomend", handleMoveEnd);
       map.on("error", handleMapError);
 
       return () => {
         destroyed = true;
 
+        if (boundsTimerRef.current) {
+          clearTimeout(boundsTimerRef.current);
+          boundsTimerRef.current = null;
+        }
+
         if (mapRef.current) {
           map.off("style.load", handleStyleLoad);
           map.off("load", handleMapLoad);
           map.off("movestart", handleMoveStart);
-          map.off("zoomstart", handleMoveStart);
           map.off("moveend", handleMoveEnd);
-          map.off("zoomend", handleMoveEnd);
           map.off("error", handleMapError);
 
           try {
@@ -352,7 +355,7 @@ export default function MapboxSection({
 
         setApiLoaded(false);
         setInstance(null);
-        setMapLoading(true);
+        setMapLoading(false);
       };
     } catch (error) {
       console.error("Erreur init carte:", error);

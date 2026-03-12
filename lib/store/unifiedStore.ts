@@ -626,6 +626,13 @@ export const useUnifiedStore = create<UnifiedStore>()(
             isListingInBounds(listing, bounds)
           );
 
+          // Guard: skip re-render if the visible set hasn't changed
+          const prev = state.listings.visible;
+          if (prev.length === visible.length) {
+            const prevIds = new Set(prev.map((l) => l.id));
+            if (visible.every((l) => prevIds.has(l.id))) return;
+          }
+
           set((state) => ({
             listings: {
               ...state.listings,
