@@ -50,8 +50,21 @@ export type {
   Listing,
 } from "./unifiedStore";
 
-// ✅ Import local des types utilisés dans ce fichier
+// ✅ Import local des types et de la valeur useUnifiedStore (pour les sélecteurs ci-dessous)
+import { useUnifiedStore as _useUnifiedStore } from "./unifiedStore";
 import type { MapCoordinates, MapBounds, Listing } from "./unifiedStore";
+
+// ==================== SÉLECTEURS INTERACTIONS ====================
+
+// Utilisés par MapboxClusterLayer (hover sync) et FarmSelectedPanel (Stage 4)
+export const useSelectedListingId = () =>
+  _useUnifiedStore((s) => s.interactions.selectedListingId);
+
+export const useHoveredListingId = () =>
+  _useUnifiedStore((s) => s.interactions.hoveredListingId);
+
+export const useInteractionsActions = () =>
+  _useUnifiedStore((s) => s.interactionsActions);
 
 // Alias type LatLng (utilisé dans quelques composants externes)
 export type LatLng = MapCoordinates;
