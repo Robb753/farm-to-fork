@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
 import HeaderMobile from "./HeaderMobile";
 import HeaderDesktop from "./HeaderDesktop";
@@ -12,21 +12,20 @@ interface HeaderProps {
 
 const MOBILE_BREAKPOINT = 768;
 
-function useIsMobile() {
-  const [isMobile, setIsMobile] = useState(false);
+// useSyncExternalStore garantit que la valeur client est lue au premier rendu
+// (pas de useState(false) qui force un re-render post-hydration sur mobile).
+// Cela supprime le Layout Shift causé par le swap HeaderDesktop → HeaderMobile.
+function subscribeToResize(callback: () => void): () => void {
+  window.addEventListener("resize", callback, { passive: true });
+  return () => window.removeEventListener("resize", callback);
+}
 
-  useEffect(() => {
-    const compute = () => window.innerWidth < MOBILE_BREAKPOINT;
-
-    // init + resize listener = OK (synchronisation avec un système externe)
-    const update = () => setIsMobile(compute());
-    update();
-
-    window.addEventListener("resize", update, { passive: true });
-    return () => window.removeEventListener("resize", update);
-  }, []);
-
-  return isMobile;
+function useIsMobile(): boolean {
+  return useSyncExternalStore(
+    subscribeToResize,
+    () => window.innerWidth < MOBILE_BREAKPOINT,
+    () => false, // snapshot serveur : false (rendu SSR = desktop par défaut)
+  );
 }
 
 export default function Header({ className = "" }: HeaderProps): JSX.Element {

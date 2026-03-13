@@ -645,12 +645,12 @@ export const useUnifiedStore = create<UnifiedStore>()(
       {
         name: "farm2fork-unified",
         partialize: (state) => ({
-          // Persister uniquement certains états
+          // map.coordinates et map.zoom sont intentionnellement exclus :
+          // l'URL (/explore?lat=&lng=&zoom=) est la seule source de vérité
+          // pour la position de la carte. Persister ces valeurs créait une
+          // course au montage entre localStorage et les params URL, causant
+          // un saut visuel et interrompant le rendu des marqueurs.
           filters: state.filters,
-          map: {
-            coordinates: state.map.coordinates,
-            zoom: state.map.zoom,
-          },
           ui: {
             isMapExpanded: state.ui.isMapExpanded,
           },
