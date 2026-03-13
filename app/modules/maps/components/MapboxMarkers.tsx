@@ -444,12 +444,22 @@ export default function MapboxMarkers(): null {
   ]);
 
   /**
-   * Après un rechargement de style Mapbox
+   * Après un rechargement de style Mapbox.
+   *
+   * On écoute "style.load" (déclenché UNE SEULE FOIS quand le style complet
+   * est prêt) et non "styledata" qui se déclenche sur chaque tuile de style
+   * chargée (~20× au démarrage) et détruisait tous les marqueurs à répétition.
    */
   useEffect(() => {
     if (!mapInstance) return;
 
     const handleStyleLoad = (): void => {
+      // On recrée les marqueurs seulement si des listings sont déjà chargés.
+      // Si le fetch n'est pas encore terminé, setAllListings → applyFiltersAndBounds
+      // le fera naturellement une fois les données disponibles.
+      const hasListings = useUnifiedStore.getState().listings.all.length > 0;
+      if (!hasListings) return;
+
       window.setTimeout(() => {
         cleanupMarkers();
         prevMapInstanceRef.current = null;
@@ -458,16 +468,16 @@ export default function MapboxMarkers(): null {
     };
 
     try {
-      mapInstance.on("styledata", handleStyleLoad);
+      mapInstance.on("style.load", handleStyleLoad);
     } catch (error) {
-      console.error("Erreur ajout listener styledata:", error);
+      console.error("Erreur ajout listener style.load:", error);
     }
 
     return () => {
       try {
-        mapInstance.off("styledata", handleStyleLoad);
+        mapInstance.off("style.load", handleStyleLoad);
       } catch (error) {
-        logger.warn("Erreur suppression listener styledata", error);
+        logger.warn("Erreur suppression listener style.load", error);
       }
     };
   }, [mapInstance, cleanupMarkers, applyFiltersAndBounds]);

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useCallback } from "react";
 import mapboxgl from "mapbox-gl";
-import "mapbox-gl/dist/mapbox-gl.css";
+// CSS chargé dans globals.css pour éviter le FOUC (import ici = chunk lazy uniquement)
 
 import {
   useMapCoordinates,

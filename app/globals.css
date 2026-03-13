@@ -1,3 +1,8 @@
+/* ============ Mapbox ============ */
+/* Chargé ici (bundle CSS initial) et non dans MapboxSection (chunk lazy) */
+/* pour éviter le FOUC au premier rendu de la carte. */
+@import "mapbox-gl/dist/mapbox-gl.css";
+
 /* ============ Tailwind ============ */
 @tailwind base;
 @tailwind components;
