@@ -13,7 +13,8 @@ import {
 } from "@/lib/store";
 
 import type { LatLng } from "@/lib/store/shared/types";
-import MapboxMarkers from "./MapboxMarkers";
+import MapboxClusterLayer from "./MapboxClusterLayer";
+// Stage 4 → décommenter : import FarmSelectedPanel from "./FarmSelectedPanel";
 import { COLORS } from "@/lib/config";
 import {
   useSetMapApiLoaded,
@@ -459,7 +460,8 @@ export default function MapboxSection({
         style={{ contain: "layout paint size" }}
       />
 
-      <MapboxMarkers />
+      <MapboxClusterLayer />
+      {/* Stage 4 → décommenter : <FarmSelectedPanel /> */}
 
       {isApiLoading && (
         <div
