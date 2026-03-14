@@ -18,6 +18,11 @@
 
 import { create } from "zustand";
 import { persist, subscribeWithSelector } from "zustand/middleware";
+import type { Listing } from "./shared/types";
+
+// Listing est défini canoniquement dans shared/types et ré-exporté ici
+// pour ne pas casser les imports existants via "@/lib/store".
+export type { Listing };
 
 // ====================================================================
 // TYPES
@@ -52,21 +57,6 @@ export interface MapBounds {
 export interface MapCoordinates {
   lat: number;
   lng: number;
-}
-
-/**
- * Listing simplifié (adaptez selon votre modèle)
- */
-export interface Listing {
-  id: number;
-  name: string;
-  address: string;
-  lat: number;
-  lng: number;
-  product_type?: string[];
-  certifications?: string[];
-  // ... autres champs selon votre modèle
-  [key: string]: any;
 }
 
 /**
@@ -264,7 +254,9 @@ function doesListingMatchFilters(
   for (const [key, values] of Object.entries(filters)) {
     if (values.length === 0) continue;
 
-    const listingValue = listing[key];
+    // Accès dynamique par clé de filtre : le cast est intentionnel car
+    // FilterState itère sur des champs connus de Listing (product_type, etc.)
+    const listingValue = (listing as unknown as Record<string, unknown>)[key];
 
     // Si le listing a un tableau de valeurs
     if (Array.isArray(listingValue)) {

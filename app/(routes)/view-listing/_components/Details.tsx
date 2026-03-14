@@ -14,7 +14,6 @@ import {
   Home,
   ExternalLink,
   Heart,
-  Eye,
 } from "@/utils/icons";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -304,11 +303,6 @@ export default function Details({
                   )}
                 </div>
               )}
-
-              <div className="flex items-center gap-1">
-                <Eye className="h-4 w-4" />
-                {Math.floor(Math.random() * 1000) + 100} vues
-              </div>
 
               {shareCount > 0 && (
                 <div className="flex items-center gap-1">

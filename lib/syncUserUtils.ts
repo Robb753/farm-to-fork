@@ -97,12 +97,17 @@ export const syncProfileToSupabase = async (
 };
 
 /**
- * Récupère le profil depuis Supabase avec retry automatique
+ * Récupère le profil depuis Supabase avec retry limité.
+ *
+ * maxAttempts = 2 suffit : si le profil n'existe pas après syncProfileToSupabase,
+ * un seul retry à 200 ms couvre les latences réseau normales.
+ * L'ancien seuil de 5 tentatives (400 * attempt ms) pouvait bloquer jusqu'à 6 s
+ * pour chaque nouvel utilisateur dont le profil n'existait pas encore.
  */
 export const getProfileFromSupabase = async (
   supabase: SupabaseDbClient,
   userId: string,
-  maxAttempts: number = 5
+  maxAttempts: number = 2
 ): Promise<{ role: AllowedRole } | null> => {
   let attempt = 0;
 
@@ -120,9 +125,9 @@ export const getProfileFromSupabase = async (
     // PGRST116 = no rows found
     if (error?.code === "PGRST116" && attempt < maxAttempts) {
       console.warn(
-        `Tentative ${attempt} : profil non trouvé, nouvelle tentative...`
+        `Tentative ${attempt} : profil non trouvé, nouvelle tentative dans 200 ms...`
       );
-      await new Promise((res) => setTimeout(res, 400 * attempt));
+      await new Promise((res) => setTimeout(res, 200));
       continue;
     }
 
