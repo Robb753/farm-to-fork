@@ -10,12 +10,27 @@ import type { Metadata } from "next";
 
 import { supabaseServerPublic } from "@/utils/supabase/server-public";
 
+import dynamic from "next/dynamic";
+
 // Composants enfants (tous "use client" — s'hydratent normalement)
 import HeroSection from "./_components/HeroSection";
-import FarmTabsClient from "./_components/FarmTabsClient";
 import ContactCard from "./_components/ContactCard";
 import OpeningHoursCard from "./_components/OpeningHoursCard";
-import MapCard from "./_components/MapCard";
+
+const FarmTabsClient = dynamic(() => import("./_components/FarmTabsClient"), {
+  ssr: false,
+  loading: () => (
+    <div className="space-y-4">
+      <div className="h-12 bg-gray-200 rounded-xl animate-pulse" />
+      <div className="h-64 bg-gray-200 rounded-lg animate-pulse" />
+    </div>
+  ),
+});
+
+const MapCard = dynamic(() => import("./_components/MapCard"), {
+  ssr: false,
+  loading: () => <SidebarCardSkeleton />,
+});
 
 type ListingWithImages = Database["public"]["Tables"]["listing"]["Row"] & {
   listingImages: Database["public"]["Tables"]["listingImages"]["Row"][];

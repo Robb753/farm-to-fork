@@ -1,6 +1,16 @@
 "use client";
 
-import SingleFarmMapbox from "@/app/modules/maps/components/SingleFarmMapbox";
+import dynamic from "next/dynamic";
+
+const SingleFarmMapbox = dynamic(
+  () => import("@/app/modules/maps/components/SingleFarmMapbox"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="aspect-[4/3] rounded-lg bg-gray-200 animate-pulse" />
+    ),
+  }
+);
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MapPin, Navigation, ExternalLink, Copy } from "@/utils/icons";
