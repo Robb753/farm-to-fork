@@ -92,8 +92,6 @@ const baseConfig = {
   experimental: {
     // Partial Prerendering: stream a static shell immediately while dynamic
     // content (listings, map data) is fetched. Enable per-route with:
-    //   export const experimental_ppr = true;
-    ppr: "incremental",
     optimizePackageImports: [
       "@radix-ui/react-dropdown-menu",
       "@radix-ui/react-alert-dialog",
