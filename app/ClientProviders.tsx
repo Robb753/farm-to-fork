@@ -62,9 +62,13 @@ const AuthSync: React.FC = () => {
   const userRef = useRef(user);
   userRef.current = user;
 
-  // Primitives stables extraites de user pour contrôler quand l'effet se relance.
+  // Mémorise l'userId pour lequel la sync a déjà réussi.
+  // Évite la double sync déclenchée par la mise à jour de user.updatedAt
+  // après que updateClerkRole() modifie les métadonnées Clerk.
+  const syncedForUserIdRef = useRef<string | null>(null);
+
+  // Seul userId contrôle quand l'effet se relance (pas userUpdatedAt).
   const userId = user?.id;
-  const userUpdatedAt = user?.updatedAt?.getTime();
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -77,6 +81,7 @@ const AuthSync: React.FC = () => {
       // CAS DÉCONNECTÉ
       // ======================
       if (!isSignedIn || !currentUser) {
+        syncedForUserIdRef.current = null;
         try {
           await logoutReset?.();
         } finally {
@@ -92,6 +97,9 @@ const AuthSync: React.FC = () => {
       // ======================
       // CAS CONNECTÉ
       // ======================
+      // Ne pas re-synchroniser si cet userId a déjà été traité avec succès.
+      // Les mises à jour de rôle explicites passent par resyncRole(), pas par ici.
+      if (syncedForUserIdRef.current === currentUser.id) return;
       if (syncingRef.current) return;
       syncingRef.current = true;
 
@@ -117,6 +125,7 @@ const AuthSync: React.FC = () => {
         await syncUser(dto);
 
         if (!cancelled) {
+          syncedForUserIdRef.current = currentUser.id;
           setReady(true);
         }
       } catch (error) {
@@ -132,8 +141,8 @@ const AuthSync: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  // userId et userUpdatedAt remplacent `user` (objet instable) comme dépendances.
-  }, [isLoaded, isSignedIn, userId, userUpdatedAt, syncUser, logoutReset, setReady, setRole]);
+  // userId (stable) remplace user (objet instable) et userUpdatedAt (change après updateClerkRole).
+  }, [isLoaded, isSignedIn, userId, syncUser, logoutReset, setReady, setRole]);
 
   return null;
 };

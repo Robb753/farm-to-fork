@@ -1,5 +1,6 @@
 // lib/store/userStore.ts
 import { create } from "zustand";
+import { useShallow } from "zustand/react/shallow";
 import { persist, subscribeWithSelector } from "zustand/middleware";
 import { toast } from "sonner";
 
@@ -442,32 +443,36 @@ export const useUserRole = () => useUserStore((s) => s.role);
 export const useIsFarmer = () => useUserStore((s) => s.role === "farmer");
 export const useIsUser = () => useUserStore((s) => s.role === "user");
 export const useUserSyncState = () =>
-  useUserStore((s) => ({
-    isSyncing: s.isSyncing,
-    isReady: s.isReady,
-    isWaitingForProfile: s.isWaitingForProfile,
-    syncError: s.syncError,
-  }));
+  useUserStore(
+    useShallow((s) => ({
+      isSyncing: s.isSyncing,
+      isReady: s.isReady,
+      isWaitingForProfile: s.isWaitingForProfile,
+      syncError: s.syncError,
+    }))
+  );
 export const useUserFavorites = () =>
   useUserStore((s) => s.profile?.favorites ?? []);
 
 export const useUserActions = () =>
-  useUserStore((s) => ({
-    initSupabase: s.initSupabase,
-    setProfile: s.setProfile,
-    setRole: s.setRole,
-    setReady: s.setReady,
-    setSyncing: s.setSyncing,
-    syncUser: s.syncUser,
-    resyncRole: s.resyncRole,
-    loadFavorites: s.loadFavorites,
-    toggleFavorite: s.toggleFavorite,
-    addFavorite: s.addFavorite,
-    removeFavorite: s.removeFavorite,
-    isFavorite: s.isFavorite,
-    reset: s.reset,
-    logoutReset: s.logoutReset,
-  }));
+  useUserStore(
+    useShallow((s) => ({
+      initSupabase: s.initSupabase,
+      setProfile: s.setProfile,
+      setRole: s.setRole,
+      setReady: s.setReady,
+      setSyncing: s.setSyncing,
+      syncUser: s.syncUser,
+      resyncRole: s.resyncRole,
+      loadFavorites: s.loadFavorites,
+      toggleFavorite: s.toggleFavorite,
+      addFavorite: s.addFavorite,
+      removeFavorite: s.removeFavorite,
+      isFavorite: s.isFavorite,
+      reset: s.reset,
+      logoutReset: s.logoutReset,
+    }))
+  );
 
 export const useIsFavorite = (listingId: number) =>
   useUserStore((s) => s.profile?.favorites.includes(listingId) ?? false);
