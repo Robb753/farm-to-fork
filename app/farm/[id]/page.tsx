@@ -18,7 +18,6 @@ import ContactCard from "./_components/ContactCard";
 import OpeningHoursCard from "./_components/OpeningHoursCard";
 
 const FarmTabsClient = dynamic(() => import("./_components/FarmTabsClient"), {
-  ssr: false,
   loading: () => (
     <div className="space-y-4">
       <div className="h-12 bg-gray-200 rounded-xl animate-pulse" />
@@ -28,7 +27,6 @@ const FarmTabsClient = dynamic(() => import("./_components/FarmTabsClient"), {
 });
 
 const MapCard = dynamic(() => import("./_components/MapCard"), {
-  ssr: false,
   loading: () => <SidebarCardSkeleton />,
 });
 
