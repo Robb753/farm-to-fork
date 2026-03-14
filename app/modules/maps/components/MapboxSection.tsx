@@ -1,8 +1,10 @@
 "use client";
 
+import "mapbox-gl/dist/mapbox-gl.css";
+import "@/lib/config/mapbox-init";
+
 import React, { useEffect, useRef, useCallback } from "react";
 import mapboxgl from "mapbox-gl";
-// CSS chargé dans globals.css pour éviter le FOUC (import ici = chunk lazy uniquement)
 
 import {
   useMapCoordinates,
@@ -221,10 +223,6 @@ export default function MapboxSection({
     setMapLoading(true);
 
     try {
-      // ✅ accessToken au moment de l'init (pas top-level)
-      const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || "";
-      mapboxgl.accessToken = token;
-
       const initialCoords = coordsRef.current;
       const initialZoom = zoomRef.current;
 
@@ -237,11 +235,11 @@ export default function MapboxSection({
           ? initialZoom
           : MAPBOX_CONFIG.zoom;
 
-          if (!token) {
-            console.error("NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN manquant");
-            setMapLoading(false);
-            return;
-          }
+      if (!mapboxgl.accessToken) {
+        console.error("[MapboxSection] mapboxgl.accessToken manquant — vérifiez NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN");
+        setMapLoading(false);
+        return;
+      }
 
       const map = new mapboxgl.Map({
         container: containerEl,

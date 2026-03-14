@@ -90,6 +90,10 @@ const baseConfig = {
 
   // Experimental -----------------------------------------------------------
   experimental: {
+    // Partial Prerendering: stream a static shell immediately while dynamic
+    // content (listings, map data) is fetched. Enable per-route with:
+    //   export const experimental_ppr = true;
+    ppr: "incremental",
     optimizePackageImports: [
       "@radix-ui/react-dropdown-menu",
       "@radix-ui/react-alert-dialog",
@@ -101,7 +105,6 @@ const baseConfig = {
       "@radix-ui/react-toast",
       "lucide-react",
       "recharts",
-      "framer-motion",
     ],
   },
 
@@ -227,12 +230,6 @@ module.exports = (phase) => {
                 test: /[\\/]node_modules[\\/]@radix-ui[\\/]/,
                 name: "radix-ui",
                 priority: 20,
-                reuseExistingChunk: true,
-              },
-              googleMaps: {
-                test: /[\\/]node_modules[\\/](@react-google-maps|@googlemaps)[\\/]/,
-                name: "google-maps",
-                priority: 30,
                 reuseExistingChunk: true,
               },
               clerk: {

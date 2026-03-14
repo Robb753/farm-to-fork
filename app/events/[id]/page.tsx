@@ -1,7 +1,6 @@
-"use client";
-
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import type { Metadata } from "next";
 import eventsData from "@/app/_data/eventsData.json";
 import Breadcrumb from "@/app/_components/Breadcrumb";
 import { COLORS } from "@/lib/config";
@@ -37,14 +36,31 @@ interface EventDetailPageProps {
   };
 }
 
+export async function generateMetadata({
+  params,
+}: EventDetailPageProps): Promise<Metadata> {
+  const events = eventsData as Event[];
+  const event = events.find((e) => e.id === Number(params.id));
+
+  if (!event) return { title: "Événement introuvable | Farm to Fork" };
+
+  return {
+    title: `${event.title} | Farm to Fork`,
+    description:
+      (event.longDescription ?? event.description)?.slice(0, 155) ??
+      `Participez à l'événement "${event.title}" organisé par Farm to Fork.`,
+    openGraph: {
+      title: `${event.title} | Farm to Fork`,
+      description: event.description,
+      type: "article",
+    },
+  };
+}
+
 /**
  * Page de détail d'un événement
- * 
- * Features:
- * - Affichage détaillé d'un événement spécifique
- * - Navigation avec breadcrumb
- * - Informations pratiques complètes
- * - Design responsive et accessible
+ *
+ * Server Component — data from static JSON, no client-side state required.
  */
 export default function EventDetailPage({ params }: EventDetailPageProps): JSX.Element {
   // Cast du type pour TypeScript
