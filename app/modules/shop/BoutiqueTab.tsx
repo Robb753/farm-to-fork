@@ -116,7 +116,7 @@ export default function BoutiqueTab({
     return () => {
       cancelled = true;
     };
-  }, [farmId, farmName, supabase, router]); // ✅ FIX ESLint (supabase) + safe
+  }, [farmId, farmName, supabase]); // router retiré : non utilisé dans l'effet
 
   // Vérif panier (tunnel fermé)
   useEffect(() => {

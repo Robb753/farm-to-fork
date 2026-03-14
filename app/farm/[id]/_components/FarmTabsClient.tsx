@@ -8,10 +8,24 @@ import { Suspense } from "react";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/lib/types/database";
 
-import PresentationTab from "./PresentationTab";
-import BoutiqueTab from "@/app/modules/shop/BoutiqueTab";
-import ServicesTab from "./ServicesTab";
-import ReviewsTab from "./ReviewsTab";
+import dynamic from "next/dynamic";
+
+const PresentationTab = dynamic(() => import("./PresentationTab"), {
+  ssr: false,
+  loading: () => <TabContentSkeleton />,
+});
+const BoutiqueTab = dynamic(() => import("@/app/modules/shop/BoutiqueTab"), {
+  ssr: false,
+  loading: () => <TabContentSkeleton />,
+});
+const ServicesTab = dynamic(() => import("./ServicesTab"), {
+  ssr: false,
+  loading: () => <TabContentSkeleton />,
+});
+const ReviewsTab = dynamic(() => import("./ReviewsTab"), {
+  ssr: false,
+  loading: () => <TabContentSkeleton />,
+});
 
 type ListingWithImages = Database["public"]["Tables"]["listing"]["Row"] & {
   listingImages: Database["public"]["Tables"]["listingImages"]["Row"][];
