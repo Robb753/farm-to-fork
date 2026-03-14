@@ -20,7 +20,7 @@ export default function Explore(): JSX.Element {
   const searchParams = useSearchParams();
   const paramsKey = searchParams.toString();
 
-  const { setAllListings } = useListingsActions();
+  const { setAllListings, setListingsLoading } = useListingsActions();
   const { setCoordinates, setZoom } = useMapActions();
 
   const lastUrlViewRef = useRef<{
@@ -87,11 +87,19 @@ export default function Explore(): JSX.Element {
     [setAllListings]
   );
 
-  useAllListingsWithImages({
+  // isLoading reflète l'état du fetch réseau.
+  // Sans ce sync, le store conserve isLoading=false pendant toute la durée du fetch,
+  // et Listing affiche EmptyState dès le premier rendu si des filtres sont persistés
+  // mais que les données ne sont pas encore arrivées.
+  const { isLoading: isFetchingListings } = useAllListingsWithImages({
     limit: 500,
     autoFetch: true,
     onSuccess: handleListingsLoaded,
   });
+
+  useEffect(() => {
+    setListingsLoading(isFetchingListings);
+  }, [isFetchingListings, setListingsLoading]);
 
   return <ListingMapView />;
 }
