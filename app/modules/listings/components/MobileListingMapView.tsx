@@ -50,10 +50,10 @@ import { escapeHTML } from "@/lib/utils/sanitize";
 interface ListingItem {
   id: string | number;
   name?: string;
-  address?: string | { label?: string; street?: string };
-  city?: string;
-  distance_km?: number;
-  distance?: string;
+  address?: string | { label?: string; street?: string } | null;
+  city?: string | null;
+  distance_km?: number | null;
+  distance?: string | number | null;
   certifications?: string[];
   purchase_mode?: string[];
   delivery_options?: string[];
@@ -67,6 +67,11 @@ interface ListingItem {
   lat?: number | string;
   lng?: number | string;
 }
+
+type AddressLike = {
+  address?: string | { label?: string; street?: string } | null;
+  city?: string | null;
+};
 
 interface CitySearchResult {
   center?: [number, number];
@@ -114,25 +119,32 @@ const formatDistance = (item: ListingItem): string | null => {
   if (typeof item?.distance === "string") {
     return escapeHTML(item.distance);
   }
+  if (typeof item?.distance === "number") {
+    return `${item.distance.toFixed(1)} km`;
+  }
   return null;
 };
 
 /**
  * Extraction de l'adresse selon différents formats
  */
-const pickAddress = (item: ListingItem): string | null => {
+const pickAddress = (item: AddressLike): string | null => {
   if (typeof item?.address === "string") {
     return item.address;
   }
-  if (typeof item?.address === "object" && item.address?.label) {
+
+  if (item?.address && typeof item.address === "object" && item.address.label) {
     return item.address.label;
   }
+
   if (
-    typeof item?.address === "object" &&
-    (item.address?.street || item?.city)
+    item?.address &&
+    typeof item.address === "object" &&
+    (item.address.street || item?.city)
   ) {
     return [item.address.street, item.city].filter(Boolean).join(", ");
   }
+
   return null;
 };
 
