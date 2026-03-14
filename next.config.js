@@ -93,16 +93,12 @@ const baseConfig = {
     // Partial Prerendering: stream a static shell immediately while dynamic
     // content (listings, map data) is fetched. Enable per-route with:
     optimizePackageImports: [
-      "@radix-ui/react-dropdown-menu",
-      "@radix-ui/react-alert-dialog",
-      "@radix-ui/react-checkbox",
-      "@radix-ui/react-label",
-      "@radix-ui/react-radio-group",
-      "@radix-ui/react-select",
-      "@radix-ui/react-slot",
-      "@radix-ui/react-toast",
       "lucide-react",
-      "recharts",
+      "@clerk/nextjs",
+      "sonner",
+      "@supabase/supabase-js",
+      "date-fns",
+      "zod",
     ],
   },
 
