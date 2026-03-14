@@ -1,11 +1,22 @@
-"use client";
-
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Wheat, ShoppingBasket, MapPinned } from "@/utils/icons";
 import React from "react";
 import Breadcrumb from "@/app/_components/Breadcrumb";
 import { COLORS, PATHS } from "@/lib/config";
 import { cn } from "@/lib/utils";
+
+export const metadata: Metadata = {
+  title: "Découvrir les saveurs locales | Farm to Fork",
+  description:
+    "Explorez l'univers des producteurs locaux : fermes, produits fermiers et marchés en circuits courts partout en France.",
+  openGraph: {
+    title: "Découvrir les saveurs locales | Farm to Fork",
+    description:
+      "Producteurs, produits fermiers et marchés locaux — circuits courts, agriculture durable.",
+    type: "website",
+  },
+};
 
 /**
  * Interface pour les cartes de découverte
@@ -334,21 +345,12 @@ export default function DiscoverLandingPage(): JSX.Element {
               className={cn(
                 "px-4 py-2 rounded-full text-sm font-medium",
                 "border transition-colors duration-200",
-                "hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                "hover:shadow-sm hover:border-green-600 hover:text-green-600 hover:bg-green-50",
+                "focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
               )}
               style={{
                 borderColor: COLORS.BORDER,
                 color: COLORS.TEXT_SECONDARY,
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = COLORS.PRIMARY_BG;
-                e.currentTarget.style.borderColor = COLORS.PRIMARY;
-                e.currentTarget.style.color = COLORS.PRIMARY;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "transparent";
-                e.currentTarget.style.borderColor = COLORS.BORDER;
-                e.currentTarget.style.color = COLORS.TEXT_SECONDARY;
               }}
             >
               {link.label}

@@ -31,6 +31,8 @@ const MobileListingMapView = dynamic(() => import("./MobileListingMapView"), {
   loading: () => null,
 });
 
+// Both ListingMapView and MapboxLazy.tsx import MapboxSection dynamically.
+// Webpack deduplicates them into a single chunk at build time.
 const MapboxSection = dynamic(
   () => import("../../maps/components/MapboxSection"),
   { ssr: false, loading: () => null }

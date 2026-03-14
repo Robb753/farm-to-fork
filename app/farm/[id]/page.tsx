@@ -1,5 +1,6 @@
 // app/farm/[id]/page.tsx
 import Link from "next/link";
+import Script from "next/script";
 import { ChevronRight, Loader2, MapPin } from "lucide-react";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
@@ -95,7 +96,34 @@ export default async function FarmPage({
     { href: null, label: listing.name ?? "Ferme" },
   ];
 
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://farm2fork.fr";
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "FoodEstablishment",
+    name: listing.name ?? "Ferme locale",
+    description: listing.description ?? undefined,
+    address: listing.address ?? undefined,
+    ...(listing.lat != null && listing.lng != null
+      ? {
+          geo: {
+            "@type": "GeoCoordinates",
+            latitude: listing.lat,
+            longitude: listing.lng,
+          },
+        }
+      : {}),
+    url: `${siteUrl}/farm/${listing.id}`,
+    image:
+      (listing as any).listingImages?.[0]?.url ?? undefined,
+  };
+
   return (
+    <>
+      <Script
+        id={`farm-jsonld-${listing.id}`}
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-blue-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -184,6 +212,7 @@ export default async function FarmPage({
         </div>
       </div>
     </div>
+    </>
   );
 }
 

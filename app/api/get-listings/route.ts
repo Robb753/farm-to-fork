@@ -16,12 +16,20 @@ interface ListingBasic {
   active: boolean;
 }
 
+interface BboxParams {
+  north: number;
+  south: number;
+  east: number;
+  west: number;
+}
+
 interface GetListingsParams {
   limit: number;
   offset: number;
   sortBy: "created_at" | "id";
   sortOrder: "asc" | "desc";
   includeInactive: boolean;
+  bbox: BboxParams | null;
 }
 
 // ——— Supabase client ———
@@ -92,10 +100,35 @@ function validateListingParams(searchParams: URLSearchParams): {
 
   const includeInactive = includeInactiveStr === "true";
 
+  // Optional viewport bounding box — used for map-driven queries
+  let bbox: BboxParams | null = null;
+  const northStr = searchParams.get("north");
+  const southStr = searchParams.get("south");
+  const eastStr = searchParams.get("east");
+  const westStr = searchParams.get("west");
+
+  if (northStr && southStr && eastStr && westStr) {
+    const north = parseFloat(northStr);
+    const south = parseFloat(southStr);
+    const east = parseFloat(eastStr);
+    const west = parseFloat(westStr);
+
+    if (
+      [north, south, east, west].every(Number.isFinite) &&
+      north > south &&
+      north <= 90 && south >= -90 &&
+      east <= 180 && west >= -180
+    ) {
+      bbox = { north, south, east, west };
+    } else {
+      errors.push("bbox invalide: north > south, lat ∈ [-90,90], lng ∈ [-180,180]");
+    }
+  }
+
   return {
     isValid: errors.length === 0,
     errors,
-    params: { limit, offset, sortBy, sortOrder, includeInactive },
+    params: { limit, offset, sortBy, sortOrder, includeInactive, bbox },
   };
 }
 
@@ -158,6 +191,16 @@ export async function GET(req: NextRequest) {
 
     if (!params.includeInactive) {
       dataQuery = dataQuery.eq("active", true);
+    }
+
+    // Viewport bounding box filter — enables scalable map-driven queries
+    if (params.bbox) {
+      const { north, south, east, west } = params.bbox;
+      dataQuery = dataQuery
+        .gte("lat", south)
+        .lte("lat", north)
+        .gte("lng", west)
+        .lte("lng", east);
     }
 
     const start = params.offset;
