@@ -14,28 +14,6 @@ export const getEmailFromUser = (user: ClerkUserDTO | null): string | null => {
   return user.email ?? null;
 };
 
-/**
- * Synchronise le metadata Clerk de l'utilisateur connecté avec son rôle en DB.
- * Le rôle est relu côté serveur depuis Supabase — rien n'est envoyé par le client.
- */
-export const updateClerkRole = async (): Promise<boolean> => {
-  try {
-    const response = await fetch("/api/sync-my-role", {
-      method: "POST",
-      headers: { "Cache-Control": "no-cache" },
-    });
-
-    if (!response.ok) {
-      console.error(`[SYNC-MY-ROLE] Échec. Statut: ${response.status}`);
-      return false;
-    }
-
-    return true;
-  } catch (error) {
-    console.error("[SYNC-MY-ROLE] Erreur:", error);
-    return false;
-  }
-};
 
 /**
  * Synchronise le profil utilisateur avec Supabase (upsert).
@@ -138,27 +116,10 @@ export const getProfileFromSupabase = async (
   return null;
 };
 
-/**
- * Détermine le rôle utilisateur à partir de Clerk (DTO) et/ou Supabase
- */
-export const determineUserRole = async (
-  supabase: SupabaseDbClient,
-  user: ClerkUserDTO
-): Promise<AllowedRole> => {
+// Clerk est la source de vérité — lecture directe, pas de fallback Supabase
+export const getUserRole = (user: ClerkUserDTO): AllowedRole => {
   if (!user?.id) return "user";
-
-  // 1) métadonnées Clerk
-  const clerkRole = user.publicMetadata?.role;
-  if (clerkRole && ["user", "farmer", "admin"].includes(clerkRole)) {
-    return clerkRole;
-  }
-
-  // 2) fallback Supabase avec retry
-  const profile = await getProfileFromSupabase(supabase, user.id);
-  if (profile?.role && ["user", "farmer", "admin"].includes(profile.role)) {
-    return profile.role;
-  }
-
-  // 3) default safe
+  const role = user.publicMetadata?.role;
+  if (role === "farmer" || role === "admin") return role;
   return "user";
 };

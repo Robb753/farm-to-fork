@@ -7,11 +7,7 @@ import { toast } from "sonner";
 import type { Json, } from "@/lib/types/database";
 import type { SupabaseDbClient } from "@/lib/syncUserUtils";
 
-import {
-  determineUserRole,
-  updateClerkRole,
-  syncProfileToSupabase,
-} from "@/lib/syncUserUtils";
+import { syncProfileToSupabase } from "@/lib/syncUserUtils";
 
 // ==================== TYPES ====================
 
@@ -342,15 +338,12 @@ export const useUserStore = create<UserState>()(
           setSyncError(null);
 
           try {
-            const resolvedRole = await determineUserRole(supabase, user);
-            setRole(resolvedRole);
-
-            // Clerk publicMetadata role doit refléter la vérité DB
-            if (user.publicMetadata?.role !== resolvedRole) {
-              await updateClerkRole();
-            }
-
-            await syncProfileToSupabase(supabase, user, resolvedRole);
+            // Clerk est la source de vérité depuis Phase 2
+            // Le rôle est set par l'admin via /api/admin/producer-requests/[id]
+            const role = (user.publicMetadata?.role as "user" | "farmer" | "admin") ?? "user";
+            setRole(role);
+            // Upsert du profil pour maintenir l'email à jour
+            await syncProfileToSupabase(supabase, user, role);
 
             await get().loadFavorites(user.id);
 
@@ -393,11 +386,9 @@ export const useUserStore = create<UserState>()(
           setSyncError(null);
 
           try {
-            const resolvedRole = await determineUserRole(supabase, user);
-            setRole(resolvedRole);
-
-            await updateClerkRole();
-            await syncProfileToSupabase(supabase, user, resolvedRole);
+            const role = (user.publicMetadata?.role as "user" | "farmer" | "admin") ?? "user";
+            setRole(role);
+            await syncProfileToSupabase(supabase, user, role);
 
             await get().loadFavorites(user.id);
 
