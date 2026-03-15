@@ -3,6 +3,7 @@
 
 import React, { useEffect } from "react";
 import dynamic from "next/dynamic";
+import { Toaster } from "sonner";
 
 interface ClientProvidersProps {
   children: React.ReactNode;
@@ -22,11 +23,6 @@ const AuthSync = dynamic(() => import("./_components/AuthSync"), {
   ssr: false,
   loading: () => null,
 });
-
-const Toaster = dynamic(
-  () => import("sonner").then((m) => ({ default: m.Toaster })),
-  { ssr: false, loading: () => null }
-);
 
 const HashCleaner: React.FC = () => {
   useEffect(() => {
