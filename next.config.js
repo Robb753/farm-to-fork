@@ -96,7 +96,6 @@ const baseConfig = {
       "lucide-react",
       "@clerk/nextjs",
       "sonner",
-      "@supabase/supabase-js",
       "date-fns",
       "zod",
     ],
