@@ -59,7 +59,7 @@ function makeSupabaseMock(profileResult: { data: unknown; error: unknown }) {
     eq: vi.fn().mockReturnThis(),
     maybeSingle: vi.fn().mockResolvedValue(profileResult),
   };
-  return { from: vi.fn().mockReturnValue(capturedQueryBuilder) } as ReturnType<typeof createClient>;
+  return { from: vi.fn().mockReturnValue(capturedQueryBuilder) } as unknown as ReturnType<typeof createClient>;
 }
 
 function setupSupabase(profileResult: { data: unknown; error: unknown }) {
@@ -77,7 +77,7 @@ beforeEach(() => {
   vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "test-service-role-key");
 
   // Default: authenticated user
-  mockAuth.mockResolvedValue({ userId: USER_ID } as Awaited<ReturnType<typeof auth>>);
+  mockAuth.mockResolvedValue({ userId: USER_ID } as unknown as Awaited<ReturnType<typeof auth>>);
 
   // Default: Clerk write succeeds
   mockUpdateUser = vi.fn().mockResolvedValue({});
@@ -105,7 +105,7 @@ describe("POST /api/sync-my-role", () => {
 
     it("returns 401 when auth() resolves with userId = null", async () => {
       // Nominal Clerk case for unauthenticated sessions
-      mockAuth.mockResolvedValue({ userId: null } as Awaited<ReturnType<typeof auth>>);
+      mockAuth.mockResolvedValue({ userId: null } as unknown as Awaited<ReturnType<typeof auth>>);
 
       const res = await POST();
       const body = await res.json();
@@ -116,7 +116,7 @@ describe("POST /api/sync-my-role", () => {
 
     it("returns 401 when auth() resolves with userId = undefined", async () => {
       // Defensive: documents that any falsy userId is rejected, not just null
-      mockAuth.mockResolvedValue({ userId: undefined } as Awaited<ReturnType<typeof auth>>);
+      mockAuth.mockResolvedValue({ userId: undefined } as unknown as Awaited<ReturnType<typeof auth>>);
 
       const res = await POST();
 
@@ -125,7 +125,7 @@ describe("POST /api/sync-my-role", () => {
 
     it("does NOT call createClient when userId is absent", async () => {
       // DB must not be reached before auth is confirmed
-      mockAuth.mockResolvedValue({ userId: null } as Awaited<ReturnType<typeof auth>>);
+      mockAuth.mockResolvedValue({ userId: null } as unknown as Awaited<ReturnType<typeof auth>>);
 
       await POST();
 
@@ -134,7 +134,7 @@ describe("POST /api/sync-my-role", () => {
 
     it("does NOT call clerkClient when userId is absent", async () => {
       // Clerk write must not be reached before auth is confirmed
-      mockAuth.mockResolvedValue({ userId: null } as Awaited<ReturnType<typeof auth>>);
+      mockAuth.mockResolvedValue({ userId: null } as unknown as Awaited<ReturnType<typeof auth>>);
 
       await POST();
 
