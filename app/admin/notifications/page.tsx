@@ -74,6 +74,11 @@ export default function AdminNotificationsPage(): JSX.Element {
   const router = useRouter();
   const supabase = useSupabaseWithClerk();
 
+  // Redirect to the new unified requests page
+  useEffect(() => {
+    router.replace("/admin/requests");
+  }, [router]);
+
   const [loading, setLoading] = useState<boolean>(true);
   const [isChecking, setIsChecking] = useState<boolean>(true);
   const [notifications, setNotifications] = useState<FarmerRequest[]>([]);
@@ -193,10 +198,11 @@ export default function AdminNotificationsPage(): JSX.Element {
         status,
       };
 
-      const response = await fetch("/api/admin/validate-farmer-request", {
-        method: "POST",
+      // Legacy endpoint removed — page redirects to /admin/requests
+      const response = await fetch(`/api/admin/producer-requests/${request.id}`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ status }),
       });
 
       if (!response.ok) {

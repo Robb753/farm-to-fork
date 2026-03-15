@@ -87,6 +87,11 @@ const baseConfig = {
         destination: "/become-producer",
         permanent: true,
       },
+      {
+        source: "/admin/claims",
+        destination: "/admin/requests",
+        permanent: true,
+      },
     ];
   },
 

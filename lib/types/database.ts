@@ -777,6 +777,77 @@ export interface Database {
         ];
       };
 
+      producer_requests: {
+        Row: {
+          id: string; // uuid
+          type: "create" | "claim";
+          user_id: string;
+          user_email: string;
+          user_name: string | null;
+          // "create" type fields
+          farm_name: string | null;
+          first_name: string | null;
+          last_name: string | null;
+          phone: string | null;
+          siret: string | null;
+          location: string | null;
+          lat: number | null;
+          lng: number | null;
+          description: string | null;
+          products: string | null;
+          website: string | null;
+          // "claim" type fields
+          listing_id: number | null; // bigint
+          // shared workflow
+          status: "pending" | "approved" | "rejected";
+          admin_note: string | null;
+          reviewed_by: string | null;
+          reviewed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          type: "create" | "claim";
+          user_id: string;
+          user_email: string;
+          user_name?: string | null;
+          farm_name?: string | null;
+          first_name?: string | null;
+          last_name?: string | null;
+          phone?: string | null;
+          siret?: string | null;
+          location?: string | null;
+          lat?: number | null;
+          lng?: number | null;
+          description?: string | null;
+          products?: string | null;
+          website?: string | null;
+          listing_id?: number | null;
+          status?: "pending" | "approved" | "rejected";
+          admin_note?: string | null;
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          status?: "pending" | "approved" | "rejected";
+          admin_note?: string | null;
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "producer_requests_listing_id_fkey";
+            columns: ["listing_id"];
+            referencedRelation: "listing";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+
       review_reports: {
         Row: {
           id: number;
@@ -863,6 +934,8 @@ export type ReviewReport =
   Database["public"]["Tables"]["review_reports"]["Row"];
 export type ListingClaimRequest =
   Database["public"]["Tables"]["listing_claim_requests"]["Row"];
+export type ProducerRequest =
+  Database["public"]["Tables"]["producer_requests"]["Row"];
 
 // Inserts
 export type ProfileInsert = Database["public"]["Tables"]["profiles"]["Insert"];
@@ -880,6 +953,8 @@ export type ReviewReportInsert =
   Database["public"]["Tables"]["review_reports"]["Insert"];
 export type ListingClaimRequestInsert =
   Database["public"]["Tables"]["listing_claim_requests"]["Insert"];
+export type ProducerRequestInsert =
+  Database["public"]["Tables"]["producer_requests"]["Insert"];
 
 // Updates
 export type ProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"];
@@ -897,6 +972,8 @@ export type ReviewReportUpdate =
   Database["public"]["Tables"]["review_reports"]["Update"];
 export type ListingClaimRequestUpdate =
   Database["public"]["Tables"]["listing_claim_requests"]["Update"];
+export type ProducerRequestUpdate =
+  Database["public"]["Tables"]["producer_requests"]["Update"];
 
 // Enum helpers
 export type UserRole = Database["public"]["Enums"]["user_role"];

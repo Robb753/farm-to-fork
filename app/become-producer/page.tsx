@@ -25,7 +25,6 @@ import {
 
 import AddressAutocompleteMapbox from "@/app/modules/maps/components/shared/AddressAutocompleteMapbox";
 import { COLORS } from "@/lib/config";
-import { useSupabaseWithClerk } from "@/utils/supabase/client";
 
 interface AddressSelectPayload {
   place_name: string;
@@ -57,7 +56,6 @@ type FormValues = z.infer<typeof schema>;
 export default function BecomeProducerPage(): JSX.Element | null {
   const router = useRouter();
   const { user, isLoaded, isSignedIn } = useUser();
-  const supabase = useSupabaseWithClerk();
 
   const [checkingExisting, setCheckingExisting] = useState(true);
   const [selectedAddress, setSelectedAddress] = useState("");
@@ -108,15 +106,13 @@ export default function BecomeProducerPage(): JSX.Element | null {
 
     const checkExisting = async () => {
       try {
-        const { data } = await supabase
-          .from("farmer_requests")
-          .select("id,status")
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        if (data) {
-          router.replace("/become-producer/pending");
-          return;
+        const res = await fetch("/api/onboarding/check-status");
+        if (res.ok) {
+          const { status } = await res.json();
+          if (status !== "none") {
+            router.replace("/become-producer/pending");
+            return;
+          }
         }
       } catch (err) {
         console.error("Erreur vérification requête existante:", err);
@@ -126,7 +122,7 @@ export default function BecomeProducerPage(): JSX.Element | null {
     };
 
     checkExisting();
-  }, [isLoaded, isSignedIn, user, router, supabase]);
+  }, [isLoaded, isSignedIn, user, router]);
 
   const handleAddressChange = (newValue: string) => {
     setSelectedAddress(newValue);
@@ -173,11 +169,11 @@ export default function BecomeProducerPage(): JSX.Element | null {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch("/api/onboarding/submit-request", {
+      const response = await fetch("/api/producer-request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: user.id,
+          type: "create",
           email: user.primaryEmailAddress?.emailAddress ?? "",
           firstName: data.firstName.trim(),
           lastName: data.lastName.trim(),
