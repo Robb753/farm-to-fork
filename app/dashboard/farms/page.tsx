@@ -425,7 +425,7 @@ export default function FarmerDashboard(): JSX.Element {
                     color: COLORS.BG_WHITE,
                   }}
                 >
-                  <Link href="/onboarding/step-1">
+                  <Link href="/become-producer">
                     Créer une demande
                   </Link>
                 </Button>
@@ -568,7 +568,7 @@ export default function FarmerDashboard(): JSX.Element {
                       color: COLORS.BG_WHITE,
                     }}
                   >
-                    <Link href="/onboarding/step-1">
+                    <Link href="/become-producer">
                       Refaire une demande
                     </Link>
                   </Button>
@@ -639,7 +639,7 @@ export default function FarmerDashboard(): JSX.Element {
                 <Button
                   size="lg"
                   className="w-full sm:w-auto bg-green-600 hover:bg-green-700"
-                  onClick={() => router.push("/onboarding/step-2")}
+                  onClick={() => router.push("/dashboard")}
                 >
                   Créer ma ferme →
                 </Button>
