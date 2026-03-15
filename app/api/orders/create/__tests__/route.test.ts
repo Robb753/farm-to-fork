@@ -127,7 +127,7 @@ function setupSupabase({
       if (table === "orders") return makeQueryMock(orderInsert);
       return makeQueryMock({ data: null, error: null });
     },
-  } as ReturnType<typeof createClient>);
+  } as unknown as ReturnType<typeof createClient>);
 }
 
 // ─── Request builder ────────────────────────────────────────────────────────
