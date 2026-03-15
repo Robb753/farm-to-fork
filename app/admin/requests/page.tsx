@@ -10,6 +10,8 @@ import {
   XCircle,
   Clock,
   RefreshCw,
+  Building2,
+  TreePine,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -25,16 +27,25 @@ import { Badge } from "@/components/ui/badge";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type ClaimStatus = "pending" | "approved" | "rejected";
+type RequestStatus = "pending" | "approved" | "rejected";
+type RequestType = "create" | "claim";
+type StatusFilter = RequestStatus | "all";
+type TypeFilter = RequestType | "all";
 
-interface ClaimRequest {
-  id: number;
-  listing_id: number;
+interface ProducerRequest {
+  id: string;
+  type: RequestType;
   user_id: string;
   user_email: string;
   user_name: string | null;
-  message: string | null;
-  status: ClaimStatus;
+  farm_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
+  siret: string | null;
+  location: string | null;
+  listing_id: number | null;
+  status: RequestStatus;
   admin_note: string | null;
   reviewed_by: string | null;
   reviewed_at: string | null;
@@ -49,13 +60,13 @@ interface ClaimRequest {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function statusBadgeVariant(status: ClaimStatus) {
+function statusBadgeVariant(status: RequestStatus) {
   if (status === "pending") return "warning" as const;
   if (status === "approved") return "success" as const;
   return "error" as const;
 }
 
-function statusLabel(status: ClaimStatus) {
+function statusLabel(status: RequestStatus) {
   if (status === "pending") return "En attente";
   if (status === "approved") return "Approuvée";
   return "Rejetée";
@@ -71,17 +82,23 @@ function formatDate(iso: string) {
   });
 }
 
+function farmLabel(req: ProducerRequest): string {
+  if (req.type === "create") return req.farm_name ?? "Ferme sans nom";
+  return req.listing?.name ?? "Ferme OSM sans nom";
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function AdminClaimsPage() {
+export default function AdminRequestsPage() {
   const router = useRouter();
   const { user, isLoaded } = useUser();
 
-  const [claims, setClaims] = useState<ClaimRequest[]>([]);
-  const [filter, setFilter] = useState<"pending" | "approved" | "rejected" | "all">("pending");
+  const [requests, setRequests] = useState<ProducerRequest[]>([]);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("pending");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [loading, setLoading] = useState(true);
-  const [actioningId, setActioningId] = useState<number | null>(null);
-  const [adminNotes, setAdminNotes] = useState<Record<number, string>>({});
+  const [actioningId, setActioningId] = useState<string | null>(null);
+  const [adminNotes, setAdminNotes] = useState<Record<string, string>>({});
 
   // Guard admin
   useEffect(() => {
@@ -97,13 +114,14 @@ export default function AdminClaimsPage() {
     }
   }, [isLoaded, user, router]);
 
-  const fetchClaims = useCallback(async () => {
+  const fetchRequests = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/claims?status=${filter}`);
+      const params = new URLSearchParams({ status: statusFilter, type: typeFilter });
+      const res = await fetch(`/api/admin/producer-requests?${params.toString()}`);
       const json = await res.json();
       if (json.success) {
-        setClaims(json.claims);
+        setRequests(json.requests);
       } else {
         toast.error("Impossible de charger les demandes");
       }
@@ -112,29 +130,32 @@ export default function AdminClaimsPage() {
     } finally {
       setLoading(false);
     }
-  }, [filter]);
+  }, [statusFilter, typeFilter]);
 
   useEffect(() => {
     if (isLoaded && user?.publicMetadata?.role === "admin") {
-      void fetchClaims();
+      void fetchRequests();
     }
-  }, [fetchClaims, isLoaded, user]);
+  }, [fetchRequests, isLoaded, user]);
 
-  const handleAction = async (claimId: number, action: "approve" | "reject") => {
-    setActioningId(claimId);
+  const handleAction = async (
+    requestId: string,
+    status: "approved" | "rejected"
+  ) => {
+    setActioningId(requestId);
     try {
-      const res = await fetch(`/api/admin/claims/${claimId}`, {
+      const res = await fetch(`/api/admin/producer-requests/${requestId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action,
-          admin_note: adminNotes[claimId]?.trim() || undefined,
+          status,
+          adminNote: adminNotes[requestId]?.trim() || undefined,
         }),
       });
       const json = await res.json();
       if (json.success) {
         toast.success(json.message);
-        setClaims((prev) => prev.filter((c) => c.id !== claimId));
+        setRequests((prev) => prev.filter((r) => r.id !== requestId));
       } else {
         toast.error(json.message ?? "Une erreur est survenue");
       }
@@ -159,122 +180,200 @@ export default function AdminClaimsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">
-            Demandes de revendication
+            Demandes producteur
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Gérez les demandes de revendication de fermes OSM.
+            Gérez les demandes de création et de revendication de fermes.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={fetchClaims} disabled={loading}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={fetchRequests}
+          disabled={loading}
+        >
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
           Actualiser
         </Button>
       </div>
 
-      {/* Filtres */}
+      {/* Status filters */}
       <div className="flex gap-2 flex-wrap">
         {(["pending", "approved", "rejected", "all"] as const).map((s) => (
           <Button
             key={s}
-            variant={filter === s ? "default" : "outline"}
+            variant={statusFilter === s ? "default" : "outline"}
             size="sm"
-            onClick={() => setFilter(s)}
+            onClick={() => setStatusFilter(s)}
           >
             {s === "pending" && <Clock className="h-3.5 w-3.5 mr-1.5" />}
             {s === "approved" && <CheckCircle className="h-3.5 w-3.5 mr-1.5" />}
             {s === "rejected" && <XCircle className="h-3.5 w-3.5 mr-1.5" />}
-            {s === "pending" ? "En attente" : s === "approved" ? "Approuvées" : s === "rejected" ? "Rejetées" : "Toutes"}
+            {s === "pending"
+              ? "En attente"
+              : s === "approved"
+              ? "Approuvées"
+              : s === "rejected"
+              ? "Rejetées"
+              : "Toutes"}
           </Button>
         ))}
       </div>
 
-      {/* Liste */}
+      {/* Type filters */}
+      <div className="flex gap-2 flex-wrap">
+        {(["all", "create", "claim"] as const).map((t) => (
+          <Button
+            key={t}
+            variant={typeFilter === t ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setTypeFilter(t)}
+          >
+            {t === "create" && <Building2 className="h-3.5 w-3.5 mr-1.5" />}
+            {t === "claim" && <TreePine className="h-3.5 w-3.5 mr-1.5" />}
+            {t === "all"
+              ? "Tous types"
+              : t === "create"
+              ? "Nouvelle ferme"
+              : "Réclamation"}
+          </Button>
+        ))}
+      </div>
+
+      {/* List */}
       {loading ? (
         <div className="flex justify-center py-16">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
-      ) : claims.length === 0 ? (
+      ) : requests.length === 0 ? (
         <Card>
           <CardContent className="py-16 text-center text-muted-foreground">
-            Aucune demande{filter !== "all" ? ` ${statusLabel(filter as ClaimStatus).toLowerCase()}` : ""}.
+            Aucune demande
+            {statusFilter !== "all"
+              ? ` ${statusLabel(statusFilter as RequestStatus).toLowerCase()}`
+              : ""}
+            .
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-4">
-          {claims.map((claim) => (
-            <Card key={claim.id}>
+          {requests.map((req) => (
+            <Card key={req.id}>
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-1 min-w-0">
-                    <CardTitle className="text-base">
-                      {claim.listing?.name ?? "Ferme sans nom"}
-                    </CardTitle>
-                    {claim.listing?.address && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge
+                        variant={req.type === "create" ? "outline" : "secondary"}
+                        size="sm"
+                      >
+                        {req.type === "create" ? (
+                          <>
+                            <Building2 className="h-3 w-3 mr-1" />
+                            Nouvelle ferme
+                          </>
+                        ) : (
+                          <>
+                            <TreePine className="h-3 w-3 mr-1" />
+                            Réclamation
+                          </>
+                        )}
+                      </Badge>
+                      <Badge variant={statusBadgeVariant(req.status)} size="sm">
+                        {statusLabel(req.status)}
+                      </Badge>
+                    </div>
+                    <CardTitle className="text-base">{farmLabel(req)}</CardTitle>
+                    {req.type === "claim" && req.listing?.address && (
                       <CardDescription className="flex items-center gap-1">
                         <MapPin className="h-3 w-3 flex-shrink-0" />
-                        {claim.listing.address}
+                        {req.listing.address}
+                      </CardDescription>
+                    )}
+                    {req.type === "create" && req.location && (
+                      <CardDescription className="flex items-center gap-1">
+                        <MapPin className="h-3 w-3 flex-shrink-0" />
+                        {req.location}
                       </CardDescription>
                     )}
                   </div>
-                  <Badge variant={statusBadgeVariant(claim.status)} size="sm">
-                    {statusLabel(claim.status)}
-                  </Badge>
                 </div>
               </CardHeader>
 
               <CardContent className="space-y-3 text-sm">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-muted-foreground">
                   <div>
-                    <span className="font-medium text-foreground">Demandeur : </span>
-                    {claim.user_name ?? "—"} ({claim.user_email})
+                    <span className="font-medium text-foreground">
+                      Demandeur :{" "}
+                    </span>
+                    {req.user_name ?? "—"} ({req.user_email})
                   </div>
                   <div>
-                    <span className="font-medium text-foreground">Soumis le : </span>
-                    {formatDate(claim.created_at)}
+                    <span className="font-medium text-foreground">
+                      Soumis le :{" "}
+                    </span>
+                    {formatDate(req.created_at)}
                   </div>
-                  {claim.listing?.osm_id && (
+                  {req.type === "create" && req.siret && (
                     <div>
-                      <span className="font-medium text-foreground">OSM ID : </span>
-                      {claim.listing.osm_id}
+                      <span className="font-medium text-foreground">
+                        SIRET :{" "}
+                      </span>
+                      {req.siret}
                     </div>
                   )}
-                  {claim.reviewed_at && (
+                  {req.type === "create" && req.phone && (
                     <div>
-                      <span className="font-medium text-foreground">Traité le : </span>
-                      {formatDate(claim.reviewed_at)}
+                      <span className="font-medium text-foreground">
+                        Téléphone :{" "}
+                      </span>
+                      {req.phone}
+                    </div>
+                  )}
+                  {req.type === "claim" && req.listing?.osm_id && (
+                    <div>
+                      <span className="font-medium text-foreground">
+                        OSM ID :{" "}
+                      </span>
+                      {req.listing.osm_id}
+                    </div>
+                  )}
+                  {req.reviewed_at && (
+                    <div>
+                      <span className="font-medium text-foreground">
+                        Traité le :{" "}
+                      </span>
+                      {formatDate(req.reviewed_at)}
                     </div>
                   )}
                 </div>
 
-                {claim.message && (
+                {req.admin_note && (
                   <div className="rounded-lg bg-muted/50 p-3">
-                    <p className="font-medium text-foreground mb-1">Message du demandeur :</p>
-                    <p className="text-muted-foreground">{claim.message}</p>
+                    <p className="font-medium text-foreground mb-1">
+                      Note admin :
+                    </p>
+                    <p className="text-muted-foreground">{req.admin_note}</p>
                   </div>
                 )}
 
-                {claim.admin_note && (
-                  <div className="rounded-lg bg-muted/50 p-3">
-                    <p className="font-medium text-foreground mb-1">Note admin :</p>
-                    <p className="text-muted-foreground">{claim.admin_note}</p>
-                  </div>
-                )}
-
-                {/* Note admin (uniquement pour demandes en attente) */}
-                {claim.status === "pending" && (
+                {req.status === "pending" && (
                   <div>
                     <label
-                      htmlFor={`note-${claim.id}`}
+                      htmlFor={`note-${req.id}`}
                       className="text-xs font-medium text-muted-foreground block mb-1"
                     >
                       Note admin (optionnel)
                     </label>
                     <textarea
-                      id={`note-${claim.id}`}
+                      id={`note-${req.id}`}
                       rows={2}
-                      value={adminNotes[claim.id] ?? ""}
+                      value={adminNotes[req.id] ?? ""}
                       onChange={(e) =>
-                        setAdminNotes((prev) => ({ ...prev, [claim.id]: e.target.value }))
+                        setAdminNotes((prev) => ({
+                          ...prev,
+                          [req.id]: e.target.value,
+                        }))
                       }
                       placeholder="Raison du refus, remarques..."
                       className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
@@ -283,15 +382,15 @@ export default function AdminClaimsPage() {
                 )}
               </CardContent>
 
-              {claim.status === "pending" && (
+              {req.status === "pending" && (
                 <CardFooter className="gap-3 pt-0">
                   <Button
                     size="sm"
                     className="bg-green-600 hover:bg-green-700"
-                    disabled={actioningId === claim.id}
-                    onClick={() => handleAction(claim.id, "approve")}
+                    disabled={actioningId === req.id}
+                    onClick={() => handleAction(req.id, "approved")}
                   >
-                    {actioningId === claim.id ? (
+                    {actioningId === req.id ? (
                       <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     ) : (
                       <CheckCircle className="h-4 w-4 mr-2" />
@@ -301,10 +400,10 @@ export default function AdminClaimsPage() {
                   <Button
                     size="sm"
                     variant="destructive"
-                    disabled={actioningId === claim.id}
-                    onClick={() => handleAction(claim.id, "reject")}
+                    disabled={actioningId === req.id}
+                    onClick={() => handleAction(req.id, "rejected")}
                   >
-                    {actioningId === claim.id ? (
+                    {actioningId === req.id ? (
                       <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     ) : (
                       <XCircle className="h-4 w-4 mr-2" />

@@ -106,10 +106,10 @@ export default function ClaimFarmPage(): JSX.Element {
     setStep("submitting");
 
     try {
-      const res = await fetch("/api/claim-farm", {
+      const res = await fetch("/api/producer-request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ listingId: farm.id }),
+        body: JSON.stringify({ type: "claim", listingId: farm.id }),
       });
 
       const json = await res.json();

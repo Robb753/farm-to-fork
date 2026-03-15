@@ -30,8 +30,8 @@ export default function AdminPage() {
     }
 
     if (role === "admin") {
-      // Rediriger vers le dashboard des notifications
-      router.replace("/admin/notifications");
+      // Rediriger vers la liste unifiée des demandes producteur
+      router.replace("/admin/requests");
     } else {
       // Pas admin, rediriger vers l'accueil
       toast.error("Accès refusé : vous n'êtes pas administrateur");

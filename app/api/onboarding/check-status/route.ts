@@ -28,8 +28,8 @@ export async function GET(): Promise<NextResponse<CheckStatusResponse>> {
   }
 
   const { data, error } = await supabase
-    .from("farmer_requests")
-    .select("status, admin_reason")
+    .from("producer_requests")
+    .select("status, admin_note")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -46,6 +46,6 @@ export async function GET(): Promise<NextResponse<CheckStatusResponse>> {
 
   return NextResponse.json({
     status: data.status as RequestStatus,
-    adminNote: data.admin_reason ?? null,
+    adminNote: data.admin_note ?? null,
   });
 }
