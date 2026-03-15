@@ -28,7 +28,10 @@ import {
   ChevronRight,
   ChevronLeft,
 } from "@/utils/icons";
-import { editListingSchema } from "@/app/schemas/editListingSchema";
+import {
+  editListingSchema,
+  editListingDraftSchema,
+} from "@/app/schemas/editListingSchema";
 import type { z } from "zod";
 import ProductSelector from "./ProductSelector";
 import FileUpload from "./FileUpload";
@@ -748,6 +751,7 @@ const EditListing: React.FC<EditListingProps> = ({
 
   const onSubmit = useCallback(
     async (values: EditListingFormValues, isPublishing: boolean = false) => {
+       console.error("onSubmit appelé", { values, isPublishing });
       if (!listing) return;
 
       setIsSubmitting(true);
@@ -847,7 +851,7 @@ const EditListing: React.FC<EditListingProps> = ({
     <div
       className={cn(
         "min-h-screen bg-gradient-to-br from-stone-50 to-amber-50/30",
-        className
+        className,
       )}
     >
       <div className="container mx-auto px-4 py-8 max-w-7xl">
@@ -917,7 +921,7 @@ const EditListing: React.FC<EditListingProps> = ({
                             "border-amber-500 bg-amber-50 text-amber-900",
                           !isActive &&
                             "border-stone-200 bg-white text-stone-600",
-                          isCompleted && "ring-1 ring-emerald-400"
+                          isCompleted && "ring-1 ring-emerald-400",
                         )}
                       >
                         <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-stone-100">
@@ -1039,7 +1043,7 @@ const EditListing: React.FC<EditListingProps> = ({
                                 isSelected &&
                                   "border-amber-500 bg-amber-50 text-amber-900",
                                 !isSelected &&
-                                  "border-stone-200 bg-white text-stone-600"
+                                  "border-stone-200 bg-white text-stone-600",
                               )}
                             >
                               <span>{opt.label}</span>
@@ -1109,7 +1113,7 @@ const EditListing: React.FC<EditListingProps> = ({
                                 isSelected &&
                                   "border-amber-500 bg-amber-50 text-amber-900",
                                 !isSelected &&
-                                  "border-stone-200 bg-white text-stone-600"
+                                  "border-stone-200 bg-white text-stone-600",
                               )}
                             >
                               <span>{opt.label}</span>
@@ -1151,7 +1155,7 @@ const EditListing: React.FC<EditListingProps> = ({
                                 isSelected &&
                                   "border-amber-500 bg-amber-50 text-amber-900",
                                 !isSelected &&
-                                  "border-stone-200 bg-white text-stone-600"
+                                  "border-stone-200 bg-white text-stone-600",
                               )}
                             >
                               <span>{opt.label}</span>
@@ -1191,7 +1195,7 @@ const EditListing: React.FC<EditListingProps> = ({
                                   isSelected &&
                                     "border-emerald-500 bg-emerald-50 text-emerald-900",
                                   !isSelected &&
-                                    "border-stone-200 bg-white text-stone-600"
+                                    "border-stone-200 bg-white text-stone-600",
                                 )}
                               >
                                 <span>{opt.label}</span>
@@ -1225,7 +1229,7 @@ const EditListing: React.FC<EditListingProps> = ({
                                   isSelected &&
                                     "border-amber-500 bg-amber-50 text-amber-900",
                                   !isSelected &&
-                                    "border-stone-200 bg-white text-stone-600"
+                                    "border-stone-200 bg-white text-stone-600",
                                 )}
                               >
                                 <span>{opt.label}</span>
@@ -1254,7 +1258,7 @@ const EditListing: React.FC<EditListingProps> = ({
                                 onClick={() =>
                                   toggleArrayValue(
                                     "additional_services",
-                                    opt.id
+                                    opt.id,
                                   )
                                 }
                                 className={cn(
@@ -1262,7 +1266,7 @@ const EditListing: React.FC<EditListingProps> = ({
                                   isSelected &&
                                     "border-amber-500 bg-amber-50 text-amber-900",
                                   !isSelected &&
-                                    "border-stone-200 bg-white text-stone-600"
+                                    "border-stone-200 bg-white text-stone-600",
                                 )}
                               >
                                 <span>{opt.label}</span>
@@ -1361,9 +1365,18 @@ const EditListing: React.FC<EditListingProps> = ({
                           type="button"
                           variant="outline"
                           disabled={isSubmitting}
-                          onClick={handleSubmit((values) =>
-                            onSubmit(values, false)
-                          )}
+                          onClick={async () => {
+                            const values = form.getValues();
+                            const result =
+                              editListingDraftSchema.safeParse(values);
+                            if (!result.success) {
+                              toast.error(
+                                "Nom et email requis pour enregistrer",
+                              );
+                              return;
+                            }
+                            await onSubmit(values, false);
+                          }}
                           className="gap-2"
                         >
                           {isSubmitting ? (
@@ -1377,8 +1390,21 @@ const EditListing: React.FC<EditListingProps> = ({
                         <Button
                           type="button"
                           disabled={isSubmitting}
-                          onClick={handleSubmit((values) =>
-                            onSubmit(values, true)
+                          onClick={handleSubmit(
+                            (values) => onSubmit(values, true),
+                            (errors) => {
+                              console.error("DEBUG validation errors:", errors);
+                              if (errors.description) setCurrentStep(1);
+                              else if (
+                                errors.product_type ||
+                                errors.production_method
+                              )
+                                setCurrentStep(2);
+                              else if (errors.purchase_mode) setCurrentStep(3);
+                              toast.error(
+                                "Complétez tous les champs requis avant de publier",
+                              );
+                            },
                           )}
                           className="gap-2"
                           style={{
