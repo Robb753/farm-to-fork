@@ -82,6 +82,11 @@ const baseConfig = {
         destination: "/sign-in",
         permanent: false,
       },
+      {
+        source: "/onboarding/:path*",
+        destination: "/become-producer",
+        permanent: true,
+      },
     ];
   },
 

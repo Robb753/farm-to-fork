@@ -510,7 +510,7 @@ export default function HeaderDesktop({
           )}
 
           <Link
-            href="/onboarding/step-1"
+            href="/become-producer"
             className="hidden md:flex items-center gap-1 text-sm font-medium px-3 py-2 rounded-lg transition-all"
             style={{ color: COLORS.PRIMARY, backgroundColor: "transparent" }}
             onMouseEnter={(e) => {

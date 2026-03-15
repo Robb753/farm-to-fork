@@ -678,7 +678,7 @@ export default function HeaderMobile({
               </Link>
 
               <Link
-                href="/onboarding/step-1"
+                href="/become-producer"
                 className="flex items-center gap-3 rounded-lg p-3 transition-colors"
                 style={{
                   color: COLORS.TEXT_SECONDARY,

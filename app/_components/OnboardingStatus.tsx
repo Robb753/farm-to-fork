@@ -225,7 +225,7 @@ export default function OnboardingStatus() {
           </CardContent>
           <CardFooter>
             <Button
-              onClick={() => router.push("/onboarding/step-1")}
+              onClick={() => router.push("/become-producer")}
               className="w-full"
               style={{
                 backgroundColor: COLORS.PRIMARY,
@@ -408,7 +408,7 @@ export default function OnboardingStatus() {
         <CardFooter className="flex gap-3">
           {request.status === "approved" && (
             <Button
-              onClick={() => router.push("/onboarding/step-2")}
+              onClick={() => router.push("/dashboard")}
               className="flex-1"
               style={{
                 backgroundColor: COLORS.SUCCESS,
@@ -422,7 +422,7 @@ export default function OnboardingStatus() {
 
           {request.status === "rejected" && (
             <Button
-              onClick={() => router.push("/onboarding/step-1")}
+              onClick={() => router.push("/become-producer")}
               variant="outline"
               className="flex-1"
             >

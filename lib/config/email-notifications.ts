@@ -275,8 +275,8 @@ export async function sendFarmerRequestStatusEmail(
         </ol>
         <p>Cliquez sur le bouton ci-dessous pour continuer votre inscription.</p>
       `;
-      ctaText = "Continuer l'inscription (Step 2)";
-      ctaLink = siteUrl ? `${siteUrl}/onboarding/step-2` : "/onboarding/step-2";
+      ctaText = "Accéder à mon dashboard";
+      ctaLink = siteUrl ? `${siteUrl}/dashboard` : "/dashboard";
     } else {
       subject = EMAIL_SUBJECTS.farmerRequestRejected;
       heading = "❌ Demande non approuvée";
