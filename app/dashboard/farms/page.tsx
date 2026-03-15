@@ -47,14 +47,9 @@ import type { Listing } from "@/lib/types";
 import type { Database } from "@/lib/types/database";
 type Product = Database["public"]["Tables"]["products"]["Row"];
 
-// 🔒 SÉCURITÉ
 import { escapeHTML, sanitizeHTML } from "@/lib/utils/sanitize";
 import { useSupabaseWithClerk } from "@/utils/supabase/client";
 
-/**
- * Normalisation minimale côté client
- * (évite les champs manquants qui cassent l'UI)
- */
 function normalizeListing(data: any): Listing {
   return {
     ...data,
@@ -63,21 +58,12 @@ function normalizeListing(data: any): Listing {
   } as Listing;
 }
 
-/**
- * Sécurise une URL entrée utilisateur
- * - force https:// si absent
- * - bloque javascript:
- */
 function getSafeWebsiteUrl(raw?: string | null): string | null {
   const v = (raw ?? "").trim();
   if (!v) return null;
-
   const withProto =
     v.startsWith("http://") || v.startsWith("https://") ? v : `https://${v}`;
-
-  // Bloque schémas dangereux (ceinture + bretelles)
   if (withProto.toLowerCase().startsWith("javascript:")) return null;
-
   return withProto;
 }
 
@@ -86,9 +72,7 @@ export default function FarmerDashboard(): JSX.Element {
   const [listing, setListing] = useState<Listing | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [farmerRequestStatus, setFarmerRequestStatus] = useState<
-    "pending" | "approved" | "rejected" | null
-  >(null);
+  const [requestStatus, setRequestStatus] = useState<"pending" | "rejected" | null>(null);
   const [checkingRequest, setCheckingRequest] = useState<boolean>(true);
   const [products, setProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState<boolean>(false);
@@ -104,103 +88,83 @@ export default function FarmerDashboard(): JSX.Element {
     );
   }, [user]);
 
-  /**
-   * 🆕 ÉTAPE 1 : Vérifier le statut de la farmer_request
-   */
+  // Rôle Clerk — source de vérité depuis Phase 2
+  const clerkRole = user?.publicMetadata?.role as string | undefined;
+  const isFarmer = clerkRole === "farmer";
+
   useEffect(() => {
-    const checkFarmerRequest = async (): Promise<void> => {
+    const run = async (): Promise<void> => {
       if (!isLoaded || !isSignedIn || !user) return;
 
+      // Producteur approuvé → chercher le listing directement
+      if (isFarmer) {
+        try {
+          setLoading(true);
+          setError(null);
+
+          const { data, error: supabaseError } = await supabase
+            .from(TABLES.LISTING)
+            .select("*")
+            .eq("clerk_user_id", user.id)
+            .maybeSingle();
+
+          if (supabaseError) {
+            console.error("Erreur Supabase:", supabaseError);
+            setError(`Erreur Supabase: ${supabaseError.message}`);
+            setListing(null);
+            return;
+          }
+
+          setListing(data ? normalizeListing(data) : null);
+        } catch (err) {
+          console.error("Erreur générale:", err);
+          setError("Une erreur inattendue s'est produite");
+          setListing(null);
+        } finally {
+          setLoading(false);
+          setCheckingRequest(false);
+        }
+        return;
+      }
+
+      // Pas encore farmer → vérifier producer_requests pour pending/rejected
       try {
         setCheckingRequest(true);
         const { data, error: requestError } = await supabase
-          .from("farmer_requests")
+          .from("producer_requests")
           .select("status")
           .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
           .maybeSingle();
 
         if (requestError) {
-          console.error("Erreur vérification farmer_request:", requestError);
-          setFarmerRequestStatus(null);
+          console.error("Erreur producer_requests:", requestError);
+          setRequestStatus(null);
           return;
         }
 
         if (!data) {
-          // Cas 1 : Aucune farmer_request
-          setFarmerRequestStatus(null);
+          setRequestStatus(null);
+        } else if (data.status === "pending") {
+          setRequestStatus("pending");
+        } else if (data.status === "rejected") {
+          setRequestStatus("rejected");
         } else {
-          // Cas 2, 3, 4 : pending, approved, rejected
-          setFarmerRequestStatus(data.status as "pending" | "approved" | "rejected");
+          // approved mais rôle Clerk pas encore mis à jour — rare
+          setRequestStatus(null);
         }
       } catch (err) {
         console.error("Erreur:", err);
-        setFarmerRequestStatus(null);
+        setRequestStatus(null);
       } finally {
         setCheckingRequest(false);
-      }
-    };
-
-    checkFarmerRequest();
-  }, [isLoaded, isSignedIn, user, supabase]);
-
-  /**
-   * ÉTAPE 2 : Récupérer le listing seulement si approved
-   */
-  useEffect(() => {
-    const fetchListing = async (): Promise<void> => {
-      if (!isLoaded) return;
-
-      if (!isSignedIn) {
-        router.push("/sign-in");
-        return;
-      }
-
-      if (!email) {
-        setError("Email non trouvé");
-        setLoading(false);
-        return;
-      }
-
-      // On attend que la vérification de farmer_request soit terminée
-      if (checkingRequest) return;
-
-      // Si pas approved, pas besoin de chercher le listing
-      if (farmerRequestStatus !== "approved") {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        setLoading(true);
-        setError(null);
-
-        const { data, error: supabaseError } = await supabase
-          .from(TABLES.LISTING)
-          .select("*")
-          .eq("clerk_user_id", user.id)
-          .maybeSingle();
-
-        if (supabaseError) {
-          console.error("Erreur Supabase détaillée:", supabaseError);
-          setError(
-            `Erreur Supabase: ${supabaseError.message || "Erreur inconnue"}`
-          );
-          setListing(null);
-          return;
-        }
-
-        setListing(data ? normalizeListing(data) : null);
-      } catch (err) {
-        console.error("Erreur générale:", err);
-        setError("Une erreur inattendue s'est produite");
-        setListing(null);
-      } finally {
         setLoading(false);
       }
     };
 
-    fetchListing();
-  }, [isLoaded, isSignedIn, email, router, checkingRequest, farmerRequestStatus, user, supabase]);
+    run();
+  }, [isLoaded, isSignedIn, user, isFarmer, supabase]);
 
   useEffect(() => {
     if (!listing) return;
@@ -217,18 +181,11 @@ export default function FarmerDashboard(): JSX.Element {
     fetchProducts();
   }, [listing, supabase]);
 
-  /**
-   * Supprime la fiche ferme après confirmation
-   * ✅ Sécurisé : delete par id + createdBy
-   */
   const handleDelete = async (): Promise<void> => {
-    if (!listing) return;
-
-    if (!isLoaded || !isSignedIn || !email) {
+    if (!listing || !isLoaded || !isSignedIn || !email) {
       toast.error("Impossible de supprimer : utilisateur non authentifié.");
       return;
     }
-
     try {
       const { error } = await supabase
         .from(TABLES.LISTING)
@@ -237,11 +194,9 @@ export default function FarmerDashboard(): JSX.Element {
         .eq("clerk_user_id", user.id);
 
       if (error) {
-        console.error("Erreur lors de la suppression :", error);
         toast.error("Erreur lors de la suppression.");
         return;
       }
-
       toast.success("Fiche supprimée avec succès !");
       setListing(null);
     } catch (err) {
@@ -250,7 +205,10 @@ export default function FarmerDashboard(): JSX.Element {
     }
   };
 
-  const handleProductToggle = async (productId: number, currentPublished: boolean): Promise<void> => {
+  const handleProductToggle = async (
+    productId: number,
+    currentPublished: boolean
+  ): Promise<void> => {
     const { error } = await supabase
       .from("products")
       .update({ is_published: !currentPublished, active: !currentPublished })
@@ -270,7 +228,10 @@ export default function FarmerDashboard(): JSX.Element {
   };
 
   const handleProductDelete = async (productId: number): Promise<void> => {
-    const { error } = await supabase.from("products").delete().eq("id", productId);
+    const { error } = await supabase
+      .from("products")
+      .delete()
+      .eq("id", productId);
     if (error) {
       toast.error("Erreur lors de la suppression du produit");
       return;
@@ -279,8 +240,8 @@ export default function FarmerDashboard(): JSX.Element {
     toast.success("Produit supprimé");
   };
 
-  // ✅ État de chargement global
-  if (loading || checkingRequest) {
+  // ── Chargement ──────────────────────────────────────────────────────────────
+  if (!isLoaded || loading || checkingRequest) {
     return (
       <div
         className="min-h-screen flex justify-center items-center"
@@ -299,7 +260,7 @@ export default function FarmerDashboard(): JSX.Element {
     );
   }
 
-  // ✅ État d'erreur
+  // ── Erreur ──────────────────────────────────────────────────────────────────
   if (error) {
     return (
       <div
@@ -319,10 +280,7 @@ export default function FarmerDashboard(): JSX.Element {
             </p>
             <Button
               onClick={() => window.location.reload()}
-              style={{
-                backgroundColor: COLORS.PRIMARY,
-                color: COLORS.BG_WHITE,
-              }}
+              style={{ backgroundColor: COLORS.PRIMARY, color: COLORS.BG_WHITE }}
             >
               Réessayer
             </Button>
@@ -332,10 +290,8 @@ export default function FarmerDashboard(): JSX.Element {
     );
   }
 
-  // ========================================
-  // CAS 1 : AUCUNE FARMER_REQUEST
-  // ========================================
-  if (farmerRequestStatus === null) {
+  // ── CAS 1 : Pas de demande ──────────────────────────────────────────────────
+  if (!isFarmer && requestStatus === null) {
     return (
       <div className="min-h-screen bg-background p-4 py-12">
         <div className="max-w-4xl mx-auto">
@@ -346,17 +302,13 @@ export default function FarmerDashboard(): JSX.Element {
             <Sprout className="w-6 h-6" />
             <span className="font-semibold text-lg">Farm2Fork</span>
           </Link>
-
           <Card className="shadow-lg border-2 text-center">
             <CardHeader className="space-y-4">
               <div
                 className="w-20 h-20 rounded-full flex items-center justify-center mx-auto"
                 style={{ backgroundColor: COLORS.PRIMARY_BG }}
               >
-                <Plus
-                  className="w-10 h-10"
-                  style={{ color: COLORS.PRIMARY }}
-                />
+                <Plus className="w-10 h-10" style={{ color: COLORS.PRIMARY }} />
               </div>
               <CardTitle className="text-3xl text-balance">
                 Devenir producteur
@@ -373,40 +325,18 @@ export default function FarmerDashboard(): JSX.Element {
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {[
-                    {
-                      icon: "🗺️",
-                      title: "Visibilité",
-                      desc: "Apparaissez sur notre carte interactive",
-                    },
-                    {
-                      icon: "🤝",
-                      title: "Vente directe",
-                      desc: "Vendez directement aux consommateurs",
-                    },
-                    {
-                      icon: "📈",
-                      title: "Croissance",
-                      desc: "Développez votre clientèle locale",
-                    },
-                    {
-                      icon: "🌍",
-                      title: "Impact",
-                      desc: "Participez à l'économie circulaire",
-                    },
+                    { icon: "🗺️", title: "Visibilité", desc: "Apparaissez sur notre carte interactive" },
+                    { icon: "🤝", title: "Vente directe", desc: "Vendez directement aux consommateurs" },
+                    { icon: "📈", title: "Croissance", desc: "Développez votre clientèle locale" },
+                    { icon: "🌍", title: "Impact", desc: "Participez à l'économie circulaire" },
                   ].map((benefit, index) => (
                     <div key={index} className="flex items-start space-x-3">
                       <div className="text-2xl">{benefit.icon}</div>
                       <div>
-                        <div
-                          className="font-medium"
-                          style={{ color: COLORS.TEXT_PRIMARY }}
-                        >
+                        <div className="font-medium" style={{ color: COLORS.TEXT_PRIMARY }}>
                           {benefit.title}
                         </div>
-                        <div
-                          className="text-sm"
-                          style={{ color: COLORS.TEXT_SECONDARY }}
-                        >
+                        <div className="text-sm" style={{ color: COLORS.TEXT_SECONDARY }}>
                           {benefit.desc}
                         </div>
                       </div>
@@ -414,22 +344,15 @@ export default function FarmerDashboard(): JSX.Element {
                   ))}
                 </div>
               </div>
-
               <div className="pt-4 space-y-3">
                 <Button
                   size="lg"
                   asChild
                   className="w-full sm:w-auto"
-                  style={{
-                    backgroundColor: COLORS.PRIMARY,
-                    color: COLORS.BG_WHITE,
-                  }}
+                  style={{ backgroundColor: COLORS.PRIMARY, color: COLORS.BG_WHITE }}
                 >
-                  <Link href="/become-producer">
-                    Créer une demande
-                  </Link>
+                  <Link href="/become-producer">Créer une demande</Link>
                 </Button>
-
                 <p className="text-xs text-muted-foreground">
                   Le processus prend environ 5 minutes et sera validé sous 24-48h
                 </p>
@@ -441,10 +364,8 @@ export default function FarmerDashboard(): JSX.Element {
     );
   }
 
-  // ========================================
-  // CAS 2 : FARMER_REQUEST PENDING
-  // ========================================
-  if (farmerRequestStatus === "pending") {
+  // ── CAS 2 : Demande en attente ──────────────────────────────────────────────
+  if (!isFarmer && requestStatus === "pending") {
     return (
       <div className="min-h-screen bg-background p-4 py-12">
         <div className="max-w-4xl mx-auto">
@@ -455,46 +376,36 @@ export default function FarmerDashboard(): JSX.Element {
             <Sprout className="w-6 h-6" />
             <span className="font-semibold text-lg">Farm2Fork</span>
           </Link>
-
           <Card className="shadow-lg border-2 text-center">
             <CardHeader className="space-y-4">
               <div
                 className="w-20 h-20 rounded-full flex items-center justify-center mx-auto"
                 style={{ backgroundColor: COLORS.PRIMARY_BG }}
               >
-                <Clock
-                  className="w-10 h-10"
-                  style={{ color: COLORS.PRIMARY }}
-                />
+                <Clock className="w-10 h-10" style={{ color: COLORS.PRIMARY }} />
               </div>
               <CardTitle className="text-3xl text-balance">
                 Demande en attente
               </CardTitle>
               <CardDescription className="text-base leading-relaxed max-w-2xl mx-auto">
                 Nous vérifions que vous êtes bien producteur. Vous recevrez un
-                email de confirmation sous 24-48h pour compléter votre fiche
-                ferme.
+                email de confirmation sous 24-48h.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="bg-accent/50 p-4 rounded-lg text-left">
                 <p className="text-sm text-muted-foreground">
-                  <strong className="text-foreground">
-                    Vérifiez votre boîte mail :
-                  </strong>{" "}
+                  <strong className="text-foreground">Vérifiez votre boîte mail :</strong>{" "}
                   {user?.primaryEmailAddress?.emailAddress}
                 </p>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Pensez à vérifier vos spams si vous ne recevez pas d'email dans
-                  les prochaines heures.
+                  Pensez à vérifier vos spams.
                 </p>
               </div>
-
               <div className="pt-4 space-y-3">
                 <Button size="lg" asChild className="w-full sm:w-auto">
                   <Link href="/">Retour à l'accueil</Link>
                 </Button>
-
                 <p className="text-xs text-muted-foreground">
                   Des questions ? Contactez-nous à{" "}
                   <a
@@ -512,10 +423,8 @@ export default function FarmerDashboard(): JSX.Element {
     );
   }
 
-  // ========================================
-  // CAS 4 : FARMER_REQUEST REJECTED
-  // ========================================
-  if (farmerRequestStatus === "rejected") {
+  // ── CAS 3 : Demande rejetée ─────────────────────────────────────────────────
+  if (!isFarmer && requestStatus === "rejected") {
     return (
       <div className="min-h-screen bg-background p-4 py-12">
         <div className="max-w-4xl mx-auto">
@@ -526,58 +435,37 @@ export default function FarmerDashboard(): JSX.Element {
             <Sprout className="w-6 h-6" />
             <span className="font-semibold text-lg">Farm2Fork</span>
           </Link>
-
           <Card className="shadow-lg border-2 text-center border-red-200 bg-red-50/50">
             <CardHeader className="space-y-4">
               <div
                 className="w-20 h-20 rounded-full flex items-center justify-center mx-auto"
-                style={{
-                  backgroundColor: `${COLORS.ERROR}20`,
-                }}
+                style={{ backgroundColor: `${COLORS.ERROR}20` }}
               >
-                <XCircle
-                  className="w-10 h-10"
-                  style={{ color: COLORS.ERROR }}
-                />
+                <XCircle className="w-10 h-10" style={{ color: COLORS.ERROR }} />
               </div>
               <CardTitle className="text-3xl text-balance text-red-900">
                 Demande non approuvée
               </CardTitle>
               <CardDescription className="text-base leading-relaxed max-w-2xl mx-auto text-red-800">
                 Malheureusement, votre demande n'a pas pu être approuvée.
-                Vous pouvez refaire une demande ou nous contacter pour plus
-                d'informations.
+                Vous pouvez refaire une demande ou nous contacter.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="bg-white p-6 rounded-lg border-2 border-red-200">
-                <h3 className="font-semibold text-lg mb-3 text-red-900">
-                  Que faire maintenant ?
-                </h3>
-                <p className="text-sm text-red-800 mb-4">
-                  Vous pouvez soumettre une nouvelle demande avec des
-                  informations complémentaires ou nous contacter pour
-                  comprendre les raisons du refus.
-                </p>
                 <div className="flex gap-3 justify-center">
                   <Button
                     size="lg"
                     asChild
-                    style={{
-                      backgroundColor: COLORS.PRIMARY,
-                      color: COLORS.BG_WHITE,
-                    }}
+                    style={{ backgroundColor: COLORS.PRIMARY, color: COLORS.BG_WHITE }}
                   >
-                    <Link href="/become-producer">
-                      Refaire une demande
-                    </Link>
+                    <Link href="/become-producer">Refaire une demande</Link>
                   </Button>
                   <Button variant="outline" asChild>
                     <Link href="/">Retour à l'accueil</Link>
                   </Button>
                 </div>
               </div>
-
               <div className="bg-red-100 p-4 rounded-lg text-left border border-red-300">
                 <p className="text-sm text-red-900">
                   <Mail className="inline w-4 h-4 mr-2" />
@@ -597,11 +485,8 @@ export default function FarmerDashboard(): JSX.Element {
     );
   }
 
-  // ========================================
-  // CAS 3 : FARMER_REQUEST APPROVED
-  // ========================================
-  // Sous-cas 3a : Pas de listing créé
-  if (!listing) {
+  // ── CAS 4 : Farmer approuvé sans listing encore ─────────────────────────────
+  if (isFarmer && !listing) {
     return (
       <div className="min-h-screen bg-background p-4 py-12">
         <div className="max-w-4xl mx-auto">
@@ -612,39 +497,29 @@ export default function FarmerDashboard(): JSX.Element {
             <Sprout className="w-6 h-6" />
             <span className="font-semibold text-lg">Farm2Fork</span>
           </Link>
-
           <Card className="shadow-lg border-2 text-center border-green-200 bg-green-50/50">
             <CardHeader className="space-y-4">
               <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto">
                 <CheckCircle2 className="w-10 h-10 text-green-600" />
               </div>
               <CardTitle className="text-3xl text-balance text-green-900">
-                ✅ Demande approuvée !
+                ✅ Compte producteur activé !
               </CardTitle>
               <CardDescription className="text-base leading-relaxed max-w-2xl mx-auto text-green-800">
-                Félicitations ! Vous êtes maintenant producteur. Créez votre
-                fiche ferme pour commencer à vendre vos produits.
+                Félicitations ! Complétez votre fiche ferme pour apparaître sur
+                la carte et commencer à vendre.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="bg-white p-6 rounded-lg border-2 border-green-200">
-                <h3 className="font-semibold text-lg mb-3 text-green-900">
-                  Prochaine étape : Créer votre ferme
-                </h3>
-                <p className="text-sm text-green-800 mb-4">
-                  Complétez les informations de votre ferme (description,
-                  produits, coordonnées, etc.) pour apparaître sur la carte et
-                  commencer à vendre.
-                </p>
                 <Button
                   size="lg"
                   className="w-full sm:w-auto bg-green-600 hover:bg-green-700"
-                  onClick={() => router.push("/dashboard")}
+                  onClick={() => router.push("/edit-listing/new")}
                 >
-                  Créer ma ferme →
+                  Compléter ma fiche ferme →
                 </Button>
               </div>
-
               <div className="bg-green-100 p-4 rounded-lg text-left border border-green-300">
                 <p className="text-sm text-green-900">
                   <strong>Un email de confirmation</strong> a été envoyé à{" "}
@@ -658,16 +533,13 @@ export default function FarmerDashboard(): JSX.Element {
     );
   }
 
-  // Sous-cas 3b : Listing existe - Dashboard complet
+  // ── CAS 5 : Dashboard complet ───────────────────────────────────────────────
   const safeWebsite = getSafeWebsiteUrl((listing as any).website);
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="mb-8">
-        <h1
-          className="text-3xl font-bold mb-2"
-          style={{ color: COLORS.PRIMARY_DARK }}
-        >
+        <h1 className="text-3xl font-bold mb-2" style={{ color: COLORS.PRIMARY_DARK }}>
           Tableau de bord producteur
         </h1>
         <p style={{ color: COLORS.TEXT_SECONDARY }}>
@@ -675,12 +547,10 @@ export default function FarmerDashboard(): JSX.Element {
         </p>
       </div>
 
+      {/* Fiche ferme */}
       <div
         className="rounded-lg shadow-md border overflow-hidden"
-        style={{
-          backgroundColor: COLORS.BG_WHITE,
-          borderColor: COLORS.BORDER,
-        }}
+        style={{ backgroundColor: COLORS.BG_WHITE, borderColor: COLORS.BORDER }}
       >
         <div
           className="px-6 py-4 border-b"
@@ -691,34 +561,21 @@ export default function FarmerDashboard(): JSX.Element {
         >
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <h2
-                className="text-xl font-semibold mb-1"
-                style={{ color: COLORS.PRIMARY_DARK }}
-              >
+              <h2 className="text-xl font-semibold mb-1" style={{ color: COLORS.PRIMARY_DARK }}>
                 {escapeHTML((listing as any).name || "Ferme sans nom")}
               </h2>
               {(listing as any).address && (
-                <div
-                  className="flex items-center text-sm"
-                  style={{ color: COLORS.TEXT_SECONDARY }}
-                >
-                  <MapPin
-                    className="h-4 w-4 mr-2"
-                    style={{ color: COLORS.TEXT_MUTED }}
-                  />
+                <div className="flex items-center text-sm" style={{ color: COLORS.TEXT_SECONDARY }}>
+                  <MapPin className="h-4 w-4 mr-2" style={{ color: COLORS.TEXT_MUTED }} />
                   {escapeHTML((listing as any).address)}
                 </div>
               )}
             </div>
-
             <div className="flex items-center gap-2">
-              {listing.active ? (
+              {listing!.active ? (
                 <div
                   className="flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium"
-                  style={{
-                    backgroundColor: `${COLORS.SUCCESS}20`,
-                    color: COLORS.SUCCESS,
-                  }}
+                  style={{ backgroundColor: `${COLORS.SUCCESS}20`, color: COLORS.SUCCESS }}
                 >
                   <CheckCircle className="h-4 w-4" />
                   Publiée
@@ -726,10 +583,7 @@ export default function FarmerDashboard(): JSX.Element {
               ) : (
                 <div
                   className="flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium"
-                  style={{
-                    backgroundColor: `${COLORS.WARNING}20`,
-                    color: COLORS.WARNING,
-                  }}
+                  style={{ backgroundColor: `${COLORS.WARNING}20`, color: COLORS.WARNING }}
                 >
                   <Clock className="h-4 w-4" />
                   Brouillon
@@ -742,10 +596,7 @@ export default function FarmerDashboard(): JSX.Element {
         <div className="p-6">
           {(listing as any).description && (
             <div className="mb-6">
-              <h3
-                className="font-medium mb-2"
-                style={{ color: COLORS.TEXT_PRIMARY }}
-              >
+              <h3 className="font-medium mb-2" style={{ color: COLORS.TEXT_PRIMARY }}>
                 Description
               </h3>
               <div
@@ -766,53 +617,39 @@ export default function FarmerDashboard(): JSX.Element {
             {Array.isArray((listing as any).product_type) &&
               (listing as any).product_type.length > 0 && (
                 <div>
-                  <h3
-                    className="font-medium mb-2"
-                    style={{ color: COLORS.TEXT_PRIMARY }}
-                  >
+                  <h3 className="font-medium mb-2" style={{ color: COLORS.TEXT_PRIMARY }}>
                     Types de produits
                   </h3>
                   <div className="flex flex-wrap gap-2">
-                    {(listing as any).product_type.map(
-                      (type: string, index: number) => (
-                        <span
-                          key={`${type}-${index}`}
-                          className="px-2 py-1 text-xs rounded-md border"
-                          style={{
-                            backgroundColor: `${COLORS.PRIMARY}10`,
-                            color: COLORS.PRIMARY,
-                            borderColor: `${COLORS.PRIMARY}30`,
-                          }}
-                        >
-                          {escapeHTML(type)}
-                        </span>
-                      )
-                    )}
+                    {(listing as any).product_type.map((type: string, index: number) => (
+                      <span
+                        key={`${type}-${index}`}
+                        className="px-2 py-1 text-xs rounded-md border"
+                        style={{
+                          backgroundColor: `${COLORS.PRIMARY}10`,
+                          color: COLORS.PRIMARY,
+                          borderColor: `${COLORS.PRIMARY}30`,
+                        }}
+                      >
+                        {escapeHTML(type)}
+                      </span>
+                    ))}
                   </div>
                 </div>
               )}
 
-            {((listing as any).email ||
-              (listing as any).phoneNumber ||
-              safeWebsite) && (
+            {((listing as any).email || (listing as any).phoneNumber || safeWebsite) && (
               <div>
-                <h3
-                  className="font-medium mb-2"
-                  style={{ color: COLORS.TEXT_PRIMARY }}
-                >
+                <h3 className="font-medium mb-2" style={{ color: COLORS.TEXT_PRIMARY }}>
                   Contact
                 </h3>
-                <div
-                  className="space-y-1 text-sm"
-                  style={{ color: COLORS.TEXT_SECONDARY }}
-                >
+                <div className="space-y-1 text-sm" style={{ color: COLORS.TEXT_SECONDARY }}>
                   {(listing as any).email && (
                     <p>📧 {escapeHTML((listing as any).email)}</p>
                   )}
                   {(listing as any).phoneNumber && (
                     <p>📞 {escapeHTML((listing as any).phoneNumber)}</p>
                   )}
-
                   {safeWebsite && (
                     <p>
                       🌐{" "}
@@ -835,52 +672,14 @@ export default function FarmerDashboard(): JSX.Element {
             )}
           </div>
 
-          <div
-            className="text-xs mb-6 space-y-1"
-            style={{ color: COLORS.TEXT_MUTED }}
-          >
+          <div className="text-xs mb-6 space-y-1" style={{ color: COLORS.TEXT_MUTED }}>
             {(listing as any).created_at && (
               <div className="flex items-center gap-1">
                 <Calendar className="h-3 w-3" />
                 Créée le :{" "}
-                {new Date((listing as any).created_at).toLocaleDateString(
-                  "fr-FR",
-                  {
-                    day: "2-digit",
-                    month: "long",
-                    year: "numeric",
-                  }
-                )}
-              </div>
-            )}
-
-            {(listing as any).published_at && (
-              <div className="flex items-center gap-1">
-                <Calendar className="h-3 w-3" />
-                Publiée le :{" "}
-                {new Date((listing as any).published_at).toLocaleDateString(
-                  "fr-FR",
-                  {
-                    day: "2-digit",
-                    month: "long",
-                    year: "numeric",
-                  }
-                )}
-              </div>
-            )}
-
-            {(listing as any).modified_at && (
-              <div className="flex items-center gap-1">
-                <Calendar className="h-3 w-3" />
-                Modifiée le :{" "}
-                {new Date((listing as any).modified_at).toLocaleDateString(
-                  "fr-FR",
-                  {
-                    day: "2-digit",
-                    month: "long",
-                    year: "numeric",
-                  }
-                )}
+                {new Date((listing as any).created_at).toLocaleDateString("fr-FR", {
+                  day: "2-digit", month: "long", year: "numeric",
+                })}
               </div>
             )}
           </div>
@@ -892,29 +691,23 @@ export default function FarmerDashboard(): JSX.Element {
             <Button
               asChild
               variant="outline"
-              className={cn(
-                "flex items-center gap-2 border-2",
-                "focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-              )}
+              className={cn("flex items-center gap-2 border-2", "focus:ring-2 focus:ring-offset-2 focus:ring-green-500")}
               style={{ borderColor: COLORS.PRIMARY, color: COLORS.PRIMARY }}
             >
-              <Link href={`/edit-listing/${listing.id}`}>
+              <Link href={`/edit-listing/${listing!.id}`}>
                 <Edit className="h-4 w-4" />
                 Modifier la fiche
               </Link>
             </Button>
 
-            {listing.active && (
+            {listing!.active && (
               <Button
                 asChild
                 variant="outline"
-                className={cn(
-                  "flex items-center gap-2 border-2",
-                  "focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                )}
+                className={cn("flex items-center gap-2 border-2", "focus:ring-2 focus:ring-offset-2 focus:ring-blue-500")}
                 style={{ borderColor: COLORS.INFO, color: COLORS.INFO }}
               >
-                <Link href={`/farm/${listing.id}`}>
+                <Link href={`/farm/${listing!.id}`}>
                   <Eye className="h-4 w-4" />
                   Voir la fiche publique
                 </Link>
@@ -924,38 +717,28 @@ export default function FarmerDashboard(): JSX.Element {
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
-                  className={cn(
-                    "flex items-center gap-2",
-                    "focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                  )}
-                  style={{
-                    backgroundColor: COLORS.ERROR,
-                    color: COLORS.BG_WHITE,
-                  }}
+                  className={cn("flex items-center gap-2", "focus:ring-2 focus:ring-offset-2 focus:ring-red-500")}
+                  style={{ backgroundColor: COLORS.ERROR, color: COLORS.BG_WHITE }}
                 >
                   <Trash2 className="h-4 w-4" />
                   Supprimer la fiche
                 </Button>
               </AlertDialogTrigger>
-
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle style={{ color: COLORS.ERROR }}>
                     Supprimer cette fiche ?
                   </AlertDialogTitle>
                   <AlertDialogDescription>
-                    Cette action est définitive. Tous les produits et images
-                    liés à cette fiche seront également supprimés.
+                    Cette action est définitive. Tous les produits et images liés
+                    à cette fiche seront également supprimés.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Annuler</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={handleDelete}
-                    style={{
-                      backgroundColor: COLORS.ERROR,
-                      color: COLORS.BG_WHITE,
-                    }}
+                    style={{ backgroundColor: COLORS.ERROR, color: COLORS.BG_WHITE }}
                   >
                     Confirmer la suppression
                   </AlertDialogAction>
@@ -986,8 +769,11 @@ export default function FarmerDashboard(): JSX.Element {
               Gérez votre catalogue produits
             </p>
           </div>
-          <Button asChild style={{ backgroundColor: COLORS.PRIMARY, color: COLORS.BG_WHITE }}>
-            <Link href={`/add-product/${listing.id}`}>
+          <Button
+            asChild
+            style={{ backgroundColor: COLORS.PRIMARY, color: COLORS.BG_WHITE }}
+          >
+            <Link href={`/add-product/${listing!.id}`}>
               <Plus className="h-4 w-4 mr-2" />
               Ajouter un produit
             </Link>
@@ -1004,7 +790,7 @@ export default function FarmerDashboard(): JSX.Element {
               Vous n&apos;avez pas encore de produits.
             </p>
             <Button asChild style={{ backgroundColor: COLORS.PRIMARY, color: COLORS.BG_WHITE }}>
-              <Link href={`/add-product/${listing.id}`}>
+              <Link href={`/add-product/${listing!.id}`}>
                 <Plus className="h-4 w-4 mr-2" />
                 Ajouter mon premier produit
               </Link>
@@ -1045,7 +831,9 @@ export default function FarmerDashboard(): JSX.Element {
                   <span
                     className={cn(
                       "px-2 py-1 rounded-full text-xs font-medium",
-                      product.is_published ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
+                      product.is_published
+                        ? "bg-green-100 text-green-700"
+                        : "bg-gray-100 text-gray-500"
                     )}
                   >
                     {product.is_published ? "Publié" : "Brouillon"}

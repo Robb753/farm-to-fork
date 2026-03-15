@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import useUserRole from "@/app/modules/hooks/useUserRole";
+import { useUser } from "@clerk/nextjs";
 import { useClerk } from "@clerk/nextjs";
 import { COLORS, PATHS } from "@/lib/config";
 import { cn } from "@/lib/utils";
@@ -25,7 +25,11 @@ interface FarmerOnlySectionProps {
  * - Configuration centralisée des couleurs
  */
 export default function FarmerOnlySection({ children }: FarmerOnlySectionProps): JSX.Element {
-  const { role, isFarmer, isAdmin, loading, user } = useUserRole();
+  const { user, isLoaded } = useUser();
+  const role = user?.publicMetadata?.role as string | undefined;
+  const isFarmer = role === "farmer";
+  const isAdmin = role === "admin";
+  const loading = !isLoaded;
   const { openSignIn, openSignUp } = useClerk();
 
   /**

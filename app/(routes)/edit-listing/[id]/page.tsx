@@ -17,7 +17,7 @@ interface EditListingPageParams {
  */
 interface EditListingPageProps {
   /** Paramètres de route Next.js */
-  params: EditListingPageParams;
+  params: Promise<EditListingPageParams>;
 }
 
 /**
@@ -33,10 +33,12 @@ interface EditListingPageProps {
  * @returns Page d'édition de listing
  */
 const EditListingPage: React.FC<EditListingPageProps> = ({ params }) => {
+  const resolvedParams = React.use(params);
+
   // Validation des paramètres
-  if (!params?.id) {
+  if (!resolvedParams?.id) {
     console.error(
-      "EditListingPage: ID du listing manquant dans les paramètres"
+      "EditListingPage: ID du listing manquant dans les paramètres",
     );
     return (
       <FarmerOnlySection>
@@ -59,7 +61,7 @@ const EditListingPage: React.FC<EditListingPageProps> = ({ params }) => {
 
   return (
     <FarmerOnlySection>
-      <EditListing params={params} />
+      <EditListing params={resolvedParams} />
     </FarmerOnlySection>
   );
 };
