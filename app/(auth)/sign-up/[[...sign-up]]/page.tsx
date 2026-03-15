@@ -120,7 +120,7 @@ export default function SignUpPage(): JSX.Element | null {
             {/* ✅ Composant Clerk avec styling personnalisé */}
             <SignUp
               signInUrl="/sign-in"
-              fallbackRedirectUrl={redirectTarget}
+              fallbackRedirectUrl="/welcome"
               appearance={{
                 elements: {
                   // Bouton principal avec couleurs de la config
