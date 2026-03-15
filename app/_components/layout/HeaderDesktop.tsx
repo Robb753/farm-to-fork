@@ -454,7 +454,7 @@ export default function HeaderDesktop({
     <header
       className={cn(
         "sticky top-0 z-[200] w-full border-b backdrop-blur supports-[backdrop-filter]:bg-white/60",
-        className
+        className,
       )}
       style={{
         backgroundColor: `${COLORS.BG_WHITE}F2`,
@@ -499,7 +499,7 @@ export default function HeaderDesktop({
                         parent.classList.add("closed");
                         setTimeout(
                           () => parent.classList.remove("closed"),
-                          300
+                          300,
                         );
                       }
                     });
@@ -510,7 +510,11 @@ export default function HeaderDesktop({
           )}
 
           <Link
-            href="/become-producer"
+            href={
+              isSignedIn
+                ? "/become-producer"
+                : "/sign-in?redirect=/become-producer"
+            }
             className="hidden md:flex items-center gap-1 text-sm font-medium px-3 py-2 rounded-lg transition-all"
             style={{ color: COLORS.PRIMARY, backgroundColor: "transparent" }}
             onMouseEnter={(e) => {

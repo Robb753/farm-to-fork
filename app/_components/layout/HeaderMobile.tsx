@@ -457,7 +457,7 @@ export default function HeaderMobile({
       <header
         className={cn(
           "fixed left-0 right-0 top-0 z-40 border-b backdrop-blur",
-          className
+          className,
         )}
         style={{
           backgroundColor: `${COLORS.BG_WHITE}F2`,
@@ -678,7 +678,7 @@ export default function HeaderMobile({
               </Link>
 
               <Link
-                href="/become-producer"
+                href="/sign-in?redirect=/become-producer"
                 className="flex items-center gap-3 rounded-lg p-3 transition-colors"
                 style={{
                   color: COLORS.TEXT_SECONDARY,
