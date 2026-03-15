@@ -3,7 +3,6 @@
 
 import React, { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2 } from "lucide-react";
 import { Suspense } from "react";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/lib/types/database";

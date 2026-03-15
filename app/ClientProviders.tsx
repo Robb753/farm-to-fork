@@ -4,6 +4,7 @@
 import React, { useEffect } from "react";
 import dynamic from "next/dynamic";
 import { Toaster } from "sonner";
+import AuthSync from "./_components/AuthSync";
 
 interface ClientProvidersProps {
   children: React.ReactNode;
@@ -15,11 +16,6 @@ const ModernAuthSystem = dynamic(
 );
 
 const AppLoadingNotifier = dynamic(() => import("@/utils/AppLoadingNotifier"), {
-  ssr: false,
-  loading: () => null,
-});
-
-const AuthSync = dynamic(() => import("./_components/AuthSync"), {
   ssr: false,
   loading: () => null,
 });
