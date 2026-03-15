@@ -1,20 +1,17 @@
 "use client";
 
 import Modal from "@/app/_components/ui/Modal";
-import { SignUp, useClerk, useUser } from "@clerk/nextjs";
+import { SignUp, useUser } from "@clerk/nextjs";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useRef, useSyncExternalStore, useState } from "react";
-import { toast } from "sonner";
-import { COLORS, PATHS } from "@/lib/config";
+import { useEffect, useRef, useSyncExternalStore } from "react";
+import { COLORS } from "@/lib/config";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 
 interface SignupRoleModalProps {
   onClose?: () => void;
 }
-
-const ROLE = "user" as const;
 
 function subscribeToResize(callback: () => void): () => void {
   if (typeof window === "undefined") return () => {};
@@ -31,34 +28,12 @@ function getIsMobileServerSnapshot(): boolean {
   return false;
 }
 
-function getRedirectUrl(): string {
-  if (typeof window === "undefined") return PATHS.HOME;
-
-  if (window.location.pathname.includes("signup-farmer")) {
-    return "/request-farmer-access";
-  }
-
-  const urlParams = new URLSearchParams(window.location.search);
-  const redirect = urlParams.get("redirect");
-
-  if (redirect && redirect.startsWith("/") && !redirect.startsWith("//")) {
-    return redirect;
-  }
-
-  return PATHS.HOME;
-}
-
 export default function SignupRoleModal({
   onClose,
 }: SignupRoleModalProps): JSX.Element {
   const router = useRouter();
-  const { client } = useClerk();
   const { user, isSignedIn } = useUser();
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // évite double submit
-  const hasSubmittedRef = useRef(false);
+  const hasRedirectedRef = useRef(false);
 
   const isMobile = useSyncExternalStore(
     subscribeToResize,
@@ -66,56 +41,19 @@ export default function SignupRoleModal({
     getIsMobileServerSnapshot
   );
 
-  const handleUserSignedUp = async (): Promise<void> => {
-    const userId = user?.id;
-    if (!userId) return;
-
-    if (hasSubmittedRef.current) return;
-    hasSubmittedRef.current = true;
-
-    setIsSubmitting(true);
-
-    try {
-      toast.info("Finalisation de votre compte...", { icon: "🌱" });
-
-      const response = await fetch("/api/update-user-role", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Cache-Control": "no-cache",
-        },
-        body: JSON.stringify({ userId, role: ROLE }),
-      });
-
-      if (!response.ok) {
-        await response.json().catch(() => null);
-        toast.warning("Compte créé, mais le rôle n'a pas pu être synchronisé.");
-      } else {
-        try {
-          await client?.reload();
-        } catch {
-          // pas critique
-        }
-        toast.success("Compte prêt ! Bienvenue sur Farm To Fork ! 🎉");
-      }
-
-      const redirectUrl = getRedirectUrl();
-
+  // After sign-up, redirect to /welcome for role selection
+  useEffect(() => {
+    if (isSignedIn && user && !hasRedirectedRef.current) {
+      hasRedirectedRef.current = true;
       onClose?.();
-
       setTimeout(() => {
-        router.push(redirectUrl);
+        router.push("/welcome");
       }, 200);
-    } catch {
-      toast.error("Une erreur est survenue pendant l'inscription.");
-      setIsSubmitting(false);
-      hasSubmittedRef.current = false;
     }
-  };
+  }, [isSignedIn, user, router, onClose]);
 
   const handleClose = (): void => {
-    if (isSubmitting) return;
-    onClose ? onClose() : router.push(PATHS.HOME);
+    onClose ? onClose() : router.push("/");
   };
 
   // =============== UI MOBILE ===============
@@ -181,21 +119,8 @@ export default function SignupRoleModal({
                     className="text-sm"
                     style={{ color: COLORS.TEXT_SECONDARY }}
                   >
-                    Il ne reste plus qu&apos;à finaliser votre profil.
+                    Redirection en cours...
                   </p>
-
-                  <button
-                    type="button"
-                    onClick={handleUserSignedUp}
-                    disabled={isSubmitting}
-                    className="w-full py-3 rounded-lg font-semibold disabled:opacity-50"
-                    style={{
-                      backgroundColor: COLORS.PRIMARY,
-                      color: COLORS.BG_WHITE,
-                    }}
-                  >
-                    {isSubmitting ? "Finalisation..." : "Continuer"}
-                  </button>
                 </div>
               ) : (
                 <>
@@ -224,7 +149,7 @@ export default function SignupRoleModal({
                   <SignUp
                     routing="hash"
                     signInUrl="#/sign-in"
-                    fallbackRedirectUrl={PATHS.HOME}
+                    fallbackRedirectUrl="/welcome"
                   />
                 </>
               )}
@@ -296,27 +221,14 @@ export default function SignupRoleModal({
                     Compte créé ✅
                   </h2>
                   <p style={{ color: COLORS.TEXT_SECONDARY }}>
-                    Cliquez pour finaliser votre profil et être redirigé.
+                    Redirection en cours...
                   </p>
-
-                  <button
-                    type="button"
-                    onClick={handleUserSignedUp}
-                    disabled={isSubmitting}
-                    className="w-full py-3 rounded-lg font-semibold disabled:opacity-50"
-                    style={{
-                      backgroundColor: COLORS.PRIMARY,
-                      color: COLORS.BG_WHITE,
-                    }}
-                  >
-                    {isSubmitting ? "Finalisation..." : "Continuer"}
-                  </button>
                 </div>
               ) : (
                 <SignUp
                   routing="hash"
                   signInUrl="#/sign-in"
-                  fallbackRedirectUrl={PATHS.HOME}
+                  fallbackRedirectUrl="/welcome"
                 />
               )}
             </div>

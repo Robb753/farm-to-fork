@@ -49,6 +49,9 @@ const isPublicRoute = createRouteMatcher([
   "/legal(.*)", // Pages légales
   "/sign-in(.*)", // Pages de connexion
   "/sign-up(.*)", // Pages d'inscription
+  "/welcome", // Choix du rôle après inscription (gère sa propre auth)
+  "/become-producer", // Formulaire demande producteur (gère sa propre auth)
+  "/become-producer/pending", // Statut d'attente (gère sa propre auth)
   "/api/public(.*)", // APIs publiques
   "/api/webhooks(.*)", // Webhooks (Clerk, Stripe, etc.)
   "/api/auth(.*)", // APIs d'authentification (éviter les boucles)
