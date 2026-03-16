@@ -102,7 +102,7 @@ export function useAllListingsWithImages(
   const supabase = useSupabaseWithClerk();
 
   const [listings, setListings] = useState<Listing[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(autoFetch);
   const [error, setError] = useState<string | null>(null);
 
   const fetchAllListings = useCallback(async (): Promise<void> => {

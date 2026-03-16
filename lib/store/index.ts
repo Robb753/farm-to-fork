@@ -27,8 +27,8 @@ export {
   useSetMapCoordinates,
   useSetMapBounds,
   useSetMapZoom,
-  // (si tu l’ajoutes dans unifiedStore)
-  // useSetMapApiLoaded,
+  useSetAllListings,
+  useSetListingsLoading,
 } from "./unifiedStore";
 
 // ✅ Export des types du store unifié
