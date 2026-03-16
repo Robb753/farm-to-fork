@@ -7,8 +7,10 @@ import { useAllListingsWithImages } from "@/app/hooks/useAllListingsWithImages";
 import { MAPBOX_CONFIG } from "@/lib/config";
 import type { LatLng, Listing } from "@/lib/store";
 import {
-  useListingsActions,
-  useMapActions,
+  useSetAllListings,
+  useSetListingsLoading,
+  useSetMapCoordinates,
+  useSetMapZoom,
 } from "@/lib/store";
 import ListingMapView from "../../modules/listings/components/ListingMapView";
 
@@ -20,8 +22,10 @@ export default function Explore(): JSX.Element {
   const searchParams = useSearchParams();
   const paramsKey = searchParams.toString();
 
-  const { setAllListings, setListingsLoading } = useListingsActions();
-  const { setCoordinates, setZoom } = useMapActions();
+  const setAllListings = useSetAllListings();
+  const setListingsLoading = useSetListingsLoading();
+  const setCoordinates = useSetMapCoordinates();
+  const setZoom = useSetMapZoom();
 
   const lastUrlViewRef = useRef<{
     lat: number;

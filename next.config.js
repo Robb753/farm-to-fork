@@ -219,7 +219,6 @@ module.exports = (phase) => {
         config.optimization = {
           ...config.optimization,
           usedExports: true,
-          sideEffects: false,
           splitChunks: {
             chunks: "all",
             cacheGroups: {

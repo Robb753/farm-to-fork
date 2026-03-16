@@ -339,10 +339,28 @@ export const useUnifiedStore = create<UnifiedStore>()(
             })),
 
           setBounds: (bounds) => {
-            set((state) => ({
-              map: { ...state.map, bounds },
+            const state = get();
+            const { all } = state.listings;
+            const { applied: filters } = state.filters;
+
+            const filtered = all.filter((listing) =>
+              doesListingMatchFilters(listing, filters)
+            );
+            const visible = filtered.filter((listing) =>
+              isListingInBounds(listing, bounds)
+            );
+
+            const prev = state.listings.visible;
+            const visibleChanged =
+              prev.length !== visible.length ||
+              !visible.every((l) => prev.some((p) => p.id === l.id));
+
+            set((s) => ({
+              map: { ...s.map, bounds },
+              listings: visibleChanged
+                ? { ...s.listings, filtered, visible }
+                : s.listings,
             }));
-            get().applyFiltersAndBounds();
           },
 
           setZoom: (zoom) =>
@@ -707,6 +725,12 @@ export const useSetMapInstance = () =>
 
 export const useListingsActions = () =>
   useUnifiedStore((state) => state.listingsActions);
+
+export const useSetAllListings = () =>
+  useUnifiedStore((s) => s.listingsActions.setAllListings);
+
+export const useSetListingsLoading = () =>
+  useUnifiedStore((s) => s.listingsActions.setListingsLoading);
 
 export const useFiltersActions = () =>
   useUnifiedStore((state) => state.filtersActions);

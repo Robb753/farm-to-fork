@@ -1,6 +1,5 @@
 "use client";
 
-import "mapbox-gl/dist/mapbox-gl.css";
 import "@/lib/config/mapbox-init";
 
 import React, { useEffect, useRef, useCallback } from "react";
@@ -352,15 +351,11 @@ export default function MapboxSection({
 
         if (containerEl) cleanContainer(containerEl);
 
-        setApiLoaded(false);
-        setInstance(null);
         setMapLoading(false);
       };
     } catch (error) {
       console.error("Erreur init carte:", error);
       setMapLoading(false);
-      setApiLoaded(false);
-      setInstance(null);
     }
   }, [
     cleanContainer,

@@ -1,3 +1,6 @@
+/* ============ Mapbox GL (loaded here so it's in the main CSS bundle) ============ */
+@import 'mapbox-gl/dist/mapbox-gl.css';
+
 /* ============ Tailwind ============ */
 @tailwind base;
 @tailwind components;

@@ -3,6 +3,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import ClientLayout from "./ClientLayout";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import Script from "next/script";
 
 /** Props du layout */
 interface RootLayoutProps {
@@ -110,29 +111,6 @@ export default function RootLayout({ children }: RootLayoutProps): JSX.Element {
           <link rel="icon" href="/favicon.ico" sizes="any" />
           <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
           <link rel="manifest" href="/manifest.json" />
-
-          {/* Google Analytics */}
-          {process.env.NODE_ENV === "production" &&
-            process.env.NEXT_PUBLIC_GA_ID && (
-              <>
-                <script
-                  async
-                  src={`https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(
-                    process.env.NEXT_PUBLIC_GA_ID
-                  )}`}
-                />
-                <script
-                  dangerouslySetInnerHTML={{
-                    __html: `
-                    window.dataLayer = window.dataLayer || [];
-                    function gtag(){dataLayer.push(arguments);}
-                    gtag('js', new Date());
-                    gtag('config', '${encodeURIComponent(process.env.NEXT_PUBLIC_GA_ID)}');
-                  `,
-                  }}
-                />
-              </>
-            )}
         </head>
 
         <body
@@ -170,6 +148,19 @@ export default function RootLayout({ children }: RootLayoutProps): JSX.Element {
             />
           )}
         </body>
+
+        {/* Google Analytics — lazyOnload defers until page is fully interactive */}
+        {process.env.NODE_ENV === "production" && process.env.NEXT_PUBLIC_GA_ID && (
+          <>
+            <Script
+              src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_ID}`}
+              strategy="lazyOnload"
+            />
+            <Script id="ga-config" strategy="lazyOnload">
+              {`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${process.env.NEXT_PUBLIC_GA_ID}');`}
+            </Script>
+          </>
+        )}
       </html>
     </ClerkProvider>
   );
