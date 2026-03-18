@@ -199,8 +199,7 @@ function esc(s: unknown): string {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
+    .replace(/"/g, "&quot;");
 }
 
 export default function MapboxClusterLayer(): null {
@@ -328,17 +327,25 @@ export default function MapboxClusterLayer(): null {
       popupRef.current = new mapboxgl.Popup({
         closeButton: true,
         closeOnClick: true,
-        offset: 12,
-        maxWidth: "220px",
+        offset: 14,
+        maxWidth: "240px",
         className: "farm-popup",
       })
         .setLngLat(coords)
         .setHTML(
-          `<div style="font-family:system-ui;padding:2px 0">` +
-          `<p style="margin:0 0 4px;font-size:14px;font-weight:700;color:${COLORS.TEXT_PRIMARY}">${esc(props.name)}</p>` +
-          `<p style="margin:0 0 8px;font-size:12px;color:#6b7280">${esc(props.address)}</p>` +
-          `<a href="/farm/${props.id}" style="display:inline-block;font-size:12px;font-weight:600;color:${COLORS.PRIMARY};text-decoration:none">Voir la fiche →</a>` +
-          `</div>`,
+          `<div style="font-family:system-ui;padding:4px 0;min-width:160px;max-width:200px">` +
+            `<p style="margin:0 0 6px 0;font-size:13px;font-weight:700;line-height:1.3;color:#111827;word-break:break-word">${esc(props.name)}</p>` +
+            (props.address
+              ? `<p style="margin:0 0 10px 0;font-size:11px;color:#6b7280;line-height:1.4">${esc(props.address)}</p>`
+              : `<div style="margin-bottom:10px"></div>`) +
+            `<a href="/farm/${props.id}" ` +
+            `style="display:inline-block;font-size:12px;font-weight:600;color:#16a34a;text-decoration:none;` +
+            `border:1px solid #16a34a;border-radius:6px;padding:4px 10px;` +
+            `transition:background 0.15s"` +
+            `onmouseover="this.style.background='#f0fdf4'"` +
+            `onmouseout="this.style.background='transparent'"` +
+            `>Voir la fiche →</a>` +
+            `</div>`,
         )
         .addTo(mapInstance);
 
