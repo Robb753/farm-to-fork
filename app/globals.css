@@ -307,31 +307,23 @@ body[data-route*="/explore"] .mapbox-dropdown [role="listbox"] {
    (à gérer au niveau des composants via Tailwind, ex: min-h-[500px])
 ========================================== */
 
-/* ── Mapbox popup farm-popup ── */
+/* Popup Mapbox custom */
 .farm-popup .mapboxgl-popup-content {
-  padding: 14px 16px !important;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+  padding: 12px 14px;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
   border: 1px solid #e5e7eb;
-  min-width: 200px;
 }
-.farm-popup .mapboxgl-popup-tip {
-  border-top-color: #ffffff;
-}
+
 .farm-popup .mapboxgl-popup-close-button {
-  font-size: 18px !important;
-  line-height: 1;
+  font-size: 16px;
   color: #9ca3af;
-  padding: 4px 8px !important;
-  top: 6px !important;
-  right: 6px !important;
-  border-radius: 4px;
-  width: auto;
-  height: auto;
-  box-shadow: none;
+  padding: 2px 6px;
+  top: 4px;
+  right: 4px;
 }
+
 .farm-popup .mapboxgl-popup-close-button:hover {
   color: #111827;
-  background: #f3f4f6 !important;
-  transform: none;
+  background: transparent;
 }
