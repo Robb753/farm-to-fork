@@ -329,13 +329,13 @@ export default function MapboxClusterLayer(): null {
         closeButton: true,
         closeOnClick: true,
         offset: 12,
-        maxWidth: "220px",
+        maxWidth: "300px",
         className: "farm-popup",
       })
         .setLngLat(coords)
         .setHTML(
-          `<div style="font-family:system-ui;padding:2px 0">` +
-          `<p style="margin:0 0 4px;font-size:14px;font-weight:700;color:${COLORS.TEXT_PRIMARY}">${esc(props.name)}</p>` +
+          `<div style="font-family:system-ui;padding:4px 24px 4px 0">` +
+          `<p style="margin:0 0 6px;font-size:13px;font-weight:700;line-height:1.4;word-wrap:break-word;overflow-wrap:break-word;color:${COLORS.TEXT_PRIMARY}">${esc(props.name)}</p>` +
           `<p style="margin:0 0 8px;font-size:12px;color:#6b7280">${esc(props.address)}</p>` +
           `<a href="/farm/${props.id}" style="display:inline-block;font-size:12px;font-weight:600;color:${COLORS.PRIMARY};text-decoration:none">Voir la fiche →</a>` +
           `</div>`,
