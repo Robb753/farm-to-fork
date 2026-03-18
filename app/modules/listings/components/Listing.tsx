@@ -12,7 +12,7 @@ import { useUser, useClerk } from "@clerk/nextjs";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 // 🔒 SÉCURITÉ: Import des fonctions de sanitisation
-import { escapeHTML, sanitizeHTML } from "@/lib/utils/sanitize";
+import { escapeHTML } from "@/lib/utils/sanitize";
 
 import {
   useVisibleListings,
@@ -222,6 +222,13 @@ const ListItem = React.memo<ListItemProps>(
     onShowOnMap,
   }) => {
     const [imageError, setImageError] = useState<boolean>(false);
+    const articleRef = useRef<HTMLElement>(null);
+
+    useEffect(() => {
+      if (isHovered) {
+        articleRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    }, [isHovered]);
 
     const getImageUrl = useCallback((): string => {
       if (Array.isArray(item.listingImages) && item.listingImages.length > 0) {
@@ -252,6 +259,7 @@ const ListItem = React.memo<ListItemProps>(
 
     return (
       <article
+        ref={articleRef}
         id={`listing-${item.id}`}
         className={cn(
           "group relative flex border rounded-xl overflow-hidden shadow-sm",
@@ -259,7 +267,7 @@ const ListItem = React.memo<ListItemProps>(
           "hover:border-green-200 hover:-translate-y-1",
           isHovered && "ring-2 ring-green-400 shadow-md border-green-300"
         )}
-        style={{ backgroundColor: COLORS.BG_WHITE }}
+        style={{ backgroundColor: isHovered ? "#f0fdf4" : COLORS.BG_WHITE }}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
       >
@@ -364,7 +372,7 @@ const ListItem = React.memo<ListItemProps>(
               <div className="flex items-start justify-between mb-2">
                 <h2
                   className={cn(
-                    "text-lg font-semibold line-clamp-1 transition-colors pr-2",
+                    "text-lg font-bold line-clamp-1 transition-colors pr-2",
                     "group-hover:text-green-700"
                   )}
                   style={{ color: COLORS.TEXT_PRIMARY }}
@@ -441,8 +449,8 @@ const ListItem = React.memo<ListItemProps>(
               </div>
 
               <div
-                className="flex items-start gap-2 text-sm mb-3"
-                style={{ color: COLORS.TEXT_SECONDARY }}
+                className="flex items-start gap-2 text-xs mb-3"
+                style={{ color: COLORS.TEXT_MUTED }}
               >
                 <MapPin
                   className="h-4 w-4 mt-0.5 flex-shrink-0"
@@ -457,7 +465,7 @@ const ListItem = React.memo<ListItemProps>(
               {item.product_type?.length && item.product_type.length > 0 && (
                 <div className="mb-3">
                   <div className="flex flex-wrap gap-1.5">
-                    {item.product_type.slice(0, 4).map((product, index) => (
+                    {item.product_type.slice(0, 3).map((product, index) => (
                       <span
                         key={index}
                         className={cn(
@@ -475,7 +483,7 @@ const ListItem = React.memo<ListItemProps>(
                         {escapeHTML(product)}
                       </span>
                     ))}
-                    {item.product_type.length > 4 && (
+                    {item.product_type.length > 3 && (
                       <span
                         className={cn(
                           "text-xs px-2.5 py-1 rounded-full border"
@@ -486,23 +494,14 @@ const ListItem = React.memo<ListItemProps>(
                           borderColor: COLORS.BORDER,
                         }}
                       >
-                        +{item.product_type.length - 4}
+                        +{item.product_type.length - 3}
                       </span>
                     )}
                   </div>
                 </div>
               )}
 
-              {item.description && (
-                /* 🔒 SÉCURITÉ: Description sanitisée (permet formatage basique) */
-                <div
-                  className="text-sm line-clamp-2 mb-3 leading-relaxed prose prose-sm max-w-none"
-                  style={{ color: COLORS.TEXT_SECONDARY }}
-                  dangerouslySetInnerHTML={{
-                    __html: sanitizeHTML(item.description),
-                  }}
-                />
-              )}
+
             </div>
 
             <div className="flex items-center justify-between mt-auto pt-2">
@@ -512,22 +511,30 @@ const ListItem = React.memo<ListItemProps>(
                 )}
               </div>
 
-              {item.rating && (
-                <div className="flex items-center gap-1 text-sm">
-                  <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-                  <span
-                    className="font-medium"
-                    style={{ color: COLORS.TEXT_PRIMARY }}
-                  >
-                    {item.rating}
-                  </span>
-                  {item.reviewCount && (
-                    <span style={{ color: COLORS.TEXT_MUTED }}>
-                      ({item.reviewCount})
+              <div className="flex items-center gap-3">
+                {item.rating && (
+                  <div className="flex items-center gap-1 text-sm">
+                    <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+                    <span
+                      className="font-medium"
+                      style={{ color: COLORS.TEXT_PRIMARY }}
+                    >
+                      {item.rating}
                     </span>
-                  )}
-                </div>
-              )}
+                    {item.reviewCount && (
+                      <span style={{ color: COLORS.TEXT_MUTED }}>
+                        ({item.reviewCount})
+                      </span>
+                    )}
+                  </div>
+                )}
+                <span
+                  className="text-xs font-semibold"
+                  style={{ color: COLORS.PRIMARY }}
+                >
+                  Voir la fiche →
+                </span>
+              </div>
             </div>
           </div>
         </Link>

@@ -194,6 +194,15 @@ function safeRemoveSource(map: mapboxgl.Map): void {
   }
 }
 
+function esc(s: unknown): string {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 export default function MapboxClusterLayer(): null {
   const map = useUnifiedStore((s) => s.map.instance) as mapboxgl.Map | null;
   const filteredListings = useFilteredListings();
@@ -294,7 +303,7 @@ export default function MapboxClusterLayer(): null {
       });
       if (!feature) return;
 
-      const props = feature.properties as { id: number; name: string };
+      const props = feature.properties as { id: number; name: string; address: string };
       const coords = (feature.geometry as GeoJSON.Point).coordinates as [
         number,
         number,
@@ -325,7 +334,11 @@ export default function MapboxClusterLayer(): null {
       })
         .setLngLat(coords)
         .setHTML(
-          `<p style="margin:0;font-family:system-ui;font-size:13px;font-weight:600;color:${COLORS.TEXT_PRIMARY}">${props.name}</p>`,
+          `<div style="font-family:system-ui;padding:2px 0">` +
+          `<p style="margin:0 0 4px;font-size:14px;font-weight:700;color:${COLORS.TEXT_PRIMARY}">${esc(props.name)}</p>` +
+          `<p style="margin:0 0 8px;font-size:12px;color:#6b7280">${esc(props.address)}</p>` +
+          `<a href="/farm/${props.id}" style="display:inline-block;font-size:12px;font-weight:600;color:${COLORS.PRIMARY};text-decoration:none">Voir la fiche →</a>` +
+          `</div>`,
         )
         .addTo(mapInstance);
 
@@ -342,6 +355,22 @@ export default function MapboxClusterLayer(): null {
       mapInstance.getCanvas().style.cursor = "";
     }
 
+    function onPointMouseEnter(e: mapboxgl.MapMouseEvent): void {
+      mapInstance.getCanvas().style.cursor = "pointer";
+      const [feat] = mapInstance.queryRenderedFeatures(e.point, {
+        layers: [LAYER_POINTS],
+      });
+      const id = feat?.properties?.id as number | undefined;
+      if (id != null) {
+        useUnifiedStore.getState().interactionsActions.setHoveredListing(id);
+      }
+    }
+
+    function onPointMouseLeave(): void {
+      mapInstance.getCanvas().style.cursor = "";
+      useUnifiedStore.getState().interactionsActions.setHoveredListing(null);
+    }
+
     function onStyleLoad(): void {
       isReadyRef.current = false;
       setupLayers(mapInstance);
@@ -356,8 +385,8 @@ export default function MapboxClusterLayer(): null {
     mapInstance.on("click", LAYER_POINTS, onPointClick);
     mapInstance.on("mouseenter", LAYER_CLUSTERS, setCursor);
     mapInstance.on("mouseleave", LAYER_CLUSTERS, resetCursor);
-    mapInstance.on("mouseenter", LAYER_POINTS, setCursor);
-    mapInstance.on("mouseleave", LAYER_POINTS, resetCursor);
+    mapInstance.on("mouseenter", LAYER_POINTS, onPointMouseEnter);
+    mapInstance.on("mouseleave", LAYER_POINTS, onPointMouseLeave);
 
     if (mapInstance.isStyleLoaded()) setupLayers(mapInstance);
 
@@ -367,8 +396,8 @@ export default function MapboxClusterLayer(): null {
       mapInstance.off("click", LAYER_POINTS, onPointClick);
       mapInstance.off("mouseenter", LAYER_CLUSTERS, setCursor);
       mapInstance.off("mouseleave", LAYER_CLUSTERS, resetCursor);
-      mapInstance.off("mouseenter", LAYER_POINTS, setCursor);
-      mapInstance.off("mouseleave", LAYER_POINTS, resetCursor);
+      mapInstance.off("mouseenter", LAYER_POINTS, onPointMouseEnter);
+      mapInstance.off("mouseleave", LAYER_POINTS, onPointMouseLeave);
 
       teardownLayers(mapInstance);
     };
