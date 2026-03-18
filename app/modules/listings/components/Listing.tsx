@@ -372,7 +372,7 @@ const ListItem = React.memo<ListItemProps>(
               <div className="flex items-start justify-between mb-2">
                 <h2
                   className={cn(
-                    "text-lg font-bold line-clamp-1 transition-colors pr-2",
+                    "text-base font-bold line-clamp-2 leading-snug transition-colors pr-2",
                     "group-hover:text-green-700"
                   )}
                   style={{ color: COLORS.TEXT_PRIMARY }}
@@ -456,9 +456,8 @@ const ListItem = React.memo<ListItemProps>(
                   className="h-4 w-4 mt-0.5 flex-shrink-0"
                   style={{ color: COLORS.PRIMARY }}
                 />
-                {/* 🔒 SÉCURITÉ: Adresse échappée (texte + attribut) */}
-                <span className="line-clamp-1" title={escapeHTML(item.address)}>
-                  {escapeHTML(item.address)}
+                <span className="line-clamp-1" title={item.address ?? ""}>
+                  {item.address}
                 </span>
               </div>
 
@@ -710,7 +709,7 @@ export default function Listing({
 
   return (
     <div
-      className="p-6 min-h-screen relative"
+      className="px-4 pt-4 pb-6 min-h-screen relative"
       style={{ backgroundColor: COLORS.BG_GRAY }}
     >
       {(isLoading || isLoadingImages) && <BookingStyleLoader />}
