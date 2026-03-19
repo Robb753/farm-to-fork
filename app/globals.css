@@ -307,23 +307,33 @@ body[data-route*="/explore"] .mapbox-dropdown [role="listbox"] {
    (à gérer au niveau des composants via Tailwind, ex: min-h-[500px])
 ========================================== */
 
-/* Popup Mapbox custom */
+/* ──────────────────────────────────────────────────────────────────────────
+   InfoWindow compact Farm2Fork — Mapbox popup override
+   Le contenu est rendu par le composant React FarmInfoWindow.
+   On supprime tous les styles natifs Mapbox pour laisser le composant
+   gérer son propre rendu (padding, border-radius, shadow…).
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* Supprime le padding et la bordure native du popup, le composant React
+   gère son propre style */
 .farm-popup .mapboxgl-popup-content {
-  padding: 12px 14px;
-  border-radius: 10px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  padding: 0;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.14), 0 1px 4px rgba(0, 0, 0, 0.08);
   border: 1px solid #e5e7eb;
+  overflow: hidden;
+  /* Empêche le contenu du composant de déborder du popup */
+  max-width: 280px;
 }
 
+/* Le close button natif Mapbox est désactivé (closeButton: false),
+   le composant React fournit son propre bouton ✕ */
 .farm-popup .mapboxgl-popup-close-button {
-  font-size: 16px;
-  color: #9ca3af;
-  padding: 2px 6px;
-  top: 4px;
-  right: 4px;
+  display: none;
 }
 
-.farm-popup .mapboxgl-popup-close-button:hover {
-  color: #111827;
-  background: transparent;
+/* Flèche du popup : fond blanc pour s'intégrer à la carte */
+.farm-popup .mapboxgl-popup-tip {
+  border-top-color: #ffffff;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.12));
 }
