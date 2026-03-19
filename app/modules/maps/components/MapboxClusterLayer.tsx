@@ -13,7 +13,11 @@
  */
 
 import { useEffect, useMemo, useRef } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import React from "react";
 import mapboxgl from "mapbox-gl";
+
+import { FarmInfoWindow } from "./FarmInfoWindow";
 
 import { COLORS, CLUSTER_CONFIG } from "@/lib/config";
 import { useFilteredListings, useUnifiedStore } from "@/lib/store";
@@ -57,6 +61,12 @@ function toGeoJSON(
         address: l.address ?? "",
         active: Boolean(l.active),
         claimed: Boolean(l.clerk_user_id),
+        // Extra fields for the InfoWindow (arrays serialized as JSON strings)
+        image_url: l.listingImages?.[0]?.url ?? "",
+        product_type: JSON.stringify(l.product_type ?? []),
+        certifications: JSON.stringify(l.certifications ?? []),
+        description: l.description ?? "",
+        availability: l.availability ?? "",
       },
     });
   }
@@ -194,13 +204,6 @@ function safeRemoveSource(map: mapboxgl.Map): void {
   }
 }
 
-function esc(s: unknown): string {
-  return String(s ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
 
 export default function MapboxClusterLayer(): null {
   const map = useUnifiedStore((s) => s.map.instance) as mapboxgl.Map | null;
@@ -209,6 +212,7 @@ export default function MapboxClusterLayer(): null {
 
   const isReadyRef = useRef(false);
   const popupRef = useRef<mapboxgl.Popup | null>(null);
+  const popupRootRef = useRef<Root | null>(null);
   const prevHoveredRef = useRef<number | null>(null);
 
   const filteredListingsRef = useRef(filteredListings);
@@ -302,7 +306,16 @@ export default function MapboxClusterLayer(): null {
       });
       if (!feature) return;
 
-      const props = feature.properties as { id: number; name: string; address: string };
+      const props = feature.properties as {
+        id: number;
+        name: string;
+        address: string;
+        image_url?: string;
+        product_type?: string;
+        certifications?: string;
+        description?: string;
+        availability?: string;
+      };
       const coords = (feature.geometry as GeoJSON.Point).coordinates as [
         number,
         number,
@@ -318,39 +331,67 @@ export default function MapboxClusterLayer(): null {
         }),
       );
 
+      // Unmount previous React root before removing old popup
+      try {
+        popupRootRef.current?.unmount();
+        popupRootRef.current = null;
+      } catch {
+        // ignore
+      }
       try {
         popupRef.current?.remove();
       } catch {
         // Previous popup may already be removed.
       }
 
+      // Render FarmInfoWindow into a detached DOM node via React root
+      const container = document.createElement("div");
+      const root = createRoot(container);
+      popupRootRef.current = root;
+
+      const removePopup = () => {
+        popupRef.current?.remove();
+        popupRef.current = null;
+        // Defer unmount to let React finish its event handling
+        setTimeout(() => {
+          root.unmount();
+          if (popupRootRef.current === root) popupRootRef.current = null;
+        }, 0);
+      };
+
+      root.render(
+        React.createElement(FarmInfoWindow, {
+          listing: {
+            id: props.id,
+            name: props.name,
+            address: props.address,
+            image_url: props.image_url,
+            product_type: props.product_type,
+            certifications: props.certifications,
+            description: props.description,
+            availability: props.availability,
+          },
+          onClose: removePopup,
+        }),
+      );
+
       popupRef.current = new mapboxgl.Popup({
-        closeButton: true,
+        closeButton: false,
         closeOnClick: true,
         offset: 14,
-        maxWidth: "240px",
+        maxWidth: "280px",
         className: "farm-popup",
       })
         .setLngLat(coords)
-        .setHTML(
-          `<div style="font-family:system-ui;padding:4px 0;min-width:160px;max-width:200px">` +
-            `<p style="margin:0 0 6px 0;font-size:13px;font-weight:700;line-height:1.3;color:#111827;word-break:break-word">${esc(props.name)}</p>` +
-            (props.address
-              ? `<p style="margin:0 0 10px 0;font-size:11px;color:#6b7280;line-height:1.4">${esc(props.address)}</p>`
-              : `<div style="margin-bottom:10px"></div>`) +
-            `<a href="/farm/${props.id}" ` +
-            `style="display:inline-block;font-size:12px;font-weight:600;color:#16a34a;text-decoration:none;` +
-            `border:1px solid #16a34a;border-radius:6px;padding:4px 10px;` +
-            `transition:background 0.15s"` +
-            `onmouseover="this.style.background='#f0fdf4'"` +
-            `onmouseout="this.style.background='transparent'"` +
-            `>Voir la fiche →</a>` +
-            `</div>`,
-        )
+        .setDOMContent(container)
         .addTo(mapInstance);
 
       popupRef.current.on("close", () => {
         popupRef.current = null;
+        setTimeout(() => {
+          root.unmount();
+          if (popupRootRef.current === root) popupRootRef.current = null;
+        }, 0);
       });
     }
 
