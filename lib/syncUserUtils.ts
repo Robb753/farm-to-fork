@@ -14,9 +14,19 @@ export const getEmailFromUser = (user: ClerkUserDTO | null): string | null => {
   return user.email ?? null;
 };
 
-
 /**
- * Synchronise le profil utilisateur avec Supabase (upsert).
+ * Synchronise le profil utilisateur avec Supabase.
+ *
+ * Stratégie INSERT / UPDATE séparés pour éviter le trigger
+ * `trg_prevent_profiles_sensitive_changes` qui bloque toute
+ * modification de user_id / email / farm_id via un upsert.
+ *
+ * - Première connexion  → INSERT complet (user_id, email, role, favorites)
+ * - Reconnexion         → UPDATE uniquement updated_at (colonnes protégées intactes)
+ *
+ * Note : la promotion de rôle (user → farmer / admin) est gérée
+ * exclusivement côté serveur via le bypass `app.bypass_sensitive = 'on'`.
+ * Elle ne passe pas par cette fonction.
  *
  * Note : la création du listing farmer est gérée exclusivement par le
  * flow d'onboarding (api/onboarding/create-listing) via clerk_user_id.
@@ -25,7 +35,7 @@ export const getEmailFromUser = (user: ClerkUserDTO | null): string | null => {
 export const syncProfileToSupabase = async (
   supabase: SupabaseDbClient,
   user: ClerkUserDTO,
-  role: AllowedRole
+  role: AllowedRole,
 ): Promise<boolean> => {
   if (!user?.id) throw new Error("Utilisateur non défini");
 
@@ -38,8 +48,8 @@ export const syncProfileToSupabase = async (
     const email = getEmailFromUser(user);
     if (!email) throw new Error("Email non disponible");
 
-    // Ne pas écraser favorites à chaque upsert :
-    // on lit d'abord pour savoir si le profil existe déjà.
+    // Vérification d'existence — évite d'écraser les colonnes protégées
+    // (user_id, email, farm_id) lors d'une reconnexion.
     const { data: existing, error: existingError } = await supabase
       .from("profiles")
       .select("user_id")
@@ -47,24 +57,38 @@ export const syncProfileToSupabase = async (
       .maybeSingle();
 
     if (existingError) {
-      console.warn("Warn read profile before upsert:", existingError);
+      console.warn("Warn read profile before insert/update:", existingError);
     }
 
-    const profileData = {
-      user_id: user.id,
-      email,
-      role,
-      updated_at: new Date().toISOString(),
-      ...(existing ? {} : { favorites: [] }),
-    };
+    if (!existing) {
+      // 🆕 Première connexion → INSERT complet
+      const { error } = await supabase.from("profiles").insert({
+        user_id: user.id,
+        email,
+        role,
+        favorites: [],
+        updated_at: new Date().toISOString(),
+      });
 
-    const { error } = await supabase
-      .from("profiles")
-      .upsert(profileData, { onConflict: "user_id" });
+      if (error) {
+        console.error("Erreur Supabase (insert):", error);
+        throw new Error(`Erreur Supabase: ${error.message}`);
+      }
+    } else {
+      // 🔄 Reconnexion → UPDATE uniquement les colonnes non-protégées
+      // ❌ PAS de user_id, email, farm_id, role — protégés par le trigger
+      //    trg_prevent_profiles_sensitive_changes
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", user.id);
 
-    if (error) {
-      console.error("Erreur Supabase:", error);
-      throw new Error(`Erreur Supabase: ${error.message}`);
+      if (error) {
+        console.error("Erreur Supabase (update):", error);
+        throw new Error(`Erreur Supabase: ${error.message}`);
+      }
     }
 
     return true;
@@ -85,7 +109,7 @@ export const syncProfileToSupabase = async (
 export const getProfileFromSupabase = async (
   supabase: SupabaseDbClient,
   userId: string,
-  maxAttempts: number = 2
+  maxAttempts: number = 2,
 ): Promise<{ role: AllowedRole } | null> => {
   let attempt = 0;
 
@@ -103,7 +127,7 @@ export const getProfileFromSupabase = async (
     // PGRST116 = no rows found
     if (error?.code === "PGRST116" && attempt < maxAttempts) {
       console.warn(
-        `Tentative ${attempt} : profil non trouvé, nouvelle tentative dans 200 ms...`
+        `Tentative ${attempt} : profil non trouvé, nouvelle tentative dans 200 ms...`,
       );
       await new Promise((res) => setTimeout(res, 200));
       continue;
