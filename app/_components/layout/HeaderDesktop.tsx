@@ -398,6 +398,7 @@ const UserMenu: React.FC<UserMenuProps> = ({ userInfo, role, onSignOut }) => {
 
 const HeaderDesktopSkeleton: React.FC = () => (
   <header
+    role="banner"
     className="sticky top-0 z-50 w-full border-b backdrop-blur supports-[backdrop-filter]:bg-white/60"
     style={{
       backgroundColor: `${COLORS.BG_WHITE}F2`,
@@ -452,6 +453,7 @@ export default function HeaderDesktop({
 
   return (
     <header
+      role="banner"
       className={cn(
         "sticky top-0 z-[200] w-full border-b backdrop-blur supports-[backdrop-filter]:bg-white/60",
         className,

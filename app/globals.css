@@ -169,8 +169,8 @@
 /* ============ Mapbox – Popups (version consolidée) ============ */
 .mapboxgl-popup { z-index: 100; animation: popup-appear .3s ease-out; }
 @keyframes popup-appear {
-  0% { opacity: 0; transform: translateY(-10px) scale(.95); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
+  0%  { opacity: 0; transform: scale(0.92); }
+  100% { opacity: 1; transform: scale(1); }
 }
 
 .mapboxgl-popup-content {
@@ -302,38 +302,21 @@ body[data-route*="/explore"] .mapbox-dropdown [role="listbox"] {
 .f2f-text-secondary { color: #6b7280; }
 .f2f-text-muted { color: #9ca3af; }
 
-/* ====== SUPPRIMÉES volontairement ======
-   .mapboxgl-map { min-height: 500px !important; }
-   (à gérer au niveau des composants via Tailwind, ex: min-h-[500px])
-========================================== */
-
-/* ──────────────────────────────────────────────────────────────────────────
-   InfoWindow compact Farm2Fork — Mapbox popup override
-   Le contenu est rendu par le composant React FarmInfoWindow.
-   On supprime tous les styles natifs Mapbox pour laisser le composant
-   gérer son propre rendu (padding, border-radius, shadow…).
-   ────────────────────────────────────────────────────────────────────────── */
-
-/* Supprime le padding et la bordure native du popup, le composant React
-   gère son propre style */
+/* ============ Farm2Fork — InfoWindow popup ============ */
 .farm-popup .mapboxgl-popup-content {
   padding: 0;
   border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.14), 0 1px 4px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.14), 0 1px 4px rgba(0,0,0,0.08);
   border: 1px solid #e5e7eb;
   overflow: hidden;
-  /* Empêche le contenu du composant de déborder du popup */
   max-width: 280px;
 }
 
-/* Le close button natif Mapbox est désactivé (closeButton: false),
-   le composant React fournit son propre bouton ✕ */
 .farm-popup .mapboxgl-popup-close-button {
   display: none;
 }
 
-/* Flèche du popup : fond blanc pour s'intégrer à la carte */
 .farm-popup .mapboxgl-popup-tip {
   border-top-color: #ffffff;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.12));
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.12));
 }
