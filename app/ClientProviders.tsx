@@ -1,14 +1,27 @@
 // app/ClientProviders.tsx
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useLayoutEffect } from "react";
 import dynamic from "next/dynamic";
 import { Toaster } from "sonner";
 import AuthSync from "./_components/AuthSync";
+import { useSupabaseWithClerk } from "@/utils/supabase/client";
+import { useUserActions } from "@/lib/store/userStore";
 
 interface ClientProvidersProps {
   children: React.ReactNode;
 }
+
+const SupabaseInitializer: React.FC = () => {
+  const supabase = useSupabaseWithClerk();
+  const { initSupabase } = useUserActions();
+
+  useLayoutEffect(() => {
+    initSupabase(supabase);
+  }, [supabase, initSupabase]);
+
+  return null;
+};
 
 const ModernAuthSystem = dynamic(
   () => import("./_components/auth/ModernAuthSystem"),
@@ -69,6 +82,7 @@ export default function ClientProviders({
 
       <ModernAuthSystem />
       <HashCleaner />
+      <SupabaseInitializer />
       <AuthSync />
       <AppLoadingNotifier />
 
