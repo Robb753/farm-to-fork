@@ -7,6 +7,7 @@ import dynamic from "next/dynamic";
 import {
   LogIn,
   PlusCircle,
+  LayoutDashboard,
   ListChecks,
   Heart,
   User,
@@ -474,26 +475,47 @@ export default function HeaderDesktop({
             </div>
           )}
 
-          <Link
-            href={
-              isSignedIn
-                ? "/become-producer"
-                : "/sign-in?redirect=/become-producer"
-            }
-            className="hidden md:flex items-center gap-1 text-sm font-medium px-3 py-2 rounded-lg transition-all"
-            style={{ color: COLORS.PRIMARY, backgroundColor: "transparent" }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = COLORS.PRIMARY_BG;
-              e.currentTarget.style.color = COLORS.PRIMARY_DARK;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "transparent";
-              e.currentTarget.style.color = COLORS.PRIMARY;
-            }}
-          >
-            <PlusCircle className="w-4 h-4" />
-            Devenir producteur
-          </Link>
+          {role !== "admin" && (
+            role === "farmer" ? (
+              <Link
+                href="/dashboard/farms"
+                className="hidden md:flex items-center gap-1 text-sm font-medium px-3 py-2 rounded-lg transition-all"
+                style={{ color: COLORS.PRIMARY, backgroundColor: "transparent" }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = COLORS.PRIMARY_BG;
+                  e.currentTarget.style.color = COLORS.PRIMARY_DARK;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                  e.currentTarget.style.color = COLORS.PRIMARY;
+                }}
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                Mon espace producteur
+              </Link>
+            ) : (
+              <Link
+                href={
+                  isSignedIn
+                    ? "/become-producer"
+                    : "/sign-in?redirect=/become-producer"
+                }
+                className="hidden md:flex items-center gap-1 text-sm font-medium px-3 py-2 rounded-lg transition-all"
+                style={{ color: COLORS.PRIMARY, backgroundColor: "transparent" }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = COLORS.PRIMARY_BG;
+                  e.currentTarget.style.color = COLORS.PRIMARY_DARK;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                  e.currentTarget.style.color = COLORS.PRIMARY;
+                }}
+              >
+                <PlusCircle className="w-4 h-4" />
+                Devenir producteur
+              </Link>
+            )
+          )}
 
           {!isSignedIn ? (
             <AuthButtons onSignIn={openSignIn} onSignUp={openSignUp} />
