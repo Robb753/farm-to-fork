@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import dynamic from "next/dynamic";
@@ -21,12 +21,6 @@ import { useUserRole, useUserActions } from "@/lib/store/userStore";
 import { COLORS } from "@/lib/config/constants";
 import { cn } from "@/lib/utils";
 import { logger } from "@/lib/logger"; // ✅
-
-declare global {
-  interface Window {
-    __F2F_HEADER_DESKTOP_MOUNTED__?: boolean;
-  }
-}
 
 interface HeaderDesktopProps {
   showSearchInHeader?: boolean;
@@ -89,35 +83,6 @@ const useUserDisplayInfo = (): UserDisplayInfo => {
     email: user?.primaryEmailAddress?.emailAddress,
     roleLabel: getRoleLabel(),
   };
-};
-
-const useHeaderDesktopMountGuard = () => {
-  const [canRender] = useState<boolean>(() => {
-    if (typeof window === "undefined") return true;
-
-    if (window.__F2F_HEADER_DESKTOP_MOUNTED__) {
-      logger.warn("HeaderDesktop déjà monté - rendu bloqué");
-      return false;
-    }
-
-    window.__F2F_HEADER_DESKTOP_MOUNTED__ = true;
-    logger.debug("HeaderDesktop monté (guard ok)");
-    return true;
-  });
-
-  useEffect(() => {
-    return () => {
-      if (
-        typeof window !== "undefined" &&
-        window.__F2F_HEADER_DESKTOP_MOUNTED__
-      ) {
-        delete window.__F2F_HEADER_DESKTOP_MOUNTED__;
-        logger.debug("HeaderDesktop démonté - flag nettoyé");
-      }
-    };
-  }, []);
-
-  return canRender;
 };
 
 const MainNavigation: React.FC = () => (
@@ -427,7 +392,6 @@ export default function HeaderDesktop({
   const role = useUserRole() as UserRole;
   const { reset } = useUserActions();
 
-  const canRender = useHeaderDesktopMountGuard();
   const userInfo = useUserDisplayInfo();
 
   const handleSignOut = useCallback(async (): Promise<void> => {
@@ -449,7 +413,6 @@ export default function HeaderDesktop({
   }, []);
 
   if (!isLoaded) return <HeaderDesktopSkeleton />;
-  if (!canRender) return null;
 
   return (
     <header
