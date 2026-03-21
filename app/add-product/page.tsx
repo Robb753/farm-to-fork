@@ -179,12 +179,12 @@ export default function AddProductPage() {
           category: p.category,
           unit: p.unit,
           price: p.price,
-          stock_quantity: p.stockQuantity ?? null,
+          stock_quantity: p.stockQuantity ?? undefined,
           available: true,
           is_published: false,
           active: true,
           stock_status: "in_stock" as const,
-        }))
+        })),
       );
 
       if (error) {
