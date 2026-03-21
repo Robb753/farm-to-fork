@@ -763,7 +763,7 @@ export default function FarmerDashboard(): JSX.Element {
         >
           <div>
             <h2 className="text-xl font-semibold" style={{ color: COLORS.PRIMARY_DARK }}>
-              Mes produits{products.length > 0 && ` (${products.length})`}
+              Mes produits{products.filter(p => p.is_published).length > 0 && ` (${products.filter(p => p.is_published).length})`}
             </h2>
             <p className="text-sm mt-1" style={{ color: COLORS.TEXT_SECONDARY }}>
               Gérez votre catalogue produits
@@ -784,10 +784,10 @@ export default function FarmerDashboard(): JSX.Element {
           <div className="p-6 text-center">
             <Loader2 className="w-6 h-6 animate-spin mx-auto" style={{ color: COLORS.PRIMARY }} />
           </div>
-        ) : products.length === 0 ? (
+        ) : products.filter(p => p.is_published).length === 0 ? (
           <div className="p-8 text-center">
             <p className="mb-4" style={{ color: COLORS.TEXT_MUTED }}>
-              Vous n&apos;avez pas encore de produits.
+              Vous n&apos;avez pas encore de produits publiés.
             </p>
             <Button asChild style={{ backgroundColor: COLORS.PRIMARY, color: COLORS.BG_WHITE }}>
               <Link href={`/add-product/${listing!.id}`}>
@@ -798,7 +798,7 @@ export default function FarmerDashboard(): JSX.Element {
           </div>
         ) : (
           <ul className="divide-y" style={{ borderColor: COLORS.BORDER }}>
-            {products.map((product) => (
+            {products.filter(p => p.is_published).map((product) => (
               <li key={product.id} className="px-6 py-4 flex items-center gap-4">
                 <div className="flex-1 min-w-0">
                   <p className="font-medium truncate" style={{ color: COLORS.TEXT_PRIMARY }}>
@@ -881,6 +881,94 @@ export default function FarmerDashboard(): JSX.Element {
           </ul>
         )}
       </div>
+
+      {/* Produits en brouillon */}
+      {products.filter(p => !p.is_published).length > 0 && (
+        <div
+          className="mt-6 rounded-lg shadow-md border overflow-hidden"
+          style={{ backgroundColor: COLORS.BG_WHITE, borderColor: COLORS.BORDER }}
+        >
+          <div
+            className="px-6 py-4 border-b"
+            style={{
+              background: `linear-gradient(to right, #fefce8, ${COLORS.BG_GRAY})`,
+              borderBottomColor: COLORS.BORDER,
+            }}
+          >
+            <div>
+              <h2 className="text-xl font-semibold" style={{ color: COLORS.TEXT_PRIMARY }}>
+                Produits en brouillon ({products.filter(p => !p.is_published).length})
+              </h2>
+              <p className="text-sm mt-1" style={{ color: COLORS.TEXT_SECONDARY }}>
+                Publiez les produits pour les rendre visibles aux acheteurs
+              </p>
+            </div>
+          </div>
+
+          <ul className="divide-y" style={{ borderColor: COLORS.BORDER }}>
+            {products.filter(p => !p.is_published).map((product) => (
+              <li key={product.id} className="px-6 py-4 flex items-center gap-4">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium truncate" style={{ color: COLORS.TEXT_PRIMARY }}>
+                    {product.name}
+                  </p>
+                  <p className="text-sm mt-0.5" style={{ color: COLORS.TEXT_SECONDARY }}>
+                    {product.price != null
+                      ? `${product.price} € / ${product.unit ?? "unité"}`
+                      : "Prix non défini"}
+                    {product.stock_quantity != null && (
+                      <> · Stock : {product.stock_quantity === 0 ? "Rupture de stock" : product.stock_quantity}</>
+                    )}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                    Brouillon
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    style={{ borderColor: COLORS.PRIMARY, color: COLORS.PRIMARY }}
+                    onClick={() => handleProductToggle(product.id, product.is_published)}
+                  >
+                    Publier
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        style={{ borderColor: COLORS.ERROR, color: COLORS.ERROR }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle style={{ color: COLORS.ERROR }}>
+                          Supprimer ce brouillon ?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Cette action est définitive. Le produit &quot;{product.name}&quot; sera supprimé.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Annuler</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => handleProductDelete(product.id)}
+                          style={{ backgroundColor: COLORS.ERROR, color: COLORS.BG_WHITE }}
+                        >
+                          Confirmer la suppression
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
