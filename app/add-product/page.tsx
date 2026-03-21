@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useSupabaseWithClerk } from "@/utils/supabase/client";
 
@@ -24,13 +23,12 @@ type SubmitStatus = "idle" | "loading" | "success" | "error";
 
 export default function AddProductPage() {
   const { user, isLoaded, isSignedIn } = useUser();
-  const router = useRouter();
   const supabase = useSupabaseWithClerk();
 
   // Form state
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
-  const [unit, setUnit] = useState("");
+  const [unit, setUnit] = useState("kg");
   const [price, setPrice] = useState("");
   const [stockQuantity, setStockQuantity] = useState("");
 
@@ -38,6 +36,7 @@ export default function AddProductPage() {
   const [suggestionStatus, setSuggestionStatus] = useState<SuggestionStatus>("idle");
   const [suggestionError, setSuggestionError] = useState("");
   const [submitStatus, setSubmitStatus] = useState<SubmitStatus>("idle");
+  const [aiSuggested, setAiSuggested] = useState(false);
 
   // Profile state
   const [farmId, setFarmId] = useState<number | null>(null);
@@ -45,8 +44,9 @@ export default function AddProductPage() {
 
   useEffect(() => {
     if (!isLoaded) return;
+
     if (!isSignedIn) {
-      router.push("/sign-in");
+      window.location.href = "/sign-in";
       return;
     }
 
@@ -103,6 +103,7 @@ export default function AddProductPage() {
       setName(data.name);
       setCategory(data.category);
       setUnit(data.unit);
+      setAiSuggested(true);
       setSuggestionStatus("success");
     } catch {
       setSuggestionStatus("error");
@@ -128,15 +129,12 @@ export default function AddProductPage() {
       toast.error("Le prix doit être supérieur à 0.");
       return;
     }
-    const parsedQty = parseInt(stockQuantity, 10);
-    if (!stockQuantity || parsedQty <= 0) {
-      toast.error("La quantité doit être supérieure à 0.");
-      return;
-    }
     if (!farmId) {
       toast.error("Ferme introuvable. Impossible d'ajouter le produit.");
       return;
     }
+
+    const parsedQty = stockQuantity.trim() !== "" ? parseInt(stockQuantity, 10) : null;
 
     setSubmitStatus("loading");
 
@@ -148,7 +146,7 @@ export default function AddProductPage() {
         category,
         unit,
         price: parsedPrice,
-        stock_quantity: parsedQty,
+        stock_quantity: parsedQty ?? undefined,
         available: true,
         is_published: true,
         active: true,
@@ -173,15 +171,16 @@ export default function AddProductPage() {
 
   if (!isLoaded || profileLoading) {
     return (
-      <main className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-500 text-sm">Chargement…</p>
+      <main className="min-h-screen bg-white flex items-center justify-center">
+        <p className="text-gray-400 text-sm">Chargement…</p>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 py-10 px-4">
-      <div className="max-w-xl mx-auto">
+    <main className="min-h-screen bg-white py-10 px-4">
+      <div className="max-w-lg mx-auto">
+
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-2xl font-semibold text-gray-900">Ajouter un produit</h1>
@@ -203,15 +202,15 @@ export default function AddProductPage() {
                 value={name}
                 onChange={(e) => {
                   setName(e.target.value);
-                  if (suggestionStatus !== "idle") setSuggestionStatus("idle");
+                  setSuggestionStatus("idle");
                 }}
                 placeholder="Ex : tomates cerises, miel de lavande…"
-                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
+                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
               />
               <button
                 onClick={handleSuggest}
                 disabled={name.trim().length < 2 || suggestionStatus === "loading"}
-                className="shrink-0 bg-green-50 text-green-700 border border-green-300 hover:bg-green-100 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+                className="shrink-0 bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg px-3 py-2 text-sm font-medium transition-colors"
               >
                 {suggestionStatus === "loading" ? "…" : "Suggérer"}
               </button>
@@ -219,7 +218,7 @@ export default function AddProductPage() {
 
             {suggestionStatus === "success" && (
               <p className="mt-1.5 text-xs text-green-600 font-medium">
-                ✓ Suggestion appliquée — vous pouvez modifier les champs.
+                ✓ Suggestion appliquée
               </p>
             )}
             {suggestionStatus === "error" && (
@@ -232,65 +231,73 @@ export default function AddProductPage() {
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
               Catégorie
             </label>
-            <div className="flex flex-wrap gap-2">
-              {CATEGORIES.map((c) => (
+
+            {aiSuggested && category ? (
+              <div className="flex items-center gap-3">
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 border border-green-200">
+                  {category}
+                </span>
                 <button
-                  key={c}
-                  onClick={() => setCategory(c)}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                    category === c
-                      ? "bg-green-600 text-white border-green-600"
-                      : "bg-white text-gray-600 border-gray-300 hover:border-green-400 hover:text-green-700"
-                  }`}
+                  onClick={() => setAiSuggested(false)}
+                  className="text-xs text-gray-500 hover:text-gray-700 underline"
                 >
-                  {c}
+                  Modifier
                 </button>
-              ))}
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {CATEGORIES.map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => setCategory(c)}
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                      category === c
+                        ? "bg-green-600 text-white border-green-600"
+                        : "bg-white text-gray-600 border-gray-200 hover:border-green-400 hover:text-green-700"
+                    }`}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 3. Prix de vente + Unité (champ combiné) */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Prix de vente
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                placeholder="3.50"
+                className="w-28 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
+              />
+              <span className="text-sm text-gray-500">€ par</span>
+              <select
+                value={unit}
+                onChange={(e) => setUnit(e.target.value)}
+                className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none bg-white"
+              >
+                {UNITS.map((u) => (
+                  <option key={u} value={u}>
+                    {u}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
-          {/* 3. Unité */}
+          {/* 4. Stock disponible (optionnel) */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Unité de vente
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {UNITS.map((u) => (
-                <button
-                  key={u}
-                  onClick={() => setUnit(u)}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                    unit === u
-                      ? "bg-green-600 text-white border-green-600"
-                      : "bg-white text-gray-600 border-gray-300 hover:border-green-400 hover:text-green-700"
-                  }`}
-                >
-                  {u}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* 4. Prix */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Prix (€)
-            </label>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              placeholder="Ex : 3.50"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
-            />
-          </div>
-
-          {/* 5. Quantité */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Quantité disponible
+              Stock disponible{" "}
+              <span className="text-gray-400 font-normal">(optionnel)</span>
             </label>
             <input
               type="number"
@@ -299,7 +306,7 @@ export default function AddProductPage() {
               value={stockQuantity}
               onChange={(e) => setStockQuantity(e.target.value)}
               placeholder="Ex : 20"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
             />
           </div>
 
@@ -307,10 +314,11 @@ export default function AddProductPage() {
           <button
             onClick={handleSubmit}
             disabled={submitStatus === "loading"}
-            className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg px-6 py-2.5 text-sm font-medium transition-colors"
+            className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl px-6 py-3 text-sm font-medium transition-colors"
           >
             {submitStatus === "loading" ? "Enregistrement…" : "Ajouter le produit"}
           </button>
+
         </div>
       </div>
     </main>
