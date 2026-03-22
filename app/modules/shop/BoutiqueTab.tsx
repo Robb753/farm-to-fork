@@ -85,6 +85,7 @@ export default function BoutiqueTab({
           .select("*")
           .eq("farm_id", farmId)
           .eq("active", true)
+          .eq("is_published", true)
           .order("name");
 
         if (error) throw error;
@@ -116,22 +117,7 @@ export default function BoutiqueTab({
     return () => {
       cancelled = true;
     };
-  }, [farmId, farmName, supabase]); // router retiré : non utilisé dans l'effet
-
-  // Vérif panier (tunnel fermé)
-  useEffect(() => {
-    if (cart.farmId && farmId && cart.farmId !== farmId) {
-      // 🔒 SÉCURITÉ: Noms de fermes échappés avec fallback
-      toast.error(
-        `Panier déjà lié à ${escapeHTML(
-          cart.farmName || "une ferme"
-        )}. Videz-le pour acheter chez ${escapeHTML(
-          farmName || "cette ferme"
-        )}.`,
-        { duration: 3500 }
-      );
-    }
-  }, [cart.farmId, cart.farmName, farmId, farmName]);
+  }, [farmId, farmName, supabase]);
 
   const goToShop = useCallback(() => {
     if (!farmId) return;

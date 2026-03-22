@@ -59,7 +59,7 @@ export default function HeroSection({
     return imgs;
   }, [listing.listingImages, listing.profileImage]);
 
-  const defaultImage = "/images/placeholder-farm.jpg";
+  const defaultImage = "/default-farm-image.jpg";
 
   const displayImages = useMemo(() => {
     return galleryImages.length > 0 ? galleryImages : [defaultImage];
