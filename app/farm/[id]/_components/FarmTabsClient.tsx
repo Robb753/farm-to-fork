@@ -9,10 +9,6 @@ import type { Database } from "@/lib/types/database";
 
 import dynamic from "next/dynamic";
 
-const PresentationTab = dynamic(() => import("./PresentationTab"), {
-  ssr: false,
-  loading: () => <TabContentSkeleton />,
-});
 const BoutiqueTab = dynamic(() => import("@/app/modules/shop/BoutiqueTab"), {
   ssr: false,
   loading: () => <TabContentSkeleton />,
@@ -30,7 +26,7 @@ type ListingWithImages = Database["public"]["Tables"]["listing"]["Row"] & {
   listingImages: Database["public"]["Tables"]["listingImages"]["Row"][];
 };
 
-type TabValue = "presentation" | "boutique" | "services" | "avis";
+type TabValue = "boutique" | "services" | "avis";
 
 const TABS_CONFIG: Array<{
   value: TabValue;
@@ -38,12 +34,6 @@ const TABS_CONFIG: Array<{
   description: string;
   icon?: string;
 }> = [
-  {
-    value: "presentation",
-    label: "Présentation",
-    description: "Découvrez l'histoire et les valeurs de la ferme",
-    icon: "🏪",
-  },
   {
     value: "boutique",
     label: "Boutique",
@@ -85,7 +75,7 @@ function TabContentSkeleton(): JSX.Element {
 export default function FarmTabsClient({
   listing,
 }: FarmTabsClientProps): JSX.Element {
-  const [activeTab, setActiveTab] = useState<TabValue>("presentation");
+  const [activeTab, setActiveTab] = useState<TabValue>("boutique");
 
   // Analytics: page view (une seule fois au montage)
   useEffect(() => {
@@ -145,12 +135,6 @@ export default function FarmTabsClient({
       </TabsList>
 
       <div className="mt-6">
-        <TabsContent value="presentation" className="space-y-6">
-          <Suspense fallback={<TabContentSkeleton />}>
-            <PresentationTab listing={listing} />
-          </Suspense>
-        </TabsContent>
-
         <TabsContent value="boutique" className="space-y-6">
           <Suspense fallback={<TabContentSkeleton />}>
             <BoutiqueTab listing={listing} />
