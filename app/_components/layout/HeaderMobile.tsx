@@ -26,13 +26,8 @@ import useCitySearchControl from "@/app/modules/maps/hooks/useCitySearchControl"
 import { COLORS } from "@/lib/config";
 import { logger } from "@/lib/logger";
 
-/**
- * Interfaces TypeScript pour HeaderMobile
- */
 interface HeaderMobileProps {
-  /** Afficher la barre de recherche dans le header */
   showSearchInHeader?: boolean;
-  /** Classe CSS personnalisée */
   className?: string;
 }
 
@@ -51,9 +46,6 @@ interface UserDisplayInfo {
 
 type UserRole = "admin" | "farmer" | "user";
 
-/**
- * Chargement dynamique de MapboxCitySearch
- */
 const MapboxCitySearch = dynamic(
   () => import("@/app/modules/maps/components/shared/MapboxCitySearch"),
   {
@@ -64,12 +56,9 @@ const MapboxCitySearch = dynamic(
         style={{ backgroundColor: COLORS.BG_GRAY }}
       />
     ),
-  }
+  },
 );
 
-/**
- * Hook pour la gestion des informations utilisateur
- */
 const useUserDisplayInfo = (): UserDisplayInfo => {
   const { user } = useUser();
   const role = useUserRole() as UserRole;
@@ -106,9 +95,6 @@ const useUserDisplayInfo = (): UserDisplayInfo => {
   };
 };
 
-/**
- * Composant Modal mobile pour navigation
- */
 const MobileModal: React.FC<MobileModalProps> = ({
   isOpen,
   onClose,
@@ -172,14 +158,32 @@ const MobileModal: React.FC<MobileModalProps> = ({
   );
 };
 
-/**
- * Menu utilisateur mobile custom (sans DropdownMenu problématique)
- */
 interface UserMenuMobileProps {
   userInfo: UserDisplayInfo;
   role: UserRole;
   onSignOut: () => Promise<void>;
 }
+
+const FarmIconMobile: React.FC<{
+  className?: string;
+  style?: React.CSSProperties;
+}> = ({ className, style }) => (
+  <svg
+    className={className}
+    style={style}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    aria-hidden="true"
+  >
+    <path
+      d="M3 9L12 2L21 9V20C21 20.5304 20.7893 21.0391 20.4142 21.4142C20.0391 21.7893 19.5304 22 19 22H5C4.46957 22 3.96086 21.7893 3.58579 21.4142C3.21071 21.0391 3 20.5304 3 20V9Z"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
 
 const UserMenuMobile: React.FC<UserMenuMobileProps> = ({
   userInfo,
@@ -190,7 +194,7 @@ const UserMenuMobile: React.FC<UserMenuMobileProps> = ({
 
   const menuItems = [
     {
-      href: "/user",
+      href: "/account",
       icon: User,
       label: "Mon profil",
       color: COLORS.TEXT_SECONDARY,
@@ -209,22 +213,7 @@ const UserMenuMobile: React.FC<UserMenuMobileProps> = ({
       ? [
           {
             href: "/dashboard/farms",
-            icon: () => (
-              <svg
-                className="w-5 h-5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                aria-hidden="true"
-              >
-                <path
-                  d="M3 9L12 2L21 9V20C21 20.5304 20.7893 21.0391 20.4142 21.4142C20.0391 21.7893 19.5304 22 19 22H5C4.46957 22 3.96086 21.7893 3.58579 21.4142C3.21071 21.0391 3 20.5304 3 20V9Z"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            ),
+            icon: FarmIconMobile,
             label: "Ma ferme",
             color: COLORS.TEXT_SECONDARY,
           },
@@ -237,13 +226,13 @@ const UserMenuMobile: React.FC<UserMenuMobileProps> = ({
       color: COLORS.TEXT_SECONDARY,
     },
     {
-      href: "/user#favorites",
+      href: "/account",
       icon: Heart,
       label: "Mes favoris",
       color: COLORS.ERROR,
     },
     {
-      href: "/user#settings",
+      href: "/account",
       icon: Settings,
       label: "Paramètres",
       color: COLORS.TEXT_SECONDARY,
@@ -379,9 +368,6 @@ const UserMenuMobile: React.FC<UserMenuMobileProps> = ({
   );
 };
 
-/**
- * Composant Skeleton pour le loading state
- */
 const HeaderMobileSkeleton: React.FC = () => (
   <header
     className="fixed left-0 right-0 top-0 z-40 border-b backdrop-blur"
@@ -403,9 +389,6 @@ const HeaderMobileSkeleton: React.FC = () => (
   </header>
 );
 
-/**
- * HeaderMobile principal
- */
 export default function HeaderMobile({
   showSearchInHeader = true,
   className = "",
@@ -421,9 +404,6 @@ export default function HeaderMobile({
   const { handleCitySelect } = useCitySearchControl({ setSearchCity });
   const userInfo = useUserDisplayInfo();
 
-  /**
-   * Gestion de la déconnexion avec nettoyage du store
-   */
   const handleSignOut = useCallback(async (): Promise<void> => {
     try {
       reset();
@@ -434,9 +414,6 @@ export default function HeaderMobile({
     }
   }, [reset, signOut]);
 
-  /**
-   * Ouverture des modales d'authentification
-   */
   const openSignIn = useCallback((): void => {
     window.dispatchEvent(new CustomEvent("openSigninModal"));
     setShowMobileMenu(false);
@@ -447,7 +424,6 @@ export default function HeaderMobile({
     setShowMobileMenu(false);
   }, []);
 
-  // Loading Clerk (remplace isClient)
   if (!isLoaded) {
     return <HeaderMobileSkeleton />;
   }
@@ -519,7 +495,7 @@ export default function HeaderMobile({
             <div className="flex items-center gap-1 shrink-0">
               {/* Favoris */}
               <Link
-                href="/user#favorites"
+                href="/account"
                 className="relative rounded-lg p-2 transition-all"
                 style={{ color: COLORS.TEXT_SECONDARY }}
                 aria-label="Favoris"

@@ -21,7 +21,7 @@ import { AvatarImage } from "@/components/ui/OptimizedImage";
 import { useUserRole, useUserActions } from "@/lib/store/userStore";
 import { COLORS } from "@/lib/config/constants";
 import { cn } from "@/lib/utils";
-import { logger } from "@/lib/logger"; // ✅
+import { logger } from "@/lib/logger";
 
 interface HeaderDesktopProps {
   showSearchInHeader?: boolean;
@@ -47,7 +47,7 @@ const MapboxCitySearch = dynamic(
         style={{ backgroundColor: COLORS.BG_GRAY }}
       />
     ),
-  }
+  },
 );
 
 const useUserDisplayInfo = (): UserDisplayInfo => {
@@ -149,12 +149,33 @@ interface UserMenuProps {
   onSignOut: () => Promise<void>;
 }
 
+const FarmIcon: React.FC<{
+  className?: string;
+  style?: React.CSSProperties;
+}> = ({ className, style }) => (
+  <svg
+    className={className}
+    style={style}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    aria-hidden="true"
+  >
+    <path
+      d="M3 9L12 2L21 9V20C21 20.5304 20.7893 21.0391 20.4142 21.4142C20.0391 21.7893 19.5304 22 19 22H5C4.46957 22 3.96086 21.7893 3.58579 21.4142C3.21071 21.0391 3 20.5304 3 20V9Z"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
 const UserMenu: React.FC<UserMenuProps> = ({ userInfo, role, onSignOut }) => {
   const [isOpen, setIsOpen] = useState<boolean>(false);
 
   const menuItems = [
     {
-      href: "/user",
+      href: "/account",
       icon: User,
       label: "Mon profil",
       color: COLORS.TEXT_SECONDARY,
@@ -173,22 +194,7 @@ const UserMenu: React.FC<UserMenuProps> = ({ userInfo, role, onSignOut }) => {
       ? [
           {
             href: "/dashboard/farms",
-            icon: () => (
-              <svg
-                className="w-4 h-4"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                aria-hidden="true"
-              >
-                <path
-                  d="M3 9L12 2L21 9V20C21 20.5304 20.7893 21.0391 20.4142 21.4142C20.0391 21.7893 19.5304 22 19 22H5C4.46957 22 3.96086 21.7893 3.58579 21.4142C3.21071 21.0391 3 20.5304 3 20V9Z"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            ),
+            icon: FarmIcon,
             label: "Ma ferme",
             color: COLORS.TEXT_SECONDARY,
           },
@@ -201,13 +207,13 @@ const UserMenu: React.FC<UserMenuProps> = ({ userInfo, role, onSignOut }) => {
       color: COLORS.TEXT_SECONDARY,
     },
     {
-      href: "/user#favorites",
+      href: "/account",
       icon: Heart,
       label: "Mes favoris",
       color: COLORS.ERROR,
     },
     {
-      href: "/user#settings",
+      href: "/account",
       icon: Settings,
       label: "Paramètres",
       color: COLORS.TEXT_SECONDARY,
@@ -217,7 +223,7 @@ const UserMenu: React.FC<UserMenuProps> = ({ userInfo, role, onSignOut }) => {
   return (
     <div className="flex items-center gap-3">
       <Link
-        href="/user#favorites"
+        href="/account"
         className="p-2 rounded-lg transition-all relative hover:bg-gray-100"
         style={{ color: COLORS.TEXT_SECONDARY }}
         title="Mes favoris"
@@ -475,12 +481,15 @@ export default function HeaderDesktop({
             </div>
           )}
 
-          {role !== "admin" && (
-            role === "farmer" ? (
+          {role !== "admin" &&
+            (role === "farmer" ? (
               <Link
                 href="/dashboard/farms"
                 className="hidden md:flex items-center gap-1 text-sm font-medium px-3 py-2 rounded-lg transition-all"
-                style={{ color: COLORS.PRIMARY, backgroundColor: "transparent" }}
+                style={{
+                  color: COLORS.PRIMARY,
+                  backgroundColor: "transparent",
+                }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = COLORS.PRIMARY_BG;
                   e.currentTarget.style.color = COLORS.PRIMARY_DARK;
@@ -501,7 +510,10 @@ export default function HeaderDesktop({
                     : "/sign-in?redirect=/become-producer"
                 }
                 className="hidden md:flex items-center gap-1 text-sm font-medium px-3 py-2 rounded-lg transition-all"
-                style={{ color: COLORS.PRIMARY, backgroundColor: "transparent" }}
+                style={{
+                  color: COLORS.PRIMARY,
+                  backgroundColor: "transparent",
+                }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = COLORS.PRIMARY_BG;
                   e.currentTarget.style.color = COLORS.PRIMARY_DARK;
@@ -514,8 +526,7 @@ export default function HeaderDesktop({
                 <PlusCircle className="w-4 h-4" />
                 Devenir producteur
               </Link>
-            )
-          )}
+            ))}
 
           {!isSignedIn ? (
             <AuthButtons onSignIn={openSignIn} onSignUp={openSignUp} />
