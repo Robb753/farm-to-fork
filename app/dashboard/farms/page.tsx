@@ -206,7 +206,7 @@ export default function FarmerDashboard(): JSX.Element {
   };
 
   const handlePublishListing = async (): Promise<void> => {
-    if (!listing) return;
+    if (!listing || !user) return;
     const { error } = await supabase
       .from("listing")
       .update({ active: true })
