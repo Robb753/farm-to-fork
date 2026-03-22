@@ -205,6 +205,21 @@ export default function FarmerDashboard(): JSX.Element {
     }
   };
 
+  const handlePublishListing = async (): Promise<void> => {
+    if (!listing) return;
+    const { error } = await supabase
+      .from("listing")
+      .update({ active: true })
+      .eq("id", listing.id)
+      .eq("clerk_user_id", user.id);
+    if (error) {
+      toast.error("Erreur lors de la publication");
+      return;
+    }
+    setListing({ ...listing, active: true });
+    toast.success("Fiche publiée ! Elle est maintenant visible sur la carte.");
+  };
+
   const handleProductToggle = async (
     productId: number,
     currentPublished: boolean
@@ -293,7 +308,7 @@ export default function FarmerDashboard(): JSX.Element {
   // ── CAS 1 : Pas de demande ──────────────────────────────────────────────────
   if (!isFarmer && requestStatus === null) {
     return (
-      <div className="min-h-screen bg-background p-4 py-12">
+      <div className="min-h-screen bg-gray-50 p-4 py-12">
         <div className="max-w-4xl mx-auto">
           <Link
             href="/"
@@ -367,7 +382,7 @@ export default function FarmerDashboard(): JSX.Element {
   // ── CAS 2 : Demande en attente ──────────────────────────────────────────────
   if (!isFarmer && requestStatus === "pending") {
     return (
-      <div className="min-h-screen bg-background p-4 py-12">
+      <div className="min-h-screen bg-gray-50 p-4 py-12">
         <div className="max-w-4xl mx-auto">
           <Link
             href="/"
@@ -426,7 +441,7 @@ export default function FarmerDashboard(): JSX.Element {
   // ── CAS 3 : Demande rejetée ─────────────────────────────────────────────────
   if (!isFarmer && requestStatus === "rejected") {
     return (
-      <div className="min-h-screen bg-background p-4 py-12">
+      <div className="min-h-screen bg-gray-50 p-4 py-12">
         <div className="max-w-4xl mx-auto">
           <Link
             href="/"
@@ -488,7 +503,7 @@ export default function FarmerDashboard(): JSX.Element {
   // ── CAS 4 : Farmer approuvé sans listing encore ─────────────────────────────
   if (isFarmer && !listing) {
     return (
-      <div className="min-h-screen bg-background p-4 py-12">
+      <div className="min-h-screen bg-gray-50 p-4 py-12">
         <div className="max-w-4xl mx-auto">
           <Link
             href="/"
@@ -537,9 +552,10 @@ export default function FarmerDashboard(): JSX.Element {
   const safeWebsite = getSafeWebsiteUrl((listing as any).website);
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
+    <div className="min-h-screen bg-gray-50">
+    <div className="max-w-4xl mx-auto py-10 px-4">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2" style={{ color: COLORS.PRIMARY_DARK }}>
+        <h1 className="text-2xl font-semibold text-gray-900 mb-1">
           Tableau de bord producteur
         </h1>
         <p style={{ color: COLORS.TEXT_SECONDARY }}>
@@ -548,14 +564,11 @@ export default function FarmerDashboard(): JSX.Element {
       </div>
 
       {/* Fiche ferme */}
-      <div
-        className="rounded-lg shadow-md border overflow-hidden"
-        style={{ backgroundColor: COLORS.BG_WHITE, borderColor: COLORS.BORDER }}
-      >
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div
           className="px-6 py-4 border-b"
           style={{
-            background: `linear-gradient(to right, ${COLORS.PRIMARY_BG}, ${COLORS.BG_GRAY})`,
+            backgroundColor: COLORS.BG_WHITE,
             borderBottomColor: COLORS.BORDER,
           }}
         >
@@ -700,6 +713,13 @@ export default function FarmerDashboard(): JSX.Element {
               </Link>
             </Button>
 
+            {!listing!.active && (
+              <Button onClick={handlePublishListing} style={{ backgroundColor: COLORS.PRIMARY, color: COLORS.BG_WHITE }}>
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Publier la fiche
+              </Button>
+            )}
+
             {listing!.active && (
               <Button
                 asChild
@@ -750,14 +770,11 @@ export default function FarmerDashboard(): JSX.Element {
       </div>
 
       {/* Mes produits */}
-      <div
-        className="mt-6 rounded-lg shadow-md border overflow-hidden"
-        style={{ backgroundColor: COLORS.BG_WHITE, borderColor: COLORS.BORDER }}
-      >
+      <div className="mt-6 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div
           className="px-6 py-4 border-b flex items-center justify-between"
           style={{
-            background: `linear-gradient(to right, ${COLORS.PRIMARY_BG}, ${COLORS.BG_GRAY})`,
+            backgroundColor: COLORS.BG_WHITE,
             borderBottomColor: COLORS.BORDER,
           }}
         >
@@ -773,7 +790,7 @@ export default function FarmerDashboard(): JSX.Element {
             asChild
             style={{ backgroundColor: COLORS.PRIMARY, color: COLORS.BG_WHITE }}
           >
-            <Link href={`/add-product/${listing!.id}`}>
+            <Link href="/add-product">
               <Plus className="h-4 w-4 mr-2" />
               Ajouter un produit
             </Link>
@@ -790,7 +807,7 @@ export default function FarmerDashboard(): JSX.Element {
               Vous n&apos;avez pas encore de produits publiés.
             </p>
             <Button asChild style={{ backgroundColor: COLORS.PRIMARY, color: COLORS.BG_WHITE }}>
-              <Link href={`/add-product/${listing!.id}`}>
+              <Link href="/add-product">
                 <Plus className="h-4 w-4 mr-2" />
                 Ajouter mon premier produit
               </Link>
@@ -884,14 +901,11 @@ export default function FarmerDashboard(): JSX.Element {
 
       {/* Produits en brouillon */}
       {products.filter(p => !p.is_published).length > 0 && (
-        <div
-          className="mt-6 rounded-lg shadow-md border overflow-hidden"
-          style={{ backgroundColor: COLORS.BG_WHITE, borderColor: COLORS.BORDER }}
-        >
+        <div className="mt-6 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div
             className="px-6 py-4 border-b"
             style={{
-              background: `linear-gradient(to right, #fefce8, ${COLORS.BG_GRAY})`,
+              backgroundColor: COLORS.BG_WHITE,
               borderBottomColor: COLORS.BORDER,
             }}
           >
@@ -970,5 +984,6 @@ export default function FarmerDashboard(): JSX.Element {
         </div>
       )}
     </div>
+  </div>
   );
 }
