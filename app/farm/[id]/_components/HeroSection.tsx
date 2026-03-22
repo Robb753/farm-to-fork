@@ -181,6 +181,20 @@ export default function HeroSection({
     window.open(safeUrl, "_blank", "noopener,noreferrer");
   };
 
+  const TYPEFERME_LABELS: Record<string, string> = {
+    farm_direct_sale: "Vente directe",
+    farm_shop: "Boutique à la ferme",
+    market: "Marché",
+    amap: "AMAP",
+    delivery: "Livraison",
+    pickup: "Retrait sur place",
+    online: "Vente en ligne",
+  };
+
+  const getTypeFermeLabel = (value: string): string =>
+    TYPEFERME_LABELS[value] ??
+    value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
   return (
     <Card className={cn("overflow-hidden bg-white shadow-lg", className)}>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
@@ -295,7 +309,7 @@ export default function HeroSection({
                   className="bg-green-50 text-green-700 border-green-200"
                 >
                   <Award className="h-3 w-3 mr-1" />
-                  {escapeHTML(listing.typeferme)}
+                  {getTypeFermeLabel(listing.typeferme)}
                 </Badge>
               </div>
             )}
