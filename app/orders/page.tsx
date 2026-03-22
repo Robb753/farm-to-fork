@@ -9,6 +9,7 @@ import { Package, ArrowRight, Calendar, MapPin, Truck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { COLORS } from "@/lib/config";
 import { toast } from "sonner";
+import { useUser } from "@clerk/nextjs";
 import { useSupabaseWithClerk } from "@/utils/supabase/client";
 
 /**
@@ -43,18 +44,18 @@ export default function MyOrdersPage(): JSX.Element {
   const [isLoading, setIsLoading] = useState(true);
 
   const supabase = useSupabaseWithClerk();
+  // Clerk est la source de vérité auth — supabase.auth.* est désactivé
+  // quand le client est configuré avec accessToken (cf. utils/supabase/client.ts)
+  const { user, isSignedIn, isLoaded } = useUser();
 
   // ✅ Extraire la logique de chargement dans useCallback pour éviter les dépendances cycliques
   const loadOrders = useCallback(async () => {
     try {
       setIsLoading(true);
 
-      // Vérifier l'auth
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
+      // Vérifier l'auth via Clerk (isLoaded évite un redirect prématuré)
+      if (!isLoaded) return;
+      if (!isSignedIn || !user) {
         toast.error("Vous devez être connecté");
         router.push("/login");
         return;
@@ -112,11 +113,11 @@ export default function MyOrdersPage(): JSX.Element {
     } finally {
       setIsLoading(false);
     }
-  }, [supabase, router]); // ✅ Dépendances explicites
+  }, [supabase, router, user, isSignedIn, isLoaded]); // ✅ Dépendances explicites
 
   useEffect(() => {
-    loadOrders();
-  }, [loadOrders]); // ✅ Dépendance sur la fonction stable
+    if (isLoaded) loadOrders();
+  }, [loadOrders, isLoaded]); // ✅ Attendre que Clerk soit prêt avant d'exécuter
 
   if (isLoading) {
     return (
