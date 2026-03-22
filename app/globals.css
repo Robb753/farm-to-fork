@@ -98,8 +98,10 @@
   box-shadow: 0 10px 25px rgba(0,0,0,.15);
 }
 
-/* Empêche certains parents (backdrop-blur, sticky…) de clipper les enfants */
-[style*="backdrop-filter"],
+/* Empêche certains parents (backdrop-blur, sticky…) de clipper les enfants.
+   On exclut les éléments du modal Clerk : leur position:fixed ne doit pas être
+   écrasée par position:relative !important (cf. fix Clerk z-index plus bas). */
+[style*="backdrop-filter"]:not(.cl-modalBackdrop):not(.cl-rootBox):not([data-clerk-modal]),
 .backdrop-blur,
 .sticky,
 .relative[data-hero-root="true"] {
@@ -275,6 +277,26 @@ body[data-route*="/explore"] .mapbox-dropdown [role="listbox"] {
 
 /* ============ Divers ============ */
 [data-sonner-toaster] { z-index: 9999 !important; }
+
+/* ============ Fix Clerk modal z-index ============ */
+/* Le modal Clerk est injecté via portal dans <body>.
+   Deux problèmes combinés pouvaient le faire apparaître derrière la page :
+   1. La règle [style*="backdrop-filter"] ci-dessus forçait position:relative sur
+      .cl-modalBackdrop (qui a un backdrop-filter inline), cassant son position:fixed.
+   2. Les règles header (z-100) et sticky (z-200) pouvaient passer au-dessus du modal.
+   On restaure ici le comportement attendu sans toucher aux composants. */
+.cl-modalBackdrop,
+.cl-rootBox,
+.cl-modal,
+[data-clerk-modal] {
+  position: fixed !important;
+  z-index: 999999 !important;
+}
+
+body > [data-clerk-portal] {
+  position: fixed !important;
+  z-index: 999999 !important;
+}
 
 /* ====== Farm to Fork sections (safe reset local) ====== */
 .explore-nearby-section,
