@@ -17,6 +17,7 @@ export default function SignInPage(): JSX.Element {
           elements: {
             rootBox: "w-full",
             card: "w-full bg-transparent shadow-none border-0 p-0",
+            cardBox: "px-6",
             headerTitle: "hidden",
             headerSubtitle: "hidden",
             socialButtonsBlockButton:

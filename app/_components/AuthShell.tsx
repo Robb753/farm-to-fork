@@ -15,7 +15,7 @@ export default function AuthShell({
   return (
     <div className="min-h-screen" style={{ backgroundColor: COLORS.BG_GRAY }}>
       <div className="max-w-5xl mx-auto px-4 py-10 md:py-14">
-        <div className="grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-6 items-stretch">
+        <div className="grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-6 items-start">
           <aside
             className="rounded-2xl border p-6 md:p-8 flex flex-col justify-between"
             style={{
@@ -70,7 +70,7 @@ export default function AuthShell({
           </aside>
 
           <main
-            className="rounded-2xl border p-4 sm:p-6 md:p-8"
+            className="rounded-2xl border p-6 md:p-8"
             style={{
               backgroundColor: COLORS.BG_WHITE,
               borderColor: COLORS.BORDER,
