@@ -97,11 +97,25 @@ export default function RootLayout({ children }: RootLayoutProps): JSX.Element {
   return (
     <ClerkProvider
       appearance={{
+        variables: {
+          colorPrimary: "#16a34a",
+          colorText: "#111827",
+          colorTextSecondary: "#6b7280",
+          colorBackground: "#ffffff",
+          colorInputBackground: "#ffffff",
+          colorInputText: "#111827",
+          borderRadius: "0.75rem",
+          fontFamily: "inherit",
+        },
         elements: {
-          formButtonPrimary: "bg-green-600 hover:bg-green-700",
-          socialButtonsBlockButton: "border-gray-200 hover:bg-gray-50",
-          footerActionText: "text-gray-600",
-          footerActionLink: "text-green-600 hover:text-green-700",
+          card: "shadow-sm border border-gray-100 rounded-2xl",
+          headerTitle: "text-xl font-semibold text-gray-900",
+          headerSubtitle: "text-sm text-gray-500",
+          socialButtonsBlockButton: "border border-gray-200 hover:bg-gray-50 rounded-xl",
+          formButtonPrimary: "bg-green-600 hover:bg-green-700 rounded-xl text-sm font-medium",
+          formFieldInput: "border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-green-500",
+          footerActionLink: "text-green-600 hover:text-green-700 font-medium",
+          identityPreviewEditButton: "text-green-600 hover:text-green-700",
         },
       }}
       localization={{ locale: "fr-FR" }}

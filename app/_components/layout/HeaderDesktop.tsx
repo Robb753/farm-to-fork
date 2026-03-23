@@ -124,8 +124,7 @@ const AuthButtons: React.FC<AuthButtonsProps> = ({ onSignIn, onSignUp }) => (
   <div className="flex items-center gap-2">
     <button
       onClick={onSignIn}
-      className="flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors hover:text-opacity-80"
-      style={{ color: COLORS.TEXT_SECONDARY }}
+      className="flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors text-gray-600 hover:text-gray-900"
       type="button"
     >
       Se connecter
@@ -133,11 +132,9 @@ const AuthButtons: React.FC<AuthButtonsProps> = ({ onSignIn, onSignUp }) => (
 
     <button
       onClick={onSignUp}
-      className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all hover:bg-opacity-90"
-      style={{ backgroundColor: COLORS.PRIMARY, color: COLORS.TEXT_WHITE }}
+      className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-full transition-all bg-green-600 text-white hover:bg-green-700"
       type="button"
     >
-      <PlusCircle className="w-4 h-4" />
       S&apos;inscrire
     </button>
   </div>
@@ -377,7 +374,7 @@ const HeaderDesktopSkeleton: React.FC = () => (
       borderColor: COLORS.BORDER,
     }}
   >
-    <div className="container flex h-16 items-center justify-between px-6">
+    <div className="container flex h-14 items-center justify-between px-6">
       <div
         className="w-32 h-8 rounded animate-pulse"
         style={{ backgroundColor: COLORS.BG_GRAY }}
@@ -412,11 +409,11 @@ export default function HeaderDesktop({
   }, [reset, signOut]);
 
   const openSignIn = useCallback((): void => {
-    window.dispatchEvent(new CustomEvent("openSigninModal"));
+    window.location.href = "/sign-in";
   }, []);
 
   const openSignUp = useCallback((): void => {
-    window.dispatchEvent(new CustomEvent("openSignupModal"));
+    window.location.href = "/sign-up";
   }, []);
 
   if (!isLoaded) return <HeaderDesktopSkeleton />;
@@ -433,7 +430,7 @@ export default function HeaderDesktop({
         borderColor: COLORS.BORDER,
       }}
     >
-      <div className="container flex h-16 items-center justify-between px-6">
+      <div className="container flex h-14 items-center justify-between px-6">
         <div className="flex items-center gap-8">
           <Link href="/" className="flex items-center space-x-2">
             <Image
@@ -456,11 +453,11 @@ export default function HeaderDesktop({
 
         <div className="flex items-center gap-4">
           {showSearchInHeader && (
-            <div className="hidden lg:flex items-center w-[380px] max-w-[40vw]">
+            <div className="hidden lg:flex items-center w-[320px] max-w-[35vw]">
               <MapboxCitySearch
                 variant="header"
                 placeholder="Rechercher une ville…"
-                className="mapbox-dropdown header-search"
+                className="mapbox-dropdown header-search w-full h-9 rounded-full bg-gray-100 border-0 pl-9 pr-4 text-sm text-gray-700 focus:bg-white focus:ring-2 focus:ring-green-500 placeholder:text-gray-400 outline-none"
                 onCitySelect={() => {
                   setTimeout(() => {
                     const dropdowns =

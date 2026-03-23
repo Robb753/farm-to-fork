@@ -415,12 +415,12 @@ export default function HeaderMobile({
   }, [reset, signOut]);
 
   const openSignIn = useCallback((): void => {
-    window.dispatchEvent(new CustomEvent("openSigninModal"));
+    window.location.href = "/sign-in";
     setShowMobileMenu(false);
   }, []);
 
   const openSignUp = useCallback((): void => {
-    window.dispatchEvent(new CustomEvent("openSignupModal"));
+    window.location.href = "/sign-up";
     setShowMobileMenu(false);
   }, []);
 
@@ -440,7 +440,7 @@ export default function HeaderMobile({
           borderColor: COLORS.BORDER,
         }}
       >
-        <div className="flex items-center gap-2 px-3 py-2 max-w-screen-sm mx-auto w-full">
+        <div className="flex items-center gap-2 px-3 py-1.5 max-w-screen-sm mx-auto w-full">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 pl-1 shrink-0">
             <Image
@@ -465,7 +465,7 @@ export default function HeaderMobile({
               <MapboxCitySearch
                 placeholder="Rechercher une ville…"
                 onCitySelect={handleCitySelect}
-                className="h-10 w-full rounded-full border border-gray-200 bg-gray-50 px-4 focus:border-green-300 focus:bg-white focus:ring-2 focus:ring-green-100"
+                className="h-9 w-full rounded-full bg-gray-100 border-0 px-4 text-sm text-gray-700 focus:bg-white focus:ring-2 focus:ring-green-500 placeholder:text-gray-400 outline-none"
               />
             </div>
           )}
