@@ -32,6 +32,7 @@ export interface Cart {
   farmName: string | null;
   items: CartItem[];
   deliveryMode: "pickup" | "delivery" | null;
+  lastUpdated: number | null;
 }
 
 /**
@@ -59,7 +60,10 @@ const initialCart: Cart = {
   farmName: null,
   items: [],
   deliveryMode: null,
+  lastUpdated: null,
 };
+
+const CART_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 heures
 
 /**
  * Anti double-clic (MVP-friendly):
@@ -101,6 +105,7 @@ export const useCartStore = create<CartStore>()(
                 farmId: product.farm_id,
                 farmName: product.farm_name,
                 items: [{ product, quantity: qty }],
+                lastUpdated: Date.now(),
               },
             };
           }
@@ -127,6 +132,7 @@ export const useCartStore = create<CartStore>()(
               cart: {
                 ...state.cart,
                 items: newItems,
+                lastUpdated: Date.now(),
               },
             };
           }
@@ -136,6 +142,7 @@ export const useCartStore = create<CartStore>()(
             cart: {
               ...state.cart,
               items: [...state.cart.items, { product, quantity: qty }],
+              lastUpdated: Date.now(),
             },
           };
         });
@@ -159,6 +166,7 @@ export const useCartStore = create<CartStore>()(
             cart: {
               ...state.cart,
               items: newItems,
+              lastUpdated: Date.now(),
             },
           };
         });
@@ -184,6 +192,7 @@ export const useCartStore = create<CartStore>()(
               cart: {
                 ...state.cart,
                 items: newItems,
+                lastUpdated: Date.now(),
               },
             };
           }
@@ -196,6 +205,7 @@ export const useCartStore = create<CartStore>()(
             cart: {
               ...state.cart,
               items: newItems,
+              lastUpdated: Date.now(),
             },
           };
         });
@@ -230,6 +240,13 @@ export const useCartStore = create<CartStore>()(
     }),
     {
       name: "farm2fork-cart",
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        const { lastUpdated } = state.cart;
+        if (lastUpdated && Date.now() - lastUpdated > CART_EXPIRY_MS) {
+          state.clearCart();
+        }
+      },
     },
   ),
 );
