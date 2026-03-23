@@ -23,11 +23,6 @@ const SupabaseInitializer: React.FC = () => {
   return null;
 };
 
-const ModernAuthSystem = dynamic(
-  () => import("./_components/auth/ModernAuthSystem"),
-  { ssr: false, loading: () => null }
-);
-
 const AppLoadingNotifier = dynamic(() => import("@/utils/AppLoadingNotifier"), {
   ssr: false,
   loading: () => null,
@@ -80,7 +75,6 @@ export default function ClientProviders({
         }}
       />
 
-      <ModernAuthSystem />
       <HashCleaner />
       <SupabaseInitializer />
       <AuthSync />

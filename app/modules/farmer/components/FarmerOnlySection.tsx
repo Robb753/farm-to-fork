@@ -3,7 +3,6 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@clerk/nextjs";
-import { useClerk } from "@clerk/nextjs";
 import { COLORS, PATHS } from "@/lib/config";
 import { cn } from "@/lib/utils";
 
@@ -30,7 +29,6 @@ export default function FarmerOnlySection({ children }: FarmerOnlySectionProps):
   const isFarmer = role === "farmer";
   const isAdmin = role === "admin";
   const loading = !isLoaded;
-  const { openSignIn, openSignUp } = useClerk();
 
   /**
    * État de chargement avec skeleton
@@ -110,14 +108,7 @@ export default function FarmerOnlySection({ children }: FarmerOnlySectionProps):
           
           <div className="flex gap-3 justify-center">
             <Button
-              onClick={() => openSignIn({ 
-                redirectUrl: "/dashboard/farms",
-                appearance: {
-                  variables: {
-                    colorPrimary: COLORS.PRIMARY,
-                  }
-                }
-              })}
+              onClick={() => { window.location.href = "/sign-in"; }}
               className={cn(
                 "transition-all duration-200 hover:shadow-sm",
                 "focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
@@ -131,14 +122,7 @@ export default function FarmerOnlySection({ children }: FarmerOnlySectionProps):
             </Button>
             <Button
               variant="outline"
-              onClick={() => openSignUp({
-                redirectUrl: "/become-producer",
-                appearance: {
-                  variables: {
-                    colorPrimary: COLORS.PRIMARY,
-                  }
-                }
-              })}
+              onClick={() => { window.location.href = "/sign-up"; }}
               className={cn(
                 "transition-all duration-200 hover:shadow-sm",
                 "focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
