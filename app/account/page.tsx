@@ -15,12 +15,14 @@ import {
   Trash2,
   ArrowRight,
   MapPin,
+  type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { COLORS } from "@/lib/config";
 import { toast } from "sonner";
 import { useUser, useClerk } from "@clerk/nextjs";
 import { useSupabaseWithClerk } from "@/utils/supabase/client";
+import Image from "next/image";
 
 // ==================== TYPES ====================
 
@@ -49,7 +51,7 @@ interface OrderItem {
 const NAV_ITEMS: {
   key: Section;
   label: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: LucideIcon;
   farmerOnly?: boolean;
 }[] = [
   { key: "profile", label: "Profil", icon: User },
@@ -317,9 +319,11 @@ function ProfileSection({
 
       <div className="flex items-center gap-5 mb-8">
         {user.imageUrl ? (
-          <img
+          <Image
             src={user.imageUrl}
             alt={fullName}
+            width={120}
+            height={50}
             className="w-20 h-20 rounded-full object-cover border-2"
             style={{ borderColor: COLORS.BORDER }}
           />
@@ -674,7 +678,7 @@ function EmptyState({
   linkHref,
   linkLabel,
 }: {
-  icon: React.ComponentType<{ className?: string }>;
+  icon: LucideIcon;
   title: string;
   description: string;
   linkHref: string;
@@ -683,7 +687,10 @@ function EmptyState({
   return (
     <div className="flex flex-col items-center py-12 text-center">
       <Icon className="w-16 h-16 mb-4" style={{ color: COLORS.TEXT_MUTED }} />
-      <p className="text-lg font-semibold mb-1" style={{ color: COLORS.TEXT_PRIMARY }}>
+      <p
+        className="text-lg font-semibold mb-1"
+        style={{ color: COLORS.TEXT_PRIMARY }}
+      >
         {title}
       </p>
       <p className="text-sm mb-6" style={{ color: COLORS.TEXT_SECONDARY }}>

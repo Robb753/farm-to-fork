@@ -2,7 +2,6 @@
 "use client";
 
 import React, { useEffect, useLayoutEffect } from "react";
-import dynamic from "next/dynamic";
 import { Toaster } from "sonner";
 import AuthSync from "./_components/AuthSync";
 import { useSupabaseWithClerk } from "@/utils/supabase/client";
@@ -22,11 +21,6 @@ const SupabaseInitializer: React.FC = () => {
 
   return null;
 };
-
-const AppLoadingNotifier = dynamic(() => import("@/utils/AppLoadingNotifier"), {
-  ssr: false,
-  loading: () => null,
-});
 
 const HashCleaner: React.FC = () => {
   useEffect(() => {
@@ -78,7 +72,6 @@ export default function ClientProviders({
       <HashCleaner />
       <SupabaseInitializer />
       <AuthSync />
-      <AppLoadingNotifier />
 
       {children}
     </>
