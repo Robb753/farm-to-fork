@@ -465,7 +465,7 @@ export default function HeaderMobile({
               <MapboxCitySearch
                 placeholder="Rechercher une ville…"
                 onCitySelect={handleCitySelect}
-                className="h-9 w-full rounded-full bg-gray-100 border-0 px-4 text-sm text-gray-700 focus:bg-white focus:ring-2 focus:ring-green-500 placeholder:text-gray-400 outline-none"
+                className="mapbox-dropdown"
               />
             </div>
           )}

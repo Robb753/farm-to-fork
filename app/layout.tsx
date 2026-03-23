@@ -109,11 +109,16 @@ export default function RootLayout({ children }: RootLayoutProps): JSX.Element {
         },
         elements: {
           card: "shadow-sm border border-gray-100 rounded-2xl",
+          cardBox: "relative !important",
+          rootBox: "relative !important",
           headerTitle: "text-xl font-semibold text-gray-900",
           headerSubtitle: "text-sm text-gray-500",
-          socialButtonsBlockButton: "border border-gray-200 hover:bg-gray-50 rounded-xl",
-          formButtonPrimary: "bg-green-600 hover:bg-green-700 rounded-xl text-sm font-medium",
-          formFieldInput: "border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-green-500",
+          socialButtonsBlockButton:
+            "border border-gray-200 hover:bg-gray-50 rounded-xl",
+          formButtonPrimary:
+            "bg-green-600 hover:bg-green-700 rounded-xl text-sm font-medium",
+          formFieldInput:
+            "border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-green-500",
           footerActionLink: "text-green-600 hover:text-green-700 font-medium",
           identityPreviewEditButton: "text-green-600 hover:text-green-700",
         },

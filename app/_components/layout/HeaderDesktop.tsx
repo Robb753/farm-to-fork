@@ -453,11 +453,11 @@ export default function HeaderDesktop({
 
         <div className="flex items-center gap-4">
           {showSearchInHeader && (
-            <div className="hidden lg:flex items-center w-[320px] max-w-[35vw]">
+            <div className="hidden lg:flex items-center w-[320px] max-w-[38vw]">
               <MapboxCitySearch
                 variant="header"
                 placeholder="Rechercher une ville…"
-                className="mapbox-dropdown header-search w-full h-9 rounded-full bg-gray-100 border-0 pl-9 pr-4 text-sm text-gray-700 focus:bg-white focus:ring-2 focus:ring-green-500 placeholder:text-gray-400 outline-none"
+                className="mapbox-dropdown header-search"
                 onCitySelect={() => {
                   setTimeout(() => {
                     const dropdowns =
