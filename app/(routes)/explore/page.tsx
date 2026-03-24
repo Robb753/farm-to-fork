@@ -2,6 +2,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import Explore from "@/app/_components/layout/Explore";
+import { getLieux } from "@/lib/data/listings";
 
 export const metadata: Metadata = {
   title: "Explorer les fermes | Farm to Fork",
@@ -54,13 +55,19 @@ function ExploreSkeleton(): JSX.Element {
 /**
  * Page d'exploration des producteurs et fermes
  *
- * Server Component wrapper: exports metadata + streams static shell.
- * <Explore /> is a client component containing all map/filter/listing logic.
+ * Server Component async : fetch les listings via supabaseServerPublic,
+ * puis les passe en prop à <Explore />. Plus de fetch côté client.
  */
-export default function ExplorePage(): JSX.Element {
+export default async function ExplorePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ ville?: string; type?: string }>;
+}): Promise<JSX.Element> {
+  const params = await searchParams;
+  const listings = await getLieux({ ville: params.ville, type: params.type });
   return (
     <Suspense fallback={<ExploreSkeleton />}>
-      <Explore />
+      <Explore listings={listings} />
     </Suspense>
   );
 }
