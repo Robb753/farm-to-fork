@@ -174,6 +174,19 @@ export async function PATCH(
       console.error("[ADMIN/PRODUCER-REQUESTS] Erreur Clerk update:", clerkError);
       // Non-blocking: continue even if Clerk update fails
     }
+
+    // Lier la ferme OSM au producteur si c'est une revendication approuvée
+    if (request.type === "claim" && request.listing_id) {
+      const { error: linkError } = await supabase
+        .from("listing")
+        .update({ clerk_user_id: request.user_id })
+        .eq("id", request.listing_id)
+        .is("clerk_user_id", null); // garde-fou : ne pas écraser si déjà lié
+      if (linkError) {
+        console.error("[ADMIN/PRODUCER-REQUESTS] Erreur liaison listing:", linkError);
+        // Non-bloquant : Clerk est déjà mis à jour, logger pour traitement manuel
+      }
+    }
   }
 
   // 7. Resolve farm name for email (create: farm_name, claim: fetch listing name)
