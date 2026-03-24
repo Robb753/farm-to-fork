@@ -12,10 +12,16 @@ import {
   Search,
   ArrowRight,
   Sparkles,
+  Clock, // ✅ AJOUT — icône pour bannière "bientôt disponible"
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { COLORS } from "@/lib/config";
-import { useCartStore, useCartTotalItems, useCartTotalPrice, type Product } from "@/lib/store/cartStore";
+import {
+  useCartStore,
+  useCartTotalItems,
+  useCartTotalPrice,
+  type Product,
+} from "@/lib/store/cartStore";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,7 +60,7 @@ export default function BoutiqueTab({
   const cart = useCartStore((state) => state.cart);
   const addItem = useCartStore((state) => state.addItem);
   const updateQuantity = useCartStore((state) => state.updateQuantity);
-  const removeItem = useCartStore((state) => state.removeItem); // ✅ IMPORTANT
+  const removeItem = useCartStore((state) => state.removeItem);
   const canAddToCart = useCartStore((state) => state.canAddToCart);
   const totalItems = useCartTotalItems();
   const totalPrice = useCartTotalPrice();
@@ -124,6 +130,9 @@ export default function BoutiqueTab({
     router.push(`/farm/${farmId}/shop`);
   }, [farmId, router]);
 
+  // ⚠️ TODO (Stripe) — goToCart désactivé pour le MVP, le bouton
+  // "Finaliser" dans le mini-cart est remplacé par un message informatif.
+  // Réactiver quand Stripe Connect sera intégré.
   const goToCart = useCallback(() => {
     if (!farmId) return;
     router.push(`/farm/${farmId}/cart`);
@@ -145,23 +154,21 @@ export default function BoutiqueTab({
       }
 
       addItem(product, 1);
-      // 🔒 SÉCURITÉ: Nom de produit échappé
       toast.success(`${escapeHTML(product.name)} ajouté au panier`);
     },
-    [addItem, canAddToCart, farmId]
+    [addItem, canAddToCart, farmId],
   );
 
-  // ✅ setter robuste: qty <= 0 => removeItem
   const setQty = useCallback(
     (productId: number, nextQty: number) => {
-      const q = Math.max(0, Math.floor(nextQty)); // clamp + int
+      const q = Math.max(0, Math.floor(nextQty));
       if (q <= 0) {
         removeItem(productId);
         return;
       }
       updateQuantity(productId, q);
     },
-    [removeItem, updateQuantity]
+    [removeItem, updateQuantity],
   );
 
   const normalizedQuery = query.trim().toLowerCase();
@@ -205,7 +212,7 @@ export default function BoutiqueTab({
 
   const previewList = useMemo(
     () => filteredSorted.slice(0, PREVIEW_LIMIT),
-    [filteredSorted]
+    [filteredSorted],
   );
 
   if (isLoading) {
@@ -239,13 +246,12 @@ export default function BoutiqueTab({
             Boutique en préparation
           </h3>
           <p className="mt-1 text-sm" style={{ color: COLORS.TEXT_SECONDARY }}>
-            Le producteur n’a pas encore ajouté de produits.
+            Le producteur n'a pas encore ajouté de produits.
           </p>
         </div>
       </div>
     );
   }
-
 
   return (
     <div className={cn("space-y-4", className)}>
@@ -268,17 +274,18 @@ export default function BoutiqueTab({
               }}
             >
               <Sparkles className="h-3.5 w-3.5" />
-              {/* 🔒 SÉCURITÉ: Nom de ferme échappé */}
               Achat chez {escapeHTML(farmName)}
             </span>
           </div>
 
           <p className="mt-1 text-sm" style={{ color: COLORS.TEXT_SECONDARY }}>
-            Ajoutez en 1 clic, puis finalisez dans le panier.
+            Découvrez les produits de cette ferme.
           </p>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-2">
+          {/* ✅ EXISTANT — bouton "Voir mon panier" conservé mais désactivé visuellement
+              TODO (Stripe) : réactiver onClick={goToCart} quand le paiement sera disponible */}
           {totalItems > 0 && (
             <Button
               variant="outline"
@@ -350,7 +357,6 @@ export default function BoutiqueTab({
                   >
                     Retrait à la ferme
                   </div>
-                  {/* 🔒 SÉCURITÉ: Jours de retrait échappés */}
                   <div style={{ color: COLORS.TEXT_SECONDARY }}>
                     {escapeHTML(listing.pickup_days)}
                   </div>
@@ -395,7 +401,7 @@ export default function BoutiqueTab({
               cartQuantity={cartQty}
               canAdd={farmId ? canAddToCart(farmId) : false}
               onAdd={() => handleAddToCart(product)}
-              onSetQuantity={(qty) => setQty(product.id, qty)} // ✅ robust
+              onSetQuantity={(qty) => setQty(product.id, qty)}
             />
           );
         })}
@@ -411,7 +417,17 @@ export default function BoutiqueTab({
         </div>
       )}
 
-      {/* Mini cart sticky discret */}
+      {/* ✅ EXISTANT — Mini cart sticky
+          ⚠️ MODIFIÉ — Le bouton "Finaliser" est remplacé par un message
+          "Paiement en ligne bientôt disponible" pour le MVP.
+          TODO (Stripe) : remplacer le bloc <PaymentComingSoon> par le bouton
+          "Finaliser" ci-dessous une fois Stripe Connect intégré :
+          ──────────────────────────────────────────────────────
+          <Button onClick={goToCart} className="shrink-0">
+            Finaliser
+            <ArrowRight className="h-4 w-4 ml-2" />
+          </Button>
+          ────────────────────────────────────────────────────── */}
       {totalItems > 0 && (
         <div className="sticky bottom-2 z-10">
           <div
@@ -444,10 +460,17 @@ export default function BoutiqueTab({
                 </div>
               </div>
 
-              <Button onClick={goToCart} className="shrink-0">
-                Finaliser
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </Button>
+              {/* ✅ NOUVEAU — Bannière "bientôt disponible" MVP
+                  Remplace le bouton "Finaliser" le temps que Stripe soit intégré */}
+              <div className="flex items-center gap-2 shrink-0 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                <Clock className="h-4 w-4 text-amber-600 shrink-0" />
+                <p className="text-xs text-amber-800 font-medium">
+                  Paiement en ligne bientôt disponible —{" "}
+                  <span className="font-normal">
+                    contactez le producteur directement
+                  </span>
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -535,7 +558,6 @@ function ProductRow({
           </div>
 
           {product.description && (
-            /* 🔒 SÉCURITÉ: Description sanitisée (permet formatage basique) */
             <div
               className="mt-2 line-clamp-2 text-sm prose prose-sm max-w-none"
               style={{ color: COLORS.TEXT_SECONDARY }}
@@ -554,7 +576,7 @@ function ProductRow({
                 type="button"
                 variant="outline"
                 size="icon"
-                onClick={() => onSetQuantity(cartQuantity - 1)} // ✅ passera par remove si 0
+                onClick={() => onSetQuantity(cartQuantity - 1)}
               >
                 <Minus className="h-4 w-4" />
               </Button>

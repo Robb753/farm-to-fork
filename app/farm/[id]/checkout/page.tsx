@@ -23,7 +23,6 @@ interface Farm {
   address: string;
   pickup_days: string | null;
   delivery_available: boolean | null;
-  delivery_days?: string | null;
   delivery_price?: number | null;
 }
 
@@ -154,7 +153,6 @@ export default function FarmCheckoutPage(): JSX.Element | null {
           address: data.address ?? "Adresse non renseignée",
           pickup_days: "À définir avec le producteur",
           delivery_available: false,
-          delivery_days: "À définir",
           delivery_price: 5,
         });
       } catch (err) {
@@ -473,7 +471,7 @@ export default function FarmCheckoutPage(): JSX.Element | null {
                 <p className="text-sm" style={{ color: COLORS.TEXT_SECONDARY }}>
                   {cart.deliveryMode === "pickup"
                     ? farm?.pickup_days || "Voir avec le producteur"
-                    : farm?.delivery_days || "Livraison disponible"}
+                    : "Livraison disponible"}
                 </p>
                 {cart.deliveryMode === "pickup" && farm?.address && (
                   <p

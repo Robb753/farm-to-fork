@@ -1,6 +1,6 @@
 "use client";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 import { useEffect, useMemo, useState } from "react";
 import { useUser } from "@clerk/nextjs";
@@ -72,7 +72,9 @@ export default function FarmerDashboard(): JSX.Element {
   const [listing, setListing] = useState<Listing | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [requestStatus, setRequestStatus] = useState<"pending" | "rejected" | null>(null);
+  const [requestStatus, setRequestStatus] = useState<
+    "pending" | "rejected" | null
+  >(null);
   const [checkingRequest, setCheckingRequest] = useState<boolean>(true);
   const [products, setProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState<boolean>(false);
@@ -222,7 +224,7 @@ export default function FarmerDashboard(): JSX.Element {
 
   const handleProductToggle = async (
     productId: number,
-    currentPublished: boolean
+    currentPublished: boolean,
   ): Promise<void> => {
     const { error } = await supabase
       .from("products")
@@ -236,8 +238,8 @@ export default function FarmerDashboard(): JSX.Element {
       prev.map((p) =>
         p.id === productId
           ? { ...p, is_published: !currentPublished, active: !currentPublished }
-          : p
-      )
+          : p,
+      ),
     );
     toast.success(!currentPublished ? "Produit publié" : "Produit dépublié");
   };
@@ -295,7 +297,10 @@ export default function FarmerDashboard(): JSX.Element {
             </p>
             <Button
               onClick={() => window.location.reload()}
-              style={{ backgroundColor: COLORS.PRIMARY, color: COLORS.BG_WHITE }}
+              style={{
+                backgroundColor: COLORS.PRIMARY,
+                color: COLORS.BG_WHITE,
+              }}
             >
               Réessayer
             </Button>
@@ -335,23 +340,48 @@ export default function FarmerDashboard(): JSX.Element {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="bg-accent/50 p-6 rounded-lg text-left">
-                <h3 className="font-semibold mb-4" style={{ color: COLORS.PRIMARY }}>
+                <h3
+                  className="font-semibold mb-4"
+                  style={{ color: COLORS.PRIMARY }}
+                >
                   🌱 Pourquoi devenir producteur ?
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {[
-                    { icon: "🗺️", title: "Visibilité", desc: "Apparaissez sur notre carte interactive" },
-                    { icon: "🤝", title: "Vente directe", desc: "Vendez directement aux consommateurs" },
-                    { icon: "📈", title: "Croissance", desc: "Développez votre clientèle locale" },
-                    { icon: "🌍", title: "Impact", desc: "Participez à l'économie circulaire" },
+                    {
+                      icon: "🗺️",
+                      title: "Visibilité",
+                      desc: "Apparaissez sur notre carte interactive",
+                    },
+                    {
+                      icon: "🤝",
+                      title: "Vente directe",
+                      desc: "Vendez directement aux consommateurs",
+                    },
+                    {
+                      icon: "📈",
+                      title: "Croissance",
+                      desc: "Développez votre clientèle locale",
+                    },
+                    {
+                      icon: "🌍",
+                      title: "Impact",
+                      desc: "Participez à l'économie circulaire",
+                    },
                   ].map((benefit, index) => (
                     <div key={index} className="flex items-start space-x-3">
                       <div className="text-2xl">{benefit.icon}</div>
                       <div>
-                        <div className="font-medium" style={{ color: COLORS.TEXT_PRIMARY }}>
+                        <div
+                          className="font-medium"
+                          style={{ color: COLORS.TEXT_PRIMARY }}
+                        >
                           {benefit.title}
                         </div>
-                        <div className="text-sm" style={{ color: COLORS.TEXT_SECONDARY }}>
+                        <div
+                          className="text-sm"
+                          style={{ color: COLORS.TEXT_SECONDARY }}
+                        >
                           {benefit.desc}
                         </div>
                       </div>
@@ -364,12 +394,16 @@ export default function FarmerDashboard(): JSX.Element {
                   size="lg"
                   asChild
                   className="w-full sm:w-auto"
-                  style={{ backgroundColor: COLORS.PRIMARY, color: COLORS.BG_WHITE }}
+                  style={{
+                    backgroundColor: COLORS.PRIMARY,
+                    color: COLORS.BG_WHITE,
+                  }}
                 >
                   <Link href="/become-producer">Créer une demande</Link>
                 </Button>
                 <p className="text-xs text-muted-foreground">
-                  Le processus prend environ 5 minutes et sera validé sous 24-48h
+                  Le processus prend environ 5 minutes et sera validé sous
+                  24-48h
                 </p>
               </div>
             </CardContent>
@@ -397,7 +431,10 @@ export default function FarmerDashboard(): JSX.Element {
                 className="w-20 h-20 rounded-full flex items-center justify-center mx-auto"
                 style={{ backgroundColor: COLORS.PRIMARY_BG }}
               >
-                <Clock className="w-10 h-10" style={{ color: COLORS.PRIMARY }} />
+                <Clock
+                  className="w-10 h-10"
+                  style={{ color: COLORS.PRIMARY }}
+                />
               </div>
               <CardTitle className="text-3xl text-balance">
                 Demande en attente
@@ -410,7 +447,9 @@ export default function FarmerDashboard(): JSX.Element {
             <CardContent className="space-y-6">
               <div className="bg-accent/50 p-4 rounded-lg text-left">
                 <p className="text-sm text-muted-foreground">
-                  <strong className="text-foreground">Vérifiez votre boîte mail :</strong>{" "}
+                  <strong className="text-foreground">
+                    Vérifiez votre boîte mail :
+                  </strong>{" "}
                   {user?.primaryEmailAddress?.emailAddress}
                 </p>
                 <p className="text-xs text-muted-foreground mt-2">
@@ -456,14 +495,17 @@ export default function FarmerDashboard(): JSX.Element {
                 className="w-20 h-20 rounded-full flex items-center justify-center mx-auto"
                 style={{ backgroundColor: `${COLORS.ERROR}20` }}
               >
-                <XCircle className="w-10 h-10" style={{ color: COLORS.ERROR }} />
+                <XCircle
+                  className="w-10 h-10"
+                  style={{ color: COLORS.ERROR }}
+                />
               </div>
               <CardTitle className="text-3xl text-balance text-red-900">
                 Demande non approuvée
               </CardTitle>
               <CardDescription className="text-base leading-relaxed max-w-2xl mx-auto text-red-800">
-                Malheureusement, votre demande n'a pas pu être approuvée.
-                Vous pouvez refaire une demande ou nous contacter.
+                Malheureusement, votre demande n'a pas pu être approuvée. Vous
+                pouvez refaire une demande ou nous contacter.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -472,7 +514,10 @@ export default function FarmerDashboard(): JSX.Element {
                   <Button
                     size="lg"
                     asChild
-                    style={{ backgroundColor: COLORS.PRIMARY, color: COLORS.BG_WHITE }}
+                    style={{
+                      backgroundColor: COLORS.PRIMARY,
+                      color: COLORS.BG_WHITE,
+                    }}
                   >
                     <Link href="/become-producer">Refaire une demande</Link>
                   </Button>
@@ -553,355 +598,36 @@ export default function FarmerDashboard(): JSX.Element {
 
   return (
     <div className="min-h-screen bg-gray-50">
-    <div className="max-w-4xl mx-auto py-10 px-4">
-      <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-gray-900 mb-1">
-          Tableau de bord producteur
-        </h1>
-        <p style={{ color: COLORS.TEXT_SECONDARY }}>
-          Gérez votre fiche ferme et vos informations
-        </p>
-      </div>
-
-      {/* Fiche ferme */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div
-          className="px-6 py-4 border-b"
-          style={{
-            backgroundColor: COLORS.BG_WHITE,
-            borderBottomColor: COLORS.BORDER,
-          }}
-        >
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <h2 className="text-xl font-semibold mb-1" style={{ color: COLORS.PRIMARY_DARK }}>
-                {escapeHTML((listing as any).name || "Ferme sans nom")}
-              </h2>
-              {(listing as any).address && (
-                <div className="flex items-center text-sm" style={{ color: COLORS.TEXT_SECONDARY }}>
-                  <MapPin className="h-4 w-4 mr-2" style={{ color: COLORS.TEXT_MUTED }} />
-                  {escapeHTML((listing as any).address)}
-                </div>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              {listing!.active ? (
-                <div
-                  className="flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium"
-                  style={{ backgroundColor: `${COLORS.SUCCESS}20`, color: COLORS.SUCCESS }}
-                >
-                  <CheckCircle className="h-4 w-4" />
-                  Publiée
-                </div>
-              ) : (
-                <div
-                  className="flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium"
-                  style={{ backgroundColor: `${COLORS.WARNING}20`, color: COLORS.WARNING }}
-                >
-                  <Clock className="h-4 w-4" />
-                  Brouillon
-                </div>
-              )}
-            </div>
-          </div>
+      <div className="max-w-4xl mx-auto py-10 px-4">
+        <div className="mb-8">
+          <h1 className="text-2xl font-semibold text-gray-900 mb-1">
+            Tableau de bord producteur
+          </h1>
+          <p style={{ color: COLORS.TEXT_SECONDARY }}>
+            Gérez votre fiche ferme et vos informations
+          </p>
         </div>
 
-        <div className="p-6">
-          {(listing as any).description && (
-            <div className="mb-6">
-              <h3 className="font-medium mb-2" style={{ color: COLORS.TEXT_PRIMARY }}>
-                Description
-              </h3>
-              <div
-                className="text-sm leading-relaxed prose prose-sm max-w-none"
-                style={{ color: COLORS.TEXT_SECONDARY }}
-                dangerouslySetInnerHTML={{
-                  __html: sanitizeHTML(
-                    (listing as any).description.length > 200
-                      ? `${(listing as any).description.substring(0, 200)}...`
-                      : (listing as any).description
-                  ),
-                }}
-              />
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            {Array.isArray((listing as any).product_type) &&
-              (listing as any).product_type.length > 0 && (
-                <div>
-                  <h3 className="font-medium mb-2" style={{ color: COLORS.TEXT_PRIMARY }}>
-                    Types de produits
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {(listing as any).product_type.map((type: string, index: number) => (
-                      <span
-                        key={`${type}-${index}`}
-                        className="px-2 py-1 text-xs rounded-md border"
-                        style={{
-                          backgroundColor: `${COLORS.PRIMARY}10`,
-                          color: COLORS.PRIMARY,
-                          borderColor: `${COLORS.PRIMARY}30`,
-                        }}
-                      >
-                        {escapeHTML(type)}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-            {((listing as any).email || (listing as any).phoneNumber || safeWebsite) && (
-              <div>
-                <h3 className="font-medium mb-2" style={{ color: COLORS.TEXT_PRIMARY }}>
-                  Contact
-                </h3>
-                <div className="space-y-1 text-sm" style={{ color: COLORS.TEXT_SECONDARY }}>
-                  {(listing as any).email && (
-                    <p>📧 {escapeHTML((listing as any).email)}</p>
-                  )}
-                  {(listing as any).phoneNumber && (
-                    <p>📞 {escapeHTML((listing as any).phoneNumber)}</p>
-                  )}
-                  {safeWebsite && (
-                    <p>
-                      🌐{" "}
-                      <a
-                        href={safeWebsite}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={cn(
-                          "hover:underline transition-colors duration-200",
-                          "focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 rounded"
-                        )}
-                        style={{ color: COLORS.PRIMARY }}
-                      >
-                        Site web
-                      </a>
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="text-xs mb-6 space-y-1" style={{ color: COLORS.TEXT_MUTED }}>
-            {(listing as any).created_at && (
-              <div className="flex items-center gap-1">
-                <Calendar className="h-3 w-3" />
-                Créée le :{" "}
-                {new Date((listing as any).created_at).toLocaleDateString("fr-FR", {
-                  day: "2-digit", month: "long", year: "numeric",
-                })}
-              </div>
-            )}
-          </div>
-
-          <div
-            className="flex flex-wrap gap-3 pt-4"
-            style={{ borderTopColor: COLORS.BORDER, borderTopWidth: "1px" }}
-          >
-            <Button
-              asChild
-              variant="outline"
-              className={cn("flex items-center gap-2 border-2", "focus:ring-2 focus:ring-offset-2 focus:ring-green-500")}
-              style={{ borderColor: COLORS.PRIMARY, color: COLORS.PRIMARY }}
-            >
-              <Link href={`/edit-listing/${listing!.id}`}>
-                <Edit className="h-4 w-4" />
-                Modifier la fiche
-              </Link>
-            </Button>
-
-            {!listing!.active && (
-              <Button onClick={handlePublishListing} style={{ backgroundColor: COLORS.PRIMARY, color: COLORS.BG_WHITE }}>
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Publier la fiche
-              </Button>
-            )}
-
-            {listing!.active && (
-              <Button
-                asChild
-                variant="outline"
-                className={cn("flex items-center gap-2 border-2", "focus:ring-2 focus:ring-offset-2 focus:ring-blue-500")}
-                style={{ borderColor: COLORS.INFO, color: COLORS.INFO }}
-              >
-                <Link href={`/farm/${listing!.id}`}>
-                  <Eye className="h-4 w-4" />
-                  Voir la fiche publique
-                </Link>
-              </Button>
-            )}
-
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  className={cn("flex items-center gap-2", "focus:ring-2 focus:ring-offset-2 focus:ring-red-500")}
-                  style={{ backgroundColor: COLORS.ERROR, color: COLORS.BG_WHITE }}
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Supprimer la fiche
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle style={{ color: COLORS.ERROR }}>
-                    Supprimer cette fiche ?
-                  </AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Cette action est définitive. Tous les produits et images liés
-                    à cette fiche seront également supprimés.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Annuler</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={handleDelete}
-                    style={{ backgroundColor: COLORS.ERROR, color: COLORS.BG_WHITE }}
-                  >
-                    Confirmer la suppression
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
-        </div>
-      </div>
-
-      {/* Mes produits */}
-      <div className="mt-6 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div
-          className="px-6 py-4 border-b flex items-center justify-between"
-          style={{
-            backgroundColor: COLORS.BG_WHITE,
-            borderBottomColor: COLORS.BORDER,
-          }}
-        >
+        {/* ✅ NOUVEAU — Bannière "Paiements bientôt disponible" MVP
+            À supprimer quand Stripe Connect sera intégré.
+            TODO (Stripe) : supprimer ce bloc une fois l'onboarding
+            Stripe Connect implémenté dans /api/stripe/connect/route.ts */}
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <Clock className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
           <div>
-            <h2 className="text-xl font-semibold" style={{ color: COLORS.PRIMARY_DARK }}>
-              Mes produits{products.filter(p => p.is_published).length > 0 && ` (${products.filter(p => p.is_published).length})`}
-            </h2>
-            <p className="text-sm mt-1" style={{ color: COLORS.TEXT_SECONDARY }}>
-              Gérez votre catalogue produits
+            <p className="text-sm font-semibold text-amber-800">
+              Paiements en ligne — bientôt disponible
+            </p>
+            <p className="mt-0.5 text-sm text-amber-700">
+              La boutique avec paiement intégré est en cours de développement.
+              En attendant, gérez vos commandes directement avec vos clients.
             </p>
           </div>
-          <Button
-            asChild
-            style={{ backgroundColor: COLORS.PRIMARY, color: COLORS.BG_WHITE }}
-          >
-            <Link href="/add-product">
-              <Plus className="h-4 w-4 mr-2" />
-              Ajouter un produit
-            </Link>
-          </Button>
         </div>
+        {/* FIN bannière MVP */}
 
-        {productsLoading ? (
-          <div className="p-6 text-center">
-            <Loader2 className="w-6 h-6 animate-spin mx-auto" style={{ color: COLORS.PRIMARY }} />
-          </div>
-        ) : products.filter(p => p.is_published).length === 0 ? (
-          <div className="p-8 text-center">
-            <p className="mb-4" style={{ color: COLORS.TEXT_MUTED }}>
-              Vous n&apos;avez pas encore de produits publiés.
-            </p>
-            <Button asChild style={{ backgroundColor: COLORS.PRIMARY, color: COLORS.BG_WHITE }}>
-              <Link href="/add-product">
-                <Plus className="h-4 w-4 mr-2" />
-                Ajouter mon premier produit
-              </Link>
-            </Button>
-          </div>
-        ) : (
-          <ul className="divide-y" style={{ borderColor: COLORS.BORDER }}>
-            {products.filter(p => p.is_published).map((product) => (
-              <li key={product.id} className="px-6 py-4 flex items-center gap-4">
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate" style={{ color: COLORS.TEXT_PRIMARY }}>
-                    {product.name}
-                  </p>
-                  <p className="text-sm mt-0.5" style={{ color: COLORS.TEXT_SECONDARY }}>
-                    {product.price != null
-                      ? `${product.price} € / ${product.unit ?? "unité"}`
-                      : "Prix non défini"}
-                    {" · "}
-                    <span
-                      style={{
-                        color:
-                          product.stock_status === "in_stock"
-                            ? COLORS.SUCCESS
-                            : product.stock_status === "low_stock"
-                            ? COLORS.WARNING
-                            : COLORS.ERROR,
-                      }}
-                    >
-                      {product.stock_status === "in_stock"
-                        ? "En stock"
-                        : product.stock_status === "low_stock"
-                        ? "Stock faible"
-                        : "Épuisé"}
-                    </span>
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span
-                    className={cn(
-                      "px-2 py-1 rounded-full text-xs font-medium",
-                      product.is_published
-                        ? "bg-green-100 text-green-700"
-                        : "bg-gray-100 text-gray-500"
-                    )}
-                  >
-                    {product.is_published ? "Publié" : "Brouillon"}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleProductToggle(product.id, product.is_published)}
-                  >
-                    {product.is_published ? "Dépublier" : "Publier"}
-                  </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        style={{ borderColor: COLORS.ERROR, color: COLORS.ERROR }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle style={{ color: COLORS.ERROR }}>
-                          Supprimer ce produit ?
-                        </AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Cette action est définitive. Le produit &quot;{product.name}&quot; sera supprimé.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Annuler</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => handleProductDelete(product.id)}
-                          style={{ backgroundColor: COLORS.ERROR, color: COLORS.BG_WHITE }}
-                        >
-                          Confirmer la suppression
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      {/* Produits en brouillon */}
-      {products.filter(p => !p.is_published).length > 0 && (
-        <div className="mt-6 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        {/* ✅ EXISTANT — Fiche ferme */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div
             className="px-6 py-4 border-b"
             style={{
@@ -909,81 +635,554 @@ export default function FarmerDashboard(): JSX.Element {
               borderBottomColor: COLORS.BORDER,
             }}
           >
-            <div>
-              <h2 className="text-xl font-semibold" style={{ color: COLORS.TEXT_PRIMARY }}>
-                Produits en brouillon ({products.filter(p => !p.is_published).length})
-              </h2>
-              <p className="text-sm mt-1" style={{ color: COLORS.TEXT_SECONDARY }}>
-                Publiez les produits pour les rendre visibles aux acheteurs
-              </p>
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <h2
+                  className="text-xl font-semibold mb-1"
+                  style={{ color: COLORS.PRIMARY_DARK }}
+                >
+                  {escapeHTML((listing as any).name || "Ferme sans nom")}
+                </h2>
+                {(listing as any).address && (
+                  <div
+                    className="flex items-center text-sm"
+                    style={{ color: COLORS.TEXT_SECONDARY }}
+                  >
+                    <MapPin
+                      className="h-4 w-4 mr-2"
+                      style={{ color: COLORS.TEXT_MUTED }}
+                    />
+                    {escapeHTML((listing as any).address)}
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {listing!.active ? (
+                  <div
+                    className="flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium"
+                    style={{
+                      backgroundColor: `${COLORS.SUCCESS}20`,
+                      color: COLORS.SUCCESS,
+                    }}
+                  >
+                    <CheckCircle className="h-4 w-4" />
+                    Publiée
+                  </div>
+                ) : (
+                  <div
+                    className="flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium"
+                    style={{
+                      backgroundColor: `${COLORS.WARNING}20`,
+                      color: COLORS.WARNING,
+                    }}
+                  >
+                    <Clock className="h-4 w-4" />
+                    Brouillon
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
-          <ul className="divide-y" style={{ borderColor: COLORS.BORDER }}>
-            {products.filter(p => !p.is_published).map((product) => (
-              <li key={product.id} className="px-6 py-4 flex items-center gap-4">
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate" style={{ color: COLORS.TEXT_PRIMARY }}>
-                    {product.name}
-                  </p>
-                  <p className="text-sm mt-0.5" style={{ color: COLORS.TEXT_SECONDARY }}>
-                    {product.price != null
-                      ? `${product.price} € / ${product.unit ?? "unité"}`
-                      : "Prix non défini"}
-                    {product.stock_quantity != null && (
-                      <> · Stock : {product.stock_quantity === 0 ? "Rupture de stock" : product.stock_quantity}</>
-                    )}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
-                    Brouillon
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    style={{ borderColor: COLORS.PRIMARY, color: COLORS.PRIMARY }}
-                    onClick={() => handleProductToggle(product.id, product.is_published)}
+          <div className="p-6">
+            {(listing as any).description && (
+              <div className="mb-6">
+                <h3
+                  className="font-medium mb-2"
+                  style={{ color: COLORS.TEXT_PRIMARY }}
+                >
+                  Description
+                </h3>
+                <div
+                  className="text-sm leading-relaxed prose prose-sm max-w-none"
+                  style={{ color: COLORS.TEXT_SECONDARY }}
+                  dangerouslySetInnerHTML={{
+                    __html: sanitizeHTML(
+                      (listing as any).description.length > 200
+                        ? `${(listing as any).description.substring(0, 200)}...`
+                        : (listing as any).description,
+                    ),
+                  }}
+                />
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              {Array.isArray((listing as any).product_type) &&
+                (listing as any).product_type.length > 0 && (
+                  <div>
+                    <h3
+                      className="font-medium mb-2"
+                      style={{ color: COLORS.TEXT_PRIMARY }}
+                    >
+                      Types de produits
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {(listing as any).product_type.map(
+                        (type: string, index: number) => (
+                          <span
+                            key={`${type}-${index}`}
+                            className="px-2 py-1 text-xs rounded-md border"
+                            style={{
+                              backgroundColor: `${COLORS.PRIMARY}10`,
+                              color: COLORS.PRIMARY,
+                              borderColor: `${COLORS.PRIMARY}30`,
+                            }}
+                          >
+                            {escapeHTML(type)}
+                          </span>
+                        ),
+                      )}
+                    </div>
+                  </div>
+                )}
+
+              {((listing as any).email ||
+                (listing as any).phoneNumber ||
+                safeWebsite) && (
+                <div>
+                  <h3
+                    className="font-medium mb-2"
+                    style={{ color: COLORS.TEXT_PRIMARY }}
                   >
-                    Publier
+                    Contact
+                  </h3>
+                  <div
+                    className="space-y-1 text-sm"
+                    style={{ color: COLORS.TEXT_SECONDARY }}
+                  >
+                    {(listing as any).email && (
+                      <p>📧 {escapeHTML((listing as any).email)}</p>
+                    )}
+                    {(listing as any).phoneNumber && (
+                      <p>📞 {escapeHTML((listing as any).phoneNumber)}</p>
+                    )}
+                    {safeWebsite && (
+                      <p>
+                        🌐{" "}
+                        <a
+                          href={safeWebsite}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={cn(
+                            "hover:underline transition-colors duration-200",
+                            "focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 rounded",
+                          )}
+                          style={{ color: COLORS.PRIMARY }}
+                        >
+                          Site web
+                        </a>
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div
+              className="text-xs mb-6 space-y-1"
+              style={{ color: COLORS.TEXT_MUTED }}
+            >
+              {(listing as any).created_at && (
+                <div className="flex items-center gap-1">
+                  <Calendar className="h-3 w-3" />
+                  Créée le :{" "}
+                  {new Date((listing as any).created_at).toLocaleDateString(
+                    "fr-FR",
+                    {
+                      day: "2-digit",
+                      month: "long",
+                      year: "numeric",
+                    },
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div
+              className="flex flex-wrap gap-3 pt-4"
+              style={{ borderTopColor: COLORS.BORDER, borderTopWidth: "1px" }}
+            >
+              <Button
+                asChild
+                variant="outline"
+                className={cn(
+                  "flex items-center gap-2 border-2",
+                  "focus:ring-2 focus:ring-offset-2 focus:ring-green-500",
+                )}
+                style={{ borderColor: COLORS.PRIMARY, color: COLORS.PRIMARY }}
+              >
+                <Link href={`/edit-listing/${listing!.id}`}>
+                  <Edit className="h-4 w-4" />
+                  Modifier la fiche
+                </Link>
+              </Button>
+
+              {!listing!.active && (
+                <Button
+                  onClick={handlePublishListing}
+                  style={{
+                    backgroundColor: COLORS.PRIMARY,
+                    color: COLORS.BG_WHITE,
+                  }}
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Publier la fiche
+                </Button>
+              )}
+
+              {listing!.active && (
+                <Button
+                  asChild
+                  variant="outline"
+                  className={cn(
+                    "flex items-center gap-2 border-2",
+                    "focus:ring-2 focus:ring-offset-2 focus:ring-blue-500",
+                  )}
+                  style={{ borderColor: COLORS.INFO, color: COLORS.INFO }}
+                >
+                  <Link href={`/farm/${listing!.id}`}>
+                    <Eye className="h-4 w-4" />
+                    Voir la fiche publique
+                  </Link>
+                </Button>
+              )}
+
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    className={cn(
+                      "flex items-center gap-2",
+                      "focus:ring-2 focus:ring-offset-2 focus:ring-red-500",
+                    )}
+                    style={{
+                      backgroundColor: COLORS.ERROR,
+                      color: COLORS.BG_WHITE,
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Supprimer la fiche
                   </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle style={{ color: COLORS.ERROR }}>
+                      Supprimer cette fiche ?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Cette action est définitive. Tous les produits et images
+                      liés à cette fiche seront également supprimés.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Annuler</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDelete}
+                      style={{
+                        backgroundColor: COLORS.ERROR,
+                        color: COLORS.BG_WHITE,
+                      }}
+                    >
+                      Confirmer la suppression
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          </div>
+        </div>
+
+        {/* ✅ EXISTANT — Mes produits */}
+        <div className="mt-6 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div
+            className="px-6 py-4 border-b flex items-center justify-between"
+            style={{
+              backgroundColor: COLORS.BG_WHITE,
+              borderBottomColor: COLORS.BORDER,
+            }}
+          >
+            <div>
+              <h2
+                className="text-xl font-semibold"
+                style={{ color: COLORS.PRIMARY_DARK }}
+              >
+                Mes produits
+                {products.filter((p) => p.is_published).length > 0 &&
+                  ` (${products.filter((p) => p.is_published).length})`}
+              </h2>
+              <p
+                className="text-sm mt-1"
+                style={{ color: COLORS.TEXT_SECONDARY }}
+              >
+                Gérez votre catalogue produits
+              </p>
+            </div>
+            <Button
+              asChild
+              style={{
+                backgroundColor: COLORS.PRIMARY,
+                color: COLORS.BG_WHITE,
+              }}
+            >
+              <Link href="/add-product">
+                <Plus className="h-4 w-4 mr-2" />
+                Ajouter un produit
+              </Link>
+            </Button>
+          </div>
+
+          {productsLoading ? (
+            <div className="p-6 text-center">
+              <Loader2
+                className="w-6 h-6 animate-spin mx-auto"
+                style={{ color: COLORS.PRIMARY }}
+              />
+            </div>
+          ) : products.filter((p) => p.is_published).length === 0 ? (
+            <div className="p-8 text-center">
+              <p className="mb-4" style={{ color: COLORS.TEXT_MUTED }}>
+                Vous n&apos;avez pas encore de produits publiés.
+              </p>
+              <Button
+                asChild
+                style={{
+                  backgroundColor: COLORS.PRIMARY,
+                  color: COLORS.BG_WHITE,
+                }}
+              >
+                <Link href="/add-product">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Ajouter mon premier produit
+                </Link>
+              </Button>
+            </div>
+          ) : (
+            <ul className="divide-y" style={{ borderColor: COLORS.BORDER }}>
+              {products
+                .filter((p) => p.is_published)
+                .map((product) => (
+                  <li
+                    key={product.id}
+                    className="px-6 py-4 flex items-center gap-4"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p
+                        className="font-medium truncate"
+                        style={{ color: COLORS.TEXT_PRIMARY }}
+                      >
+                        {product.name}
+                      </p>
+                      <p
+                        className="text-sm mt-0.5"
+                        style={{ color: COLORS.TEXT_SECONDARY }}
+                      >
+                        {product.price != null
+                          ? `${product.price} € / ${product.unit ?? "unité"}`
+                          : "Prix non défini"}
+                        {" · "}
+                        <span
+                          style={{
+                            color:
+                              product.stock_status === "in_stock"
+                                ? COLORS.SUCCESS
+                                : product.stock_status === "low_stock"
+                                  ? COLORS.WARNING
+                                  : COLORS.ERROR,
+                          }}
+                        >
+                          {product.stock_status === "in_stock"
+                            ? "En stock"
+                            : product.stock_status === "low_stock"
+                              ? "Stock faible"
+                              : "Épuisé"}
+                        </span>
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span
+                        className={cn(
+                          "px-2 py-1 rounded-full text-xs font-medium",
+                          product.is_published
+                            ? "bg-green-100 text-green-700"
+                            : "bg-gray-100 text-gray-500",
+                        )}
+                      >
+                        {product.is_published ? "Publié" : "Brouillon"}
+                      </span>
                       <Button
                         variant="outline"
                         size="sm"
-                        style={{ borderColor: COLORS.ERROR, color: COLORS.ERROR }}
+                        onClick={() =>
+                          handleProductToggle(product.id, product.is_published)
+                        }
                       >
-                        <Trash2 className="h-4 w-4" />
+                        {product.is_published ? "Dépublier" : "Publier"}
                       </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle style={{ color: COLORS.ERROR }}>
-                          Supprimer ce brouillon ?
-                        </AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Cette action est définitive. Le produit &quot;{product.name}&quot; sera supprimé.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Annuler</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => handleProductDelete(product.id)}
-                          style={{ backgroundColor: COLORS.ERROR, color: COLORS.BG_WHITE }}
-                        >
-                          Confirmer la suppression
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
-              </li>
-            ))}
-          </ul>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            style={{
+                              borderColor: COLORS.ERROR,
+                              color: COLORS.ERROR,
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle style={{ color: COLORS.ERROR }}>
+                              Supprimer ce produit ?
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Cette action est définitive. Le produit &quot;
+                              {product.name}&quot; sera supprimé.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Annuler</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleProductDelete(product.id)}
+                              style={{
+                                backgroundColor: COLORS.ERROR,
+                                color: COLORS.BG_WHITE,
+                              }}
+                            >
+                              Confirmer la suppression
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </li>
+                ))}
+            </ul>
+          )}
         </div>
-      )}
+
+        {/* ✅ EXISTANT — Produits en brouillon */}
+        {products.filter((p) => !p.is_published).length > 0 && (
+          <div className="mt-6 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div
+              className="px-6 py-4 border-b"
+              style={{
+                backgroundColor: COLORS.BG_WHITE,
+                borderBottomColor: COLORS.BORDER,
+              }}
+            >
+              <div>
+                <h2
+                  className="text-xl font-semibold"
+                  style={{ color: COLORS.TEXT_PRIMARY }}
+                >
+                  Produits en brouillon (
+                  {products.filter((p) => !p.is_published).length})
+                </h2>
+                <p
+                  className="text-sm mt-1"
+                  style={{ color: COLORS.TEXT_SECONDARY }}
+                >
+                  Publiez les produits pour les rendre visibles aux acheteurs
+                </p>
+              </div>
+            </div>
+
+            <ul className="divide-y" style={{ borderColor: COLORS.BORDER }}>
+              {products
+                .filter((p) => !p.is_published)
+                .map((product) => (
+                  <li
+                    key={product.id}
+                    className="px-6 py-4 flex items-center gap-4"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p
+                        className="font-medium truncate"
+                        style={{ color: COLORS.TEXT_PRIMARY }}
+                      >
+                        {product.name}
+                      </p>
+                      <p
+                        className="text-sm mt-0.5"
+                        style={{ color: COLORS.TEXT_SECONDARY }}
+                      >
+                        {product.price != null
+                          ? `${product.price} € / ${product.unit ?? "unité"}`
+                          : "Prix non défini"}
+                        {product.stock_quantity != null && (
+                          <>
+                            {" "}
+                            · Stock :{" "}
+                            {product.stock_quantity === 0
+                              ? "Rupture de stock"
+                              : product.stock_quantity}
+                          </>
+                        )}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                        Brouillon
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        style={{
+                          borderColor: COLORS.PRIMARY,
+                          color: COLORS.PRIMARY,
+                        }}
+                        onClick={() =>
+                          handleProductToggle(product.id, product.is_published)
+                        }
+                      >
+                        Publier
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            style={{
+                              borderColor: COLORS.ERROR,
+                              color: COLORS.ERROR,
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle style={{ color: COLORS.ERROR }}>
+                              Supprimer ce brouillon ?
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Cette action est définitive. Le produit &quot;
+                              {product.name}&quot; sera supprimé.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Annuler</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleProductDelete(product.id)}
+                              style={{
+                                backgroundColor: COLORS.ERROR,
+                                color: COLORS.BG_WHITE,
+                              }}
+                            >
+                              Confirmer la suppression
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </li>
+                ))}
+            </ul>
+          </div>
+        )}
+      </div>
     </div>
-  </div>
   );
 }

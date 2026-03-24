@@ -34,8 +34,9 @@ type ListingWithImages = Database["public"]["Tables"]["listing"]["Row"] & {
   listingImages: Database["public"]["Tables"]["listingImages"]["Row"][];
 };
 
+// ─── Next.js 15 : params est une Promise ─────────────────────────────────────
 interface PageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 // ─── Data fetching ────────────────────────────────────────────────────────────
@@ -49,7 +50,7 @@ async function getListing(id: string): Promise<ListingWithImages | null> {
     .select(`*, listingImages (*)`)
     .eq("id", parsedId)
     .or(
-      "active.eq.true,and(active.eq.false,osm_id.not.is.null,clerk_user_id.is.null)"
+      "active.eq.true,and(active.eq.false,osm_id.not.is.null,clerk_user_id.is.null)",
     )
     .single();
 
@@ -67,7 +68,8 @@ async function getListing(id: string): Promise<ListingWithImages | null> {
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
-  const listing = await getListing(params.id);
+  const { id } = await params;
+  const listing = await getListing(id);
   if (!listing) return { title: "Ferme introuvable | Farm To Fork" };
 
   return {
@@ -98,7 +100,8 @@ function SidebarCardSkeleton(): JSX.Element {
 export default async function FarmPage({
   params,
 }: PageProps): Promise<JSX.Element> {
-  const listing = await getListing(params.id);
+  const { id } = await params;
+  const listing = await getListing(id);
 
   // 404 serveur immédiat — pas de flash loader → EmptyState
   if (!listing) notFound();
@@ -126,8 +129,7 @@ export default async function FarmPage({
         }
       : {}),
     url: `${siteUrl}/farm/${listing.id}`,
-    image:
-      (listing as any).listingImages?.[0]?.url ?? undefined,
+    image: (listing as any).listingImages?.[0]?.url ?? undefined,
   };
 
   return (
@@ -137,94 +139,94 @@ export default async function FarmPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Section principale */}
-          <main className="lg:col-span-2 space-y-6">
-            {/* Bannière de revendication */}
-            {listing.osm_id && !listing.clerk_user_id && (
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-                <div className="flex items-center gap-2 text-amber-800 text-sm">
-                  <MapPin className="h-4 w-4 flex-shrink-0 text-amber-600" />
-                  <span>
-                    <strong>Propriétaire de cette ferme ?</strong> Cette fiche a
-                    été pré-enregistrée depuis OpenStreetMap et attend
-                    d&apos;être revendiquée.
-                  </span>
-                </div>
-                <Link
-                  href={`/farm/${listing.id}/claim`}
-                  className="flex-shrink-0 inline-flex items-center justify-center px-4 py-2 rounded-lg bg-amber-600 text-white text-sm font-medium hover:bg-amber-700 transition-colors"
-                >
-                  Revendiquer cette ferme
-                </Link>
-              </div>
-            )}
-
-            {/* Fil d'Ariane */}
-            <nav
-              className="flex flex-wrap items-center gap-2 text-sm mb-2"
-              aria-label="Fil d'Ariane"
-            >
-              {breadcrumbItems.map((item, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  {index > 0 && (
-                    <ChevronRight className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                  )}
-                  {item.href ? (
-                    <Link
-                      href={item.href}
-                      className={cn(
-                        "text-gray-500 hover:text-green-600 transition-colors",
-                        "hover:underline focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 rounded-sm"
-                      )}
-                    >
-                      {item.label}
-                    </Link>
-                  ) : (
-                    <span className="text-green-700 font-medium truncate max-w-[200px] sm:max-w-[300px]">
-                      {item.label}
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Section principale */}
+            <main className="lg:col-span-2 space-y-6">
+              {/* Bannière de revendication */}
+              {listing.osm_id && !listing.clerk_user_id && (
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                  <div className="flex items-center gap-2 text-amber-800 text-sm">
+                    <MapPin className="h-4 w-4 flex-shrink-0 text-amber-600" />
+                    <span>
+                      <strong>Propriétaire de cette ferme ?</strong> Cette fiche
+                      a été pré-enregistrée depuis OpenStreetMap et attend
+                      d&apos;être revendiquée.
                     </span>
-                  )}
+                  </div>
+                  <Link
+                    href={`/farm/${listing.id}/claim`}
+                    className="flex-shrink-0 inline-flex items-center justify-center px-4 py-2 rounded-lg bg-amber-600 text-white text-sm font-medium hover:bg-amber-700 transition-colors"
+                  >
+                    Revendiquer cette ferme
+                  </Link>
                 </div>
-              ))}
-            </nav>
+              )}
 
-            {/* Hero Section */}
-            <Suspense
-              fallback={
-                <div className="h-64 bg-gray-100 rounded-lg animate-pulse flex items-center justify-center">
-                  <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-                </div>
-              }
-            >
-              <HeroSection listing={listing} />
-            </Suspense>
+              {/* Fil d'Ariane */}
+              <nav
+                className="flex flex-wrap items-center gap-2 text-sm mb-2"
+                aria-label="Fil d'Ariane"
+              >
+                {breadcrumbItems.map((item, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    {index > 0 && (
+                      <ChevronRight className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                    )}
+                    {item.href ? (
+                      <Link
+                        href={item.href}
+                        className={cn(
+                          "text-gray-500 hover:text-green-600 transition-colors",
+                          "hover:underline focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 rounded-sm",
+                        )}
+                      >
+                        {item.label}
+                      </Link>
+                    ) : (
+                      <span className="text-green-700 font-medium truncate max-w-[200px] sm:max-w-[300px]">
+                        {item.label}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </nav>
 
-            {/* Onglets (état + analytics côté client) */}
-            <FarmTabsClient listing={listing} />
-          </main>
-
-          {/* Sidebar */}
-          <aside className="space-y-6 order-first lg:order-last">
-            <div className="sticky top-6 space-y-6 z-20">
-              <Suspense fallback={<SidebarCardSkeleton />}>
-                <ContactCard listing={listing} />
+              {/* Hero Section */}
+              <Suspense
+                fallback={
+                  <div className="h-64 bg-gray-100 rounded-lg animate-pulse flex items-center justify-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                  </div>
+                }
+              >
+                <HeroSection listing={listing} />
               </Suspense>
 
-              <Suspense fallback={<SidebarCardSkeleton />}>
-                <OpeningHoursCard listing={listing} />
-              </Suspense>
+              {/* Onglets (état + analytics côté client) */}
+              <FarmTabsClient listing={listing} />
+            </main>
 
-              <Suspense fallback={<SidebarCardSkeleton />}>
-                <MapCard listing={listing} />
-              </Suspense>
-            </div>
-          </aside>
+            {/* Sidebar */}
+            <aside className="space-y-6 order-first lg:order-last">
+              <div className="sticky top-6 space-y-6 z-20">
+                <Suspense fallback={<SidebarCardSkeleton />}>
+                  <ContactCard listing={listing} />
+                </Suspense>
+
+                <Suspense fallback={<SidebarCardSkeleton />}>
+                  <OpeningHoursCard listing={listing} />
+                </Suspense>
+
+                <Suspense fallback={<SidebarCardSkeleton />}>
+                  <MapCard listing={listing} />
+                </Suspense>
+              </div>
+            </aside>
+          </div>
         </div>
       </div>
-    </div>
     </>
   );
 }
@@ -234,7 +236,7 @@ declare global {
     gtag?: (
       command: string,
       action: string,
-      parameters: Record<string, unknown>
+      parameters: Record<string, unknown>,
     ) => void;
   }
 }

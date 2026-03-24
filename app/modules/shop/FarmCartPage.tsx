@@ -20,7 +20,8 @@ import { useSupabaseWithClerk } from "@/utils/supabase/client";
 
 /**
  * Interface pour une ferme (UI)
- * -> on impose string côté UI, donc on map depuis Supabase (string | null)
+ * delivery_price et delivery_zones retirés — colonnes inexistantes en DB.
+ * Prix de livraison fixé à 5€ pour le MVP.
  */
 interface Farm {
   id: number;
@@ -28,13 +29,10 @@ interface Farm {
   address: string;
   pickup_days: string | null;
   delivery_available: boolean | null;
-  delivery_days?: string | null;
-  delivery_price?: number | null;
-  delivery_zones?: string[] | null;
 }
 
 /**
- * Type local du SELECT listing (Supabase peut retourner des null)
+ * Type local du SELECT listing (colonnes réellement présentes en DB)
  */
 type ListingCartRow = {
   id: number;
@@ -42,10 +40,11 @@ type ListingCartRow = {
   address: string | null;
   pickup_days: string | null;
   delivery_available: boolean | null;
-  delivery_days: string | null;
-  delivery_price: number | null;
-  delivery_zones: string[] | null;
 };
+
+// Prix de livraison fixe MVP — à rendre configurable quand delivery_price
+// sera ajouté à la table listing
+const DELIVERY_PRICE_MVP = 5;
 
 export default function CartPage(): JSX.Element {
   const params = useParams();
@@ -79,14 +78,10 @@ export default function CartPage(): JSX.Element {
       try {
         setIsLoading(true);
 
-        // ✅ Select ciblé + typage + mapping vers Farm (UI)
         const { data, error } = await supabase
           .from("listing")
-          .select(
-            "id, name, address, pickup_days, delivery_available, delivery_days, delivery_price, delivery_zones"
-          )
+          .select("id, name, address, pickup_days, delivery_available")
           .eq("id", farmId)
-          .eq("active", true)
           .single<ListingCartRow>();
 
         if (error) throw error;
@@ -103,14 +98,15 @@ export default function CartPage(): JSX.Element {
           address: data.address ?? "Adresse non renseignée",
           pickup_days: data.pickup_days ?? null,
           delivery_available: data.delivery_available ?? false,
-          delivery_days: data.delivery_days ?? null,
-          delivery_price: data.delivery_price ?? null,
-          delivery_zones: data.delivery_zones ?? null,
         };
 
         if (!cancelled) setFarm(mappedFarm);
       } catch (error) {
-        console.error("Erreur chargement ferme:", error);
+        const err = error as { message?: string; code?: string };
+        console.error("Erreur chargement ferme:", {
+          message: err?.message,
+          code: err?.code,
+        });
         toast.error("Impossible de charger les informations de la ferme");
         router.push("/explore");
       } finally {
@@ -140,7 +136,7 @@ export default function CartPage(): JSX.Element {
     (productId: number, currentQty: number) => {
       updateQuantity(productId, currentQty + 1);
     },
-    [updateQuantity]
+    [updateQuantity],
   );
 
   const handleDec = useCallback(
@@ -152,7 +148,7 @@ export default function CartPage(): JSX.Element {
       }
       updateQuantity(productId, next);
     },
-    [removeItem, updateQuantity]
+    [removeItem, updateQuantity],
   );
 
   const handleClearCart = useCallback(() => {
@@ -160,11 +156,11 @@ export default function CartPage(): JSX.Element {
     toast.success("Panier vidé");
   }, [clearCart]);
 
-  // Totaux
+  // Prix de livraison MVP — fixe à 5€ si livraison disponible
   const deliveryPrice = useMemo(() => {
     if (!farm?.delivery_available) return 0;
-    return farm.delivery_price ?? 5;
-  }, [farm?.delivery_available, farm?.delivery_price]);
+    return DELIVERY_PRICE_MVP;
+  }, [farm?.delivery_available]);
 
   const total =
     cart.deliveryMode === "delivery" ? subtotal + deliveryPrice : subtotal;
@@ -390,7 +386,7 @@ export default function CartPage(): JSX.Element {
                 "flex items-start gap-4 p-4 rounded-lg border-2 cursor-pointer transition-all",
                 cart.deliveryMode === "pickup"
                   ? "border-green-500 bg-green-50"
-                  : "border-gray-200 hover:border-gray-300"
+                  : "border-gray-200 hover:border-gray-300",
               )}
             >
               <input
@@ -431,14 +427,14 @@ export default function CartPage(): JSX.Element {
               </span>
             </label>
 
-            {/* Livraison */}
+            {/* Livraison — visible uniquement si delivery_available */}
             {farm?.delivery_available && (
               <label
                 className={cn(
                   "flex items-start gap-4 p-4 rounded-lg border-2 cursor-pointer transition-all",
                   cart.deliveryMode === "delivery"
                     ? "border-green-500 bg-green-50"
-                    : "border-gray-200 hover:border-gray-300"
+                    : "border-gray-200 hover:border-gray-300",
                 )}
               >
                 <input
@@ -466,7 +462,8 @@ export default function CartPage(): JSX.Element {
                     className="text-sm"
                     style={{ color: COLORS.TEXT_SECONDARY }}
                   >
-                    🚚 {farm.delivery_days || "Livraison disponible"}
+                    🚚 Livraison disponible — contactez le producteur pour les
+                    détails
                   </p>
                 </div>
                 <span className="font-bold" style={{ color: COLORS.PRIMARY }}>
@@ -527,7 +524,7 @@ export default function CartPage(): JSX.Element {
               "block w-full py-4 px-6 rounded-lg font-semibold text-lg text-center",
               "transition-all duration-200 hover:shadow-lg",
               !cart.deliveryMode &&
-                "opacity-50 cursor-not-allowed pointer-events-none"
+                "opacity-50 cursor-not-allowed pointer-events-none",
             )}
             style={{ backgroundColor: COLORS.PRIMARY, color: COLORS.BG_WHITE }}
             onMouseEnter={(e) => {
