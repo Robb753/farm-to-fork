@@ -211,7 +211,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // Verify listing exists, has osm_id, not yet claimed
   const { data: listing, error: listingError } = await supabase
     .from("listing")
-    .select("id, osm_id, clerk_user_id, name")
+    .select("id, osm_id, clerk_user_id, name, address")
     .eq("id", listingId)
     .single();
 
@@ -303,6 +303,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       { status: 500 }
     );
   }
+
+  // Fire-and-forget admin email — même pattern que le flow "create"
+  sendAdminNotificationEmail({
+    farm_name: listing.name ?? "Ferme sans nom",
+    email: userEmail,
+    location: listing.address ?? "",
+    user_id: userId,
+    first_name: clerkUser.firstName ?? undefined,
+    last_name: clerkUser.lastName ?? undefined,
+  }).catch((err) => console.error("[PRODUCER-REQUEST/claim] Email admin:", err));
 
   return NextResponse.json({
     success: true,
