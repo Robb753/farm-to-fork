@@ -194,11 +194,7 @@ const DesktopListingMapView = (): JSX.Element => {
               globalBusy ? "opacity-60" : "opacity-100"
             )}
           >
-            <Listing
-              onLoadMore={undefined}
-              hasMore={false}
-              isLoading={isLoading}
-            />
+            <Listing isLoading={isLoading} />
           </div>
         </div>
 

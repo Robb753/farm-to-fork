@@ -55,8 +55,6 @@ interface ListingItem {
  * Interface pour les props du composant principal
  */
 interface ListingProps {
-  onLoadMore?: () => void;
-  hasMore?: boolean;
   isLoading?: boolean;
 }
 
@@ -545,8 +543,6 @@ ListItem.displayName = "ListItem";
 
 /* Main Component - Version avec Fetch Simplifié */
 export default function Listing({
-  onLoadMore,
-  hasMore = false,
   isLoading = false,
 }: ListingProps): JSX.Element {
   // Store hooks
@@ -582,12 +578,6 @@ export default function Listing({
         typeof listing.lng === "string" ? parseFloat(listing.lng) : listing.lng,
     }));
   }, [visibleListings]);
-
-  // ✅ Plus besoin d'un loading "images" séparé
-  const isLoadingImages = false;
-
-  // ✅ Fetch supprimé - Les données viennent maintenant d'Explore.tsx
-  // Le composant Listing est maintenant purement présentationnel
 
   // Handlers
   const handleShowOnMap = useCallback(
@@ -670,33 +660,8 @@ export default function Listing({
     window.location.reload();
   }, [clearSelection]);
 
-  // Load more avec IntersectionObserver
-  const loadMoreRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!hasMore || !onLoadMore) return;
-    const el = loadMoreRef.current;
-    if (!el) return;
-
-    let locked = false;
-    const io = new IntersectionObserver(
-      (entries) => {
-        const entry = entries[0];
-        if (entry.isIntersecting && !locked && !isLoading) {
-          locked = true;
-          onLoadMore();
-          setTimeout(() => (locked = false), 800);
-        }
-      },
-      { rootMargin: "200px 0px" }
-    );
-
-    io.observe(el);
-    return () => io.disconnect();
-  }, [hasMore, onLoadMore, isLoading]);
-
   // État vide
-  if (transformedItems.length === 0 && !isLoading && !isLoadingImages) {
+  if (transformedItems.length === 0 && !isLoading) {
     return (
       <div
         className="p-6 min-h-screen"
@@ -712,12 +677,12 @@ export default function Listing({
       className="px-4 pt-4 pb-6 min-h-screen relative"
       style={{ backgroundColor: COLORS.BG_GRAY }}
     >
-      {(isLoading || isLoadingImages) && <BookingStyleLoader />}
+      {isLoading && <BookingStyleLoader />}
 
       <div
         className={cn(
           "flex flex-col gap-4 transition-all duration-300 max-w-4xl mx-auto",
-          (isLoading || isLoadingImages) && "opacity-50 pointer-events-none"
+          isLoading && "opacity-50 pointer-events-none"
         )}
       >
         {transformedItems.map((item) => {
@@ -743,49 +708,6 @@ export default function Listing({
             />
           );
         })}
-
-        {/* Load More */}
-        {hasMore && (
-          <div className="mt-6 flex flex-col items-center gap-4">
-            <button
-              type="button"
-              onClick={onLoadMore}
-              disabled={isLoading}
-              className={cn(
-                "inline-flex items-center gap-3 rounded-lg px-6 py-3",
-                "text-base font-medium transition-all duration-200",
-                "hover:shadow-lg hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
-              )}
-              style={{
-                backgroundColor: COLORS.PRIMARY,
-                color: COLORS.BG_WHITE,
-              }}
-              onMouseEnter={(e) => {
-                if (!isLoading) {
-                  e.currentTarget.style.backgroundColor = COLORS.PRIMARY_DARK;
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isLoading) {
-                  e.currentTarget.style.backgroundColor = COLORS.PRIMARY;
-                }
-              }}
-            >
-              {isLoading ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Chargement...
-                </>
-              ) : (
-                <>
-                  <span>Charger plus</span>
-                  <span>↓</span>
-                </>
-              )}
-            </button>
-            <div ref={loadMoreRef} className="h-8 w-8 opacity-0" />
-          </div>
-        )}
       </div>
     </div>
   );
