@@ -1,9 +1,8 @@
 // app/_components/layout/Explore.tsx
 "use client";
 
-import React, { useCallback, useEffect, useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useAllListingsWithImages } from "@/app/hooks/useAllListingsWithImages";
 import { MAPBOX_CONFIG } from "@/lib/config";
 import type { LatLng, Listing } from "@/lib/store";
 import {
@@ -17,7 +16,11 @@ import ListingMapView from "../../modules/listings/components/ListingMapView";
 const approx = (a: number, b: number, eps: number = 1e-6): boolean =>
   Math.abs(a - b) <= eps;
 
-export default function Explore(): JSX.Element {
+interface ExploreProps {
+  listings: Listing[];
+}
+
+export default function Explore({ listings }: ExploreProps): JSX.Element {
   const router = useRouter();
   const searchParams = useSearchParams();
   const paramsKey = searchParams.toString();
@@ -78,32 +81,17 @@ export default function Explore(): JSX.Element {
     setZoom(targetZoom);
   }, [paramsKey, router, setCoordinates, setZoom]);
 
-  // ✅ Called directly from the fetch callback — no bridge useEffect needed
-  const handleListingsLoaded = useCallback(
-    (raw: Listing[]) => {
-      const normalized = raw.map((l: any) => ({
-        ...l,
-        active: l.active ?? true,
-        created_at: l.created_at ?? new Date().toISOString(),
-      }));
-      setAllListings(normalized);
-    },
-    [setAllListings]
-  );
-
-  // isLoading reflète l'état du fetch réseau.
-  // Sans ce sync, le store conserve isLoading=false pendant toute la durée du fetch,
-  // et Listing affiche EmptyState dès le premier rendu si des filtres sont persistés
-  // mais que les données ne sont pas encore arrivées.
-  const { isLoading: isFetchingListings } = useAllListingsWithImages({
-    limit: 500,
-    autoFetch: true,
-    onSuccess: handleListingsLoaded,
-  });
-
+  // Initialise le store au montage avec les listings chargés côté serveur.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    setListingsLoading(isFetchingListings);
-  }, [isFetchingListings, setListingsLoading]);
+    const normalized = listings.map((l: any) => ({
+      ...l,
+      active: l.active ?? true,
+      created_at: l.created_at ?? new Date().toISOString(),
+    }));
+    setAllListings(normalized);
+    setListingsLoading(false);
+  }, []);
 
   return <ListingMapView />;
 }
