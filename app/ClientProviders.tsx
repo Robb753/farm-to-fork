@@ -2,11 +2,10 @@
 "use client";
 
 import React, { useEffect, useLayoutEffect } from "react";
-import { toast, Toaster } from "sonner";
+import { Toaster } from "sonner";
 import AuthSync from "./_components/AuthSync";
 import { useSupabaseWithClerk } from "@/utils/supabase/client";
 import { useUserActions } from "@/lib/store/userStore";
-import { useCartStore } from "@/lib/store/cartStore";
 
 interface ClientProvidersProps {
   children: React.ReactNode;
@@ -20,19 +19,6 @@ const SupabaseInitializer: React.FC = () => {
     initSupabase(supabase);
   }, [supabase, initSupabase]);
 
-  return null;
-};
-
-const CART_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 heures
-
-const CartExpiryChecker: React.FC = () => {
-  useEffect(() => {
-    const { cart, clearCart } = useCartStore.getState();
-    if (cart.lastUpdated && Date.now() - cart.lastUpdated > CART_EXPIRY_MS) {
-      clearCart();
-      toast.info("Votre panier a expiré et a été vidé automatiquement.");
-    }
-  }, []);
   return null;
 };
 
@@ -83,7 +69,6 @@ export default function ClientProviders({
         }}
       />
 
-      <CartExpiryChecker />
       <HashCleaner />
       <SupabaseInitializer />
       <AuthSync />

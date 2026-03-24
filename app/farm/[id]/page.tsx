@@ -17,15 +17,6 @@ import HeroSection from "./_components/HeroSection";
 import ContactCard from "./_components/ContactCard";
 import OpeningHoursCard from "./_components/OpeningHoursCard";
 
-const FarmTabsClient = dynamic(() => import("./_components/FarmTabsClient"), {
-  loading: () => (
-    <div className="space-y-4">
-      <div className="h-12 bg-gray-200 rounded-xl animate-pulse" />
-      <div className="h-64 bg-gray-200 rounded-lg animate-pulse" />
-    </div>
-  ),
-});
-
 const MapCard = dynamic(() => import("./_components/MapCard"), {
   loading: () => <SidebarCardSkeleton />,
 });
@@ -204,8 +195,6 @@ export default async function FarmPage({
                 <HeroSection listing={listing} />
               </Suspense>
 
-              {/* Onglets (état + analytics côté client) */}
-              <FarmTabsClient listing={listing} />
             </main>
 
             {/* Sidebar */}
