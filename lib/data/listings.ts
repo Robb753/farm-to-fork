@@ -39,7 +39,7 @@ export async function getLieux(
     .select(
       `id, name, address, lat, lng, active, clerk_user_id, osm_id,
        availability, product_type, certifications, purchase_mode,
-       production_method, additional_services, rating, description,
+       production_method, additional_services, description,
        created_at, ${TABLES.LISTING_IMAGES}(id, url)`
     )
     .or("active.eq.true,and(osm_id.not.is.null,clerk_user_id.is.null)")
