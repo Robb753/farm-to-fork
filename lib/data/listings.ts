@@ -1,8 +1,15 @@
 // lib/data/listings.ts
 // Server-only — ne pas importer dans des Client Components.
+import { cache } from "react";
 import { supabaseServerPublic } from "@/utils/supabase/server-public";
 import { TABLES, LISTING_COLUMNS } from "@/lib/config";
 import type { Listing } from "@/lib/types";
+import type { Database } from "@/lib/types/database";
+
+export type ListingWithImages =
+  Database["public"]["Tables"]["listing"]["Row"] & {
+    listingImages: Database["public"]["Tables"]["listingImages"]["Row"][];
+  };
 
 const parseListingCoords = (listing: any): Listing => {
   const lat =
@@ -39,7 +46,7 @@ export async function getLieux(
     .select(
       `id, name, address, lat, lng, active, clerk_user_id, osm_id,
        availability, product_type, certifications, purchase_mode,
-       production_method, additional_services, rating, description,
+       production_method, additional_services, description,
        created_at, ${TABLES.LISTING_IMAGES}(id, url)`
     )
     .or("active.eq.true,and(osm_id.not.is.null,clerk_user_id.is.null)")
@@ -53,3 +60,27 @@ export async function getLieux(
 
   return (data ?? []).map(parseListingCoords);
 }
+
+export const getListing = cache(
+  async (id: string): Promise<ListingWithImages | null> => {
+    const parsedId = parseInt(id, 10);
+    if (isNaN(parsedId)) return null;
+
+    const { data, error } = await supabaseServerPublic
+      .from(TABLES.LISTING)
+      .select(`*, ${TABLES.LISTING_IMAGES}(*)`)
+      .eq("id", parsedId)
+      .or(
+        "active.eq.true,and(active.eq.false,osm_id.not.is.null,clerk_user_id.is.null)",
+      )
+      .single();
+
+    if (error) {
+      if (error.code === "PGRST116") return null; // no rows
+      console.error("[getListing] Supabase error:", error);
+      return null;
+    }
+
+    return data as ListingWithImages;
+  }
+);

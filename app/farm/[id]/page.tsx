@@ -5,10 +5,9 @@ import { ChevronRight, Loader2, MapPin } from "lucide-react";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { cn } from "@/lib/utils";
-import type { Database } from "@/lib/types/database";
 import type { Metadata } from "next";
 
-import { supabaseServerPublic } from "@/utils/supabase/server-public";
+import { getListing, type ListingWithImages } from "@/lib/data/listings";
 
 import dynamic from "next/dynamic";
 
@@ -21,37 +20,9 @@ const MapCard = dynamic(() => import("./_components/MapCard"), {
   loading: () => <SidebarCardSkeleton />,
 });
 
-type ListingWithImages = Database["public"]["Tables"]["listing"]["Row"] & {
-  listingImages: Database["public"]["Tables"]["listingImages"]["Row"][];
-};
-
 // ─── Next.js 15 : params est une Promise ─────────────────────────────────────
 interface PageProps {
   params: Promise<{ id: string }>;
-}
-
-// ─── Data fetching ────────────────────────────────────────────────────────────
-
-async function getListing(id: string): Promise<ListingWithImages | null> {
-  const parsedId = parseInt(id, 10);
-  if (isNaN(parsedId)) return null;
-
-  const { data, error } = await supabaseServerPublic
-    .from("listing")
-    .select(`*, listingImages (*)`)
-    .eq("id", parsedId)
-    .or(
-      "active.eq.true,and(active.eq.false,osm_id.not.is.null,clerk_user_id.is.null)",
-    )
-    .single();
-
-  if (error) {
-    if (error.code === "PGRST116") return null; // no rows
-    console.error("Supabase error [farm page]:", error);
-    return null;
-  }
-
-  return data as ListingWithImages;
 }
 
 // ─── generateMetadata ────────────────────────────────────────────────────────
