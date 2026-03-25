@@ -115,6 +115,8 @@ export interface Database {
 
           /** Identifiant OSM — null pour les fermes créées manuellement */
           osm_id: number | null;
+
+          slug: string;
         };
 
         Insert: {
@@ -176,6 +178,7 @@ export interface Database {
 
           clerk_user_id?: string | null;
           osm_id?: number | null;
+          slug?: string;
         };
 
         Update: {
@@ -237,6 +240,7 @@ export interface Database {
 
           clerk_user_id?: string | null;
           osm_id?: number | null;
+          slug?: string;
         };
 
         Relationships: [];

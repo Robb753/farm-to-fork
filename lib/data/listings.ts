@@ -44,7 +44,7 @@ export async function getLieux(
   const { data, error } = await supabaseServerPublic
     .from(TABLES.LISTING)
     .select(
-      `id, name, address, lat, lng, active, clerk_user_id, osm_id,
+      `id, name, address, lat, lng, active, clerk_user_id, osm_id, slug,
        availability, product_type, certifications, purchase_mode,
        production_method, additional_services, description,
        created_at, ${TABLES.LISTING_IMAGES}(id, url)`
@@ -81,6 +81,23 @@ export const getListing = cache(
       return null;
     }
 
+    return data as ListingWithImages;
+  }
+);
+
+export const getListingBySlug = cache(
+  async (slug: string): Promise<ListingWithImages | null> => {
+    const { data, error } = await supabaseServerPublic
+      .from(TABLES.LISTING)
+      .select(`*, ${TABLES.LISTING_IMAGES}(*)`)
+      .eq("slug", slug)
+      .or("active.eq.true,and(active.eq.false,osm_id.not.is.null,clerk_user_id.is.null)")
+      .single();
+    if (error) {
+      if (error.code === "PGRST116") return null;
+      console.error("[getListingBySlug] Supabase error:", error);
+      return null;
+    }
     return data as ListingWithImages;
   }
 );

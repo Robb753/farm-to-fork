@@ -1,4 +1,4 @@
-// app/farm/[id]/page.tsx
+// app/farm/[slug]/page.tsx
 import Link from "next/link";
 import Script from "next/script";
 import { ChevronRight, Loader2, MapPin } from "lucide-react";
@@ -7,7 +7,9 @@ import { notFound } from "next/navigation";
 import { cn } from "@/lib/utils";
 import type { Metadata } from "next";
 
-import { getListing, type ListingWithImages } from "@/lib/data/listings";
+import { getListingBySlug, type ListingWithImages } from "@/lib/data/listings";
+import { supabaseServerPublic } from "@/utils/supabase/server-public";
+import { TABLES } from "@/lib/config";
 
 import dynamic from "next/dynamic";
 
@@ -22,7 +24,17 @@ const MapCard = dynamic(() => import("./_components/MapCard"), {
 
 // ─── Next.js 15 : params est une Promise ─────────────────────────────────────
 interface PageProps {
-  params: Promise<{ id: string }>;
+  params: Promise<{ slug: string }>;
+}
+
+// ─── generateStaticParams ────────────────────────────────────────────────────
+
+export async function generateStaticParams() {
+  const { data } = await supabaseServerPublic
+    .from(TABLES.LISTING)
+    .select("slug")
+    .not("slug", "is", null);
+  return (data ?? []).map((row) => ({ slug: row.slug }));
 }
 
 // ─── generateMetadata ────────────────────────────────────────────────────────
@@ -30,8 +42,8 @@ interface PageProps {
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
-  const { id } = await params;
-  const listing = await getListing(id);
+  const { slug } = await params;
+  const listing = await getListingBySlug(slug);
   if (!listing) return { title: "Ferme introuvable | Farm To Fork" };
 
   return {
@@ -62,8 +74,8 @@ function SidebarCardSkeleton(): JSX.Element {
 export default async function FarmPage({
   params,
 }: PageProps): Promise<JSX.Element> {
-  const { id } = await params;
-  const listing = await getListing(id);
+  const { slug } = await params;
+  const listing = await getListingBySlug(slug);
 
   // 404 serveur immédiat — pas de flash loader → EmptyState
   if (!listing) notFound();
@@ -90,7 +102,7 @@ export default async function FarmPage({
           },
         }
       : {}),
-    url: `${siteUrl}/farm/${listing.id}`,
+    url: `${siteUrl}/farm/${listing.slug}`,
     image: (listing as any).listingImages?.[0]?.url ?? undefined,
   };
 
@@ -118,7 +130,7 @@ export default async function FarmPage({
                     </span>
                   </div>
                   <Link
-                    href={`/farm/${listing.id}/claim`}
+                    href={`/farm/${listing.slug}/claim`}
                     className="flex-shrink-0 inline-flex items-center justify-center px-4 py-2 rounded-lg bg-amber-600 text-white text-sm font-medium hover:bg-amber-700 transition-colors"
                   >
                     Revendiquer cette ferme
