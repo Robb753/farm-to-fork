@@ -1,7 +1,6 @@
 "use client";
 
 import React, {
-  useEffect,
   useState,
   useCallback,
   useMemo,
@@ -83,24 +82,6 @@ const DesktopListingMapView = (): JSX.Element => {
 
   // ✅ États locaux
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-
-  /**
-   * Écoute des événements de modale globale
-   */
-  useEffect(() => {
-    const handleModalEvent = (e: CustomEvent): void => {
-      setIsModalOpen((e as any).detail === true);
-    };
-
-    window.addEventListener("modalOpen", handleModalEvent as EventListener);
-
-    return () => {
-      window.removeEventListener(
-        "modalOpen",
-        handleModalEvent as EventListener
-      );
-    };
-  }, []);
 
   /**
    * Toggle taille de carte
