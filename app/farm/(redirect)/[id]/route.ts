@@ -4,16 +4,15 @@ import type { NextRequest } from "next/server";
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: Promise<{ slug: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { slug } = await params;
-  // Si c'est un ID numérique → redirect 301 vers slug
-  if (/^\d+$/.test(slug)) {
-    const listing = await getListing(slug);
+  const { id } = await params;
+  // Seulement pour les IDs numériques
+  if (/^\d+$/.test(id)) {
+    const listing = await getListing(id);
     if (listing?.slug) {
       redirect(`/farm/${listing.slug}`);
     }
   }
-  // Pas un ID numérique et pas trouvé → 404
   redirect("/explorer");
 }
