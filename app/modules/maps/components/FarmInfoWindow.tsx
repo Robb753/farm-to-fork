@@ -9,6 +9,7 @@ export interface FarmInfoWindowProps {
   /** Données de la ferme (issues des propriétés GeoJSON) */
   listing: {
     id: number;
+    slug?: string;
     name: string;
     address?: string;
     image_url?: string;
@@ -387,7 +388,7 @@ function CompactVariant({
       {/* CTA */}
       <div style={{ padding: "10px 12px" }}>
         <a
-          href={`/farm/${listing.id}`}
+          href={`/farm/${listing.slug ?? listing.id}`}
           style={{
             display: "flex",
             alignItems: "center",
@@ -563,7 +564,7 @@ function CardVariant({
       {/* CTA */}
       <div style={{ padding: "10px 12px" }}>
         <a
-          href={`/farm/${listing.id}`}
+          href={`/farm/${listing.slug ?? listing.id}`}
           style={{
             display: "flex",
             alignItems: "center",
