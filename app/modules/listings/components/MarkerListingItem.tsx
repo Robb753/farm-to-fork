@@ -104,7 +104,7 @@ function MarkerListingItem({
     } else if (typeof window !== "undefined") {
       window.location.href = `/farm/${item?.slug ?? id}`;
     }
-  }, [id, onNavigate]);
+  }, [id, onNavigate, item?.slug]);
 
   /**
    * Gestion des événements clavier pour l'accessibilité
