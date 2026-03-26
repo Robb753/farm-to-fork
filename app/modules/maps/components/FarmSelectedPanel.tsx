@@ -86,7 +86,7 @@ export default function FarmSelectedPanel() {
       {/* Actions */}
       <div className="px-4 pb-4 flex gap-2">
         <a
-          href={`/farm/${farm.id}`}
+          href={`/farm/${farm.slug ?? farm.id}`}
           className="flex-1 py-2 px-3 rounded-lg text-center text-xs font-semibold text-white"
           style={{ background: COLORS.PRIMARY }}
         >
@@ -94,7 +94,7 @@ export default function FarmSelectedPanel() {
         </a>
         {isUnclaimed && (
           <a
-            href={`/farm/${farm.id}/claim`}
+            href={`/farm/${farm.slug ?? farm.id}/claim`}
             className="flex-1 py-2 px-3 rounded-lg text-center text-xs font-semibold text-white"
             style={{ background: "#d97706" }}
           >

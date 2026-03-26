@@ -20,6 +20,7 @@ interface ListingImage {
  */
 interface ListingItem {
   id: string | number;
+  slug?: string;
   name?: string;
   address?: string;
   price?: number | string;
@@ -101,7 +102,7 @@ function MarkerListingItem({
     if (onNavigate) {
       onNavigate(id);
     } else if (typeof window !== "undefined") {
-      window.location.href = `/farm/${id}`;
+      window.location.href = `/farm/${item?.slug ?? id}`;
     }
   }, [id, onNavigate]);
 

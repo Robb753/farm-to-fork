@@ -51,6 +51,8 @@ export interface Listing {
   /** Clerk user ID du propriétaire — null si ferme non encore revendiquée */
   clerk_user_id?: string | null;
   distance?: number | null;
+  /** Slug URL unique — ex: ferme-dollinger-182 */
+  slug?: string;
 }
 
 /**

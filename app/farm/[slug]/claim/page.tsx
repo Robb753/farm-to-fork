@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 
 interface FarmInfo {
   id: number;
+  slug: string;
   name: string | null;
   address: string | null;
   osm_id: number | null;
@@ -43,28 +44,26 @@ export default function ClaimFarmPage(): JSX.Element {
   const [step, setStep] = useState<ClaimStep>("loading");
   const [errorMsg, setErrorMsg] = useState("");
 
-  const idParam = params?.id;
+  const slugParam = params?.slug;
 
   useEffect(() => {
     let cancelled = false;
 
     async function run() {
-      if (!idParam || typeof idParam !== "string") {
+      if (!slugParam || typeof slugParam !== "string") {
         if (!cancelled) setStep("not-found");
         return;
       }
 
-      const parsedId = parseInt(idParam, 10);
-      if (Number.isNaN(parsedId)) {
-        if (!cancelled) setStep("not-found");
-        return;
-      }
+      const isNumeric = /^\d+$/.test(slugParam);
 
-      const { data, error } = await supabase
+      const query = supabase
         .from("listing")
-        .select("id, name, address, osm_id, clerk_user_id")
-        .eq("id", parsedId)
-        .single();
+        .select("id, slug, name, address, osm_id, clerk_user_id");
+
+      const { data, error } = isNumeric
+        ? await query.eq("id", parseInt(slugParam, 10)).single()
+        : await query.eq("slug", slugParam).single();
 
       if (cancelled) return;
 
@@ -73,8 +72,14 @@ export default function ClaimFarmPage(): JSX.Element {
         return;
       }
 
+      if (!data.slug) {
+        console.error("[CLAIM] farm.slug absent du select — vérifier la migration Supabase");
+        setStep("not-found");
+        return;
+      }
+
       if (!data.osm_id) {
-        router.replace(`/farm/${parsedId}`);
+        router.replace(`/farm/${data.slug}`);
         return;
       }
 
@@ -93,13 +98,13 @@ export default function ClaimFarmPage(): JSX.Element {
     return () => {
       cancelled = true;
     };
-  }, [idParam, supabase, router]);
+  }, [slugParam, supabase, router]);
 
   const handleClaim = async () => {
     if (!farm) return;
 
     if (!isUserLoaded || !user) {
-      router.push(`/sign-in?redirect_url=/farm/${farm.id}/claim`);
+      router.push(`/sign-in?redirect_url=/farm/${farm.slug}/claim`);
       return;
     }
 
@@ -155,7 +160,7 @@ export default function ClaimFarmPage(): JSX.Element {
           </CardHeader>
           <CardFooter className="justify-center pt-4">
             <Button asChild variant="outline">
-              <Link href={`/farm/${farm?.id}`}>
+              <Link href={`/farm/${farm?.slug}`}>
                 <ChevronLeft className="h-4 w-4 mr-1" />
                 Retour à la fiche ferme
               </Link>
@@ -198,7 +203,7 @@ export default function ClaimFarmPage(): JSX.Element {
             size="sm"
             className="w-fit -ml-2 mb-2 text-muted-foreground"
           >
-            <Link href={`/farm/${farm?.id}`}>
+            <Link href={`/farm/${farm?.slug}`}>
               <ChevronLeft className="h-4 w-4 mr-1" />
               Voir la fiche ferme
             </Link>
@@ -244,7 +249,7 @@ export default function ClaimFarmPage(): JSX.Element {
         <CardFooter className="flex-col gap-3">
           {!isUserLoaded || !user ? (
             <Button asChild className="w-full bg-green-600 hover:bg-green-700">
-              <Link href={`/sign-in?redirect_url=/farm/${farm?.id}/claim`}>
+              <Link href={`/sign-in?redirect_url=/farm/${farm?.slug}/claim`}>
                 Connexion pour revendiquer
               </Link>
             </Button>

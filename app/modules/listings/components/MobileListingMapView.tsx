@@ -49,6 +49,7 @@ import { escapeHTML } from "@/lib/utils/sanitize";
  */
 interface ListingItem {
   id: string | number;
+  slug?: string;
   name?: string;
   address?: string | { label?: string; street?: string } | null;
   city?: string | null;
@@ -236,7 +237,7 @@ const FarmCard = memo<FarmCardProps>(function FarmCard({
         e.currentTarget.style.borderColor = `${COLORS.PRIMARY}30`;
       }}
     >
-      <Link href={`/farm/${item.id}`} prefetch={false} className="block">
+      <Link href={`/farm/${item.slug ?? item.id}`} prefetch={false} className="block">
         <div
           className="relative h-40"
           style={{ backgroundColor: `${COLORS.PRIMARY}10` }}

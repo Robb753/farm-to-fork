@@ -32,6 +32,7 @@ import { COLORS } from "@/lib/config";
  */
 interface ListingItem {
   id: string | number;
+  slug?: string;
   name: string;
   address: string;
   lat?: number;
@@ -269,7 +270,7 @@ const ListItem = React.memo<ListItemProps>(
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
       >
-        <Link href={`/farm/${item.id}`} className="flex w-full">
+        <Link href={`/farm/${item.slug ?? item.id}`} className="flex w-full">
           {/* Image Section */}
           <div className="relative w-32 sm:w-40 md:w-48 h-32 sm:h-36 flex-shrink-0">
             {!imageError ? (
