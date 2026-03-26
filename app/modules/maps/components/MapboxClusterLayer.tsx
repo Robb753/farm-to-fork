@@ -325,12 +325,6 @@ export default function MapboxClusterLayer(): null {
         .getState()
         .interactionsActions.setSelectedListing(props.id);
 
-      window.dispatchEvent(
-        new CustomEvent("listingSelected", {
-          detail: { id: props.id, fromMap: true },
-        }),
-      );
-
       // Unmount previous React root before removing old popup
       try {
         popupRootRef.current?.unmount();
