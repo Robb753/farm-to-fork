@@ -82,7 +82,6 @@ export default function Explore({ listings }: ExploreProps): JSX.Element {
   }, [paramsKey, router, setCoordinates, setZoom]);
 
   // Initialise le store au montage avec les listings chargés côté serveur.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const normalized = listings.map((l: any) => ({
       ...l,
@@ -91,6 +90,7 @@ export default function Explore({ listings }: ExploreProps): JSX.Element {
     }));
     setAllListings(normalized);
     setListingsLoading(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return <ListingMapView />;
