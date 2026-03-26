@@ -7,7 +7,7 @@ import { notFound } from "next/navigation";
 import { cn } from "@/lib/utils";
 import type { Metadata } from "next";
 
-import { getListingBySlug, type ListingWithImages } from "@/lib/data/listings";
+import { getListingBySlug } from "@/lib/data/listings";
 import { supabaseServerPublic } from "@/utils/supabase/server-public";
 import { TABLES } from "@/lib/config";
 
