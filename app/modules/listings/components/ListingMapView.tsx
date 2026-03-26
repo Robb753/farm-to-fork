@@ -1,7 +1,6 @@
 "use client";
 
 import React, {
-  useState,
   useCallback,
   useMemo,
   useSyncExternalStore,
@@ -80,9 +79,6 @@ const DesktopListingMapView = (): JSX.Element => {
   const isMapExpanded = useIsMapExpanded();
   const { setMapExpanded } = useUIActions();
 
-  // ✅ États locaux
-  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-
   /**
    * Toggle taille de carte
    */
@@ -117,17 +113,9 @@ const DesktopListingMapView = (): JSX.Element => {
     >
       <GlobalLoadingOverlay active={globalBusy} label="Mise à jour..." />
 
-      {/* ✅ Overlay pour modale */}
-      {isModalOpen && (
-        <div
-          className="pointer-events-none fixed inset-0 z-20 backdrop-blur-sm"
-          style={{ backgroundColor: `${COLORS.BG_WHITE}99` }}
-        />
-      )}
-
       {/* ✅ Section filtres sticky */}
       <div
-        className={cn("sticky top-0 border-b shadow-sm", isModalOpen && "z-40")}
+        className={cn("sticky top-0 border-b shadow-sm")}
         style={{
           backgroundColor: COLORS.BG_WHITE,
           borderColor: COLORS.BORDER,
@@ -146,8 +134,7 @@ const DesktopListingMapView = (): JSX.Element => {
             "relative overflow-y-auto transition-all duration-500 ease-in-out",
             isMapExpanded
               ? "hidden md:w-0 md:opacity-0"
-              : "w-full md:basis-1/2",
-            isModalOpen && "pointer-events-none opacity-50"
+              : "w-full md:basis-1/2"
           )}
         >
           {/* ✅ Compteur de résultats */}
@@ -183,8 +170,7 @@ const DesktopListingMapView = (): JSX.Element => {
         <div
           className={cn(
             "relative transition-all duration-500 ease-in-out",
-            isMapExpanded ? "w-full" : "w-full md:basis-1/2",
-            isModalOpen && "pointer-events-none opacity-50"
+            isMapExpanded ? "w-full" : "w-full md:basis-1/2"
           )}
         >
           <MapboxSection isMapExpanded={isMapExpanded} />
