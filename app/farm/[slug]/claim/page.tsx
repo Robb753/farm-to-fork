@@ -1,168 +1,74 @@
-"use client";
+// app/farm/[slug]/claim/page.tsx
+// Server Component — gère l'auth et le guard listing avant de rendre ClaimFlow.
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter, notFound } from "next/navigation";
+import { auth } from "@clerk/nextjs/server";
+import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
-import { Loader2, MapPin, ChevronLeft, Clock } from "lucide-react";
-import { useSupabaseWithClerk } from "@/utils/supabase/client";
-import { useUser } from "@clerk/nextjs";
+import { ChevronLeft } from "lucide-react";
+import type { Metadata } from "next";
+
+import { getListingBySlug } from "@/lib/data/listings";
+import { ClaimFlow } from "./_components/ClaimFlow";
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
+  CardDescription,
+  CardFooter,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 
-interface FarmInfo {
-  id: number;
-  slug: string;
-  name: string | null;
-  address: string | null;
-  osm_id: number | null;
-  clerk_user_id: string | null;
+interface PageProps {
+  params: Promise<{ slug: string }>;
 }
 
-type ClaimStep =
-  | "loading"
-  | "ready"
-  | "submitting"
-  | "pending"
-  | "error"
-  | "not-found";
-
-export default function ClaimFarmPage(): JSX.Element {
-  const params = useParams();
-  const router = useRouter();
-  const { user, isLoaded: isUserLoaded } = useUser();
-  const supabase = useSupabaseWithClerk();
-
-  const [farm, setFarm] = useState<FarmInfo | null>(null);
-  const [step, setStep] = useState<ClaimStep>("loading");
-  const [errorMsg, setErrorMsg] = useState("");
-
-  const slugParam = params?.slug;
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function run() {
-      if (!slugParam || typeof slugParam !== "string") {
-        if (!cancelled) setStep("not-found");
-        return;
-      }
-
-      const isNumeric = /^\d+$/.test(slugParam);
-
-      const query = supabase
-        .from("listing")
-        .select("id, slug, name, address, osm_id, clerk_user_id");
-
-      const { data, error } = isNumeric
-        ? await query.eq("id", parseInt(slugParam, 10)).single()
-        : await query.eq("slug", slugParam).single();
-
-      if (cancelled) return;
-
-      if (error || !data) {
-        setStep("not-found");
-        return;
-      }
-
-      if (!data.slug) {
-        console.error("[CLAIM] farm.slug absent du select — vérifier la migration Supabase");
-        setStep("not-found");
-        return;
-      }
-
-      if (!data.osm_id) {
-        router.replace(`/farm/${data.slug}`);
-        return;
-      }
-
-      if (data.clerk_user_id) {
-        setErrorMsg("Cette ferme a déjà été revendiquée.");
-        setStep("error");
-        return;
-      }
-
-      setFarm(data as FarmInfo);
-      setStep("ready");
-    }
-
-    void run();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [slugParam, supabase, router]);
-
-  const handleClaim = async () => {
-    if (!farm) return;
-
-    if (!isUserLoaded || !user) {
-      router.push(`/sign-in?redirect_url=/farm/${farm.slug}/claim`);
-      return;
-    }
-
-    setStep("submitting");
-
-    try {
-      const res = await fetch("/api/producer-request", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "claim", listingId: farm.id }),
-      });
-
-      const json = await res.json();
-
-      if (!res.ok || !json.success) {
-        setErrorMsg(json.message ?? "Une erreur est survenue.");
-        setStep("error");
-        return;
-      }
-
-      setStep("pending");
-    } catch (err) {
-      console.error("[CLAIM] Erreur réseau:", err);
-      setErrorMsg("Erreur réseau. Veuillez réessayer.");
-      setStep("error");
-    }
+export async function generateMetadata({
+  params,
+}: PageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const listing = await getListingBySlug(slug);
+  if (!listing) return { title: "Ferme introuvable | Farm To Fork" };
+  return {
+    title: `Revendiquer ${listing.name ?? "la fiche"} | Farm To Fork`,
   };
+}
 
-  if (step === "loading") {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50">
-        <Loader2 className="h-8 w-8 animate-spin text-green-600" />
-      </div>
-    );
+export default async function ClaimFarmPage({ params }: PageProps) {
+  const { slug } = await params;
+
+  // Auth — redirige vers sign-in si non connecté
+  const { userId } = await auth();
+  if (!userId) {
+    redirect(`/sign-in?redirect_url=/farm/${slug}/claim`);
   }
 
-  if (step === "not-found") {
-    notFound();
-  }
+  // Récupère le listing
+  const listing = await getListingBySlug(slug);
 
-  if (step === "pending") {
+  // Listing inexistant ou sans osm_id (pas éligible)
+  if (!listing) notFound();
+  if (!listing.osm_id) redirect(`/farm/${slug}`);
+
+  // Listing déjà revendiqué par un autre user
+  if (listing.clerk_user_id && listing.clerk_user_id !== userId) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50 px-4">
         <Card className="max-w-md w-full text-center">
-          <CardHeader className="pb-2">
-            <Clock className="h-14 w-14 text-amber-500 mx-auto mb-2" />
-            <CardTitle>Demande soumise !</CardTitle>
+          <CardHeader>
+            <div className="text-4xl mb-2">🔒</div>
+            <CardTitle>Fiche déjà revendiquée</CardTitle>
             <CardDescription>
-              Votre demande de revendication pour{" "}
-              <strong>{farm?.name ?? "cette ferme"}</strong> a bien été enregistrée.
-              Un administrateur va l&apos;examiner et vous serez notifié par e-mail.
+              La fiche{" "}
+              <strong>{listing.name ?? "cette ferme"}</strong> a déjà été
+              revendiquée par un autre utilisateur.
             </CardDescription>
           </CardHeader>
-          <CardFooter className="justify-center pt-4">
+          <CardFooter className="justify-center">
             <Button asChild variant="outline">
-              <Link href={`/farm/${farm?.slug}`}>
+              <Link href={`/farm/${slug}`}>
                 <ChevronLeft className="h-4 w-4 mr-1" />
-                Retour à la fiche ferme
+                Retour à la fiche
               </Link>
             </Button>
           </CardFooter>
@@ -171,21 +77,22 @@ export default function ClaimFarmPage(): JSX.Element {
     );
   }
 
-  if (step === "error") {
+  // Listing déjà revendiqué par le même user (retour sur la page)
+  if (listing.clerk_user_id === userId) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50 px-4">
         <Card className="max-w-md w-full text-center">
           <CardHeader>
-            <div className="text-4xl mb-2">⚠️</div>
-            <CardTitle className="text-xl">Impossible de revendiquer</CardTitle>
-            <CardDescription>{errorMsg}</CardDescription>
+            <div className="text-4xl mb-2">✅</div>
+            <CardTitle>Vous êtes déjà propriétaire</CardTitle>
+            <CardDescription>
+              Vous avez déjà revendiqué la fiche{" "}
+              <strong>{listing.name ?? "cette ferme"}</strong>.
+            </CardDescription>
           </CardHeader>
           <CardFooter className="justify-center">
-            <Button asChild variant="outline">
-              <Link href="/explore">
-                <ChevronLeft className="h-4 w-4 mr-1" />
-                Retour à la carte
-              </Link>
+            <Button asChild className="bg-emerald-600 hover:bg-emerald-700">
+              <Link href={`/farm/${slug}`}>Voir ma fiche</Link>
             </Button>
           </CardFooter>
         </Card>
@@ -194,82 +101,45 @@ export default function ClaimFarmPage(): JSX.Element {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50 px-4">
-      <Card className="max-w-md w-full">
-        <CardHeader>
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="w-fit -ml-2 mb-2 text-muted-foreground"
-          >
-            <Link href={`/farm/${farm?.slug}`}>
-              <ChevronLeft className="h-4 w-4 mr-1" />
-              Voir la fiche ferme
-            </Link>
-          </Button>
-          <Badge
-            variant="warning"
-            size="sm"
-            icon={<MapPin className="h-3 w-3" />}
-            className="w-fit mb-1"
-          >
-            Ferme pré-enregistrée OSM
-          </Badge>
-          <CardTitle>C&apos;est votre ferme ?</CardTitle>
-          <CardDescription>
-            Soumettez une demande de revendication — un administrateur l&apos;examinera
-            avant activation.
-          </CardDescription>
-        </CardHeader>
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 px-4 py-10">
+      <div className="max-w-md mx-auto">
+        {/* Back link */}
+        <Link
+          href={`/farm/${slug}`}
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Voir la fiche ferme
+        </Link>
 
-        <CardContent className="space-y-4">
-          <div className="rounded-xl border bg-muted/50 p-4 space-y-1">
-            <p className="font-semibold text-foreground text-lg">
-              {farm?.name ?? "Ferme sans nom"}
-            </p>
-            {farm?.address && (
-              <p className="text-sm text-muted-foreground flex items-start gap-1.5">
-                <MapPin className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
-                {farm.address}
-              </p>
-            )}
-          </div>
+        {/* Card conteneur */}
+        <Card className="shadow-sm">
+          <CardHeader className="pb-6">
+            <CardTitle className="text-lg">
+              Revendiquer cette fiche
+            </CardTitle>
+            <CardDescription>
+              Vérifiez votre identité pour devenir propriétaire de la
+              fiche{" "}
+              <strong className="text-foreground">
+                {listing.name ?? "de cette ferme"}
+              </strong>
+              .
+            </CardDescription>
+          </CardHeader>
 
-          <div className="space-y-2 text-sm text-muted-foreground">
-            <p className="font-medium text-foreground">Ce que cette action fait :</p>
-            <ul className="space-y-1 pl-4 list-disc">
-              <li>Soumet une demande de revendication à l&apos;équipe</li>
-              <li>Après validation, vous accédez à un tableau de bord producteur</li>
-              <li>Vous pouvez compléter et publier votre fiche</li>
-            </ul>
-          </div>
-        </CardContent>
-
-        <CardFooter className="flex-col gap-3">
-          {!isUserLoaded || !user ? (
-            <Button asChild className="w-full bg-green-600 hover:bg-green-700">
-              <Link href={`/sign-in?redirect_url=/farm/${farm?.slug}/claim`}>
-                Connexion pour revendiquer
-              </Link>
-            </Button>
-          ) : (
-            <Button
-              onClick={handleClaim}
-              disabled={step === "submitting"}
-              className="w-full bg-green-600 hover:bg-green-700"
-            >
-              {step === "submitting" && (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              )}
-              Soumettre ma demande
-            </Button>
-          )}
-          <p className="text-xs text-muted-foreground text-center">
-            La ferme ne sera activée qu&apos;après validation par notre équipe.
-          </p>
-        </CardFooter>
-      </Card>
+          <CardContent>
+            <ClaimFlow
+              listing={{
+                id: listing.id,
+                name: listing.name,
+                slug: listing.slug,
+                address: listing.address,
+              }}
+            />
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

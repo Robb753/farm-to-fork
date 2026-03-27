@@ -736,12 +736,21 @@ export interface Database {
           user_email: string;
           user_name: string | null;
           message: string | null;
-          status: "pending" | "approved" | "rejected";
+          status: "pending" | "code_sent" | "verified" | "rejected";
           admin_note: string | null;
           reviewed_by: string | null;
           reviewed_at: string | null;
           created_at: string;
           updated_at: string;
+          // Nouvelles colonnes — tunnel de vérification
+          contact_name: string | null;
+          contact_phone: string | null;
+          contact_email: string | null;
+          verification_method: "email" | "sms" | null;
+          verification_code: string | null;
+          code_expires_at: string | null;
+          code_attempts: number | null;
+          verified_at: string | null;
         };
         Insert: {
           id?: number;
@@ -750,12 +759,20 @@ export interface Database {
           user_email: string;
           user_name?: string | null;
           message?: string | null;
-          status?: "pending" | "approved" | "rejected";
+          status?: "pending" | "code_sent" | "verified" | "rejected";
           admin_note?: string | null;
           reviewed_by?: string | null;
           reviewed_at?: string | null;
           created_at?: string;
           updated_at?: string;
+          contact_name?: string | null;
+          contact_phone?: string | null;
+          contact_email?: string | null;
+          verification_method?: "email" | "sms" | null;
+          verification_code?: string | null;
+          code_expires_at?: string | null;
+          code_attempts?: number | null;
+          verified_at?: string | null;
         };
         Update: {
           id?: number;
@@ -764,12 +781,20 @@ export interface Database {
           user_email?: string;
           user_name?: string | null;
           message?: string | null;
-          status?: "pending" | "approved" | "rejected";
+          status?: "pending" | "code_sent" | "verified" | "rejected";
           admin_note?: string | null;
           reviewed_by?: string | null;
           reviewed_at?: string | null;
           created_at?: string;
           updated_at?: string;
+          contact_name?: string | null;
+          contact_phone?: string | null;
+          contact_email?: string | null;
+          verification_method?: "email" | "sms" | null;
+          verification_code?: string | null;
+          code_expires_at?: string | null;
+          code_attempts?: number | null;
+          verified_at?: string | null;
         };
         Relationships: [
           {
