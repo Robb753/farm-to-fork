@@ -379,3 +379,140 @@ export async function verifyCode(
 
   return { success: true, listingSlug: listing.slug };
 }
+
+// ─── Action 4 : verifierSiret ─────────────────────────────────────────────────
+
+export type SiretVerificationResult =
+  | {
+      success: true;
+      siret: string;
+      companyName: string;
+      isAgriculture: boolean;
+      isActive: boolean;
+    }
+  | { success: false; error: string };
+
+export async function verifierSiret(
+  claimId: number,
+  siret: string
+): Promise<SiretVerificationResult> {
+  const { userId } = await auth();
+  if (!userId) return { success: false, error: "Connexion requise" };
+
+  // Normalise et valide le format
+  const normalized = siret.replace(/\s/g, "");
+  if (!/^\d{14}$/.test(normalized)) {
+    return { success: false, error: "Format SIRET invalide (14 chiffres attendus)" };
+  }
+
+  const apiKey = process.env.INSEE_API_KEY;
+  if (!apiKey) {
+    return {
+      success: false,
+      error: "Service de vérification temporairement indisponible. Vous pouvez passer cette étape.",
+    };
+  }
+
+  let inseeData: unknown;
+  try {
+    const response = await fetch(
+      `https://api.insee.fr/api-sirene/3.11/siret/${normalized}`,
+      {
+        headers: { "X-INSEE-Api-Key-Integration": apiKey },
+        signal: AbortSignal.timeout(5000),
+      }
+    );
+
+    if (response.status === 404) {
+      return { success: false, error: "SIRET introuvable" };
+    }
+
+    if (response.status === 403) {
+      return { success: false, error: "SIRET introuvable" };
+    }
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: "Service de vérification temporairement indisponible. Vous pouvez passer cette étape.",
+      };
+    }
+
+    inseeData = await response.json();
+  } catch (err) {
+    const isTimeout = err instanceof Error && err.name === "TimeoutError";
+    const isAbort = err instanceof Error && err.name === "AbortError";
+    if (isTimeout || isAbort) {
+      return {
+        success: false,
+        error: "Service de vérification temporairement indisponible. Vous pouvez passer cette étape.",
+      };
+    }
+    console.error("[SIRET/fetch]", err);
+    return {
+      success: false,
+      error: "Service de vérification temporairement indisponible. Vous pouvez passer cette étape.",
+    };
+  }
+
+  // Extrait les données de l'établissement
+  const data = inseeData as {
+    etablissement: {
+      etatAdministratifEtablissement: string;
+      uniteLegale: {
+        denominationUniteLegale?: string;
+        prenomUsuelUniteLegale?: string;
+        nomUniteLegale?: string;
+        activitePrincipaleUniteLegale?: string;
+        etatAdministratifUniteLegale?: string;
+      };
+    };
+  };
+
+  const uniteLegale = data.etablissement.uniteLegale;
+
+  // Nom de l'entreprise : société ou personne physique
+  const companyName =
+    uniteLegale.denominationUniteLegale ??
+    ([uniteLegale.prenomUsuelUniteLegale, uniteLegale.nomUniteLegale]
+      .filter(Boolean)
+      .join(" ") ||
+      "Entreprise non nommée");
+
+  // Vérifie si actif
+  const isUniteLegaleActive = uniteLegale.etatAdministratifUniteLegale === "A";
+  const isEtablissementActive =
+    data.etablissement.etatAdministratifEtablissement === "A";
+
+  if (!isUniteLegaleActive || !isEtablissementActive) {
+    return { success: false, error: "Établissement fermé" };
+  }
+
+  // Code NAF — agriculture = 01xx ou 03xx
+  const nafCode = uniteLegale.activitePrincipaleUniteLegale ?? "";
+  const isAgriculture = /^(01|03)/.test(nafCode);
+
+  // Persiste en DB
+  const supabase = getSupabase();
+  const { error: updateError } = await supabase
+    .from("listing_claim_requests")
+    .update({
+      siret: normalized,
+      siret_verified: true,
+      siret_company_name: companyName,
+    })
+    .eq("id", claimId);
+
+  if (updateError) {
+    console.error("[SIRET/update]", updateError);
+    // Non-bloquant : on retourne quand même le succès
+  }
+
+  return {
+    success: true,
+    siret: normalized,
+    companyName,
+    isAgriculture,
+    isActive: true,
+  };
+}

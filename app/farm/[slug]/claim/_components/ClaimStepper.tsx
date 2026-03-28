@@ -5,13 +5,14 @@ import { cn } from "@/lib/utils";
 
 const STEPS = [
   { label: "Contact" },
+  { label: "SIRET" },
   { label: "Vérification" },
   { label: "Code" },
   { label: "Confirmation" },
 ];
 
 interface ClaimStepperProps {
-  currentStep: 1 | 2 | 3 | 4;
+  currentStep: 1 | 2 | 3 | 4 | 5;
 }
 
 export function ClaimStepper({ currentStep }: ClaimStepperProps) {
@@ -19,7 +20,7 @@ export function ClaimStepper({ currentStep }: ClaimStepperProps) {
     <nav aria-label="Progression revendication" className="w-full">
       <ol className="flex items-center">
         {STEPS.map((step, i) => {
-          const stepNum = (i + 1) as 1 | 2 | 3 | 4;
+          const stepNum = (i + 1) as 1 | 2 | 3 | 4 | 5;
           const isCompleted = stepNum < currentStep;
           const isActive = stepNum === currentStep;
 

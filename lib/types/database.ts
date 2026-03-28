@@ -747,6 +747,9 @@ export interface Database {
           code_expires_at: string | null;
           code_attempts: number | null;
           verified_at: string | null;
+          siret: string | null;
+          siret_verified: boolean | null;
+          siret_company_name: string | null;
         };
         Insert: {
           id?: number;
@@ -766,6 +769,9 @@ export interface Database {
           code_expires_at?: string | null;
           code_attempts?: number | null;
           verified_at?: string | null;
+          siret?: string | null;
+          siret_verified?: boolean | null;
+          siret_company_name?: string | null;
         };
         Update: {
           id?: number;
@@ -785,6 +791,9 @@ export interface Database {
           code_expires_at?: string | null;
           code_attempts?: number | null;
           verified_at?: string | null;
+          siret?: string | null;
+          siret_verified?: boolean | null;
+          siret_company_name?: string | null;
         };
         Relationships: [
           {
