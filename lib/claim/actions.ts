@@ -232,17 +232,11 @@ export async function sendVerificationCode(
   if (method === "email") {
     const firstName = claim.contact_email?.split("@")[0] ?? "Producteur";
     sendVerificationCodeEmail({
-      to: "delivered@resend.dev",
+      to: claim.contact_email!,
       prenom: firstName,
       farmName: listing?.name ?? "votre ferme",
       code,
     }).catch((err) => console.error("[CLAIM/email]", err));
-    console.error("[CLAIM/email] Tentative envoi à:", claim.contact_email);
-    console.error("[CLAIM/email] Code (debug only):", code);
-    console.error(
-      "[CLAIM/email] RESEND_API_KEY présente:",
-      !!process.env.RESEND_API_KEY,
-    );
   } else {
     // SMS via Twilio (import dynamique — évite l'erreur si non installé)
     try {
@@ -395,14 +389,14 @@ export async function verifyCode(
 
   // Emails (fire-and-forget)
   sendClaimSuccessEmail({
-    to: "delivered@resend.dev",
+    to: claim.contact_email!,
     farmName: listing.name ?? "votre ferme",
     listingSlug: listing.slug,
   }).catch((err) => console.error("[CLAIM/success-email]", err));
 
   sendAdminClaimNotificationEmail({
     farmName: listing.name ?? "Ferme sans nom",
-    userEmail: "delivered@resend.dev",
+    userEmail: claim.contact_email!,
     listingSlug: listing.slug,
   }).catch((err) => console.error("[CLAIM/admin-notif]", err));
 

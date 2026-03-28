@@ -2,6 +2,7 @@
 // Templates Resend pour le tunnel de revendication de fiche.
 
 import { getResendClient, emailConfig } from "@/lib/email/resendClient";
+import { EMAIL_CONFIG } from "../config";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -38,7 +39,7 @@ export async function sendVerificationCodeEmail(
 
   try {
     const result = await resend.emails.send({
-      from: emailConfig.defaultFrom,
+      from: `Farm to Fork <${EMAIL_CONFIG.fromAddress}>`,
       to,
       subject: `Votre code Farm2Fork : ${code}`,
       html: `
@@ -111,7 +112,7 @@ export async function sendClaimSuccessEmail(
 
   try {
     await resend.emails.send({
-      from: emailConfig.defaultFrom,
+      from: `Farm to Fork <${EMAIL_CONFIG.fromAddress}>`,
       to,
       subject: `Félicitations ! Votre fiche ${farmName} est revendiquée`,
       html: `
@@ -190,7 +191,7 @@ export async function sendAdminClaimNotificationEmail(
 
   try {
     await resend.emails.send({
-      from: emailConfig.defaultFrom,
+      from: `Farm to Fork <${EMAIL_CONFIG.fromAddress}>`,
       to: emailConfig.adminEmails,
       subject: `[Farm2Fork] Revendication auto-vérifiée — ${farmName}`,
       html: `
