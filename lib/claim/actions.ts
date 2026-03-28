@@ -439,6 +439,7 @@ export async function verifierSiret(
     }
 
     inseeData = await response.json();
+    console.error("[INSEE] raw response:", JSON.stringify(inseeData, null, 2));
   } catch (err) {
     const isTimeout = err instanceof Error && err.name === "TimeoutError";
     const isAbort = err instanceof Error && err.name === "AbortError";
@@ -458,7 +459,10 @@ export async function verifierSiret(
   // Extrait les données de l'établissement
   const data = inseeData as {
     etablissement: {
-      etatAdministratifEtablissement: string;
+      periodesEtablissement: Array<{
+        dateFin: string | null;
+        etatAdministratifEtablissement: string;
+      }>;
       uniteLegale: {
         denominationUniteLegale?: string;
         prenomUsuelUniteLegale?: string;
@@ -481,8 +485,11 @@ export async function verifierSiret(
 
   // Vérifie si actif
   const isUniteLegaleActive = uniteLegale.etatAdministratifUniteLegale === "A";
+  const periodeCourante = data.etablissement.periodesEtablissement?.find(
+    (p: { dateFin: string | null }) => p.dateFin === null,
+  );
   const isEtablissementActive =
-    data.etablissement.etatAdministratifEtablissement === "A";
+    periodeCourante?.etatAdministratifEtablissement === "A";
 
   if (!isUniteLegaleActive || !isEtablissementActive) {
     return { success: false, error: "Établissement fermé" };
