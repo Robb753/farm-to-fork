@@ -80,6 +80,12 @@ export async function submitClaimRequest(
 
   const { listingId, contactName, contactEmail, contactPhone, message } =
     parsed.data;
+
+  // Champs SIRET (pré-vérifiés à l'étape précédente)
+  const siret = (formData.get("siret") as string | null)?.trim() || null;
+  const siretCompanyName =
+    (formData.get("siret_company_name") as string | null)?.trim() || null;
+
   const supabase = getSupabase();
 
   // Vérifie listing
@@ -119,6 +125,13 @@ export async function submitClaimRequest(
         code_expires_at: null,
         code_attempts: 0,
         verified_at: null,
+        ...(siret
+          ? {
+              siret,
+              siret_company_name: siretCompanyName,
+              siret_verified: true,
+            }
+          : {}),
       },
       { onConflict: "listing_id,clerk_user_id" },
     )
@@ -393,8 +406,8 @@ export type SiretVerificationResult =
   | { success: false; error: string };
 
 export async function verifierSiret(
-  claimId: number,
-  siret: string
+  siret: string,
+  claimId?: number
 ): Promise<SiretVerificationResult> {
   const { userId } = await auth();
   if (!userId) return { success: false, error: "Connexion requise" };
@@ -409,7 +422,7 @@ export async function verifierSiret(
   if (!apiKey) {
     return {
       success: false,
-      error: "Service de vérification temporairement indisponible. Vous pouvez passer cette étape.",
+      error: "Service de vérification temporairement indisponible. Veuillez réessayer dans quelques instants.",
     };
   }
 
@@ -434,7 +447,7 @@ export async function verifierSiret(
     if (!response.ok) {
       return {
         success: false,
-        error: "Service de vérification temporairement indisponible. Vous pouvez passer cette étape.",
+        error: "Service de vérification temporairement indisponible. Veuillez réessayer dans quelques instants.",
       };
     }
 
@@ -446,13 +459,13 @@ export async function verifierSiret(
     if (isTimeout || isAbort) {
       return {
         success: false,
-        error: "Service de vérification temporairement indisponible. Vous pouvez passer cette étape.",
+        error: "Service de vérification temporairement indisponible. Veuillez réessayer dans quelques instants.",
       };
     }
     console.error("[SIRET/fetch]", err);
     return {
       success: false,
-      error: "Service de vérification temporairement indisponible. Vous pouvez passer cette étape.",
+      error: "Service de vérification temporairement indisponible. Veuillez réessayer dans quelques instants.",
     };
   }
 
@@ -499,20 +512,22 @@ export async function verifierSiret(
   const nafCode = uniteLegale.activitePrincipaleUniteLegale ?? "";
   const isAgriculture = /^(01|03)/.test(nafCode);
 
-  // Persiste en DB
-  const supabase = getSupabase();
-  const { error: updateError } = await supabase
-    .from("listing_claim_requests")
-    .update({
-      siret: normalized,
-      siret_verified: true,
-      siret_company_name: companyName,
-    })
-    .eq("id", claimId);
+  // Persiste en DB si claimId fourni
+  if (claimId) {
+    const supabase = getSupabase();
+    const { error: updateError } = await supabase
+      .from("listing_claim_requests")
+      .update({
+        siret: normalized,
+        siret_verified: true,
+        siret_company_name: companyName,
+      })
+      .eq("id", claimId);
 
-  if (updateError) {
-    console.error("[SIRET/update]", updateError);
-    // Non-bloquant : on retourne quand même le succès
+    if (updateError) {
+      console.error("[SIRET/update]", updateError);
+      // Non-bloquant : on retourne quand même le succès
+    }
   }
 
   return {

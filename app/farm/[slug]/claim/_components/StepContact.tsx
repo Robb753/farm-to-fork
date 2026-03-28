@@ -13,6 +13,8 @@ interface StepContactProps {
   listingId: number;
   listingName: string;
   listingAddress: string | null;
+  siretCompanyName: string | null;
+  siretRaw: string | null;
   onSuccess: (result: Extract<SubmitClaimResult, { success: true }>) => void;
 }
 
@@ -22,17 +24,22 @@ export function StepContact({
   listingId,
   listingName,
   listingAddress,
+  siretCompanyName,
+  siretRaw,
   onSuccess,
 }: StepContactProps) {
   const { user } = useUser();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
+  // Pré-remplissage nom : INSEE en priorité, Clerk en fallback
+  const defaultName =
+    siretCompanyName ??
+    ([user?.firstName, user?.lastName].filter(Boolean).join(" ") || "");
+
   // Pré-remplissage email Clerk
   const defaultEmail =
     user?.primaryEmailAddress?.emailAddress ?? "";
-  const defaultName =
-    [user?.firstName, user?.lastName].filter(Boolean).join(" ") || "";
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -70,8 +77,14 @@ export function StepContact({
         )}
       </div>
 
-      {/* Hidden listingId */}
+      {/* Hidden fields */}
       <input type="hidden" name="listingId" value={listingId} />
+      {siretRaw && (
+        <input type="hidden" name="siret" value={siretRaw} />
+      )}
+      {siretCompanyName && (
+        <input type="hidden" name="siret_company_name" value={siretCompanyName} />
+      )}
 
       {/* Nom complet */}
       <div className="space-y-1.5">
@@ -87,6 +100,11 @@ export function StepContact({
           autoComplete="name"
           disabled={isPending}
         />
+        {siretCompanyName && (
+          <p className="text-xs text-stone-400">
+            Pré-rempli depuis votre SIRET. Vous pouvez modifier.
+          </p>
+        )}
       </div>
 
       {/* Email professionnel */}

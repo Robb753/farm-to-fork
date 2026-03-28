@@ -5,9 +5,11 @@ import { verifierSiret } from "@/lib/claim/actions";
 import type { SiretVerificationResult } from "@/lib/claim/actions";
 
 interface StepSiretProps {
-  claimId: number;
-  onSuccess: () => void;
-  onSkip: () => void;
+  onSuccess: (data: {
+    siret: string;
+    companyName: string;
+    isAgriculture: boolean;
+  }) => void;
 }
 
 function formatSiret(v: string): string {
@@ -18,7 +20,7 @@ function formatSiret(v: string): string {
   );
 }
 
-export function StepSiret({ claimId, onSuccess, onSkip }: StepSiretProps) {
+export function StepSiret({ onSuccess }: StepSiretProps) {
   const [inputValue, setInputValue] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<SiretVerificationResult | null>(null);
@@ -30,7 +32,6 @@ export function StepSiret({ claimId, onSuccess, onSkip }: StepSiretProps) {
   function handleInputChange(e: ChangeEvent<HTMLInputElement>) {
     const formatted = formatSiret(e.target.value);
     setInputValue(formatted);
-    // Reset result si l'utilisateur modifie le champ
     if (result) {
       setResult(null);
       setServiceUnavailable(false);
@@ -43,7 +44,7 @@ export function StepSiret({ claimId, onSuccess, onSkip }: StepSiretProps) {
     setResult(null);
     setServiceUnavailable(false);
 
-    const res = await verifierSiret(claimId, digits);
+    const res = await verifierSiret(digits);
     setResult(res);
 
     if (!res.success) {
@@ -65,12 +66,12 @@ export function StepSiret({ claimId, onSuccess, onSkip }: StepSiretProps) {
   return (
     <div className="space-y-6">
       <p className="text-sm text-muted-foreground">
-        Votre numéro SIRET permet de confirmer l&apos;identité de votre
-        exploitation agricole. Cette étape est facultative.
+        Votre numéro SIRET est requis pour confirmer l&apos;identité de votre
+        exploitation. Il garantit l&apos;authenticité de votre revendication.
       </p>
 
       {/* Champ SIRET + bouton vérifier */}
-      {!(result && result.success) && (
+      {!(result && result.success) && !serviceUnavailable && (
         <div className="space-y-3">
           <label
             htmlFor="siret-input"
@@ -106,8 +107,27 @@ export function StepSiret({ claimId, onSuccess, onSkip }: StepSiretProps) {
         </div>
       )}
 
-      {/* Résultat erreur */}
-      {result && !result.success && (
+      {/* Service temporairement indisponible — bloquant */}
+      {serviceUnavailable && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-4 space-y-3">
+          <p className="text-sm font-medium text-amber-800">
+            Service de vérification temporairement indisponible.
+          </p>
+          <p className="text-sm text-amber-700">
+            Veuillez réessayer dans quelques instants.
+          </p>
+          <button
+            type="button"
+            onClick={handleReset}
+            className="w-full rounded-md border border-amber-300 bg-white px-4 py-2 text-sm font-medium text-amber-800 hover:bg-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-400 transition-colors"
+          >
+            Réessayer
+          </button>
+        </div>
+      )}
+
+      {/* Résultat erreur (hors service indisponible) */}
+      {result && !result.success && !serviceUnavailable && (
         <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {result.error}
         </div>
@@ -135,7 +155,11 @@ export function StepSiret({ claimId, onSuccess, onSkip }: StepSiretProps) {
                 {result.companyName}
               </p>
               <p className="text-xs text-emerald-600 font-mono mt-0.5">
-                SIRET {result.siret.replace(/(\d{2})(\d{3})(\d{3})(\d{5})(\d{1})/, "$1 $2 $3 $4 $5")}
+                SIRET{" "}
+                {result.siret.replace(
+                  /(\d{2})(\d{3})(\d{3})(\d{5})(\d{1})/,
+                  "$1 $2 $3 $4 $5"
+                )}
               </p>
               {result.isAgriculture && (
                 <p className="text-xs text-emerald-700 mt-1">
@@ -152,7 +176,13 @@ export function StepSiret({ claimId, onSuccess, onSkip }: StepSiretProps) {
           <div className="flex flex-col gap-2">
             <button
               type="button"
-              onClick={onSuccess}
+              onClick={() =>
+                onSuccess({
+                  siret: result.siret,
+                  companyName: result.companyName,
+                  isAgriculture: result.isAgriculture,
+                })
+              }
               className="w-full rounded-md bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors"
             >
               Oui, continuer
@@ -167,27 +197,6 @@ export function StepSiret({ claimId, onSuccess, onSkip }: StepSiretProps) {
           </div>
         </div>
       )}
-
-      {/* Bouton Passer — plus visible si service indisponible */}
-      <div className="pt-2 border-t border-border">
-        {serviceUnavailable ? (
-          <button
-            type="button"
-            onClick={onSkip}
-            className="w-full rounded-md border border-border px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors"
-          >
-            Passer cette étape
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={onSkip}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Passer cette étape
-          </button>
-        )}
-      </div>
     </div>
   );
 }

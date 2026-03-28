@@ -4,8 +4,8 @@ import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const STEPS = [
-  { label: "Contact" },
   { label: "SIRET" },
+  { label: "Contact" },
   { label: "Vérification" },
   { label: "Code" },
   { label: "Confirmation" },

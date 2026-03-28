@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { ClaimStepper } from "./ClaimStepper";
-import { StepContact } from "./StepContact";
 import { StepSiret } from "./StepSiret";
+import { StepContact } from "./StepContact";
 import { StepMethod } from "./StepMethod";
 import { StepVerify } from "./StepVerify";
 import { StepSuccess } from "./StepSuccess";
@@ -30,11 +30,23 @@ interface ClaimState {
   contactPhone: string | null;
 }
 
+interface SiretData {
+  siret: string;
+  companyName: string;
+  isAgriculture: boolean;
+}
+
 export function ClaimFlow({ listing }: ClaimFlowProps) {
   const [step, setStep] = useState<Step>(1);
+  const [siretData, setSiretData] = useState<SiretData | null>(null);
   const [claimState, setClaimState] = useState<ClaimState | null>(null);
   const [method, setMethod] = useState<"email" | "sms">("email");
   const [finalSlug, setFinalSlug] = useState<string>(listing.slug);
+
+  function handleSiretSuccess(data: SiretData) {
+    setSiretData(data);
+    setStep(2);
+  }
 
   function handleContactSuccess(
     result: Extract<SubmitClaimResult, { success: true }>
@@ -46,10 +58,6 @@ export function ClaimFlow({ listing }: ClaimFlowProps) {
       contactEmail: result.contactEmail,
       contactPhone: result.contactPhone,
     });
-    setStep(2);
-  }
-
-  function handleSiretDone() {
     setStep(3);
   }
 
@@ -64,8 +72,8 @@ export function ClaimFlow({ listing }: ClaimFlowProps) {
   }
 
   const stepLabels: Record<Step, string> = {
-    1: "Qui êtes-vous ?",
-    2: "Vérification SIRET",
+    1: "Vérification SIRET",
+    2: "Vos coordonnées",
     3: "Méthode de vérification",
     4: "Saisir le code",
     5: "Revendication confirmée",
@@ -89,19 +97,17 @@ export function ClaimFlow({ listing }: ClaimFlowProps) {
 
       {/* Contenu */}
       {step === 1 && (
+        <StepSiret onSuccess={handleSiretSuccess} />
+      )}
+
+      {step === 2 && (
         <StepContact
           listingId={listing.id}
           listingName={listing.name ?? "Ferme sans nom"}
           listingAddress={listing.address}
+          siretCompanyName={siretData?.companyName ?? null}
+          siretRaw={siretData?.siret ?? null}
           onSuccess={handleContactSuccess}
-        />
-      )}
-
-      {step === 2 && claimState && (
-        <StepSiret
-          claimId={claimState.claimId}
-          onSuccess={handleSiretDone}
-          onSkip={handleSiretDone}
         />
       )}
 
