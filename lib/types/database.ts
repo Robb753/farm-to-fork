@@ -731,21 +731,17 @@ export interface Database {
       listing_claim_requests: {
         Row: {
           id: number;
+          created_at: string;
+          updated_at: string | null;
           listing_id: number;
-          user_id: string;
-          user_email: string;
-          user_name: string | null;
+          clerk_user_id: string;
+          contact_email: string | null;
+          contact_phone: string | null;
           message: string | null;
           status: "pending" | "code_sent" | "verified" | "rejected";
-          admin_note: string | null;
-          reviewed_by: string | null;
           reviewed_at: string | null;
-          created_at: string;
-          updated_at: string;
-          // Nouvelles colonnes — tunnel de vérification
+          reviewed_by: string | null;
           contact_name: string | null;
-          contact_phone: string | null;
-          contact_email: string | null;
           verification_method: "email" | "sms" | null;
           verification_code: string | null;
           code_expires_at: string | null;
@@ -754,20 +750,17 @@ export interface Database {
         };
         Insert: {
           id?: number;
+          created_at?: string;
+          updated_at?: string | null;
           listing_id: number;
-          user_id: string;
-          user_email: string;
-          user_name?: string | null;
+          clerk_user_id: string;
+          contact_email?: string | null;
+          contact_phone?: string | null;
           message?: string | null;
           status?: "pending" | "code_sent" | "verified" | "rejected";
-          admin_note?: string | null;
-          reviewed_by?: string | null;
           reviewed_at?: string | null;
-          created_at?: string;
-          updated_at?: string;
+          reviewed_by?: string | null;
           contact_name?: string | null;
-          contact_phone?: string | null;
-          contact_email?: string | null;
           verification_method?: "email" | "sms" | null;
           verification_code?: string | null;
           code_expires_at?: string | null;
@@ -776,20 +769,17 @@ export interface Database {
         };
         Update: {
           id?: number;
+          created_at?: string;
+          updated_at?: string | null;
           listing_id?: number;
-          user_id?: string;
-          user_email?: string;
-          user_name?: string | null;
+          clerk_user_id?: string;
+          contact_email?: string | null;
+          contact_phone?: string | null;
           message?: string | null;
           status?: "pending" | "code_sent" | "verified" | "rejected";
-          admin_note?: string | null;
-          reviewed_by?: string | null;
           reviewed_at?: string | null;
-          created_at?: string;
-          updated_at?: string;
+          reviewed_by?: string | null;
           contact_name?: string | null;
-          contact_phone?: string | null;
-          contact_email?: string | null;
           verification_method?: "email" | "sms" | null;
           verification_code?: string | null;
           code_expires_at?: string | null;

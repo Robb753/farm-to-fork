@@ -109,20 +109,18 @@ export async function submitClaimRequest(
     .upsert(
       {
         listing_id: listingId,
-        user_id: userId,
-        user_email: contactEmail,
-        user_name: contactName,
+        clerk_user_id: userId,
         contact_name: contactName,
         contact_email: contactEmail,
         contact_phone: contactPhone ?? null,
         message: message ?? null,
-        status: "pending" as const,
+        status: "pending",
         verification_code: null,
         code_expires_at: null,
         code_attempts: 0,
         verified_at: null,
       },
-      { onConflict: "listing_id,user_id", ignoreDuplicates: false }
+      { onConflict: "listing_id,clerk_user_id" },
     )
     .select("id")
     .single();
@@ -171,12 +169,12 @@ export async function sendVerificationCode(
   // Vérifie ownership + état
   const { data: claim } = await supabase
     .from("listing_claim_requests")
-    .select("id, user_id, contact_email, contact_phone, listing_id, status")
+    .select("id, clerk_user_id, contact_email, contact_phone, listing_id, status")
     .eq("id", claimId)
     .single();
 
   if (!claim) return { success: false, error: "Demande introuvable" };
-  if (claim.user_id !== userId) return { success: false, error: "Non autorisé" };
+  if (claim.clerk_user_id !== userId) return { success: false, error: "Non autorisé" };
   if (claim.status === "verified") return { success: false, error: "Déjà vérifié" };
   if (claim.status === "rejected") return { success: false, error: "Demande rejetée" };
 
@@ -221,11 +219,17 @@ export async function sendVerificationCode(
   if (method === "email") {
     const firstName = claim.contact_email?.split("@")[0] ?? "Producteur";
     sendVerificationCodeEmail({
-      to: claim.contact_email!,
+      to: "delivered@resend.dev",
       prenom: firstName,
       farmName: listing?.name ?? "votre ferme",
       code,
     }).catch((err) => console.error("[CLAIM/email]", err));
+    console.error("[CLAIM/email] Tentative envoi à:", claim.contact_email);
+    console.error("[CLAIM/email] Code (debug only):", code);
+    console.error(
+      "[CLAIM/email] RESEND_API_KEY présente:",
+      !!process.env.RESEND_API_KEY,
+    );
   } else {
     // SMS via Twilio (import dynamique — évite l'erreur si non installé)
     try {
@@ -267,13 +271,14 @@ export async function verifyCode(
   const { data: claim } = await supabase
     .from("listing_claim_requests")
     .select(
-      "id, user_id, listing_id, status, verification_code, code_expires_at, code_attempts, contact_email, contact_name"
+      "id, clerk_user_id, listing_id, status, verification_code, code_expires_at, code_attempts, contact_email, contact_name",
     )
     .eq("id", claimId)
     .single();
 
   if (!claim) return { success: false, error: "Demande introuvable" };
-  if (claim.user_id !== userId) return { success: false, error: "Non autorisé" };
+  if (claim.clerk_user_id !== userId)
+    return { success: false, error: "Non autorisé" };
   if (claim.status !== "code_sent")
     return { success: false, error: "Aucun code actif" };
   if (
@@ -361,14 +366,14 @@ export async function verifyCode(
 
   // Emails (fire-and-forget)
   sendClaimSuccessEmail({
-    to: claim.contact_email!,
+    to: "delivered@resend.dev",
     farmName: listing.name ?? "votre ferme",
     listingSlug: listing.slug,
   }).catch((err) => console.error("[CLAIM/success-email]", err));
 
   sendAdminClaimNotificationEmail({
     farmName: listing.name ?? "Ferme sans nom",
-    userEmail: claim.contact_email!,
+    userEmail: "delivered@resend.dev",
     listingSlug: listing.slug,
   }).catch((err) => console.error("[CLAIM/admin-notif]", err));
 

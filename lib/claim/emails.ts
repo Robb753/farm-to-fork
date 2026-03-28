@@ -37,7 +37,7 @@ export async function sendVerificationCodeEmail(
   const codeDisplay = code.split("").join(" ");
 
   try {
-    await resend.emails.send({
+    const result = await resend.emails.send({
       from: emailConfig.defaultFrom,
       to,
       subject: `Votre code Farm2Fork : ${code}`,
@@ -90,6 +90,7 @@ export async function sendVerificationCodeEmail(
         </div>
       `,
     });
+    console.error("[RESEND] result:", JSON.stringify(result));
     return true;
   } catch (err) {
     console.error("[CLAIM/email] Erreur envoi code:", err);
