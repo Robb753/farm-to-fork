@@ -308,6 +308,7 @@ type ListingData = {
   additional_services: AdditionalServiceId[];
   products: string[]; // UI only
   active: DbListing["active"];
+  slug: DbListing["slug"] | null;
   listingImages: Pick<DbListingImage, "url">[];
 };
 
@@ -525,6 +526,7 @@ class ListingService {
       ),
       products: [],
       active: raw.active ?? false,
+      slug: raw.slug ?? null,
       listingImages: Array.isArray(raw.listingImages) ? raw.listingImages : [],
     };
   }
