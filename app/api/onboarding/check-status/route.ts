@@ -12,6 +12,7 @@ type RequestStatus = "none" | "pending" | "approved" | "rejected";
 interface CheckStatusResponse {
   status: RequestStatus;
   adminNote?: string | null;
+  listing_id?: number | null;
 }
 
 const supabase = createClient<Database>(
@@ -29,7 +30,7 @@ export async function GET(): Promise<NextResponse<CheckStatusResponse>> {
 
   const { data, error } = await supabase
     .from("producer_requests")
-    .select("status, admin_note")
+    .select("status, admin_note, listing_id")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -47,5 +48,6 @@ export async function GET(): Promise<NextResponse<CheckStatusResponse>> {
   return NextResponse.json({
     status: data.status as RequestStatus,
     adminNote: data.admin_note ?? null,
+    listing_id: data.listing_id ?? null,
   });
 }

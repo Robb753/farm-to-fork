@@ -26,6 +26,7 @@ export default function BecomeProducerPendingPage(): JSX.Element | null {
   const { user, isLoaded, isSignedIn } = useUser();
   const [status, setStatus] = useState<RequestStatus>("loading");
   const [adminNote, setAdminNote] = useState<string | null>(null);
+  const [listingId, setListingId] = useState<number | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchStatus = async () => {
@@ -44,6 +45,7 @@ export default function BecomeProducerPendingPage(): JSX.Element | null {
 
       setStatus(newStatus);
       setAdminNote(data.adminNote ?? null);
+      setListingId(data.listing_id ?? null);
 
       // Stop polling once a final state is reached
       if (newStatus === "approved" || newStatus === "rejected") {
@@ -55,6 +57,10 @@ export default function BecomeProducerPendingPage(): JSX.Element | null {
 
       if (newStatus === "none") {
         router.replace("/become-producer");
+      }
+
+      if (newStatus === "approved" && data.listing_id) {
+        router.replace(`/edit-listing/${data.listing_id}`);
       }
     } catch (err) {
       console.error("[PENDING] Erreur polling:", err);
@@ -107,6 +113,28 @@ export default function BecomeProducerPendingPage(): JSX.Element | null {
 
   // ── APPROVED ──
   if (status === "approved") {
+    // Si listing_id présent : redirection automatique déjà déclenchée dans fetchStatus.
+    // On affiche un écran de chargement le temps que router.replace prenne effet.
+    if (listingId) {
+      return (
+        <div
+          className="min-h-screen flex items-center justify-center"
+          style={{ backgroundColor: COLORS.BG_GRAY }}
+        >
+          <div className="text-center">
+            <Loader2
+              className="w-10 h-10 animate-spin mx-auto mb-4"
+              style={{ color: COLORS.PRIMARY }}
+            />
+            <p style={{ color: COLORS.TEXT_SECONDARY }}>
+              Redirection vers votre fiche ferme…
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    // Listing_id absent : erreur côté trigger/DB
     return (
       <div
         className="min-h-screen py-12 px-4"
@@ -131,24 +159,33 @@ export default function BecomeProducerPendingPage(): JSX.Element | null {
                 Demande approuvée !
               </CardTitle>
               <CardDescription className="text-base text-green-800">
-                Félicitations ! Votre compte producteur est activé. Vous pouvez
-                maintenant créer votre fiche ferme.
+                Votre compte producteur est activé. Un email de confirmation a
+                été envoyé à{" "}
+                <strong>{user?.primaryEmailAddress?.emailAddress}</strong>
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="bg-white p-5 rounded-lg border-2 border-green-200">
-                <p className="text-sm text-green-900 mb-4">
-                  Un email de confirmation a été envoyé à{" "}
-                  <strong>{user?.primaryEmailAddress?.emailAddress}</strong>
+              <div className="bg-white p-4 rounded-lg border border-orange-200 text-left">
+                <p className="text-sm text-orange-800">
+                  Votre compte est approuvé mais une erreur est survenue lors
+                  de la création de votre fiche. Veuillez contacter le support.
                 </p>
+              </div>
+              <a
+                href="mailto:support@farm2fork.com"
+                className="block w-full"
+              >
                 <Button
                   size="lg"
-                  className="w-full bg-green-600 hover:bg-green-700 font-semibold"
-                  onClick={() => router.push("/dashboard")}
+                  className="w-full font-semibold"
+                  style={{
+                    backgroundColor: COLORS.PRIMARY,
+                    color: COLORS.BG_WHITE,
+                  }}
                 >
-                  Accéder à mon dashboard →
+                  Contacter le support
                 </Button>
-              </div>
+              </a>
             </CardContent>
           </Card>
         </div>
