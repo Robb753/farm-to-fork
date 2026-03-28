@@ -363,6 +363,22 @@ export async function verifyCode(
     .eq("id", claimId);
 
   // Relie la fiche au user + active si inactif
+  // Vérifie si le user possède déjà une autre fiche
+  const { data: fichesExistantes } = await supabase
+    .from("listing")
+    .select("id, slug")
+    .eq("clerk_user_id", userId)
+    .neq("id", listing.id);
+
+  // Si oui → détache l'ancienne avant d'attacher la nouvelle
+  if (fichesExistantes && fichesExistantes.length > 0) {
+    await supabase
+      .from("listing")
+      .update({ clerk_user_id: null })
+      .in("id", fichesExistantes.map((f) => f.id));
+  }
+
+  // Attache la fiche revendiquée
   await supabase
     .from("listing")
     .update({
