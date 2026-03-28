@@ -776,8 +776,14 @@ const EditListing: React.FC<EditListingProps> = ({
         }
 
         if (isPublishing) {
-          toast.success("Fiche publiée avec succès !");
-          setTimeout(() => router.push("/dashboard/farms"), 1000);
+          toast.success("Votre fiche est maintenant visible sur la carte !");
+          setTimeout(
+            () =>
+              router.push(
+                listing.slug ? `/farm/${listing.slug}` : "/dashboard/farms"
+              ),
+            1000
+          );
         } else {
           toast.success("Modifications enregistrées");
         }
