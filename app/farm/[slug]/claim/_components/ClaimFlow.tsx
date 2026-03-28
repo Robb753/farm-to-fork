@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ClaimStepper } from "./ClaimStepper";
 import { StepContact } from "./StepContact";
+import { StepSiret } from "./StepSiret";
 import { StepMethod } from "./StepMethod";
 import { StepVerify } from "./StepVerify";
 import { StepSuccess } from "./StepSuccess";
@@ -19,7 +20,7 @@ interface ClaimFlowProps {
   listing: ListingInfo;
 }
 
-type Step = 1 | 2 | 3 | 4;
+type Step = 1 | 2 | 3 | 4 | 5;
 
 interface ClaimState {
   claimId: number;
@@ -48,34 +49,39 @@ export function ClaimFlow({ listing }: ClaimFlowProps) {
     setStep(2);
   }
 
+  function handleSiretDone() {
+    setStep(3);
+  }
+
   function handleMethodSuccess(selectedMethod: "email" | "sms") {
     setMethod(selectedMethod);
-    setStep(3);
+    setStep(4);
   }
 
   function handleVerifySuccess(slug: string) {
     setFinalSlug(slug);
-    setStep(4);
+    setStep(5);
   }
 
   const stepLabels: Record<Step, string> = {
     1: "Qui êtes-vous ?",
-    2: "Méthode de vérification",
-    3: "Saisir le code",
-    4: "Revendication confirmée",
+    2: "Vérification SIRET",
+    3: "Méthode de vérification",
+    4: "Saisir le code",
+    5: "Revendication confirmée",
   };
 
   return (
     <div className="w-full max-w-md mx-auto">
       {/* Stepper */}
-      {step < 4 && (
+      {step < 5 && (
         <div className="mb-8">
           <ClaimStepper currentStep={step} />
         </div>
       )}
 
       {/* Titre étape */}
-      {step < 4 && (
+      {step < 5 && (
         <h1 className="text-xl font-bold text-foreground mb-6">
           {stepLabels[step]}
         </h1>
@@ -92,6 +98,14 @@ export function ClaimFlow({ listing }: ClaimFlowProps) {
       )}
 
       {step === 2 && claimState && (
+        <StepSiret
+          claimId={claimState.claimId}
+          onSuccess={handleSiretDone}
+          onSkip={handleSiretDone}
+        />
+      )}
+
+      {step === 3 && claimState && (
         <StepMethod
           claimId={claimState.claimId}
           contactEmail={claimState.contactEmail}
@@ -100,7 +114,7 @@ export function ClaimFlow({ listing }: ClaimFlowProps) {
         />
       )}
 
-      {step === 3 && claimState && (
+      {step === 4 && claimState && (
         <StepVerify
           claimId={claimState.claimId}
           method={method}
@@ -110,7 +124,7 @@ export function ClaimFlow({ listing }: ClaimFlowProps) {
         />
       )}
 
-      {step === 4 && (
+      {step === 5 && (
         <StepSuccess
           listingName={claimState?.listingName ?? listing.name ?? "Votre ferme"}
           listingSlug={finalSlug}
