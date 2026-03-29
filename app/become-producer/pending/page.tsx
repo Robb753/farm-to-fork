@@ -20,6 +20,8 @@ import { COLORS } from "@/lib/config";
 type RequestStatus = "loading" | "none" | "pending" | "approved" | "rejected";
 
 const POLL_INTERVAL_MS = 30_000;
+const FAST_POLL_INTERVAL_MS = 3_000;
+const MAX_APPROVED_POLLS = 10;
 
 export default function BecomeProducerPendingPage(): JSX.Element | null {
   const router = useRouter();
@@ -28,6 +30,7 @@ export default function BecomeProducerPendingPage(): JSX.Element | null {
   const [adminNote, setAdminNote] = useState<string | null>(null);
   const [listingId, setListingId] = useState<number | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const approvedPollCountRef = useRef<number>(0);
 
   const fetchStatus = async () => {
     try {
@@ -47,20 +50,47 @@ export default function BecomeProducerPendingPage(): JSX.Element | null {
       setAdminNote(data.adminNote ?? null);
       setListingId(data.listing_id ?? null);
 
-      // Stop polling once a final state is reached
-      if (newStatus === "approved" || newStatus === "rejected") {
+      if (newStatus === "none") {
+        router.replace("/become-producer");
+        return;
+      }
+
+      if (newStatus === "rejected") {
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
           intervalRef.current = null;
         }
+        return;
       }
 
-      if (newStatus === "none") {
-        router.replace("/become-producer");
-      }
+      if (newStatus === "approved") {
+        if (data.listing_id) {
+          // listing_id ready: stop polling and redirect
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+          }
+          router.replace(`/edit-listing/${data.listing_id}`);
+          return;
+        }
 
-      if (newStatus === "approved" && data.listing_id) {
-        router.replace(`/edit-listing/${data.listing_id}`);
+        // listing_id absent: switch to fast polling if not already
+        approvedPollCountRef.current += 1;
+
+        if (approvedPollCountRef.current >= MAX_APPROVED_POLLS) {
+          // Give up after MAX_APPROVED_POLLS attempts: show error UI
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+          }
+          return;
+        }
+
+        // Switch interval to fast if still at normal speed
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = setInterval(fetchStatus, FAST_POLL_INTERVAL_MS);
+        }
       }
     } catch (err) {
       console.error("[PENDING] Erreur polling:", err);
@@ -78,7 +108,7 @@ export default function BecomeProducerPendingPage(): JSX.Element | null {
     // Initial fetch
     fetchStatus();
 
-    // Start polling
+    // Start polling at normal interval
     intervalRef.current = setInterval(fetchStatus, POLL_INTERVAL_MS);
 
     return () => {

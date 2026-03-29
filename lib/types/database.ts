@@ -926,21 +926,37 @@ export interface Database {
     };
     Enums: {
       user_role: "user" | "farmer" | "admin";
-      availability_enum: "open" | "closed" | "by_appointment";
-      certification_enum: "bio" | "label_rouge" | "aoc" | "local";
+      availability_enum:
+        | "Saisonnière"
+        | "Toute lannée"
+        | "Pré-commande"
+        | "Sur abonnement"
+        | "Événements spéciaux";
+      certification_enum: "Label AB" | "Label Rouge" | "AOP/AOC" | "HVE" | "Demeter";
       product_type_enum:
-        | "fruits"
-        | "legumes"
-        | "produits_laitiers"
-        | "viande"
-        | "cereales";
-      purchase_mode_enum: "direct" | "market" | "delivery" | "pickup";
-      production_method_enum: "organic" | "conventional" | "sustainable";
+        | "Fruits"
+        | "Légumes"
+        | "Produits laitiers"
+        | "Viande"
+        | "Œufs"
+        | "Produits transformés";
+      purchase_mode_enum:
+        | "Vente directe à la ferme"
+        | "Marché local"
+        | "Livraison à domicile"
+        | "Point de vente collectif"
+        | "Drive fermier";
+      production_method_enum:
+        | "Agriculture conventionnelle"
+        | "Agriculture biologique"
+        | "Agriculture durable"
+        | "Agriculture raisonnée";
       additional_services_enum:
-        | "farm_visits"
-        | "workshops"
-        | "tasting"
-        | "delivery";
+        | "Visite de la ferme"
+        | "Ateliers de cuisine"
+        | "Hébergement"
+        | "Activités pour enfants"
+        | "Réservation pour événements";
     };
     CompositeTypes: {
       [_ in never]: never;
