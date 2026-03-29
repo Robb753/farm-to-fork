@@ -71,29 +71,35 @@ export default function HeroSection({
 
     const toBadge = (cert: Certification): CertBadge => {
       switch (cert) {
-        case "bio":
+        case "Label AB":
           return {
             label: "Bio",
             color: "bg-green-100 text-green-700 border-green-200",
             icon: "🌱",
           };
-        case "label_rouge":
+        case "Label Rouge":
           return {
             label: "Label Rouge",
             color: "bg-red-100 text-red-700 border-red-200",
             icon: "🏷️",
           };
-        case "aoc":
+        case "AOP/AOC":
           return {
             label: "AOC",
             color: "bg-purple-100 text-purple-700 border-purple-200",
             icon: "⭐",
           };
-        case "local":
+        case "HVE":
           return {
-            label: "Local",
+            label: "HVE",
             color: "bg-blue-100 text-blue-700 border-blue-200",
             icon: "📍",
+          };
+        case "Demeter":
+          return {
+            label: "Demeter",
+            color: "bg-yellow-100 text-yellow-700 border-yellow-200",
+            icon: "🌿",
           };
         default:
           return {
