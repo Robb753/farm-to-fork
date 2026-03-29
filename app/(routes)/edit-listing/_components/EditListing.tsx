@@ -89,21 +89,20 @@ type ProductionMethodId =
     CertificationId,
     DbCertification | null
   > = {
-    "Label AB": "bio",
-    "Label Rouge": "label_rouge",
-    "AOC/AOP": "aoc",
-
-    // Pas dans ton enum DB actuel => on ignore / ou on mappe "local"
-    IGP: null,
-    Demeter: null,
-    HVE: null,
+    "Label AB": "Label AB",
+    "Label Rouge": "Label Rouge",
+    "AOC/AOP": "AOP/AOC", // DB uses "AOP/AOC"
+    IGP: null, // pas dans l'enum DB
+    Demeter: "Demeter",
+    HVE: "HVE",
   };
 
   const CERTIFICATION_DB_TO_UI: Record<DbCertification, CertificationId> = {
-    bio: "Label AB",
-    label_rouge: "Label Rouge",
-    aoc: "AOC/AOP",
-    local: "HVE", // ou "IGP" / "Local" si tu ajoutes un label UI dédié
+    "Label AB": "Label AB",
+    "Label Rouge": "Label Rouge",
+    "AOP/AOC": "AOC/AOP", // DB "AOP/AOC" → UI "AOC/AOP"
+    HVE: "HVE",
+    Demeter: "Demeter",
   };
 
   function toDbCertificationArray(
@@ -137,22 +136,21 @@ type ProductionMethodId =
     | "Drive fermier"
     | "Click & Collect";
 
-  const PURCHASE_MODE_UI_TO_DB: Record<PurchaseModeId, DbPurchaseMode> = {
-    "Vente directe à la ferme": "direct",
-    "Marché local": "market",
-    "Livraison à domicile": "delivery",
-
-    // ta DB n’a que 4 valeurs, donc on regroupe en "pickup"
-    "Point de vente collectif": "pickup",
-    "Drive fermier": "pickup",
-    "Click & Collect": "pickup",
+  const PURCHASE_MODE_UI_TO_DB: Record<PurchaseModeId, DbPurchaseMode | null> = {
+    "Vente directe à la ferme": "Vente directe à la ferme",
+    "Marché local": "Marché local",
+    "Livraison à domicile": "Livraison à domicile",
+    "Point de vente collectif": "Point de vente collectif",
+    "Drive fermier": "Drive fermier",
+    "Click & Collect": null, // pas dans l’enum DB
   };
 
   const PURCHASE_MODE_DB_TO_UI: Record<DbPurchaseMode, PurchaseModeId> = {
-    direct: "Vente directe à la ferme",
-    market: "Marché local",
-    delivery: "Livraison à domicile",
-    pickup: "Click & Collect", // choix par défaut (ou "Point de vente collectif" si tu préfères)
+    "Vente directe à la ferme": "Vente directe à la ferme",
+    "Marché local": "Marché local",
+    "Livraison à domicile": "Livraison à domicile",
+    "Point de vente collectif": "Point de vente collectif",
+    "Drive fermier": "Drive fermier",
   };
 
   type DbAvailability = Database["public"]["Enums"]["availability_enum"];
@@ -175,48 +173,44 @@ type ProductionMethodId =
       | "Réservation pour événements"
       | "Événements pour professionnels";
 
-    // ✅ Mappings UI -> DB (compromis car DB n'a que 3 valeurs)
     const AVAILABILITY_UI_TO_DB: Record<AvailabilityId, DbAvailability> = {
-      // DB: open | closed | by_appointment
-      Saisonnière: "open",
-      "Toute l'année": "open",
-      "Pré-commande": "by_appointment",
-      "Sur abonnement": "by_appointment",
-      "Événements spéciaux": "by_appointment",
+      Saisonnière: "Saisonnière",
+      "Toute l'année": "Toute lannée", // DB n'a pas d'apostrophe
+      "Pré-commande": "Pré-commande",
+      "Sur abonnement": "Sur abonnement",
+      "Événements spéciaux": "Événements spéciaux",
     };
 
     const AVAILABILITY_DB_TO_UI: Record<DbAvailability, AvailabilityId> = {
-      open: "Toute l'année",
-      closed: "Saisonnière", // choix par défaut, à toi de décider
-      by_appointment: "Pré-commande",
+      Saisonnière: "Saisonnière",
+      "Toute lannée": "Toute l'année",
+      "Pré-commande": "Pré-commande",
+      "Sur abonnement": "Sur abonnement",
+      "Événements spéciaux": "Événements spéciaux",
     };
 
-    // ✅ Mappings UI -> DB (DB n'a que 4 valeurs)
     const ADDITIONAL_SERVICE_UI_TO_DB: Record<
       AdditionalServiceId,
       DbAdditionalService | null
     > = {
-      "Visite de la ferme": "farm_visits",
-      "Ateliers de cuisine": "workshops",
-      Dégustation: "tasting",
-
-      // DB propose "delivery" mais c'est plutôt un mode logistique,
-      // on peut l'utiliser pour "Réservation pour événements" ? (pas idéal)
-      // => je préfère ignorer les options non supportées
-      "Activités pour enfants": null,
-      Hébergement: null,
-      "Réservation pour événements": null,
-      "Événements pour professionnels": null,
+      "Visite de la ferme": "Visite de la ferme",
+      "Ateliers de cuisine": "Ateliers de cuisine",
+      Dégustation: null, // pas dans l'enum DB
+      "Activités pour enfants": "Activités pour enfants",
+      Hébergement: "Hébergement",
+      "Réservation pour événements": "Réservation pour événements",
+      "Événements pour professionnels": null, // pas dans l'enum DB
     };
 
     const ADDITIONAL_SERVICE_DB_TO_UI: Record<
       DbAdditionalService,
       AdditionalServiceId
     > = {
-      farm_visits: "Visite de la ferme",
-      workshops: "Ateliers de cuisine",
-      tasting: "Dégustation",
-      delivery: "Réservation pour événements", // fallback (ou "Activités pour enfants" si tu veux)
+      "Visite de la ferme": "Visite de la ferme",
+      "Ateliers de cuisine": "Ateliers de cuisine",
+      Hébergement: "Hébergement",
+      "Activités pour enfants": "Activités pour enfants",
+      "Réservation pour événements": "Réservation pour événements",
     };
 
     function toDbAvailabilityArray(
@@ -261,9 +255,12 @@ type ProductionMethodId =
   ): DbPurchaseMode[] | null {
     if (!input || input.length === 0) return null;
 
-    // déduplique + map
     const mapped = Array.from(
-      new Set(input.map((v) => PURCHASE_MODE_UI_TO_DB[v]))
+      new Set(
+        input
+          .map((v) => PURCHASE_MODE_UI_TO_DB[v])
+          .filter((v): v is DbPurchaseMode => v !== null)
+      )
     );
 
     return mapped.length ? mapped : null;
@@ -315,36 +312,30 @@ type ListingData = {
 /**
  * Mappings UI -> DB
  */
-const PRODUCT_TYPE_UI_TO_DB: Record<ProductTypeId, DbProductType | null> = {
-  Légumes: "legumes",
-  Fruits: "fruits",
-  "Produits laitiers": "produits_laitiers",
-  Viande: "viande",
-  Œufs: null, // pas dans enum DB
-  "Produits transformés": null, // pas dans enum DB
+const PRODUCT_TYPE_UI_TO_DB: Record<ProductTypeId, DbProductType> = {
+  Fruits: "Fruits",
+  Légumes: "Légumes",
+  "Produits laitiers": "Produits laitiers",
+  Viande: "Viande",
+  Œufs: "Œufs",
+  "Produits transformés": "Produits transformés",
 };
 
 function toDbProductTypeArray(
   input: ProductTypeId[] | null | undefined
 ): DbProductType[] | null {
   if (!input || input.length === 0) return null;
-
-  const mapped = input
-    .map((v) => PRODUCT_TYPE_UI_TO_DB[v])
-    .filter((v): v is DbProductType => v !== null);
-
-  return mapped.length > 0 ? mapped : null;
+  return input.map((v) => PRODUCT_TYPE_UI_TO_DB[v]);
 }
 
 const PRODUCTION_METHOD_UI_TO_DB: Record<
   UiProductionMethod,
   DbProductionMethod
 > = {
-  "Agriculture conventionnelle": "conventional",
-  "Agriculture biologique": "organic",
-  "Agriculture durable": "sustainable",
-  // ta DB ne semble pas avoir "reasoned"
-  "Agriculture raisonnée": "sustainable",
+  "Agriculture conventionnelle": "Agriculture conventionnelle",
+  "Agriculture biologique": "Agriculture biologique",
+  "Agriculture durable": "Agriculture durable",
+  "Agriculture raisonnée": "Agriculture raisonnée",
 };
 
 function toDbProductionMethodArray(

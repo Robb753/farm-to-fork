@@ -218,7 +218,9 @@ export const editListingDraftSchema = baseEditListingSchema
   })
   .extend({
     name: z.string().trim().min(1, "Le nom de la ferme est requis"),
-    email: z.string().trim().email("Adresse email invalide"),
+    email: z
+      .union([z.literal(""), z.string().trim().email("Adresse email invalide")])
+      .optional(),
   });
 
 /* -------------------------------------------
