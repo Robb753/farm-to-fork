@@ -15,7 +15,7 @@ import {
 
 import type { LatLng } from "@/lib/store/shared/types";
 import MapboxClusterLayer from "./MapboxClusterLayer";
-// Stage 4 → décommenter : import FarmSelectedPanel from "./FarmSelectedPanel";
+import FarmSelectedPanel from "./FarmSelectedPanel";
 import { COLORS } from "@/lib/config";
 import {
   useSetMapApiLoaded,
@@ -454,7 +454,7 @@ export default function MapboxSection({
       />
 
       <MapboxClusterLayer />
-      {/* Stage 4 → décommenter : <FarmSelectedPanel /> */}
+      <FarmSelectedPanel />
 
       {isApiLoading && (
         <div

@@ -42,7 +42,6 @@ interface ListingItem {
   certifications?: string[];
   availability?: string;
   rating?: number;
-  reviewCount?: number;
   listingImages?: Array<{ url: string }>;
   image_url?: string;
   images?: string[];
@@ -50,6 +49,7 @@ interface ListingItem {
   updated_at?: string;
   active?: boolean;
   clerk_user_id?: string | null;
+  distance?: number | null;
 }
 
 /**
@@ -70,6 +70,27 @@ interface ListItemProps {
   onMouseLeave: () => void;
   onToggleFavorite: () => void;
   onShowOnMap?: (item: ListingItem) => void;
+}
+
+/* ------------------------------
+   Helpers
+------------------------------ */
+function getFarmEmoji(productTypes?: string[]): string {
+  if (!productTypes?.length) return "🌿";
+  const types = productTypes.map((t) => t.toLowerCase());
+  if (types.some((t) => t.includes("vigne") || t.includes("vin"))) return "🍇";
+  if (types.some((t) => t.includes("marché") || t.includes("marche"))) return "🛒";
+  if (types.some((t) => t.includes("amap"))) return "🤝";
+  return "🏡";
+}
+
+function getInitials(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
 }
 
 /* ------------------------------
@@ -209,7 +230,7 @@ const CertificationBadge = ({
   </div>
 );
 
-/* ListItem Component - Version Complète et Belle */
+/* ListItem Component - Redesign hiérarchie visuelle */
 const ListItem = React.memo<ListItemProps>(
   ({
     item,
@@ -231,9 +252,9 @@ const ListItem = React.memo<ListItemProps>(
 
     const getImageUrl = useCallback((): string => {
       if (Array.isArray(item.listingImages) && item.listingImages.length > 0) {
-        return item.listingImages[0]?.url || "/default-farm-image.jpg";
+        return item.listingImages[0]?.url || "";
       }
-      return "/default-farm-image.jpg";
+      return "";
     }, [item]);
 
     const handleFavoriteClick = useCallback(
@@ -255,33 +276,38 @@ const ListItem = React.memo<ListItemProps>(
     );
 
     const imageUrl = getImageUrl();
+    const hasImage = !!imageUrl && !imageError;
+    const emoji = getFarmEmoji(item.product_type);
+    const initials = getInitials(item.name);
+    const isUnclaimed = !item.active && !item.clerk_user_id;
 
     return (
       <article
         ref={articleRef}
         id={`listing-${item.id}`}
         className={cn(
-          "group relative flex border rounded-xl overflow-hidden shadow-sm",
-          "transition-all duration-300 hover:shadow-lg mb-4",
-          "hover:border-green-200 hover:-translate-y-1",
-          isHovered && "ring-2 ring-green-400 shadow-md border-green-300"
+          "group relative flex border rounded-xl overflow-hidden",
+          "transition-all duration-150 hover:shadow-md hover:-translate-y-0.5 mb-3",
+          isHovered
+            ? "ring-2 ring-green-400 shadow-md border-green-300 -translate-y-0.5"
+            : "shadow-sm border-gray-200 hover:border-green-200"
         )}
         style={{ backgroundColor: isHovered ? "#f0fdf4" : COLORS.BG_WHITE }}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
       >
-        <Link href={`/farm/${item.slug ?? item.id}`} className="flex w-full">
-          {/* Image Section */}
-          <div className="relative w-32 sm:w-40 md:w-48 h-32 sm:h-36 flex-shrink-0">
-            {!imageError ? (
+        <Link href={`/farm/${item.slug ?? item.id}`} className="flex w-full min-h-[100px]">
+          {/* === IMAGE SECTION === */}
+          <div className="relative w-[120px] sm:w-[140px] flex-shrink-0 self-stretch">
+            {hasImage ? (
               <OptimizedImage
                 src={imageUrl}
-                alt={escapeHTML(`${item.name} - Ferme locale`)} // ✅ Échappé
+                alt={escapeHTML(`${item.name} - Ferme locale`)}
                 fill={true}
                 width={0}
                 height={0}
-                sizes="(max-width: 640px) 40vw, 192px"
-                className="object-cover transition-all duration-500 group-hover:scale-105"
+                sizes="140px"
+                className="object-cover transition-transform duration-500 group-hover:scale-105"
                 onError={() => setImageError(true)}
                 onLoad={() => {}}
                 showSkeleton={true}
@@ -289,251 +315,195 @@ const ListItem = React.memo<ListItemProps>(
               />
             ) : (
               <div
-                className="w-full h-full flex items-center justify-center"
-                style={{ backgroundColor: COLORS.BG_GRAY }}
+                className="w-full h-full flex flex-col items-center justify-center gap-1 select-none"
+                style={{ backgroundColor: "#f0fdf4" }}
               >
-                <div
-                  className="text-center"
-                  style={{ color: COLORS.TEXT_MUTED }}
+                <span className="text-3xl leading-none">{emoji}</span>
+                <span
+                  className="text-sm font-bold tracking-wide"
+                  style={{ color: COLORS.PRIMARY }}
                 >
-                  <svg
-                    className="w-8 h-8 mx-auto mb-2"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2z"
-                    />
-                  </svg>
-                  <span className="text-xs">Image non disponible</span>
-                </div>
+                  {initials}
+                </span>
               </div>
             )}
 
+            {/* Status badge — top left */}
             {item.availability && (
               <div className="absolute top-2 left-2">
                 <StatusBadge availability={item.availability} />
               </div>
             )}
 
-            {Array.isArray(item.listingImages) &&
-              item.listingImages.length > 1 && (
-                <div
-                  className={cn(
-                    "absolute bottom-2 right-2 px-2 py-1 rounded-full text-xs flex items-center gap-1"
-                  )}
+            {/* "Non revendiquée" badge — bottom left */}
+            {isUnclaimed && (
+              <div className="absolute bottom-2 left-1.5">
+                <span
+                  className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-semibold"
                   style={{
-                    backgroundColor: `${COLORS.TEXT_PRIMARY}B3`,
-                    color: COLORS.BG_WHITE,
+                    backgroundColor: "rgba(254,243,199,0.95)",
+                    color: "#92400e",
                   }}
                 >
-                  <svg
-                    className="w-3 h-3"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                  {item.listingImages.length}
-                </div>
+                  ⚠️ Non revendiquée
+                </span>
+              </div>
+            )}
+
+            {/* Multiple images counter — bottom right */}
+            {Array.isArray(item.listingImages) && item.listingImages.length > 1 && (
+              <div
+                className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded-full text-[10px] flex items-center gap-0.5"
+                style={{
+                  backgroundColor: "rgba(0,0,0,0.55)",
+                  color: "#fff",
+                }}
+              >
+                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path
+                    fillRule="evenodd"
+                    d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                {item.listingImages.length}
+              </div>
+            )}
+
+            {/* Action buttons overlay — top right */}
+            <div className="absolute top-2 right-2 flex flex-col gap-1.5">
+              {item.lat && item.lng && onShowOnMap && (
+                <button
+                  onClick={handleShowOnMapClick}
+                  className="p-1.5 rounded-full shadow-sm hover:shadow-md transition-all duration-200 hover:scale-110"
+                  style={{ backgroundColor: "rgba(255,255,255,0.92)" }}
+                  aria-label="Voir sur la carte"
+                  title="Voir sur la carte"
+                  type="button"
+                >
+                  <MapPin className="h-3.5 w-3.5" style={{ color: COLORS.PRIMARY }} />
+                </button>
               )}
+              <button
+                onClick={handleFavoriteClick}
+                className="p-1.5 rounded-full shadow-sm hover:shadow-md transition-all duration-200 hover:scale-110"
+                style={{ backgroundColor: "rgba(255,255,255,0.92)" }}
+                aria-label={isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
+                type="button"
+              >
+                <Heart
+                  className={cn("h-3.5 w-3.5 transition-all duration-200", isFavorite ? "fill-current" : "")}
+                  style={{ color: isFavorite ? COLORS.ERROR : COLORS.TEXT_MUTED }}
+                />
+              </button>
+            </div>
           </div>
 
-          {/* Content Section */}
-          <div className="flex-1 p-4 flex flex-col justify-between min-w-0">
-            <div>
-              {!item.active && !item.clerk_user_id && (
-                <div className="mb-2">
+          {/* === CONTENT SECTION === */}
+          <div className="flex-1 p-3 flex flex-col justify-start min-w-0 gap-1.5">
+            {/* Name */}
+            <h2
+              className={cn(
+                "text-base font-bold line-clamp-1 leading-snug transition-colors",
+                "group-hover:text-green-700"
+              )}
+              style={{ color: COLORS.TEXT_PRIMARY }}
+            >
+              {/* 🔒 SÉCURITÉ: Nom de ferme échappé */}
+              {escapeHTML(item.name)}
+            </h2>
+
+            {/* Address + Distance */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1 text-xs min-w-0" style={{ color: COLORS.TEXT_MUTED }}>
+                <MapPin className="h-3.5 w-3.5 flex-shrink-0" style={{ color: COLORS.PRIMARY }} />
+                <span className="line-clamp-1" title={item.address ?? ""}>{item.address}</span>
+              </div>
+              {item.distance != null && (
+                <span
+                  className="ml-2 flex-shrink-0 text-xs font-medium px-1.5 py-0.5 rounded-full"
+                  style={{
+                    backgroundColor: `${COLORS.PRIMARY}12`,
+                    color: COLORS.PRIMARY,
+                  }}
+                >
+                  {item.distance < 1
+                    ? `${Math.round(item.distance * 1000)} m`
+                    : `${item.distance.toFixed(1)} km`}
+                </span>
+              )}
+            </div>
+
+            {/* Rating */}
+            {item.rating != null && (
+              <div className="flex items-center gap-1">
+                <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
+                <span className="text-xs font-medium" style={{ color: COLORS.TEXT_PRIMARY }}>
+                  {item.rating}
+                </span>
+              </div>
+            )}
+
+            {/* Product tags */}
+            {item.product_type?.length && item.product_type.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {item.product_type.slice(0, 3).map((product, index) => (
                   <span
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border"
+                    key={index}
+                    className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border font-medium"
                     style={{
-                      backgroundColor: "#fef3c7",
-                      color: "#92400e",
-                      borderColor: "#fde68a",
+                      backgroundColor: `${COLORS.PRIMARY}10`,
+                      color: COLORS.PRIMARY,
+                      borderColor: `${COLORS.PRIMARY}20`,
                     }}
                   >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                    </svg>
-                    Non revendiquée
+                    <Leaf className="w-3 h-3" />
+                    {/* 🔒 SÉCURITÉ: Type de produit échappé */}
+                    {escapeHTML(product)}
                   </span>
-                </div>
-              )}
-
-              <div className="flex items-start justify-between mb-2">
-                <h2
-                  className={cn(
-                    "text-base font-bold line-clamp-2 leading-snug transition-colors pr-2",
-                    "group-hover:text-green-700"
-                  )}
-                  style={{ color: COLORS.TEXT_PRIMARY }}
-                >
-                  {/* 🔒 SÉCURITÉ: Nom de ferme échappé */}
-                  {escapeHTML(item.name)}
-                </h2>
-
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  {item.lat && item.lng && onShowOnMap && (
-                    <button
-                      onClick={handleShowOnMapClick}
-                      className={cn(
-                        "p-2 rounded-full shadow-sm hover:shadow-md border",
-                        "transition-all duration-200 hover:scale-110"
-                      )}
-                      style={{
-                        backgroundColor: `${COLORS.PRIMARY}10`,
-                        borderColor: `${COLORS.PRIMARY}30`,
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = `${COLORS.PRIMARY}20`;
-                        e.currentTarget.style.borderColor = COLORS.PRIMARY;
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = `${COLORS.PRIMARY}10`;
-                        e.currentTarget.style.borderColor = `${COLORS.PRIMARY}30`;
-                      }}
-                      aria-label="Voir sur la carte"
-                      title="Voir sur la carte"
-                      type="button"
-                    >
-                      <MapPin
-                        className="h-4 w-4"
-                        style={{ color: COLORS.PRIMARY }}
-                      />
-                    </button>
-                  )}
-
-                  <button
-                    onClick={handleFavoriteClick}
-                    className={cn(
-                      "p-2 rounded-full shadow-sm hover:shadow-md border",
-                      "transition-all duration-200 hover:scale-110"
-                    )}
+                ))}
+                {item.product_type.length > 3 && (
+                  <span
+                    className="text-xs px-2 py-0.5 rounded-full border"
                     style={{
                       backgroundColor: COLORS.BG_GRAY,
+                      color: COLORS.TEXT_MUTED,
                       borderColor: COLORS.BORDER,
                     }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = COLORS.BG_WHITE;
-                      e.currentTarget.style.borderColor = COLORS.ERROR;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = COLORS.BG_GRAY;
-                      e.currentTarget.style.borderColor = COLORS.BORDER;
-                    }}
-                    aria-label={
-                      isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"
-                    }
-                    type="button"
                   >
-                    <Heart
-                      className={cn(
-                        "h-4 w-4 transition-all duration-200",
-                        isFavorite ? "fill-current" : ""
-                      )}
-                      style={{
-                        color: isFavorite ? COLORS.ERROR : COLORS.TEXT_MUTED,
-                      }}
-                    />
-                  </button>
-                </div>
-              </div>
-
-              <div
-                className="flex items-start gap-2 text-xs mb-3"
-                style={{ color: COLORS.TEXT_MUTED }}
-              >
-                <MapPin
-                  className="h-4 w-4 mt-0.5 flex-shrink-0"
-                  style={{ color: COLORS.PRIMARY }}
-                />
-                <span className="line-clamp-1" title={item.address ?? ""}>
-                  {item.address}
-                </span>
-              </div>
-
-              {item.product_type?.length && item.product_type.length > 0 && (
-                <div className="mb-3">
-                  <div className="flex flex-wrap gap-1.5">
-                    {item.product_type.slice(0, 3).map((product, index) => (
-                      <span
-                        key={index}
-                        className={cn(
-                          "inline-flex items-center gap-1 text-xs px-2.5 py-1",
-                          "rounded-full border font-medium transition-colors duration-200"
-                        )}
-                        style={{
-                          backgroundColor: `${COLORS.PRIMARY}10`,
-                          color: COLORS.PRIMARY,
-                          borderColor: `${COLORS.PRIMARY}20`,
-                        }}
-                      >
-                        <Leaf className="w-3 h-3" />
-                        {/* 🔒 SÉCURITÉ: Type de produit échappé */}
-                        {escapeHTML(product)}
-                      </span>
-                    ))}
-                    {item.product_type.length > 3 && (
-                      <span
-                        className={cn(
-                          "text-xs px-2.5 py-1 rounded-full border"
-                        )}
-                        style={{
-                          backgroundColor: COLORS.BG_GRAY,
-                          color: COLORS.TEXT_MUTED,
-                          borderColor: COLORS.BORDER,
-                        }}
-                      >
-                        +{item.product_type.length - 3}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-
-
-            </div>
-
-            <div className="flex items-center justify-between mt-auto pt-2">
-              <div className="flex items-center gap-2">
-                {item.certifications?.[0] && (
-                  <CertificationBadge certification={item.certifications[0]} />
+                    +{item.product_type.length - 3}
+                  </span>
                 )}
               </div>
+            )}
 
-              <div className="flex items-center gap-3">
-                {item.rating && (
-                  <div className="flex items-center gap-1 text-sm">
-                    <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-                    <span
-                      className="font-medium"
-                      style={{ color: COLORS.TEXT_PRIMARY }}
-                    >
-                      {item.rating}
-                    </span>
-                    {item.reviewCount && (
-                      <span style={{ color: COLORS.TEXT_MUTED }}>
-                        ({item.reviewCount})
-                      </span>
-                    )}
-                  </div>
+            {/* Description */}
+            {item.description && (
+              <p className="text-xs line-clamp-2" style={{ color: COLORS.TEXT_SECONDARY }}>
+                {escapeHTML(item.description)}
+              </p>
+            )}
+
+            {/* Certifications (max 2) */}
+            {item.certifications && item.certifications.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-auto pt-0.5">
+                {item.certifications.slice(0, 2).map((cert, i) => (
+                  <CertificationBadge key={i} certification={cert} />
+                ))}
+                {item.certifications.length > 2 && (
+                  <span
+                    className="text-xs px-2 py-0.5 rounded-full border"
+                    style={{
+                      backgroundColor: COLORS.BG_GRAY,
+                      color: COLORS.TEXT_MUTED,
+                      borderColor: COLORS.BORDER,
+                    }}
+                  >
+                    +{item.certifications.length - 2}
+                  </span>
                 )}
-                <span
-                  className="text-xs font-semibold"
-                  style={{ color: COLORS.PRIMARY }}
-                >
-                  Voir la fiche →
-                </span>
               </div>
-            </div>
+            )}
           </div>
         </Link>
       </article>

@@ -13,11 +13,7 @@
  */
 
 import { useEffect, useMemo, useRef } from "react";
-import { createRoot, type Root } from "react-dom/client";
-import React from "react";
 import mapboxgl from "mapbox-gl";
-
-import { FarmInfoWindow } from "./FarmInfoWindow";
 
 import { COLORS, CLUSTER_CONFIG } from "@/lib/config";
 import { useFilteredListings, useUnifiedStore } from "@/lib/store";
@@ -61,6 +57,9 @@ function toGeoJSON(
         address: l.address ?? "",
         active: Boolean(l.active),
         claimed: Boolean(l.clerk_user_id),
+        slug: l.slug ?? "",
+        rating: l.rating ?? null,
+        distance: l.distance ?? null,
         // Extra fields for the InfoWindow (arrays serialized as JSON strings)
         image_url: l.listingImages?.[0]?.url ?? "",
         product_type: JSON.stringify(l.product_type ?? []),
@@ -212,7 +211,6 @@ export default function MapboxClusterLayer(): null {
 
   const isReadyRef = useRef(false);
   const popupRef = useRef<mapboxgl.Popup | null>(null);
-  const popupRootRef = useRef<Root | null>(null);
   const prevHoveredRef = useRef<number | null>(null);
 
   const filteredListingsRef = useRef(filteredListings);
@@ -310,6 +308,9 @@ export default function MapboxClusterLayer(): null {
         id: number;
         name: string;
         address: string;
+        slug?: string;
+        rating?: number | null;
+        distance?: number | null;
         image_url?: string;
         product_type?: string;
         certifications?: string;
@@ -321,72 +322,10 @@ export default function MapboxClusterLayer(): null {
         number,
       ];
 
+      // Stage 4: use FarmSelectedPanel via store instead of inline Mapbox popup
       useUnifiedStore
         .getState()
-        .interactionsActions.setSelectedListing(props.id);
-
-      // Unmount previous React root before removing old popup
-      try {
-        popupRootRef.current?.unmount();
-        popupRootRef.current = null;
-      } catch {
-        // ignore
-      }
-      try {
-        popupRef.current?.remove();
-      } catch {
-        // Previous popup may already be removed.
-      }
-
-      // Render FarmInfoWindow into a detached DOM node via React root
-      const container = document.createElement("div");
-      const root = createRoot(container);
-      popupRootRef.current = root;
-
-      const removePopup = () => {
-        popupRef.current?.remove();
-        popupRef.current = null;
-        // Defer unmount to let React finish its event handling
-        setTimeout(() => {
-          root.unmount();
-          if (popupRootRef.current === root) popupRootRef.current = null;
-        }, 0);
-      };
-
-      root.render(
-        React.createElement(FarmInfoWindow, {
-          listing: {
-            id: props.id,
-            name: props.name,
-            address: props.address,
-            image_url: props.image_url,
-            product_type: props.product_type,
-            certifications: props.certifications,
-            description: props.description,
-            availability: props.availability,
-          },
-          onClose: removePopup,
-        }),
-      );
-
-      popupRef.current = new mapboxgl.Popup({
-        closeButton: false,
-        closeOnClick: true,
-        offset: 14,
-        maxWidth: "280px",
-        className: "farm-popup",
-      })
-        .setLngLat(coords)
-        .setDOMContent(container)
-        .addTo(mapInstance);
-
-      popupRef.current.on("close", () => {
-        popupRef.current = null;
-        setTimeout(() => {
-          root.unmount();
-          if (popupRootRef.current === root) popupRootRef.current = null;
-        }, 0);
-      });
+        .listingsActions.setOpenInfoWindowId(props.id);
     }
 
     function setCursor(): void {
