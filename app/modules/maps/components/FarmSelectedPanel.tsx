@@ -1,18 +1,10 @@
 "use client";
 
 /**
- * FarmSelectedPanel — Stage 4
+ * FarmSelectedPanel — Stage 4 (actif)
  *
  * Panneau React flottant affiché quand une ferme est sélectionnée sur la carte.
  * Remplace la mapboxgl.Popup inline de MapboxClusterLayer.
- *
- * Activation (Stage 4) :
- *   1. Dans MapboxSection.tsx : décommenter <FarmSelectedPanel />
- *   2. Dans MapboxClusterLayer.tsx onPointClick :
- *      - remplacer interactionsActions.setSelectedListing(id)
- *        par listingsActions.setOpenInfoWindowId(id)
- *      - supprimer le bloc popup Mapbox
- *      - supprimer le dispatch CustomEvent listingSelected
  */
 
 import { useUnifiedStore, useAllListings } from "@/lib/store";
@@ -32,6 +24,18 @@ export default function FarmSelectedPanel() {
   if (!farm) return null;
 
   const isUnclaimed = !farm.active && !farm.clerk_user_id;
+  const imageUrl =
+    Array.isArray(farm.listingImages) && farm.listingImages.length > 0
+      ? farm.listingImages[0]?.url
+      : null;
+  const products = farm.product_type ?? [];
+  const isOpen_ = farm.availability === "open";
+  const distLabel =
+    farm.distance != null
+      ? farm.distance < 1
+        ? `${Math.round(farm.distance * 1000)} m`
+        : `${farm.distance.toFixed(1)} km`
+      : null;
 
   return (
     <div
@@ -40,7 +44,47 @@ export default function FarmSelectedPanel() {
                  border border-gray-100 overflow-hidden"
       style={{ background: COLORS.BG_WHITE }}
     >
-      {/* En-tête */}
+      {/* Image banner */}
+      {imageUrl && (
+        <div className="relative h-28 w-full overflow-hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={imageUrl}
+            alt={farm.name}
+            className="w-full h-full object-cover"
+          />
+          {/* Availability badge over image */}
+          {farm.availability && (
+            <span
+              className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide"
+              style={{
+                backgroundColor: isOpen_ ? "rgba(22,163,74,0.9)" : "rgba(220,38,38,0.85)",
+                color: "#fff",
+              }}
+            >
+              {isOpen_ ? "Ouvert" : "Fermé"}
+            </span>
+          )}
+          {/* Close button over image */}
+          <button
+            onClick={clearSelection}
+            className="absolute top-2 right-2 p-1 rounded-full hover:bg-black/20 transition-colors"
+            aria-label="Fermer"
+            style={{ backgroundColor: "rgba(0,0,0,0.35)" }}
+          >
+            <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+              <path
+                d="M1 1l12 12M13 1L1 13"
+                stroke="white"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {/* Header (no image case) */}
       <div className="flex items-start justify-between p-4 pb-2">
         <div className="flex-1 min-w-0">
           {isUnclaimed && (
@@ -62,26 +106,95 @@ export default function FarmSelectedPanel() {
               className="text-xs mt-0.5 truncate"
               style={{ color: COLORS.TEXT_SECONDARY }}
             >
-              {farm.address}
+              📍 {farm.address}
             </p>
+          )}
+
+          {/* Rating + Distance */}
+          {(farm.rating != null || distLabel) && (
+            <div className="flex items-center gap-2 mt-1">
+              {farm.rating != null && (
+                <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: "#92400e" }}>
+                  <span style={{ color: "#fbbf24" }}>★</span>
+                  {farm.rating}
+                </span>
+              )}
+              {distLabel && (
+                <span
+                  className="text-xs font-medium px-1.5 py-0.5 rounded-full"
+                  style={{
+                    backgroundColor: "#f0fdf4",
+                    color: "#16a34a",
+                    border: "1px solid #bbf7d0",
+                  }}
+                >
+                  {distLabel}
+                </span>
+              )}
+            </div>
           )}
         </div>
 
-        <button
-          onClick={clearSelection}
-          className="ml-2 p-1 rounded-full hover:bg-gray-100 transition-colors shrink-0"
-          aria-label="Fermer"
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path
-              d="M1 1l12 12M13 1L1 13"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-          </svg>
-        </button>
+        {/* Close button (no image case) */}
+        {!imageUrl && (
+          <button
+            onClick={clearSelection}
+            className="ml-2 p-1 rounded-full hover:bg-gray-100 transition-colors shrink-0"
+            aria-label="Fermer"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path
+                d="M1 1l12 12M13 1L1 13"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+        )}
       </div>
+
+      {/* Product tags */}
+      {products.length > 0 && (
+        <div className="px-4 pb-2 flex flex-wrap gap-1">
+          {products.slice(0, 3).map((p, i) => (
+            <span
+              key={i}
+              className="text-xs px-2 py-0.5 rounded-full font-medium"
+              style={{
+                backgroundColor: `${COLORS.PRIMARY}12`,
+                color: COLORS.PRIMARY,
+                border: `1px solid ${COLORS.PRIMARY}25`,
+              }}
+            >
+              {p}
+            </span>
+          ))}
+          {products.length > 3 && (
+            <span
+              className="text-xs px-2 py-0.5 rounded-full"
+              style={{ backgroundColor: "#f3f4f6", color: "#6b7280" }}
+            >
+              +{products.length - 3}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Availability badge (no image case) */}
+      {!imageUrl && farm.availability && (
+        <div className="px-4 pb-2">
+          <span
+            className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full"
+            style={{
+              backgroundColor: isOpen_ ? "#dcfce7" : "#fee2e2",
+              color: isOpen_ ? "#16a34a" : "#dc2626",
+            }}
+          >
+            {isOpen_ ? "Ouvert" : "Fermé"}
+          </span>
+        </div>
+      )}
 
       {/* Actions */}
       <div className="px-4 pb-4 flex gap-2">

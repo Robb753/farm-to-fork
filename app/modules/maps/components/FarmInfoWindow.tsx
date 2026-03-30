@@ -19,6 +19,8 @@ export interface FarmInfoWindowProps {
     certifications?: string;
     description?: string;
     availability?: string;
+    rating?: number | null;
+    distance?: number | null;
   };
   onClose: () => void;
   isFavorite?: boolean;
@@ -232,6 +234,48 @@ function AvailabilityBadge({ availability }: { availability?: string }) {
   );
 }
 
+/** Ligne rating + distance */
+function RatingDistance({
+  rating,
+  distance,
+}: {
+  rating?: number | null;
+  distance?: number | null;
+}) {
+  if (rating == null && distance == null) return null;
+  const distLabel =
+    distance != null
+      ? distance < 1
+        ? `${Math.round(distance * 1000)} m`
+        : `${distance.toFixed(1)} km`
+      : null;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
+      {rating != null && (
+        <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 11, color: "#92400e" }}>
+          <span style={{ color: "#fbbf24", fontSize: 12 }}>★</span>
+          <span style={{ fontWeight: 600 }}>{rating}</span>
+        </span>
+      )}
+      {distLabel && (
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 500,
+            padding: "1px 6px",
+            borderRadius: 99,
+            backgroundColor: "#f0fdf4",
+            color: "#16a34a",
+            border: "1px solid #bbf7d0",
+          }}
+        >
+          {distLabel}
+        </span>
+      )}
+    </div>
+  );
+}
+
 // ─── Variant A : Compact ──────────────────────────────────────────────────────
 /**
  * Variante compacte — avatar centré (fallback ou mini photo ronde)
@@ -253,12 +297,16 @@ function CompactVariant({
   onClose,
   isFavorite,
   onToggleFavorite,
+  rating,
+  distance,
 }: {
   listing: FarmInfoWindowProps["listing"];
   badges: string[];
   onClose: () => void;
   isFavorite: boolean;
   onToggleFavorite?: (id: number) => void;
+  rating?: number | null;
+  distance?: number | null;
 }) {
   const name = safeText(listing.name) || "Ferme sans nom";
   const address = safeText(listing.address);
@@ -327,6 +375,7 @@ function CompactVariant({
               {address}
             </p>
           )}
+          <RatingDistance rating={rating} distance={distance} />
         </div>
 
         {/* Actions */}
@@ -445,12 +494,16 @@ function CardVariant({
   onClose,
   isFavorite,
   onToggleFavorite,
+  rating,
+  distance,
 }: {
   listing: FarmInfoWindowProps["listing"];
   badges: string[];
   onClose: () => void;
   isFavorite: boolean;
   onToggleFavorite?: (id: number) => void;
+  rating?: number | null;
+  distance?: number | null;
 }) {
   const name = safeText(listing.name) || "Ferme sans nom";
   const address = safeText(listing.address);
@@ -507,7 +560,7 @@ function CardVariant({
           {address && (
             <p
               style={{
-                margin: "0 0 6px 0",
+                margin: "0 0 4px 0",
                 fontSize: 11,
                 color: COLORS.TEXT_SECONDARY,
                 lineHeight: 1.4,
@@ -520,6 +573,7 @@ function CardVariant({
               {address}
             </p>
           )}
+          <RatingDistance rating={rating} distance={distance} />
 
           {/* Badges */}
           {badges.length > 0 && (
@@ -641,6 +695,8 @@ export function FarmInfoWindow({
         onClose={onClose}
         isFavorite={isFavorite}
         onToggleFavorite={onToggleFavorite}
+        rating={listing.rating}
+        distance={listing.distance}
       />
     );
   }
@@ -652,6 +708,8 @@ export function FarmInfoWindow({
       onClose={onClose}
       isFavorite={isFavorite}
       onToggleFavorite={onToggleFavorite}
+      rating={listing.rating}
+      distance={listing.distance}
     />
   );
 }
