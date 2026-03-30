@@ -1,6 +1,6 @@
 "use client";
 
-import { MapPin, Award, Heart, Star, Leaf } from "lucide-react";
+import { MapPin, Award, Heart, Star } from "lucide-react";
 import React, {
   useState,
   useEffect,
@@ -279,26 +279,24 @@ const ListItem = React.memo<ListItemProps>(
     const hasImage = !!imageUrl && !imageError;
     const emoji = getFarmEmoji(item.product_type);
     const initials = getInitials(item.name);
-    const isUnclaimed = !item.active && !item.clerk_user_id;
 
     return (
       <article
         ref={articleRef}
         id={`listing-${item.id}`}
         className={cn(
-          "group relative flex border rounded-xl overflow-hidden",
+          "group relative flex border rounded-xl overflow-hidden cursor-pointer",
           "transition-all duration-150 hover:shadow-md hover:-translate-y-0.5 mb-3",
           isHovered
-            ? "ring-2 ring-green-400 shadow-md border-green-300 -translate-y-0.5"
-            : "shadow-sm border-gray-200 hover:border-green-200"
+            ? "shadow-md border-emerald-500 -translate-y-0.5 bg-emerald-50/30"
+            : "shadow-sm bg-white border-gray-200 hover:border-emerald-200"
         )}
-        style={{ backgroundColor: isHovered ? "#f0fdf4" : COLORS.BG_WHITE }}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
       >
         <Link href={`/farm/${item.slug ?? item.id}`} className="flex w-full min-h-[100px]">
           {/* === IMAGE SECTION === */}
-          <div className="relative w-[120px] sm:w-[140px] flex-shrink-0 self-stretch">
+          <div className="relative w-32 flex-shrink-0 self-stretch rounded-l-xl overflow-hidden">
             {hasImage ? (
               <OptimizedImage
                 src={imageUrl}
@@ -328,27 +326,18 @@ const ListItem = React.memo<ListItemProps>(
               </div>
             )}
 
-            {/* Status badge — top left */}
-            {item.availability && (
-              <div className="absolute top-2 left-2">
-                <StatusBadge availability={item.availability} />
-              </div>
-            )}
-
-            {/* "Non revendiquée" badge — bottom left */}
-            {isUnclaimed && (
-              <div className="absolute bottom-2 left-1.5">
-                <span
-                  className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-semibold"
-                  style={{
-                    backgroundColor: "rgba(254,243,199,0.95)",
-                    color: "#92400e",
-                  }}
-                >
-                  ⚠️ Non revendiquée
+            {/* Claimed/unclaimed badge — top left */}
+            <div className="absolute top-2 left-2">
+              {item.clerk_user_id ? (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500 text-white">
+                  ✓ Revendiquée
                 </span>
-              </div>
-            )}
+              ) : (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-400 text-white">
+                  ⚠ Non revendiquée
+                </span>
+              )}
+            </div>
 
             {/* Multiple images counter — bottom right */}
             {Array.isArray(item.listingImages) && item.listingImages.length > 1 && (
@@ -375,25 +364,25 @@ const ListItem = React.memo<ListItemProps>(
               {item.lat && item.lng && onShowOnMap && (
                 <button
                   onClick={handleShowOnMapClick}
-                  className="p-1.5 rounded-full shadow-sm hover:shadow-md transition-all duration-200 hover:scale-110"
-                  style={{ backgroundColor: "rgba(255,255,255,0.92)" }}
+                  className="p-1.5 rounded-full bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all duration-200 hover:scale-110"
                   aria-label="Voir sur la carte"
                   title="Voir sur la carte"
                   type="button"
                 >
-                  <MapPin className="h-3.5 w-3.5" style={{ color: COLORS.PRIMARY }} />
+                  <MapPin className="h-3.5 w-3.5 text-emerald-700" />
                 </button>
               )}
               <button
                 onClick={handleFavoriteClick}
-                className="p-1.5 rounded-full shadow-sm hover:shadow-md transition-all duration-200 hover:scale-110"
-                style={{ backgroundColor: "rgba(255,255,255,0.92)" }}
+                className="p-1.5 rounded-full bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all duration-200 hover:scale-110"
                 aria-label={isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
                 type="button"
               >
                 <Heart
-                  className={cn("h-3.5 w-3.5 transition-all duration-200", isFavorite ? "fill-current" : "")}
-                  style={{ color: isFavorite ? COLORS.ERROR : COLORS.TEXT_MUTED }}
+                  className={cn(
+                    "h-3.5 w-3.5 transition-all duration-200",
+                    isFavorite ? "fill-current text-red-500" : "text-gray-400"
+                  )}
                 />
               </button>
             </div>
@@ -404,10 +393,9 @@ const ListItem = React.memo<ListItemProps>(
             {/* Name */}
             <h2
               className={cn(
-                "text-base font-bold line-clamp-1 leading-snug transition-colors",
-                "group-hover:text-green-700"
+                "text-sm font-semibold text-gray-900 line-clamp-1 leading-snug transition-colors",
+                "group-hover:text-emerald-700"
               )}
-              style={{ color: COLORS.TEXT_PRIMARY }}
             >
               {/* 🔒 SÉCURITÉ: Nom de ferme échappé */}
               {escapeHTML(item.name)}
@@ -415,8 +403,8 @@ const ListItem = React.memo<ListItemProps>(
 
             {/* Address + Distance */}
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1 text-xs min-w-0" style={{ color: COLORS.TEXT_MUTED }}>
-                <MapPin className="h-3.5 w-3.5 flex-shrink-0" style={{ color: COLORS.PRIMARY }} />
+              <div className="flex items-center gap-1 text-xs text-gray-500 min-w-0">
+                <MapPin className="h-3.5 w-3.5 flex-shrink-0 text-emerald-700" />
                 <span className="line-clamp-1" title={item.address ?? ""}>{item.address}</span>
               </div>
               {item.distance != null && (
@@ -446,31 +434,18 @@ const ListItem = React.memo<ListItemProps>(
 
             {/* Product tags */}
             {item.product_type?.length && item.product_type.length > 0 && (
-              <div className="flex flex-wrap gap-1">
+              <div className="flex flex-wrap gap-1 mt-1.5">
                 {item.product_type.slice(0, 3).map((product, index) => (
                   <span
                     key={index}
-                    className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border font-medium"
-                    style={{
-                      backgroundColor: `${COLORS.PRIMARY}10`,
-                      color: COLORS.PRIMARY,
-                      borderColor: `${COLORS.PRIMARY}20`,
-                    }}
+                    className="bg-emerald-50 text-emerald-700 text-xs px-2 py-0.5 rounded-full"
                   >
-                    <Leaf className="w-3 h-3" />
                     {/* 🔒 SÉCURITÉ: Type de produit échappé */}
                     {escapeHTML(product)}
                   </span>
                 ))}
                 {item.product_type.length > 3 && (
-                  <span
-                    className="text-xs px-2 py-0.5 rounded-full border"
-                    style={{
-                      backgroundColor: COLORS.BG_GRAY,
-                      color: COLORS.TEXT_MUTED,
-                      borderColor: COLORS.BORDER,
-                    }}
-                  >
+                  <span className="bg-gray-100 text-gray-500 text-xs px-2 py-0.5 rounded-full">
                     +{item.product_type.length - 3}
                   </span>
                 )}
@@ -479,7 +454,7 @@ const ListItem = React.memo<ListItemProps>(
 
             {/* Description */}
             {item.description && (
-              <p className="text-xs line-clamp-2" style={{ color: COLORS.TEXT_SECONDARY }}>
+              <p className="text-xs text-gray-400 line-clamp-2 mt-1.5">
                 {escapeHTML(item.description)}
               </p>
             )}
