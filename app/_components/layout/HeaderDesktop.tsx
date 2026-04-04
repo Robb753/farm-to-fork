@@ -2,7 +2,6 @@
 
 import React, { useState, useCallback } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import dynamic from "next/dynamic";
 import {
   LogIn,
@@ -11,12 +10,13 @@ import {
   ListChecks,
   Heart,
   User,
-  MapPin,
   Bell,
   Settings,
   Package,
+  Sprout,
 } from "lucide-react";
 import { useUser, useClerk } from "@clerk/nextjs";
+import { usePathname } from "next/navigation";
 import { AvatarImage } from "@/components/ui/OptimizedImage";
 import { useUserRole, useUserActions } from "@/lib/store/userStore";
 import { COLORS } from "@/lib/config/constants";
@@ -86,34 +86,41 @@ const useUserDisplayInfo = (): UserDisplayInfo => {
   };
 };
 
-const MainNavigation: React.FC = () => (
-  <nav className="hidden md:flex items-center space-x-6">
-    <Link
-      href="/explore"
-      className="text-sm font-medium transition-colors flex items-center gap-1 hover:text-green-600"
-      style={{ color: COLORS.TEXT_SECONDARY }}
-    >
-      <MapPin className="w-4 h-4" />
-      Explorer
-    </Link>
+const NAV_ITEMS = [
+  { href: "/explore", label: "Explorer" },
+  { href: "/discover/producteurs", label: "Producteurs" },
+  { href: "/discover/produits", label: "Produits" },
+] as const;
 
-    <Link
-      href="/discover/producteurs"
-      className="text-sm font-medium transition-colors hover:text-green-600"
-      style={{ color: COLORS.TEXT_SECONDARY }}
-    >
-      Producteurs
-    </Link>
+const MainNavigation: React.FC = () => {
+  const pathname = usePathname();
 
-    <Link
-      href="/discover/produits"
-      className="text-sm font-medium transition-colors hover:text-green-600"
-      style={{ color: COLORS.TEXT_SECONDARY }}
-    >
-      Produits
-    </Link>
-  </nav>
-);
+  return (
+    <nav className="hidden md:flex items-center gap-1">
+      {NAV_ITEMS.map(({ href, label }) => {
+        const isActive =
+          pathname === href || pathname.startsWith(href + "/");
+        return (
+          <Link
+            key={href}
+            href={href}
+            className={cn(
+              "relative px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+              isActive
+                ? "text-gray-900 bg-gray-100"
+                : "text-gray-500 hover:text-gray-900 hover:bg-gray-100",
+            )}
+          >
+            {label}
+            {isActive && (
+              <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-4 h-0.5 rounded-full bg-green-600" />
+            )}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+};
 
 interface AuthButtonsProps {
   onSignIn: () => void;
@@ -121,10 +128,10 @@ interface AuthButtonsProps {
 }
 
 const AuthButtons: React.FC<AuthButtonsProps> = ({ onSignIn, onSignUp }) => (
-  <div className="flex items-center gap-2">
+  <div className="flex items-center gap-1">
     <button
       onClick={onSignIn}
-      className="flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors text-gray-600 hover:text-gray-900"
+      className="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
       type="button"
     >
       Se connecter
@@ -132,7 +139,7 @@ const AuthButtons: React.FC<AuthButtonsProps> = ({ onSignIn, onSignUp }) => (
 
     <button
       onClick={onSignUp}
-      className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-full transition-all bg-green-600 text-white hover:bg-green-700"
+      className="px-5 py-2 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-colors"
       type="button"
     >
       S&apos;inscrire
@@ -218,32 +225,27 @@ const UserMenu: React.FC<UserMenuProps> = ({ userInfo, role, onSignOut }) => {
   ];
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-2">
       <Link
         href="/account"
-        className="p-2 rounded-lg transition-all relative hover:bg-gray-100"
-        style={{ color: COLORS.TEXT_SECONDARY }}
+        className="p-2 rounded-lg transition-colors text-gray-500 hover:bg-gray-100 hover:text-gray-900"
         title="Mes favoris"
       >
         <Heart className="w-5 h-5" />
       </Link>
 
       <button
-        className="p-2 rounded-lg transition-all relative hover:bg-gray-100"
-        style={{ color: COLORS.TEXT_SECONDARY }}
+        className="p-2 rounded-lg transition-colors text-gray-500 hover:bg-gray-100 hover:text-gray-900 relative"
         type="button"
       >
         <Bell className="w-5 h-5" />
-        <span
-          className="absolute -top-1 -right-1 w-3 h-3 rounded-full"
-          style={{ backgroundColor: COLORS.ERROR }}
-        />
+        <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500" />
       </button>
 
       <div className="relative">
         <button
           onClick={() => setIsOpen((v) => !v)}
-          className="flex items-center gap-2 p-1 rounded-lg transition-colors focus:outline-none hover:bg-gray-50"
+          className="flex items-center p-1 rounded-lg hover:bg-gray-100 transition-colors focus:outline-none"
           type="button"
         >
           <AvatarImage
@@ -253,31 +255,11 @@ const UserMenu: React.FC<UserMenuProps> = ({ userInfo, role, onSignOut }) => {
             className="ring-2 ring-gray-100 hover:ring-green-200 transition-all"
             fallbackSrc="/default-avatar.png"
           />
-          <div className="hidden lg:block text-left">
-            <div
-              className="text-sm font-medium"
-              style={{ color: COLORS.TEXT_PRIMARY }}
-            >
-              {userInfo.displayName}
-            </div>
-            <div className="text-xs" style={{ color: COLORS.TEXT_MUTED }}>
-              {userInfo.roleLabel}
-            </div>
-          </div>
         </button>
 
         {isOpen && (
-          <div
-            className="absolute right-0 mt-2 w-64 rounded-xl shadow-xl z-50 py-2"
-            style={{
-              backgroundColor: COLORS.BG_WHITE,
-              border: `1px solid ${COLORS.BORDER}`,
-            }}
-          >
-            <div
-              className="p-3 border-b"
-              style={{ borderColor: COLORS.BORDER }}
-            >
+          <div className="absolute right-0 mt-2 w-64 rounded-xl shadow-xl z-50 py-2 bg-white border border-gray-100">
+            <div className="p-3 border-b border-gray-100">
               <div className="flex items-center gap-3">
                 <AvatarImage
                   src={userInfo.avatarUrl}
@@ -287,16 +269,10 @@ const UserMenu: React.FC<UserMenuProps> = ({ userInfo, role, onSignOut }) => {
                   fallbackSrc="/default-avatar.png"
                 />
                 <div className="flex-1 min-w-0">
-                  <div
-                    className="font-medium truncate"
-                    style={{ color: COLORS.TEXT_PRIMARY }}
-                  >
+                  <div className="font-medium truncate text-gray-900">
                     {userInfo.displayName}
                   </div>
-                  <div
-                    className="text-sm truncate"
-                    style={{ color: COLORS.TEXT_MUTED }}
-                  >
+                  <div className="text-sm truncate text-gray-400">
                     {userInfo.email}
                   </div>
                   <div
@@ -319,32 +295,26 @@ const UserMenu: React.FC<UserMenuProps> = ({ userInfo, role, onSignOut }) => {
                   <Link
                     key={`${item.href}-${index}`}
                     href={item.href}
-                    className="flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors"
+                    className="flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700"
                     onClick={() => setIsOpen(false)}
                   >
                     <IconComponent
                       className="w-4 h-4"
                       style={{ color: item.color }}
                     />
-                    <span style={{ color: COLORS.TEXT_PRIMARY }}>
-                      {item.label}
-                    </span>
+                    <span>{item.label}</span>
                   </Link>
                 );
               })}
 
-              <div
-                className="my-1 border-t"
-                style={{ borderColor: COLORS.BORDER }}
-              />
+              <div className="my-1 border-t border-gray-100" />
 
               <button
                 onClick={() => {
                   setIsOpen(false);
                   void onSignOut();
                 }}
-                className="flex items-center gap-3 px-4 py-2 hover:bg-red-50 transition-colors w-full text-left"
-                style={{ color: COLORS.ERROR }}
+                className="flex items-center gap-3 px-4 py-2 hover:bg-red-50 transition-colors w-full text-left text-red-600"
                 type="button"
               >
                 <LogIn className="w-4 h-4 rotate-180" />
@@ -368,21 +338,11 @@ const UserMenu: React.FC<UserMenuProps> = ({ userInfo, role, onSignOut }) => {
 const HeaderDesktopSkeleton: React.FC = () => (
   <header
     role="banner"
-    className="sticky top-0 z-50 w-full border-b backdrop-blur supports-[backdrop-filter]:bg-white/60"
-    style={{
-      backgroundColor: `${COLORS.BG_WHITE}F2`,
-      borderColor: COLORS.BORDER,
-    }}
+    className="sticky top-0 z-[200] w-full bg-white border-b border-gray-100"
   >
-    <div className="container flex h-14 items-center justify-between px-6">
-      <div
-        className="w-32 h-8 rounded animate-pulse"
-        style={{ backgroundColor: COLORS.BG_GRAY }}
-      />
-      <div
-        className="w-20 h-8 rounded animate-pulse"
-        style={{ backgroundColor: COLORS.BG_GRAY }}
-      />
+    <div className="container flex h-16 items-center justify-between px-6">
+      <div className="w-32 h-8 rounded-lg animate-pulse bg-gray-100" />
+      <div className="w-20 h-8 rounded-lg animate-pulse bg-gray-100" />
     </div>
   </header>
 );
@@ -422,36 +382,24 @@ export default function HeaderDesktop({
     <header
       role="banner"
       className={cn(
-        "sticky top-0 z-[200] w-full border-b backdrop-blur supports-[backdrop-filter]:bg-white/60",
+        "sticky top-0 z-[200] w-full bg-white border-b border-gray-100",
         className,
       )}
-      style={{
-        backgroundColor: `${COLORS.BG_WHITE}F2`,
-        borderColor: COLORS.BORDER,
-      }}
     >
-      <div className="container flex h-14 items-center justify-between px-6">
+      <div className="container flex h-16 items-center justify-between px-6">
+        {/* Left: Logo + Navigation */}
         <div className="flex items-center gap-8">
-          <Link href="/" className="flex items-center space-x-2">
-            <Image
-              src="/logof2f.svg"
-              alt="Farm To Fork"
-              width={120}
-              height={32}
-              className="h-8 w-auto"
-              priority
-            />
-            <span
-              className="text-xl font-bold hidden sm:block"
-              style={{ color: COLORS.PRIMARY }}
-            >
-              Farm To Fork
+          <Link href="/" className="flex items-center gap-2">
+            <Sprout className="w-5 h-5 text-green-600" />
+            <span className="text-[17px] font-semibold tracking-tight text-gray-900">
+              Farm2Fork
             </span>
           </Link>
           <MainNavigation />
         </div>
 
-        <div className="flex items-center gap-4">
+        {/* Right: Search + CTA + Auth */}
+        <div className="flex items-center gap-3">
           {showSearchInHeader && (
             <div className="hidden lg:flex items-center w-[320px] max-w-[38vw]">
               <MapboxCitySearch
@@ -482,19 +430,7 @@ export default function HeaderDesktop({
             (role === "farmer" ? (
               <Link
                 href="/dashboard/farms"
-                className="hidden md:flex items-center gap-1 text-sm font-medium px-3 py-2 rounded-lg transition-all"
-                style={{
-                  color: COLORS.PRIMARY,
-                  backgroundColor: "transparent",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = COLORS.PRIMARY_BG;
-                  e.currentTarget.style.color = COLORS.PRIMARY_DARK;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                  e.currentTarget.style.color = COLORS.PRIMARY;
-                }}
+                className="hidden md:flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg transition-colors text-green-600 hover:bg-green-50 hover:text-green-700"
               >
                 <LayoutDashboard className="w-4 h-4" />
                 Mon espace producteur
@@ -506,19 +442,7 @@ export default function HeaderDesktop({
                     ? "/become-producer"
                     : "/sign-in?redirect=/become-producer"
                 }
-                className="hidden md:flex items-center gap-1 text-sm font-medium px-3 py-2 rounded-lg transition-all"
-                style={{
-                  color: COLORS.PRIMARY,
-                  backgroundColor: "transparent",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = COLORS.PRIMARY_BG;
-                  e.currentTarget.style.color = COLORS.PRIMARY_DARK;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                  e.currentTarget.style.color = COLORS.PRIMARY;
-                }}
+                className="hidden md:flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg transition-colors text-green-600 hover:bg-green-50 hover:text-green-700"
               >
                 <PlusCircle className="w-4 h-4" />
                 Devenir producteur
