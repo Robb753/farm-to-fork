@@ -90,6 +90,14 @@ const MapboxCitySearch: React.FC<MapboxCitySearchProps> = ({
   const abortControllerRef = useRef<AbortController | null>(null);
   const suppressNextSearchRef = useRef<boolean>(false);
 
+  // Hooks Next.js — declared before state so urlParams is available for lazy init
+  const router = useRouter();
+  const pathname = usePathname();
+  const urlParams = useSearchParams();
+
+  // Recent searches (localStorage)
+  const { recentSearches, addRecentSearch } = useRecentSearches();
+
   // États
   const cityFromUrl = variant === "header" ? (urlParams?.get("city") ?? "") : "";
   const [searchText, setSearchText] = useState<string>(cityFromUrl);
@@ -97,14 +105,6 @@ const MapboxCitySearch: React.FC<MapboxCitySearchProps> = ({
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
   const [selectedIndex, setSelectedIndex] = useState<number>(-1);
-
-  // Hooks Next.js
-  const router = useRouter();
-  const pathname = usePathname();
-  const urlParams = useSearchParams();
-
-  // Recent searches (localStorage)
-  const { recentSearches, addRecentSearch } = useRecentSearches();
 
   /**
    * Recherche Mapbox
