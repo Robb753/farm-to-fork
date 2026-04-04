@@ -137,8 +137,8 @@ const FilterSection: React.FC<FilterSectionProps> = ({ className = "" }) => {
   return (
     <div className={`flex w-full flex-col gap-1 ${className}`}>
       {/* Barre de filtres principale */}
-      <div className="w-full border-b border-gray-100 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60">
-        <div className="mx-auto max-w-6xl px-3">
+      <div className="w-full border-b border-gray-100 bg-white">
+        <div className="mx-auto max-w-6xl px-4">
           <div className="no-scrollbar flex h-12 items-center gap-2 overflow-x-auto py-2 [scrollbar-width:none] [-ms-overflow-style:none]">
             {/* ═══ Filtres dynamiques depuis la config ═══ */}
             {memoizedFilterSections.map((section: any, index: number) => {
@@ -281,7 +281,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({ className = "" }) => {
             <button
               type="button"
               onClick={() => setIsModalOpen(true)}
-              className="ml-auto inline-flex h-9 items-center gap-2 rounded-full border border-gray-200 bg-white px-3 text-xs shadow-[0_1px_0_0_rgba(17,24,39,0.04)] hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="ml-auto inline-flex h-9 items-center gap-2 rounded-full border border-gray-200 bg-white px-3 text-xs shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               aria-label="Ouvrir le panneau de filtres avancés"
             >
               <Filter className="h-4 w-4" />

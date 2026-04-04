@@ -1,12 +1,13 @@
 "use client";
 
 import React, { useRef, useState, useCallback, useEffect } from "react";
-import { Search, MapPin } from "lucide-react";
+import { Search, MapPin, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { COLORS } from "@/lib/config";
 import { logger } from "@/lib/logger";
+import { useRecentSearches } from "../../hooks/useRecentSearches";
 
 /**
  * Interfaces TypeScript pour MapboxCitySearch
@@ -89,17 +90,21 @@ const MapboxCitySearch: React.FC<MapboxCitySearchProps> = ({
   const abortControllerRef = useRef<AbortController | null>(null);
   const suppressNextSearchRef = useRef<boolean>(false);
 
+  // Hooks Next.js — declared before state so urlParams is available for lazy init
+  const router = useRouter();
+  const pathname = usePathname();
+  const urlParams = useSearchParams();
+
+  // Recent searches (localStorage)
+  const { recentSearches, addRecentSearch } = useRecentSearches();
+
   // États
-  const [searchText, setSearchText] = useState<string>("");
+  const cityFromUrl = variant === "header" ? (urlParams?.get("city") ?? "") : "";
+  const [searchText, setSearchText] = useState<string>(cityFromUrl);
   const [suggestions, setSuggestions] = useState<CitySearchResult[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
   const [selectedIndex, setSelectedIndex] = useState<number>(-1);
-
-  // Hooks Next.js
-  const router = useRouter();
-  const pathname = usePathname();
-  const urlParams = useSearchParams();
 
   /**
    * Recherche Mapbox
@@ -246,7 +251,6 @@ const MapboxCitySearch: React.FC<MapboxCitySearchProps> = ({
         window.setTimeout(() => {
           setShowSuggestions(false);
           setSuggestions([]);
-          if (variant === "header") setSearchText("");
         }, 100);
 
         logger.debug("MapboxCitySearch: navigation", {
@@ -277,6 +281,13 @@ const MapboxCitySearch: React.FC<MapboxCitySearchProps> = ({
 
         const cityData: CitySearchResult = { ...suggestion, zoom: 12 };
         onCitySelect?.(cityData);
+
+        addRecentSearch({
+          city: suggestion.text,
+          place_name: suggestion.place_name,
+          center: suggestion.center,
+          bbox: suggestion.bbox,
+        });
 
         navigateWith(suggestion);
 
@@ -382,14 +393,19 @@ const MapboxCitySearch: React.FC<MapboxCitySearchProps> = ({
   }, []);
 
   /**
-   * Reset lors changements URL
+   * Reset lors changements URL — syncs header search text from city param
    */
   const paramsString = urlParams?.toString() || "";
   useEffect(() => {
     setShowSuggestions(false);
     setSuggestions([]);
     suppressNextSearchRef.current = false;
-  }, [pathname, paramsString]);
+    if (variant === "header") {
+      // Suppress the debounce search triggered by this programmatic text change
+      suppressNextSearchRef.current = true;
+      setSearchText(urlParams?.get("city") ?? "");
+    }
+  }, [pathname, paramsString, variant, urlParams]);
 
   /**
    * Clear
@@ -448,13 +464,18 @@ const MapboxCitySearch: React.FC<MapboxCitySearchProps> = ({
             setSearchText(e.target.value);
             if (!e.target.value.trim()) {
               setSuggestions([]);
-              setShowSuggestions(false);
+              // Show recent searches panel if available
+              setShowSuggestions(recentSearches.length > 0);
             } else {
               setShowSuggestions(true);
             }
           }}
           onKeyDown={handleKeyDown}
-          onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+          onFocus={() => {
+            if (suggestions.length > 0 || (recentSearches.length > 0 && searchText.length < 3)) {
+              setShowSuggestions(true);
+            }
+          }}
           placeholder={placeholder}
           className="flex-grow bg-transparent outline-none text-sm"
           style={{ color: COLORS.TEXT_PRIMARY }}
@@ -516,6 +537,63 @@ const MapboxCitySearch: React.FC<MapboxCitySearchProps> = ({
           </button>
         )}
       </div>
+
+      {/* Recent Searches — shown when focused and text < 3 chars */}
+      {showSuggestions && recentSearches.length > 0 && searchText.length < 3 && (
+        <div
+          ref={suggestionsRef}
+          className="absolute top-full left-0 right-0 mt-2 rounded-xl shadow-xl z-[9999] max-h-80 overflow-y-auto"
+          style={{
+            backgroundColor: COLORS.BG_WHITE,
+            border: `1px solid ${COLORS.BORDER}`,
+          }}
+        >
+          <div
+            className="px-4 py-2 text-xs font-medium border-b"
+            style={{ color: COLORS.TEXT_MUTED, borderColor: COLORS.BORDER }}
+          >
+            Recherches récentes
+          </div>
+          {recentSearches.map((recent, index) => (
+            <button
+              key={`recent-${index}-${recent.city}`}
+              onClick={() =>
+                selectSuggestion({
+                  id: `recent-${index}`,
+                  text: recent.city,
+                  place_name: recent.place_name,
+                  center: recent.center,
+                  bbox: recent.bbox,
+                })
+              }
+              className="w-full text-left px-4 py-3 transition-colors border-b last:border-b-0 first:rounded-t-xl last:rounded-b-xl hover:bg-gray-50"
+              style={{ borderColor: COLORS.BORDER }}
+              type="button"
+            >
+              <div className="flex items-start gap-3">
+                <Clock
+                  className="w-4 h-4 mt-0.5 flex-shrink-0"
+                  style={{ color: COLORS.TEXT_MUTED }}
+                />
+                <div className="flex-grow min-w-0">
+                  <div
+                    className="font-medium truncate text-sm"
+                    style={{ color: COLORS.TEXT_PRIMARY }}
+                  >
+                    {recent.city}
+                  </div>
+                  <div
+                    className="text-xs truncate"
+                    style={{ color: COLORS.TEXT_SECONDARY }}
+                  >
+                    {recent.place_name}
+                  </div>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Suggestions */}
       {showSuggestions && suggestions.length > 0 && (

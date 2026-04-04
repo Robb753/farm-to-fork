@@ -178,7 +178,7 @@ const DropdownPill: React.FC<DropdownPillProps> = ({
         e.stopPropagation();
         toggle();
       }}
-      className={`inline-flex h-9 items-center gap-2 rounded-full border px-3 text-xs shadow-[0_1px_0_0_rgba(17,24,39,0.04)] transition ${CSS_CLASSES.FOCUS_RING} ${
+      className={`inline-flex h-9 items-center gap-2 rounded-full border px-3 text-xs shadow-sm transition ${CSS_CLASSES.FOCUS_RING} ${
         disabled
           ? "border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed"
           : isActive
