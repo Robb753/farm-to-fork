@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 
 const STORAGE_KEY = "farm2fork_recent_searches";
 const MAX_ENTRIES = 6;
@@ -12,21 +12,22 @@ export interface RecentSearch {
   bbox?: [number, number, number, number];
 }
 
-export function useRecentSearches() {
-  const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
-
-  // Hydrate from localStorage on mount (client-only)
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as RecentSearch[];
-        if (Array.isArray(parsed)) setRecentSearches(parsed);
-      }
-    } catch {
-      // Ignore parse errors or missing localStorage (SSR, private browsing)
+function readRecentSearches(): RecentSearch[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as RecentSearch[];
+      if (Array.isArray(parsed)) return parsed;
     }
-  }, []);
+  } catch {
+    // Ignore parse errors or missing localStorage (private browsing)
+  }
+  return [];
+}
+
+export function useRecentSearches() {
+  const [recentSearches, setRecentSearches] = useState<RecentSearch[]>(readRecentSearches);
 
   const addRecentSearch = useCallback((entry: RecentSearch) => {
     setRecentSearches((prev) => {
