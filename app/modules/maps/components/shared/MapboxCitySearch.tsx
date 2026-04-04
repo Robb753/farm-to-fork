@@ -462,10 +462,10 @@ const MapboxCitySearch: React.FC<MapboxCitySearchProps> = ({
           type="text"
           value={searchText}
           onChange={(e) => {
+            suppressNextSearchRef.current = false; // user is typing — always re-enable search
             setSearchText(e.target.value);
-            if (!e.target.value.trim()) {
+            if (e.target.value === "") {
               setSuggestions([]);
-              // Show recent searches panel if available
               setShowSuggestions(recentSearches.length > 0);
             } else {
               setShowSuggestions(true);
@@ -473,7 +473,7 @@ const MapboxCitySearch: React.FC<MapboxCitySearchProps> = ({
           }}
           onKeyDown={handleKeyDown}
           onFocus={() => {
-            if (suggestions.length > 0 || (recentSearches.length > 0 && searchText.length < 3)) {
+            if (suggestions.length > 0 || (recentSearches.length > 0 && searchText.length === 0)) {
               setShowSuggestions(true);
             }
           }}
@@ -539,8 +539,8 @@ const MapboxCitySearch: React.FC<MapboxCitySearchProps> = ({
         )}
       </div>
 
-      {/* Recent Searches — shown when focused and text < 3 chars */}
-      {showSuggestions && recentSearches.length > 0 && searchText.length < 3 && (
+      {/* Recent Searches — shown when focused and input is empty */}
+      {showSuggestions && recentSearches.length > 0 && searchText.length === 0 && (
         <div
           ref={suggestionsRef}
           className="absolute top-full left-0 right-0 mt-2 rounded-xl shadow-xl z-[9999] max-h-80 overflow-y-auto"
