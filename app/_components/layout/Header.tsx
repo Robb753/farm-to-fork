@@ -31,7 +31,7 @@ function useIsMobile(): boolean {
 export default function Header({ className = "" }: HeaderProps): JSX.Element {
   const isMobile = useIsMobile();
   const pathname = usePathname();
-  const showSearchInHeader = pathname !== "/";
+  const showSearchInHeader = pathname === "/explore";
 
   return (
     <HeaderErrorBoundary className={className}>
