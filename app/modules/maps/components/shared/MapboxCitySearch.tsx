@@ -403,9 +403,10 @@ const MapboxCitySearch: React.FC<MapboxCitySearchProps> = ({
     if (variant === "header") {
       // Suppress the debounce search triggered by this programmatic text change
       suppressNextSearchRef.current = true;
-      setSearchText(urlParams?.get("city") ?? "");
+      const city = new URLSearchParams(paramsString).get("city") ?? "";
+      setSearchText(city);
     }
-  }, [pathname, paramsString, variant, urlParams]);
+  }, [pathname, paramsString, variant]);
 
   /**
    * Clear
