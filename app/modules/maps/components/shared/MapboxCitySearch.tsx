@@ -303,7 +303,7 @@ const MapboxCitySearch: React.FC<MapboxCitySearchProps> = ({
         toast.error("Erreur lors de la sélection de ville");
       }
     },
-    [navigateWith, onCitySelect]
+    [addRecentSearch, navigateWith, onCitySelect]
   );
 
   /**
