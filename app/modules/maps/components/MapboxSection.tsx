@@ -299,7 +299,7 @@ export default function MapboxSection({
       };
 
       const handleMoveStart = (e?: any) => {
-        if (e && (e.originalEvent || e.type)) userInteractingRef.current = true;
+        if (e?.originalEvent) userInteractingRef.current = true;
       };
 
       const handleMoveEnd = () => {
@@ -375,7 +375,6 @@ export default function MapboxSection({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !isApiLoaded) return;
-    if (userInteractingRef.current) return;
     if (!isValidCoords(coordinates)) return;
 
     const mapboxCoords = coordsToMapbox(coordinates);
