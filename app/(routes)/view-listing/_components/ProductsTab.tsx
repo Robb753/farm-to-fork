@@ -289,10 +289,6 @@ export default function ProductsTab({
       if (selectedCategory !== "all" && category.name !== selectedCategory)
         return false;
 
-      if (showSeasonalOnly) {
-        // TODO: filtrer quand tu auras season[] réels
-      }
-
       if (!searchLower) return true;
 
       const categoryMatches = category.name.toLowerCase().includes(searchLower);
@@ -301,7 +297,7 @@ export default function ProductsTab({
       );
       return categoryMatches || itemsMatch;
     });
-  }, [productCategories, selectedCategory, searchTerm, showSeasonalOnly]);
+  }, [productCategories, selectedCategory, searchTerm]);
 
   const categoryNames = useMemo(
     () => productCategories.map((cat) => cat.name),

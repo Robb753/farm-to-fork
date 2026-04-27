@@ -608,10 +608,8 @@ export default function FarmerDashboard(): JSX.Element {
           </p>
         </div>
 
-        {/* ✅ NOUVEAU — Bannière "Paiements bientôt disponible" MVP
-            À supprimer quand Stripe Connect sera intégré.
-            TODO (Stripe) : supprimer ce bloc une fois l'onboarding
-            Stripe Connect implémenté dans /api/stripe/connect/route.ts */}
+        {/* Bannière MVP — paiements en ligne post-MVP (Stripe Connect)
+            À retirer quand /api/stripe/connect/route.ts sera implémenté. */}
         <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
           <Clock className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
           <div>
