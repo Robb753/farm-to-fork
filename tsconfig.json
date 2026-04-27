@@ -33,15 +33,7 @@
     "next-env.d.ts",
     ".next/types/**/*.ts",
     "**/*.ts",
-    "**/*.tsx",
-    "app/legal/page.jsx",
-    "components/ui/input.tsx",
-    "app/_components/layout/FilterSection.tsx",
-    "app/admin/notifications/page.tsx",
-    "app/ClientLayout.tsx",
-    "app/(routes)/explore/page.tsx",
-    "middleware.js",
-    "utils/googleMapsLoader.js"
+    "**/*.tsx"
   ],
   "exclude": [
     "node_modules",
