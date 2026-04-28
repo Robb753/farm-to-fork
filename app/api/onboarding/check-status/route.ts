@@ -15,13 +15,16 @@ interface CheckStatusResponse {
   listing_id?: number | null;
 }
 
-const supabase = createClient<Database>(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-);
-
 export async function GET(): Promise<NextResponse<CheckStatusResponse>> {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !supabaseKey) {
+    return NextResponse.json({ status: "none" }, { status: 500 });
+  }
+  const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
   const { userId } = await auth();
 
   if (!userId) {

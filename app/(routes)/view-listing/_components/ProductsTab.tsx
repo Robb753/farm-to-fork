@@ -261,7 +261,6 @@ export default function ProductsTab({
 }: ProductsTabProps): JSX.Element {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
-  const [showSeasonalOnly, setShowSeasonalOnly] = useState(false);
 
   const listingId = listing?.id;
 
@@ -348,7 +347,6 @@ export default function ProductsTab({
   const handleClearFilters = useCallback(() => {
     setSearchTerm("");
     setSelectedCategory("all");
-    setShowSeasonalOnly(false);
   }, []);
 
   if (productCategories.length === 0) {

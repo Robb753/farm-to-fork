@@ -51,22 +51,6 @@ interface GetAllUsersParams {
   search?: string;
 }
 
-// Sécurité : vérifie que les clés serveur sont bien définies
-if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.SUPABASE_URL) {
-  throw new Error("Les variables d'environnement Supabase sont manquantes.");
-}
-
-// On stocke dans des constantes typées string pour éviter le `string | undefined`
-const SUPABASE_URL: string = process.env.SUPABASE_URL!;
-const SUPABASE_SERVICE_ROLE_KEY: string =
-  process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-// Initialisation du client Supabase côté serveur
-const supabase = createClient<Database>(
-  SUPABASE_URL,
-  SUPABASE_SERVICE_ROLE_KEY
-);
-
 /**
  * API Route pour récupérer tous les utilisateurs
  */
@@ -74,6 +58,17 @@ export async function GET(
   req: NextRequest
 ): Promise<NextResponse<GetAllUsersResponse>> {
   try {
+    // ==================== ENV CHECK ====================
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !supabaseServiceKey) {
+      return NextResponse.json(
+        { error: "Configuration serveur manquante" },
+        { status: 500 }
+      );
+    }
+    const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey);
+
     // ==================== AUTH + ADMIN CHECK ====================
     const { userId } = await auth();
     if (!userId) {

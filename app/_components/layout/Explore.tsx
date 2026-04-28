@@ -83,7 +83,7 @@ export default function Explore({ listings }: ExploreProps): JSX.Element {
 
   // Initialise le store au montage avec les listings chargés côté serveur.
   useEffect(() => {
-    const normalized = listings.map((l: any) => ({
+    const normalized = listings.map((l) => ({
       ...l,
       active: l.active ?? true,
       created_at: l.created_at ?? new Date().toISOString(),

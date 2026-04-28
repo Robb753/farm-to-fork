@@ -44,25 +44,6 @@ interface CreateListingBody {
 }
 
 /**
- * Supabase client (Service Role)
- * - IMPORTANT: service role = bypass RLS (ok pour route serveur)
- */
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error(
-    "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment variables."
-  );
-}
-
-const supabase: SupabaseClient<Database> = createClient<Database>(
-  supabaseUrl,
-  supabaseKey,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-);
-
-/**
  * Helpers
  */
 const toStockStatus = (v: unknown): StockStatus => {
@@ -82,6 +63,20 @@ export async function POST(req: NextRequest) {
   const now = new Date().toISOString();
 
   try {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !supabaseKey) {
+      return NextResponse.json(
+        { success: false, error: "Configuration serveur manquante" },
+        { status: 500 }
+      );
+    }
+    const supabase: SupabaseClient<Database> = createClient<Database>(
+      supabaseUrl,
+      supabaseKey,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+
     const { userId: clerkUserId } = await auth();
     if (!clerkUserId) {
       return NextResponse.json(

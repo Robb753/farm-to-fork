@@ -112,6 +112,7 @@ interface UIState {
   isTablet: boolean;
   isDesktop: boolean;
   isFiltersModalOpen: boolean;
+  isMobileFiltersOpen: boolean;
 }
 
 /**
@@ -172,6 +173,7 @@ interface UIActions {
   toggleMapExpanded: () => void;
   setDeviceType: (mobile: boolean, tablet: boolean, desktop: boolean) => void;
   setFiltersModalOpen: (open: boolean) => void;
+  setMobileFiltersOpen: (open: boolean) => void;
 }
 
 /**
@@ -326,6 +328,7 @@ export const useUnifiedStore = create<UnifiedStore>()(
           isTablet: false,
           isDesktop: true,
           isFiltersModalOpen: false,
+          isMobileFiltersOpen: false,
         },
 
         // ============================================================
@@ -603,6 +606,11 @@ export const useUnifiedStore = create<UnifiedStore>()(
           setFiltersModalOpen: (open) =>
             set((state) => ({
               ui: { ...state.ui, isFiltersModalOpen: open },
+            })),
+
+          setMobileFiltersOpen: (open) =>
+            set((state) => ({
+              ui: { ...state.ui, isMobileFiltersOpen: open },
             })),
         },
 

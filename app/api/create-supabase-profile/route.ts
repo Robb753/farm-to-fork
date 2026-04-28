@@ -41,16 +41,6 @@ function isValidRole(role: string): role is ValidRole {
   return VALID_ROLES.includes(role as ValidRole);
 }
 
-// Validation et récupération des variables d'environnement côté serveur
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error("Variables d'environnement Supabase manquantes");
-}
-
-const supabase = createClient<Database>(supabaseUrl, supabaseKey);
-
 /**
  * API Route pour créer un profil utilisateur
  *
@@ -64,6 +54,16 @@ export async function POST(
   request: NextRequest
 ): Promise<NextResponse<CreateProfileResponse>> {
   try {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !supabaseKey) {
+      return NextResponse.json(
+        { success: false, error: "Configuration serveur manquante" },
+        { status: 500 }
+      );
+    }
+    const supabase = createClient<Database>(supabaseUrl, supabaseKey);
+
     // ==========================================
     // AUTH : vérifier que l'appelant est connecté
     // ==========================================

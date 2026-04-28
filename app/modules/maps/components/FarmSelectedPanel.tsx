@@ -29,7 +29,7 @@ export default function FarmSelectedPanel() {
       ? farm.listingImages[0]?.url
       : null;
   const products = farm.product_type ?? [];
-  const isOpen_ = farm.availability === "open";
+  const isActive = farm.active ?? false;
   const distLabel =
     farm.distance != null
       ? farm.distance < 1
@@ -54,15 +54,15 @@ export default function FarmSelectedPanel() {
             className="w-full h-full object-cover"
           />
           {/* Availability badge over image */}
-          {farm.availability && (
+          {farm.active !== undefined && (
             <span
               className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide"
               style={{
-                backgroundColor: isOpen_ ? "rgba(22,163,74,0.9)" : "rgba(220,38,38,0.85)",
+                backgroundColor: isActive ? "rgba(22,163,74,0.9)" : "rgba(220,38,38,0.85)",
                 color: "#fff",
               }}
             >
-              {isOpen_ ? "Ouvert" : "Fermé"}
+              {isActive ? "Ouvert" : "Fermé"}
             </span>
           )}
           {/* Close button over image */}
@@ -182,16 +182,16 @@ export default function FarmSelectedPanel() {
       )}
 
       {/* Availability badge (no image case) */}
-      {!imageUrl && farm.availability && (
+      {!imageUrl && farm.active !== undefined && (
         <div className="px-4 pb-2">
           <span
             className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full"
             style={{
-              backgroundColor: isOpen_ ? "#dcfce7" : "#fee2e2",
-              color: isOpen_ ? "#16a34a" : "#dc2626",
+              backgroundColor: isActive ? "#dcfce7" : "#fee2e2",
+              color: isActive ? "#16a34a" : "#dc2626",
             }}
           >
-            {isOpen_ ? "Ouvert" : "Fermé"}
+            {isActive ? "Ouvert" : "Fermé"}
           </span>
         </div>
       )}
