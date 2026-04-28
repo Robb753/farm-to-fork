@@ -168,7 +168,6 @@ function addPointsLayerIfNeeded(map: mapboxgl.Map): void {
         "case",
         ["boolean", ["feature-state", "hover"], false],
         14,
-        // Stage 3 TODO:
         ["boolean", ["feature-state", "selected"], false], 16,
         10,
       ],

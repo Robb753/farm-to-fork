@@ -298,8 +298,8 @@ export default function MapboxSection({
         }
       };
 
-      const handleMoveStart = (e?: any) => {
-        if (e?.originalEvent) userInteractingRef.current = true;
+      const handleMoveStart = (e: mapboxgl.MapEventOf<"movestart">) => {
+        if (e.originalEvent) userInteractingRef.current = true;
       };
 
       const handleMoveEnd = () => {
@@ -315,7 +315,7 @@ export default function MapboxSection({
         }
       };
 
-      const handleMapError = (e: any) => {
+      const handleMapError = (e: mapboxgl.ErrorEvent) => {
         console.error("Erreur Mapbox:", e);
         setMapLoading(false);
       };

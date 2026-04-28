@@ -36,9 +36,17 @@ interface EmailResponse {
 }
 
 // =======================
-// Resend client
+// Resend client (lazy — évite le crash au build sans RESEND_API_KEY)
 // =======================
-const resend = new Resend(process.env.RESEND_API_KEY);
+let _resend: Resend | null = null;
+function getResend(): Resend {
+  if (!_resend) {
+    const key = process.env.RESEND_API_KEY;
+    if (!key) throw new Error("RESEND_API_KEY manquant dans les variables d'environnement");
+    _resend = new Resend(key);
+  }
+  return _resend;
+}
 
 // =======================
 // Helpers
@@ -209,7 +217,7 @@ export async function sendAdminNotificationEmail(
         EMAIL_BUILDERS.buildButton("Voir et traiter la demande", adminUrl)
     );
 
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResend().emails.send({
       from: EMAIL_CONFIG.fromAddress,
       to: toMutableArray(EMAIL_CONFIG.adminEmails),
       subject: `${EMAIL_SUBJECTS.newFarmerRequest}: ${farmNameSafe}`,
@@ -312,7 +320,7 @@ export async function sendFarmerRequestStatusEmail(
         </div>`
     );
 
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResend().emails.send({
       from: EMAIL_CONFIG.fromAddress,
       to: requestData.email, // email brut OK (pas injecté dans HTML)
       subject,
