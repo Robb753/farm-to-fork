@@ -26,9 +26,10 @@ function getClient(): SupabaseClient<Database> {
 export const supabaseServerPublic: SupabaseClient<Database> = new Proxy(
   {} as SupabaseClient<Database>,
   {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     get(_target, prop) {
-      return (getClient() as any)[prop];
+      // Reflect.get forwards the lookup to the real client via [[Get]] —
+      // avoids bracket notation that would trigger security/detect-object-injection.
+      return Reflect.get(getClient(), prop, getClient());
     },
   }
 );

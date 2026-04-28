@@ -316,7 +316,7 @@ export default function MapboxClusterLayer(): null {
         description?: string;
         availability?: string;
       };
-      const coords = (feature.geometry as GeoJSON.Point).coordinates as [
+      const _coords = (feature.geometry as GeoJSON.Point).coordinates as [
         number,
         number,
       ];

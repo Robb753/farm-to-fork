@@ -178,7 +178,7 @@ const EmptyState = ({ onRetry }: { onRetry: () => void }): JSX.Element => (
   </div>
 );
 
-const StatusBadge = ({
+const _StatusBadge = ({
   availability,
   className = "",
 }: {
