@@ -47,9 +47,7 @@ const FiltersModal = dynamic<FiltersModalProps>(
 /* ------------------------------------------------------------------ */
 
 export const openMobileFilters = (): void => {
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent("openMobileFilters"));
-  }
+  useUnifiedStore.getState().uiActions.setMobileFiltersOpen(true);
 };
 
 /* ------------------------------------------------------------------ */
@@ -59,7 +57,7 @@ export const openMobileFilters = (): void => {
 const FilterSection: React.FC<FilterSectionProps> = ({ className = "" }) => {
   // ═══ État local ═══
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isMobileModalOpen, setIsMobileModalOpen] = useState(false);
+  const isMobileModalOpen = useUnifiedStore((s) => s.ui.isMobileFiltersOpen);
 
   // ✅ MIGRATION: Sélecteur optimisé du store unifié
   const filters = useUnifiedStore((state) => state.filters.current);
@@ -82,17 +80,6 @@ const FilterSection: React.FC<FilterSectionProps> = ({ className = "" }) => {
   const handleFilterChangeSafe = (key: string, value: string) =>
     handleFilterChange(key as keyof FilterState, value);
 
-  // ═══ Gestion des événements mobiles ═══
-  // ⚠️ TODO: Remplacer par state.ui.isMobileFiltersOpen dans le store unifié
-  useEffect(() => {
-    const handleOpenMobileFilters = () => setIsMobileModalOpen(true);
-    window.addEventListener("openMobileFilters", handleOpenMobileFilters);
-
-    return () => {
-      window.removeEventListener("openMobileFilters", handleOpenMobileFilters);
-    };
-  }, []);
-
   // ═══ Gestion scroll modal mobile ═══
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -109,7 +96,8 @@ const FilterSection: React.FC<FilterSectionProps> = ({ className = "" }) => {
   }, [isMobileModalOpen]);
 
   // ═══ Fonctions de gestion modal ═══
-  const closeMobileModal = () => setIsMobileModalOpen(false);
+  const closeMobileModal = () =>
+    useUnifiedStore.getState().uiActions.setMobileFiltersOpen(false);
 
   const handleResetAndClose = () => {
     resetAllFilters();

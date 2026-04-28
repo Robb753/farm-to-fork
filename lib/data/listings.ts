@@ -11,22 +11,22 @@ export type ListingWithImages =
     listingImages: Database["public"]["Tables"]["listingImages"]["Row"][];
   };
 
-const parseListingCoords = (listing: any): Listing => {
+const parseListingCoords = (listing: Record<string, unknown>): Listing => {
   const lat =
-    typeof listing?.lat === "string"
+    typeof listing.lat === "string"
       ? parseFloat(listing.lat)
-      : typeof listing?.lat === "number"
+      : typeof listing.lat === "number"
         ? listing.lat
         : null;
 
   const lng =
-    typeof listing?.lng === "string"
+    typeof listing.lng === "string"
       ? parseFloat(listing.lng)
-      : typeof listing?.lng === "number"
+      : typeof listing.lng === "number"
         ? listing.lng
         : null;
 
-  return { ...listing, lat, lng } as Listing;
+  return { ...listing, lat, lng } as unknown as Listing;
 };
 
 export interface GetLieuxFilters {

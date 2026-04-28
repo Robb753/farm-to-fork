@@ -50,11 +50,11 @@ type Product = Database["public"]["Tables"]["products"]["Row"];
 import { escapeHTML, sanitizeHTML } from "@/lib/utils/sanitize";
 import { useSupabaseWithClerk } from "@/utils/supabase/client";
 
-function normalizeListing(data: any): Listing {
+function normalizeListing(data: Database["public"]["Tables"]["listing"]["Row"]): Listing {
   return {
     ...data,
-    active: data?.active ?? true,
-    created_at: data?.created_at ?? new Date().toISOString(),
+    active: data.active ?? true,
+    created_at: data.created_at ?? new Date().toISOString(),
   } as Listing;
 }
 

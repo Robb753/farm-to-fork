@@ -33,7 +33,7 @@ export interface Listing {
   address: string;
   lat: number;
   lng: number;
-  availability?: "open" | "closed";
+  availability?: string[] | null;
   product_type?: string[];
   certifications?: string[];
   rating?: number;
