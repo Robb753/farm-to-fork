@@ -119,4 +119,14 @@ export default [
       "no-console": "off",
     },
   },
+
+  // ✅ TEST SETUP : désactiver object-injection sur vitest.setup.ts
+  // Les accès store[key] dans le mock localStorage sont intentionnels (faux positifs).
+  // Ce fichier ne traite aucune entrée utilisateur — exclusion limitée au setup de test.
+  {
+    files: ["vitest.setup.ts"],
+    rules: {
+      "security/detect-object-injection": "off",
+    },
+  },
 ];
