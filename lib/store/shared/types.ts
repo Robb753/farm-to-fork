@@ -53,6 +53,8 @@ export interface Listing {
   distance?: number | null;
   /** Slug URL unique — ex: ferme-dollinger-182 */
   slug?: string;
+  /** true si la ferme propose des fraises actuellement en saison */
+  hasStrawberriesNow?: boolean;
 }
 
 /**

@@ -5,6 +5,10 @@ import { supabaseServerPublic } from "@/utils/supabase/server-public";
 import { TABLES, LISTING_COLUMNS } from "@/lib/config";
 import type { Listing } from "@/lib/types";
 import type { Database } from "@/lib/types/database";
+import {
+  hasSeasonalStrawberries,
+  type SeasonalProduct,
+} from "@/lib/utils/seasonality";
 
 export type ListingWithImages =
   Database["public"]["Tables"]["listing"]["Row"] & {
@@ -47,7 +51,8 @@ export async function getLieux(
       `id, name, address, lat, lng, active, clerk_user_id, osm_id, slug,
        availability, product_type, certifications, purchase_mode,
        production_method, additional_services, description,
-       created_at, ${TABLES.LISTING_IMAGES}(id, url)`
+       created_at, ${TABLES.LISTING_IMAGES}(id, url),
+       ${TABLES.PRODUCTS}!listing_id(id, name, seasonal, season_start, season_end)`
     )
     .or("active.eq.true,and(osm_id.not.is.null,clerk_user_id.is.null)")
     .order(LISTING_COLUMNS.CREATED_AT, { ascending: false })
@@ -58,7 +63,14 @@ export async function getLieux(
     return [];
   }
 
-  return (data ?? []).map(parseListingCoords);
+  return (data ?? []).map((row) => {
+    const listing = parseListingCoords(row as Record<string, unknown>);
+    const products = (row as Record<string, unknown>)[TABLES.PRODUCTS];
+    listing.hasStrawberriesNow = hasSeasonalStrawberries(
+      Array.isArray(products) ? (products as SeasonalProduct[]) : null
+    );
+    return listing;
+  });
 }
 
 export const getListing = cache(
