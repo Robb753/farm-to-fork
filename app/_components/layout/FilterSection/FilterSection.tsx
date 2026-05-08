@@ -14,7 +14,10 @@ import ActiveFilters from "./components/ActiveFilters";
 import ViewToggle from "./components/ViewToggle";
 import MobileFilters from "./components/MobileFilters";
 
-import { useUnifiedStore } from "@/lib/store/unifiedStore";
+import {
+  useUnifiedStore,
+  useSeasonalStrawberriesOnly,
+} from "@/lib/store/unifiedStore";
 import type { FilterState } from "@/lib/store/unifiedStore";
 
 // ✅ Configuration et utils
@@ -61,6 +64,10 @@ const FilterSection: React.FC<FilterSectionProps> = ({ className = "" }) => {
 
   // ✅ MIGRATION: Sélecteur optimisé du store unifié
   const filters = useUnifiedStore((state) => state.filters.current);
+  const seasonalStrawberriesOnly = useSeasonalStrawberriesOnly();
+  const toggleSeasonalStrawberries = useUnifiedStore(
+    (s) => s.filtersActions.toggleSeasonalStrawberries
+  );
 
   // ═══ Hooks personnalisés ═══
   const {
@@ -264,6 +271,25 @@ const FilterSection: React.FC<FilterSectionProps> = ({ className = "" }) => {
                 )}
               </div>
             </DropdownPill>
+
+            {/* ═══ Filtre Fraises de saison ═══ */}
+            <button
+              type="button"
+              onClick={toggleSeasonalStrawberries}
+              aria-pressed={seasonalStrawberriesOnly}
+              className={`inline-flex h-9 flex-shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-medium shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-red-400 ${
+                seasonalStrawberriesOnly
+                  ? "border-red-300 bg-red-50 text-red-700 hover:bg-red-100"
+                  : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+              }`}
+              aria-label={
+                seasonalStrawberriesOnly
+                  ? "Désactiver le filtre fraises de saison"
+                  : "Filtrer les fermes avec des fraises de saison"
+              }
+            >
+              🍓 Fraises de saison
+            </button>
 
             {/* ═══ Bouton modal filtres avancés ═══ */}
             <button

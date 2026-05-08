@@ -92,6 +92,7 @@ interface FiltersState {
   current: FilterState;
   applied: FilterState;
   hasActiveFilters: boolean;
+  seasonalStrawberriesOnly: boolean;
 }
 
 /**
@@ -154,6 +155,7 @@ interface FiltersActions {
   resetFilters: () => void;
   toggleFilter: (key: keyof FilterState, value: string) => void;
   applyFilters: () => void;
+  toggleSeasonalStrawberries: () => void;
 }
 
 /**
@@ -314,6 +316,7 @@ export const useUnifiedStore = create<UnifiedStore>()(
           current: EMPTY_FILTERS,
           applied: EMPTY_FILTERS,
           hasActiveFilters: false,
+          seasonalStrawberriesOnly: false,
         },
 
         interactions: {
@@ -522,9 +525,20 @@ export const useUnifiedStore = create<UnifiedStore>()(
                 current: EMPTY_FILTERS,
                 applied: EMPTY_FILTERS,
                 hasActiveFilters: false,
+                seasonalStrawberriesOnly: false,
               },
             }));
             // ✅ Synchronisation automatique après reset
+            get().applyFiltersAndBounds();
+          },
+
+          toggleSeasonalStrawberries: () => {
+            set((state) => ({
+              filters: {
+                ...state.filters,
+                seasonalStrawberriesOnly: !state.filters.seasonalStrawberriesOnly,
+              },
+            }));
             get().applyFiltersAndBounds();
           },
 
@@ -631,13 +645,15 @@ export const useUnifiedStore = create<UnifiedStore>()(
         applyFiltersAndBounds: () => {
           const state = get();
           const { all } = state.listings;
-          const { applied: filters } = state.filters;
+          const { applied: filters, seasonalStrawberriesOnly } = state.filters;
           const { bounds } = state.map;
 
-          // Étape 1: Filtrer par critères de filtre
-          const filtered = all.filter((listing) =>
-            doesListingMatchFilters(listing, filters)
-          );
+          // Étape 1: Filtrer par critères de filtre + filtre fraises de saison
+          const filtered = all.filter((listing) => {
+            if (!doesListingMatchFilters(listing, filters)) return false;
+            if (seasonalStrawberriesOnly && !listing.hasStrawberriesNow) return false;
+            return true;
+          });
 
           // Étape 2: Filtrer par bounds géographiques
           const visible = filtered.filter((listing) =>
@@ -708,6 +724,9 @@ export const useCurrentFilters = () =>
 
 export const useHasActiveFilters = () =>
   useUnifiedStore((state) => state.filters.hasActiveFilters);
+
+export const useSeasonalStrawberriesOnly = () =>
+  useUnifiedStore((state) => state.filters.seasonalStrawberriesOnly);
 
 export const useIsMapExpanded = () =>
   useUnifiedStore((state) => state.ui.isMapExpanded);

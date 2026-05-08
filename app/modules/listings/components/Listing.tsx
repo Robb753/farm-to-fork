@@ -50,6 +50,7 @@ interface ListingItem {
   active?: boolean;
   clerk_user_id?: string | null;
   distance?: number | null;
+  hasStrawberriesNow?: boolean;
 }
 
 /**
@@ -450,6 +451,13 @@ const ListItem = React.memo<ListItemProps>(
                   </span>
                 )}
               </div>
+            )}
+
+            {/* Fraises de saison badge */}
+            {item.hasStrawberriesNow && (
+              <span className="inline-flex w-fit items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-xs font-medium text-red-600">
+                🍓 Fraises
+              </span>
             )}
 
             {/* Description */}
