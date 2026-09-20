@@ -1,75 +1,46 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Farm2Fork
 
-## Getting Started
+Next.js, Clerk, Supabase et Mapbox. Branche de référence : `master`.
 
-First, run the development server:
+## Installation et contrôles
+
+Node **24.19.0** (`.nvmrc`), npm **11.9.0** ; le lockfile fait référence.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+nvm use
+npm ci
+npm run ci:check
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+La CI couvre les PR et les pushes sur master/main. `ci:check` exécute ESLint, TypeScript, Vitest et un build avec catalogue local vide et clés fictives, sans secrets. Il exige un checkout sans fichiers `.env` ni configuration `.clerk`. **Ne jamais déployer le `.next` produit par `build:ci`.** Ce contrôle ne valide ni les données, ni Clerk, ni les autorisations réelles. `next/font` nécessite Google Fonts pendant la compilation. Les scripts Playwright historiques ne sont pas opérationnels.
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+## Développement et vrai déploiement
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+Copier `.env.example` dans `.env.local` et renseigner les variables en privé. Aucune clé service/secrète dans `NEXT_PUBLIC_`. Les fichiers `.env` et `private-audit/` sont ignorés par Git.
 
-## Learn More
+```bash
+npm run env:check:runtime -- --development
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+Pour l'environnement cible :
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm run env:check:runtime
+npm run build
+npm start
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+`env:check` contrôle les variables publiques ; `env:check:runtime` exige aussi les paramètres serveur. Ils vérifient présence/forme/cohérence, pas l'authenticité des clés ni les droits. Ne pas remplacer la commande de déploiement par `build:ci`.
 
-## Deploy on Vercel
+## Base et authentification
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Lire [la réconciliation](docs/reconciliation.md) avant tout SQL. Les migrations historiques ne reconstruisent pas l'état réel et ne doivent pas être rejouées en bloc. Le code utilise le template Clerk `supabase` : le conserver tant que la configuration Clerk/Supabase n'est pas vérifiée.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+Exécuter `supabase/audit/export-schema.sql` en lecture seule ; enregistrer la cellule JSON snapshot dans `private-audit/schema.json`, puis :
 
+```bash
+npm run schema:check -- private-audit/schema.json
+```
 
-1) Création de la demande (pending)
-
-Table : public.farmer_requests
-Action : INSERT
-RLS : WITH CHECK (user_id = auth.jwt()->>'sub')
-Statut initial : pending
-Unicité : 1 demande pending max par user_id + par email (index partiels)
-
-2) Validation admin (approved / rejected)
-
-Action admin : UPDATE farmer_requests SET status='approved'|'rejected'
-RLS : is_admin() requis pour UPDATE/DELETE et SELECT global
-Trigger : trg_farmer_requests_status_change (BEFORE UPDATE OF status)
-Fonction : handle_farmer_request_status_change() (SECURITY DEFINER)
-
-3) Approved
-
-farmer_requests reçoit :
-validated_by = admin_sub
-approved_by_admin_at = now()
-updated_at = now()
-profiles :
-UPSERT user_id=request.user_id
-role='farmer'
-email=request.email
-listing :
-création si inexistante
-listing “draft” (active=false) pré-rempli (name/email/phone/location/lat/lng)
-profiles.farm_id lié au listing
-
-4) Rejected
-
-farmer_requests reçoit :
-validated_by = admin_sub
-updated_at = now()
-admin_reason optionnel
-Aucun listing créé
+Ce contrôle partiel vérifie tables/colonnes, identifiants Clerk et certaines erreurs RLS. Il ne valide pas nullabilité, enums, tous les droits ou le comportement des triggers. Ce n'est ni une migration ni une certification de sécurité. Ne pas publier l'export brut : les fonctions peuvent contenir des littéraux privés.
