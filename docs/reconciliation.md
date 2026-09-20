@@ -41,7 +41,7 @@ L'advisor confirme une table sans RLS, trois sans policies, neuf fonctions sans 
 
 ## Clerk et déploiement : preuves manquantes
 
-Le client conserve getToken({template: 'supabase'}). current_clerk_user_id lit bien auth.jwt()->>'sub'. Le plugin connecté expose le catalogue SQL, pas les réglages du template Clerk ni de l'authentification tierce. Pas de session Clerk réelle disponible ; Vercel non connecté lors du contrôle.
+Le client conserve getToken({template: 'supabase'}). current_clerk_user_id lit bien auth.jwt()->>'sub'. Le plugin connecté expose le catalogue SQL, pas les réglages du template Clerk ni de l'authentification tierce. Pas de session Clerk réelle disponible. Côté Vercel, le projet est identifié sous le scope `robb753s-projects`, mais l'accès connecté actuel renvoie **403 Forbidden** sur ce scope : les logs et variables du déploiement échoué ne peuvent donc pas être lus avant ré-authentification sur l'équipe.
 
 À confirmer sans copier les secrets dans le dépôt :
 
@@ -52,10 +52,16 @@ Le client conserve getToken({template: 'supabase'}). current_clerk_user_id lit b
 
 L'[intégration native Clerk](https://supabase.com/docs/guides/auth/third-party/clerk) est recommandée ; templates dépréciés depuis avril 2025, primitives encore disponibles. Pas de migration aveugle. Changelog Supabase consulté le 20 septembre 2026 ; aucun changement de SDK, schéma géré ou extension engagé.
 
+## Correctif de permissions préparé
+
+Un correctif SQL ciblé est maintenant versionné dans `supabase/audit/targeted-permissions-fix.sql`. Il est volontairement **non appliqué** : il remplace les deux policies `auth.uid()` de `producer_requests`, ferme l'écriture publique sur `products`, active RLS et retire les droits client de `osm_import_review`, durcit l'INSERT de `profiles`, retire la lecture publique des fiches non revendiquées inactives et limite les écritures Storage `listingImages` au propriétaire de l'ID de fiche encodé dans le chemin `<listingId>/...` déjà utilisé par l'application. `is_admin()` et les triggers d'approbation producteur restent inchangés tant que les claims Clerk et le parcours producteur ne sont pas traités explicitement.
+
+Ce fichier est un **draft de validation**, pas une migration de production. Il doit être essayé avec visiteur/A/B/admin et de vrais JWT Clerk dans un environnement isolé avant transformation en migration.
+
 ## Changements et limites
 
 Next.js **15.5.14 → 15.5.25**, outils Next/ESLint alignés, versions exactes et lockfile. Node 24.19.0/npm 11.9.0 explicités. CI master/main et PR : npm ci, lint, types, tests, build isolé sans secrets. `.env.example`, contrôles de configuration et export/catalogue documentés. Trois commentaires ESLint inutiles retirés, sans comportement UI changé. Pas de migration majeure, changement React/Clerk ou architecture.
 
 Le build isolé pré-rend un catalogue vide avec clés fictives. Ne jamais déployer sa sortie. Un build réel exige les variables cibles ; pages avec données, authentification et autorisations restent à tester. next/font dépend du réseau Google Fonts. Les dépendances transitives Clerk dépréciées sont signalées à l'installation ; aucune mise à niveau majeure ajoutée.
 
-**Clôture partielle :** inventaire Supabase réel et comparaison terminés ; correctif Next/build préparé. Configuration Clerk/Vercel et recette RLS A/B restent bloquées. Les règles dangereuses sont identifiées, pas corrigées silencieusement. Une reconstruction complète du schéma depuis zéro reste à établir ; ne pas rejouer les migrations historiques.
+**Clôture partielle :** inventaire Supabase réel et comparaison terminés ; correctif Next/build préparé ; CI GitHub distante **#85 réussie** sur le commit `60609bbc1d0107cde53b66b3fea24484ef523b2e`. Le correctif de permissions est préparé mais non appliqué. Configuration Clerk et accès au scope Vercel restent les blocages externes ; la recette RLS A/B nécessite encore un environnement de test avec de vrais JWT. Une reconstruction complète du schéma depuis zéro reste à établir ; ne pas rejouer les migrations historiques.
