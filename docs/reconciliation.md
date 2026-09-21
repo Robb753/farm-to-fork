@@ -57,4 +57,4 @@ Next.js **15.5.14 → 15.5.25**, outils Next/ESLint alignés, versions exactes e
 
 Le build isolé pré-rend un catalogue vide avec clés fictives. Ne jamais déployer sa sortie. Un build réel exige les variables cibles ; pages avec données, authentification et autorisations restent à tester. next/font dépend du réseau Google Fonts. Les dépendances transitives Clerk dépréciées sont signalées à l'installation ; aucune mise à niveau majeure ajoutée.
 
-**Vérification finale en cours :** voir `Audit-Farm2Fork-MVP.md` pour les résultats actualisés de CI et les éventuelles limites. Les preuves précédentes ne remplacent pas le contrôle du nouveau commit.
+**Validation isolée terminée :** CI [#92](https://github.com/Robb753/farm-to-fork/actions/runs/35567315128) verte sur `4bbae259` : lint, TypeScript, 142 tests, build, 283 assertions PGlite et 140 assertions sur Supabase natif après reset vide. Les anciens blocages Vercel/Clerk sont levés. Aucun correctif appliqué en production. Voir `Audit-Farm2Fork-MVP.md` pour les limites et trois prochaines actions.

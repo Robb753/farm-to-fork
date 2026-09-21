@@ -12,7 +12,7 @@ npm ci
 npm run ci:check
 ```
 
-La CI couvre les PR et les pushes sur master/main. `ci:check` exécute ESLint, TypeScript, Vitest, la matrice SQL sur deux bases isolées et un build avec catalogue local vide et clés fictives, sans secrets. Il exige un checkout sans fichiers `.env` ni configuration `.clerk`. **Ne jamais déployer le `.next` produit par `build:ci`.** Ce contrôle ne valide ni les données, ni Clerk, ni les autorisations réelles. `next/font` nécessite Google Fonts pendant la compilation. Les scripts Playwright historiques ne sont pas opérationnels.
+La CI couvre les PR et les pushes sur master/main. `ci:check` exécute ESLint, TypeScript, Vitest, la matrice SQL sur deux bases isolées et un build avec catalogue local vide et clés fictives, sans secrets. Il exige un checkout sans fichiers `.env` ni configuration `.clerk`. **Ne jamais déployer le `.next` produit par `build:ci`.** Ce contrôle valide les autorisations SQL sur fixtures ; il ne valide ni les données de production ni une session Clerk signée. `next/font` nécessite Google Fonts pendant la compilation. Les scripts Playwright historiques ne sont pas opérationnels.
 
 ## Développement et vrai déploiement
 

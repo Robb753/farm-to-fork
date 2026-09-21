@@ -4,7 +4,7 @@ Date : 21 septembre 2026. Dépôt : Robb753/farm-to-fork. Branche de travail : `
 
 ## Mise à jour — tâche 1 « Réconcilier code et configuration réelle »
 
-**État : CI distante et Vercel validés ; liaison Clerk ↔ Supabase confirmée. Baseline et matrice SQL validées sur deux bases PostgreSQL isolées ; vérification finale locale/CI en cours.** Le code, la configuration versionnée, l’inventaire Supabase réel et la CI ont été réconciliés. Aucun parcours producteur n’a été refondu, aucune nouvelle fonctionnalité n’a été ajoutée et aucune migration/écriture n’a été appliquée à la base de production.
+**État : tâche 1 vérifiée dans son périmètre isolé. Baseline reconstruite sur Supabase local natif, matrice SQL validée et CI #92 verte au commit `4bbae2599114f5a5f74dceeb7f8ff28190a99363`.** Le code, la configuration versionnée, l’inventaire Supabase réel et la CI ont été réconciliés. Aucun parcours producteur n’a été refondu, aucune nouvelle fonctionnalité n’a été ajoutée et aucune migration/écriture n’a été appliquée à la base de production.
 
 Travail livré dans la PR en brouillon #114. Le correctif initial est au commit `60609bbc1d0107cde53b66b3fea24484ef523b2e`; des commits de documentation et de préparation SQL ont ensuite été ajoutés sur la même branche.
 
@@ -28,8 +28,10 @@ Travail livré dans la PR en brouillon #114. Le correctif initial est au commit 
 | `npm run typecheck` | Réussi | Contrôle statique |
 | `npm run test:unit` | **142 tests réussis** | Services simulés |
 | `npm run build:ci` | **Réussi** | Build isolé, non déployable |
-| `npm run ci:check` | Réussi localement | Même périmètre que ci-dessus |
-| GitHub Actions CI #85 | **Succès** | Commit `60609bbc...` |
+| `npm run ci:check` | **Réussi localement après baseline**, code 0 | Inclut désormais les 283 assertions SQL |
+| [CI #92](https://github.com/Robb753/farm-to-fork/actions/runs/35567315128) | **Jobs ci et database réussis** | Commit `4bbae259` ; installation verrouillée, lint/types, 142 tests, SQL, build |
+| Supabase CLI/Docker natif | **Reset vide et matrice réussis** | PostgreSQL 17.6.1.167 ; aucun accès cloud |
+| Matrice SQL | **283 assertions PGlite + 140 natives réussies** | Claims fictifs sous rôles anon/authenticated, sans BYPASSRLS |
 | `npm run schema:check -- private-audit/schema.json` | **3 écarts détectés** | RLS OSM + 2 policies Clerk UUID |
 | Vercel | **Réussi sur codex/reconcile-config-build / 0337ff1**, Node 24, Next.js 15.5.25 | Résultat communiqué par Robin |
 | npm run env:check | **Réussi avec configuration Vercel réelle** | Résultat communiqué par Robin |
@@ -58,11 +60,13 @@ Le correctif préparé ferme uniquement les ouvertures déjà démontrées : pro
 
 - Catalogue réel versionné : 12 tables, 205 colonnes, 47 contraintes, 65 index, 6 enums, 10 séquences, 11 fonctions et 10 triggers, policies/grants et bucket applicatif. Aucune donnée utilisateur exportée.
 - Deux migrations : baseline de l’existant puis correctif ciblé ; les six anciens SQL sont archivés inchangés dans `supabase/legacy-migrations/`.
-- Deux bases PostgreSQL 17/PGlite indépendantes : comparaison au catalogue source, contrôles négatifs des anciennes failles, reconstruction vide puis matrice après correctif. **283 assertions de permissions réussies** avant le dernier contrôle complet.
-- Tests sous rôles anon/authenticated sans superuser ni BYPASSRLS : products, listingImages/Storage, profiles, listing, osm_import_review et policies Clerk de producer_requests. Détails et commandes dans `supabase/baseline/README.md`.
-- Job CI `database` ajouté : Supabase CLI 2.117.0, Docker local, reset sans seed puis même matrice. Résultat du nouveau commit encore à confirmer.
+- Deux bases PostgreSQL 17/PGlite indépendantes : comparaison au catalogue source, contrôles négatifs des anciennes failles, reconstruction vide puis matrice après correctif. **283 assertions de permissions réussies**, y compris lors du contrôle complet.
+- Tests sous rôles anon/authenticated sans superuser ni BYPASSRLS : products, listingImages/Storage, profiles, listing, osm_import_review et policies Clerk de producer_requests. Les droits d’exécution des fonctions sont aussi comparés à la source. Détails et commandes dans `supabase/baseline/README.md`.
+- Job CI `database` ajouté : Supabase CLI 2.117.0, Docker local, reset sans seed puis même matrice. **Démarrage, reset, comparaison et matrice réussis en CI #92.**
 
 ### Limites et clôture
+
+Aucun blocage technique restant pour la validation isolée demandée. La CI #89 avait identifié un ordre de tri différent entre PGlite et PostgreSQL natif ; la collation du test est désormais explicite, sans modifier les règles d’accès. Les défauts de permissions décrits plus haut restent présents en production puisque ce chantier ne les y applique pas.
 
 Les anciens blocages Vercel/Clerk sont levés selon les preuves communiquées par Robin. Aucun correctif SQL appliqué en production, aucun parcours producteur modifié, aucun service payant créé, aucune fusion dans master.
 
@@ -70,9 +74,9 @@ Docker n’est pas disponible dans cet environnement de travail : la vérificati
 
 ## Les 3 prochaines actions
 
-1. Obtenir et consigner le résultat du nouveau job Supabase local : reconstruction vide et matrice visiteur/A/B/admin.
-2. Terminer et consigner lint, TypeScript, tests, build et CI sur les changements de baseline.
-3. Clôturer la tâche 1 avec ses preuves et limites ; conserver la PR en brouillon sans fusion ni lancement du chantier producteur.
+1. Relire et valider la PR #114 avec les preuves de reconstruction et la matrice SQL ; aucune fusion effectuée ici.
+2. Préparer séparément l’adoption de l’historique et le déploiement du seul correctif ciblé sur la base existante : sauvegarde, état des données, administrateur DB et retour arrière ; ne jamais y rejouer la baseline.
+3. Après autorisation de ce déploiement distinct, effectuer la recette connectée visiteur/A/B/admin, notamment via l’API Storage, avant d’ouvrir un autre chantier MVP.
 
 ## Limite de périmètre
 
