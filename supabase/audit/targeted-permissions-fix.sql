@@ -1,7 +1,7 @@
 -- REVIEWED CANDIDATE — isolated SQL tests only; DO NOT APPLY DIRECTLY TO PRODUCTION.
 -- Prepared from the live read-only inventory on 2026-09-20.
--- Validate on an isolated Supabase environment with real Clerk JWTs (visitor/A/B/admin)
--- before converting this file into a migration.
+-- Versioned for isolated reconstruction; SQL matrix uses visitor/A/B/admin claims.
+-- Signed Clerk JWT acceptance is verified separately; no production rollout here.
 --
 -- Scope: configuration reconciliation only. No producer-flow redesign.
 
