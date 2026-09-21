@@ -12,7 +12,7 @@ npm ci
 npm run ci:check
 ```
 
-La CI couvre les PR et les pushes sur master/main. `ci:check` exécute ESLint, TypeScript, Vitest et un build avec catalogue local vide et clés fictives, sans secrets. Il exige un checkout sans fichiers `.env` ni configuration `.clerk`. **Ne jamais déployer le `.next` produit par `build:ci`.** Ce contrôle ne valide ni les données, ni Clerk, ni les autorisations réelles. `next/font` nécessite Google Fonts pendant la compilation. Les scripts Playwright historiques ne sont pas opérationnels.
+La CI couvre les PR et les pushes sur master/main. `ci:check` exécute ESLint, TypeScript, Vitest, la matrice SQL sur deux bases isolées et un build avec catalogue local vide et clés fictives, sans secrets. Il exige un checkout sans fichiers `.env` ni configuration `.clerk`. **Ne jamais déployer le `.next` produit par `build:ci`.** Ce contrôle ne valide ni les données, ni Clerk, ni les autorisations réelles. `next/font` nécessite Google Fonts pendant la compilation. Les scripts Playwright historiques ne sont pas opérationnels.
 
 ## Développement et vrai déploiement
 
@@ -35,7 +35,7 @@ npm start
 
 ## Base et authentification
 
-Lire [la réconciliation](docs/reconciliation.md) avant tout SQL. Les migrations historiques ne reconstruisent pas l'état réel et ne doivent pas être rejouées en bloc. Le code utilise le template Clerk `supabase` : le conserver tant que la configuration Clerk/Supabase n'est pas vérifiée.
+Lire [la réconciliation](docs/reconciliation.md) avant tout SQL. La [baseline vérifiée et sa procédure](supabase/baseline/README.md) reconstruisent le schéma applicatif sur Supabase vide ; les anciennes migrations sont archivées hors chaîne active. `npm run db:check` vérifie gratuitement deux bases PostgreSQL isolées ; la CI ajoute Supabase local/Docker. Ne jamais exécuter cette reconstruction en production. La liaison Clerk/Supabase est confirmée par recette navigateur.
 
 Exécuter `supabase/audit/export-schema.sql` en lecture seule ; enregistrer la cellule JSON snapshot dans `private-audit/schema.json`, puis :
 

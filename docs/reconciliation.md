@@ -1,6 +1,6 @@
 # Réconciliation code / configuration — 20 septembre 2026
 
-Tâche 1 uniquement. Référence initiale master@ebb34f927d00fa4716944bb1af6ed5159440bc58 ; branche codex/reconcile-config-build. Aucun parcours produit modifié, aucune écriture en base, aucune migration appliquée.
+Tâche 1 uniquement. Référence initiale master@ebb34f927d00fa4716944bb1af6ed5159440bc58 ; branche codex/reconcile-config-build. Aucun parcours produit modifié, aucune écriture ni migration en production.
 
 ## Source vérifiée
 
@@ -39,24 +39,17 @@ L'advisor confirme une table sans RLS, trois sans policies, neuf fonctions sans 
 - [SECURITY DEFINER / authenticated](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable)
 - [Extension dans public](https://supabase.com/docs/guides/database/database-linter?lint=0014_extension_in_public)
 
-## Clerk et déploiement : preuves manquantes
+## Clerk et déploiement : preuves acquises
 
-Le client conserve getToken({template: 'supabase'}). current_clerk_user_id lit bien auth.jwt()->>'sub'. Le plugin connecté expose le catalogue SQL, pas les réglages du template Clerk ni de l'authentification tierce. Pas de session Clerk réelle disponible. Côté Vercel, le projet est identifié sous le scope `robb753s-projects`, mais l'accès connecté actuel renvoie **403 Forbidden** sur ce scope : les logs et variables du déploiement échoué ne peuvent donc pas être lus avant ré-authentification sur l'équipe.
+Robin confirme la CI distante verte, Vercel réussi sur `codex/reconcile-config-build` / `0337ff1` (Node 24, Next.js 15.5.25), `env:check` réussi avec la configuration réelle, et Clerk Third-Party Auth activé dans Supabase avec l'issuer `https://humane-buffalo-60.clerk.accounts.dev`. Le test navigateur connecté retourne 200/204 sur `profiles` : le JWT signé et le sub Clerk sont acceptés pour ces opérations. Les anciens blocages Vercel/Clerk sont levés ; aucune modification de l'intégration n'est nécessaire ici.
 
-À confirmer sans copier les secrets dans le dépôt :
+## Baseline et permissions isolées
 
-1. Même projet Supabase dans les variables serveur/public ; instance Clerk test/live, domaine/issuer, template supabase et mécanisme effectivement accepté par Supabase.
-2. Sur comptes de test : JWT signé accepté par Data API, sub Clerk, rôle PostgreSQL authenticated, autorité des claims métier et synchronisation Clerk/profiles. Décoder un JWT ne valide pas sa signature.
-3. Vercel : branche/commit déployé, Node 24, npm/lockfile, commande npm run build, variables Preview/Production, domaines Clerk/CSP et restrictions Mapbox. APP_URL et SITE_URL doivent désigner l'origine cible.
-4. Recette des droits visiteur/A/B/admin dans un environnement de test. Aucune tentative d'écriture ou d'exploitation sur production dans cet inventaire.
+La [procédure de reconstruction](../supabase/baseline/README.md) décrit deux migrations versionnées, le catalogue réel de référence et la matrice visiteur/A/B/admin. Les six anciens SQL sont archivés inchangés, hors chaîne active. Le correctif ciblé est appliqué uniquement aux bases de test.
 
-L'[intégration native Clerk](https://supabase.com/docs/guides/auth/third-party/clerk) est recommandée ; templates dépréciés depuis avril 2025, primitives encore disponibles. Pas de migration aveugle. Changelog Supabase consulté le 20 septembre 2026 ; aucun changement de SDK, schéma géré ou extension engagé.
+La matrice a révélé et permis de corriger la résolution ambiguë de `name` dans les policies Storage, la lecture des images de sa fiche inactive et des privilèges hors RLS. Le correctif empêche aussi l'auto-attribution d'un rôle au premier INSERT et le bootstrap administrateur par email JWT : `is_admin()` dépend désormais exclusivement du rôle protégé en base. Avant une future mise en production, vérifier un compte administrateur en base. Les triggers producteur restent inchangés.
 
-## Correctif de permissions préparé
-
-Un correctif SQL ciblé est maintenant versionné dans `supabase/audit/targeted-permissions-fix.sql`. Il est volontairement **non appliqué** : il remplace les deux policies `auth.uid()` de `producer_requests`, ferme l'écriture publique sur `products`, active RLS et retire les droits client de `osm_import_review`, durcit l'INSERT de `profiles`, retire la lecture publique des fiches non revendiquées inactives et limite les écritures Storage `listingImages` au propriétaire de l'ID de fiche encodé dans le chemin `<listingId>/...` déjà utilisé par l'application. `is_admin()` et les triggers d'approbation producteur restent inchangés tant que les claims Clerk et le parcours producteur ne sont pas traités explicitement.
-
-Ce fichier est un **draft de validation**, pas une migration de production. Il doit être essayé avec visiteur/A/B/admin et de vrais JWT Clerk dans un environnement isolé avant transformation en migration.
+Deux reconstructions indépendantes avec PostgreSQL 17/PGlite vérifient le catalogue et les permissions. La CI ajoute un reset avec Supabase CLI/Docker réel. Les claims fictifs SQL vérifient l'autorisation, pas la signature JWT ; la preuve navigateur précédente couvre séparément l'authentification. Aucun projet payant créé, aucune écriture en production.
 
 ## Changements et limites
 
@@ -64,4 +57,4 @@ Next.js **15.5.14 → 15.5.25**, outils Next/ESLint alignés, versions exactes e
 
 Le build isolé pré-rend un catalogue vide avec clés fictives. Ne jamais déployer sa sortie. Un build réel exige les variables cibles ; pages avec données, authentification et autorisations restent à tester. next/font dépend du réseau Google Fonts. Les dépendances transitives Clerk dépréciées sont signalées à l'installation ; aucune mise à niveau majeure ajoutée.
 
-**Clôture partielle :** inventaire Supabase réel et comparaison terminés ; correctif Next/build préparé ; CI GitHub distante **#85 réussie** sur le commit `60609bbc1d0107cde53b66b3fea24484ef523b2e`. Le correctif de permissions est préparé mais non appliqué. Configuration Clerk et accès au scope Vercel restent les blocages externes ; la recette RLS A/B nécessite encore un environnement de test avec de vrais JWT. Une reconstruction complète du schéma depuis zéro reste à établir ; ne pas rejouer les migrations historiques.
+**Vérification finale en cours :** voir `Audit-Farm2Fork-MVP.md` pour les résultats actualisés de CI et les éventuelles limites. Les preuves précédentes ne remplacent pas le contrôle du nouveau commit.

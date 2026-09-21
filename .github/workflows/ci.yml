@@ -34,8 +34,30 @@ jobs:
         run: npm install --global npm@11.9.0
 
       - name: Install
-        run: npm ci
+        run: npm ci --no-audit --no-fund
 
       # No production keys on PRs, including forks. This never deploys .next.
       - name: Lint, types, unit tests and isolated build
         run: npm run ci:check
+
+  database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm install --global npm@11.9.0
+      - run: npm ci --no-audit --no-fund
+      # Docker services are local to this runner; no Supabase account or token.
+      - name: Start isolated Supabase
+        run: npx --yes supabase@2.117.0 start -x studio,imgproxy,realtime,edge-runtime,logflare,vector,supavisor,mailpit
+      - name: Reconstruct an empty local database
+        run: npx --yes supabase@2.117.0 db reset --local --no-seed --yes
+      - name: Verify catalog and visitor / A / B / admin permissions
+        run: npm run db:check:supabase
+      - name: Stop local services
+        if: always()
+        run: npx --yes supabase@2.117.0 stop --no-backup
