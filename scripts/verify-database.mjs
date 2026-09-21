@@ -23,6 +23,7 @@ function appCatalog(s) {
   result.indexes = sort(s.indexes.filter(x => x.schemaname === 'public'));
   // PostgreSQL table_catalog changes with the local database name, not its schema.
   result.table_grants = sort(s.table_grants.filter(x => x.table_schema === 'public' && ['PUBLIC','anon','authenticated','service_role'].includes(x.grantee)).map(x => Object.fromEntries(Object.entries(x).filter(([key]) => !['table_catalog', 'grantor'].includes(key)))));
+  result.routine_grants = sort(s.routine_grants.filter(x => x.routine_schema === 'public' && source.functions.some(f => f.name === x.routine_name) && ['PUBLIC','anon','authenticated','service_role'].includes(x.grantee)).map(x => Object.fromEntries(Object.entries(x).filter(([key]) => !['routine_catalog','specific_catalog','specific_name','grantor'].includes(key)))));
   result.storage_buckets = sort(s.storage_buckets);
   return result;
 }
@@ -99,7 +100,7 @@ async function matrix(db) {
     const ids = actor === 'admin' ? [1,2,3,4] : actor === 'A' ? [1,2,4] : [2,4];
     await check(db,actor,'listing visibility','SELECT id::int AS id FROM listing ORDER BY id',ids.map(id=>({id})));
     await check(db,actor,'product reads preserved','SELECT id::int AS id FROM products ORDER BY id',[{id:11},{id:22}]);
-    await check(db,actor,'profiles visibility','SELECT user_id FROM profiles ORDER BY user_id', actor==='visitor'?[]:actor==='admin'?[{user_id:'user_A'},{user_id:'user_B'},{user_id:'user_admin'}]:[{user_id:`user_${actor}`}]);
+    await check(db,actor,'profiles visibility','SELECT user_id FROM profiles ORDER BY user_id COLLATE "C"', actor==='visitor'?[]:actor==='admin'?[{user_id:'user_A'},{user_id:'user_B'},{user_id:'user_admin'}]:[{user_id:`user_${actor}`}]);
     await check(db,actor,'no OSM direct read','SELECT id FROM osm_import_review','42501');
     await check(db,actor,'no OSM direct write',"INSERT INTO osm_import_review(name) VALUES ('test') RETURNING id",'42501');
     await check(db,actor,'no cross-farm product update',`UPDATE products SET name='x' WHERE farm_id=${other} RETURNING name`,actor==='visitor'?'42501':[]);
@@ -136,7 +137,7 @@ async function matrix(db) {
       await check(db,actor,'own storage delete via API SQL context',`DELETE FROM storage.objects WHERE name='${own}/${own===1?'a':'b'}.jpg' RETURNING name`,[{name:`${own}/${own===1?'a':'b'}.jpg`}],{storageApi:true});
       await check(db,actor,'storage direct delete protected',`DELETE FROM storage.objects WHERE name='${own}/${own===1?'a':'b'}.jpg' RETURNING name`,'42501');
       for (const name of ['abc/file.jpg','999999999999999999999999999999/file.jpg','01/file.jpg']) await check(db,actor,`invalid path ${name}`,`INSERT INTO storage.objects(bucket_id,name) VALUES ('listingImages','${name}') RETURNING name`,'42501');
-      await check(db,actor,'Clerk request ownership','SELECT user_id FROM producer_requests ORDER BY user_id',[{user_id:`user_${actor}`}]);
+      await check(db,actor,'Clerk request ownership','SELECT user_id FROM producer_requests ORDER BY user_id COLLATE "C"',[{user_id:`user_${actor}`}]);
       await check(db,actor,'no sequence reset',"SELECT setval('public.products_id_seq',999)",'42501');
     }
   }

@@ -24,7 +24,7 @@ npm run db:check
 
 PGlite 0.3.14 exécute le vrai moteur PostgreSQL 17.5 en WebAssembly. Deux bases locales indépendantes sont créées puis fermées. La première baseline est comparée au catalogue de référence ; des contrôles négatifs reproduisent les anciennes ouvertures. Après correctif, la matrice est testée. La seconde base repart de zéro, rejoue les deux migrations, vérifie le même catalogue, l'absence de données applicatives puis la même matrice.
 
-`source-catalog.json` contient uniquement les métadonnées relues du schéma applicatif. Le test compare colonnes/types/nullabilité/defaults/identités, contraintes, index, enums, fonctions, triggers, RLS, policies, grants de tables, bucket, définitions et propriété des séquences. Les compteurs de séquences, OID, espaces des définitions SQL et nom local de base ne sont pas des critères d'identité.
+`source-catalog.json` contient uniquement les métadonnées relues du schéma applicatif. Le test compare colonnes/types/nullabilité/defaults/identités, contraintes, index, enums, fonctions, triggers, RLS, policies, grants de tables et fonctions, bucket, définitions et propriété des séquences. Les compteurs de séquences, OID, espaces des définitions SQL et nom local de base ne sont pas des critères d'identité.
 
 `supabase/tests/*fixture.sql` fournit la frontière SQL gérée par Supabase pour le test sans Docker. Ces fichiers ne sont **pas des migrations**. Leurs fonctions JWT et protections de suppression Storage proviennent des définitions réelles. Ils ne simulent pas les décisions RLS ; PostgreSQL les exécute. Ils ne reproduisent cependant pas les serveurs Auth/PostgREST/Storage HTTP.
 

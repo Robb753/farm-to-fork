@@ -899,6 +899,17 @@ REVOKE ALL ON ALL TABLES IN SCHEMA public FROM PUBLIC, anon, authenticated, serv
 REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM PUBLIC, anon, authenticated, service_role;
 
 -- Function ACLs below retain the source grants; extension-owned functions retain their defaults.
+REVOKE ALL ON FUNCTION public."current_clerk_user_id"() FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public."generate_claim_code"() FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public."handle_farmer_request_approval"() FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public."handle_producer_request_approval"() FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public."is_admin"() FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public."is_farmer"() FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public."prevent_profile_role_change"() FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public."prevent_profiles_sensitive_changes"() FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public."set_updated_at"() FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public."update_lcr_updated_at"() FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public."update_updated_at_column"() FROM PUBLIC, anon, authenticated, service_role;
 
 GRANT DELETE ON public."farmer_requests" TO "anon";
 
