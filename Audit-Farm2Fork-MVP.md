@@ -2,6 +2,20 @@
 
 Date : 21 septembre 2026. Dépôt : Robb753/farm-to-fork. Branche de travail : `codex/reconcile-config-build`.
 
+## Préparation du déploiement sur la base existante — 21 septembre 2026
+
+**Plan préparé, aucune écriture en production, aucune fusion.** Dossier complet : [`supabase/deployment/README.md`](supabase/deployment/README.md), avec pré-checks SQL, inventaire exact des droits, plan de migrations/hash et rollback testé.
+
+- PR #114 : HEAD relu **6f491c8**, différent du commit CI #92 (**4bbae259**) mais validé par **CI #93**, jobs applicatif et Supabase natif verts. Entre les deux : documentation/workflow uniquement, migrations identiques. Ces références désignent le code validé avant les nouveaux fichiers de préparation.
+- Historique distant relu : `[]` ; table `supabase_migrations.schema_migrations` **absente**. Schéma applicatif relu conforme à la baseline source. **Ne jamais exécuter la baseline sur cette production existante.**
+- Adoption prévue : `migration repair 20260920213943 --status applied` sur le projet explicitement ciblé ; écrit uniquement le suivi historique. Non exécuté. Puis `migration list` et `db push --dry-run --skip-vault`, dont la sortie doit contenir **uniquement 20260921051759_targeted_permissions.sql**. Le plan JSON est une simulation hors ligne, pas un dry-run distant prétendument effectué.
+- Profil admin présent : **1**, identifiant Clerk/email renseignés. La maîtrise réelle du compte par l’opérateur reste à confirmer par connexion avant application.
+- Impacts à arbitrer : **40 objets Storage à chemin non numérique**, dont la lecture reste publique mais dont les écritures propriétaires seront refusées ; **1 fiche possédée avec profil farmer/admin non rattaché à la ferme correspondante**. Aucune donnée corrigée automatiquement. Aucun produit à listing_id/farm_id contradictoires ; 7 fiches non revendiquées inactives deviendront non publiques.
+- Rollback préparé hors des migrations actives ; test isolé réussi : retour exact au catalogue/grants initiaux, données et séquences inchangées, triggers/fonctions producteur conservés. Il réouvre les anciens droits dangereux et exige un accord distinct. `migration repair --status reverted` ne remplace jamais l’exécution du rollback SQL.
+- Vérifications de préparation : hashes des migrations conservés, matrice SQL relancée, test de non-modification et de rollback réussi. Les workflows versionnés ne poussent aucune migration distante ; l’absence d’intégration externe n’est pas attestée, donc aucune fusion.
+
+**Arrêt avant la première écriture.** Accord proposé pour la phase A uniquement : enregistrer la baseline dans l’historique, puis présenter le dry-run réel. L’application du correctif (phase B) reste conditionnée à un nouvel accord, à l’arbitrage des deux impacts, à une sauvegarde restaurable attestée et au contrôle du compte admin. Aucun justificatif de sauvegarde ni accès opérateur CLI/Postgres n’a été établi dans cette préparation ; les accès du connecteur en lecture ne remplacent pas ces prérequis.
+
 ## Mise à jour — tâche 1 « Réconcilier code et configuration réelle »
 
 **État : tâche 1 vérifiée dans son périmètre isolé. Baseline reconstruite sur Supabase local natif, matrice SQL validée et CI #92 verte au commit `4bbae2599114f5a5f74dceeb7f8ff28190a99363`.** Le code, la configuration versionnée, l’inventaire Supabase réel et la CI ont été réconciliés. Aucun parcours producteur n’a été refondu, aucune nouvelle fonctionnalité n’a été ajoutée et aucune migration/écriture n’a été appliquée à la base de production.
@@ -74,9 +88,9 @@ Docker n’est pas disponible dans cet environnement de travail : la vérificati
 
 ## Les 3 prochaines actions
 
-1. Relire et valider la PR #114 avec les preuves de reconstruction et la matrice SQL ; aucune fusion effectuée ici.
-2. Préparer séparément l’adoption de l’historique et le déploiement du seul correctif ciblé sur la base existante : sauvegarde, état des données, administrateur DB et retour arrière ; ne jamais y rejouer la baseline.
-3. Après autorisation de ce déploiement distinct, effectuer la recette connectée visiteur/A/B/admin, notamment via l’API Storage, avant d’ouvrir un autre chantier MVP.
+1. Après accord explicite, adopter **uniquement l’historique de la baseline**, vérifier `migration list` et présenter le dry-run distant ne proposant que targeted_permissions.
+2. Valider le compte admin, la sauvegarde et le traitement/acceptation des 40 anciens chemins Storage et du rattachement farmer/admin identifié ; aucune correction implicite.
+3. Après un accord distinct, déployer le seul correctif, vérifier historique/droits et effectuer la recette connectée, avec rollback encadré disponible. Aucun parcours producteur engagé.
 
 ## Limite de périmètre
 
