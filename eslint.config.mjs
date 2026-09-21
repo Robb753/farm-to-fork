@@ -129,4 +129,13 @@ export default [
       "security/detect-object-injection": "off",
     },
   },
+  // CLI diagnostics print names only; dynamic keys address environment/catalog metadata.
+  {
+    files: ["scripts/**/*.mjs"],
+    languageOptions: { globals: globals.node },
+    rules: {
+      "no-console": "off",
+      "security/detect-object-injection": "off",
+    },
+  },
 ];

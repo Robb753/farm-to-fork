@@ -95,7 +95,6 @@ function FarmThumbnail({
         backgroundColor: COLORS.PRIMARY_BG,
       }}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={imageUrl}
         alt={`Photo de ${name}`}

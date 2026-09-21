@@ -1310,7 +1310,6 @@ const EditListing: React.FC<EditListingProps> = ({
                               key={idx}
                               className="h-20 w-28 overflow-hidden rounded-md border border-stone-200 bg-stone-50"
                             >
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={img.url}
                                 alt={`Image ${idx + 1}`}
