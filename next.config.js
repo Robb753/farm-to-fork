@@ -1,4 +1,6 @@
-const { PHASE_PRODUCTION_BUILD } = require("next/constants");
+const { PHASE_PRODUCTION_BUILD, PHASE_DEVELOPMENT_SERVER } = require("next/constants");
+const { assertLocalEnvironment, supabaseNetworkConfig } = require("./scripts/local-environment.cjs");
+const supabaseNetwork = supabaseNetworkConfig(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NODE_ENV === "development");
 const withBundleAnalyzer = require("@next/bundle-analyzer")({
   enabled: process.env.ANALYZE === "true",
 });
@@ -8,11 +10,7 @@ const baseConfig = {
   // Images -----------------------------------------------------------------
   images: {
     remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "reukdkgdlvgdvyuwuaub.supabase.co",
-        pathname: "/storage/v1/object/public/**",
-      },
+      supabaseNetwork.imagePattern,
       { protocol: "https", hostname: "img.clerk.com" },
       { protocol: "https", hostname: "images.clerk.dev" },
       { protocol: "https", hostname: "lh3.googleusercontent.com" },
@@ -140,8 +138,7 @@ const baseConfig = {
       "style-src 'self' 'unsafe-inline' https://api.mapbox.com",
       [
         "connect-src 'self'",
-        "https://*.supabase.co",
-        "wss://*.supabase.co",
+        ...supabaseNetwork.connectSources,
         "https://api.clerk.com",
         "https://*.clerk.com",
         "https://*.clerk.accounts.dev",
@@ -154,7 +151,7 @@ const baseConfig = {
         "img-src 'self' data: blob:",
         "https://img.clerk.com",
         "https://images.clerk.dev",
-        "https://reukdkgdlvgdvyuwuaub.supabase.co",
+        ...supabaseNetwork.imageSources,
         "https://lh3.googleusercontent.com",
         "https://*.ggpht.com",
       ].join(" "),
@@ -209,6 +206,8 @@ const baseConfig = {
 // Export principal --------------------------------------------------------
 // -------------------------------------------------------------------------
 module.exports = (phase) => {
+  // Also protect direct `next dev`, not only the npm wrapper.
+  if (phase === PHASE_DEVELOPMENT_SERVER) assertLocalEnvironment(process.env);
   const isProdBuild = phase === PHASE_PRODUCTION_BUILD;
 
   return withBundleAnalyzer({

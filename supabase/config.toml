@@ -18,7 +18,8 @@ enabled = true
 schema_paths = []
 
 [db.seed]
-enabled = false
+enabled = true
+sql_paths = ["./seed.local.sql"]
 
 [studio]
 enabled = false
@@ -28,7 +29,13 @@ enabled = false
 
 [auth]
 enabled = true
-site_url = "http://127.0.0.1:3000"
+site_url = "http://localhost:3000"
+
+# Existing Clerk Development instance. Keep the application's "supabase" JWT
+# template contract unchanged; no Clerk secret or production project setting here.
+[auth.third_party.clerk]
+enabled = true
+domain = "humane-buffalo-60.clerk.accounts.dev"
 
 [storage]
 enabled = true

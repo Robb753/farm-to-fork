@@ -8,11 +8,12 @@
   },
   "packageManager": "npm@11.9.0",
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/dev-local.mjs",
     "build": "npm run env:check && next build",
     "build:ci": "node scripts/ci-build.mjs",
     "env:check": "node scripts/environment.mjs",
     "env:check:runtime": "node scripts/environment.mjs --runtime",
+    "env:local": "node scripts/configure-local-env.mjs",
     "schema:check": "node scripts/check-schema.mjs",
     "start": "next start",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx --max-warnings=0",

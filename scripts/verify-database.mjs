@@ -149,6 +149,30 @@ async function matrix(db) {
   await check(db,'admin','admin can read inactive images','SELECT id::int AS id FROM "listingImages" ORDER BY id',[{id:101},{id:102}]);
 }
 
+async function verifyDeveloperSeed(db) {
+  const sql = read('supabase/seed.local.sql');
+  await db.exec(sql);
+  const snapshot = async () => (await db.query(`SELECT jsonb_build_object(
+    'listing', (SELECT to_jsonb(l) FROM listing l WHERE id=900001),
+    'product', (SELECT to_jsonb(p) FROM products p WHERE id=900001),
+    'profiles', (SELECT jsonb_agg(p ORDER BY user_id) FROM profiles p WHERE user_id IN
+      ('user_2xdHwRCAiBFmMlY8X7L4Ei83HoE','user_3Bc9ftGQlBxlSK6wPtXWz8OzYuW','user_local_fixture_nonowner'))
+  ) AS data`)).rows[0].data;
+  const before = await snapshot();
+  await db.exec(sql);
+  assert.deepEqual(await snapshot(), before, 'Local seed must be idempotent');
+  assert.equal(before.profiles.length, 3);
+  assert.equal(before.listing.clerk_user_id, 'user_3Bc9ftGQlBxlSK6wPtXWz8OzYuW');
+  const farmer = { identity: { role: 'authenticated', claims: { sub: 'user_3Bc9ftGQlBxlSK6wPtXWz8OzYuW', role: 'authenticated' } } };
+  const nonowner = { identity: { role: 'authenticated', claims: { sub: 'user_local_fixture_nonowner', role: 'authenticated' } } };
+  await check(db, 'local farmer', 'synthetic farm owner update', "UPDATE listing SET name='test' WHERE id=900001 RETURNING id::int", [{id:900001}], farmer);
+  await check(db, 'local nonowner', 'synthetic farm nonowner denied', "UPDATE listing SET name='test' WHERE id=900001 RETURNING id::int", [], nonowner);
+  await check(db, 'local farmer', 'synthetic storage owner insert', "INSERT INTO storage.objects(bucket_id,name) VALUES ('listingImages','900001/TEST-local.txt') RETURNING name", [{name:'900001/TEST-local.txt'}], farmer);
+  await check(db, 'local nonowner', 'synthetic storage nonowner denied', "INSERT INTO storage.objects(bucket_id,name) VALUES ('listingImages','900001/TEST-local.txt') RETURNING name", '42501', nonowner);
+  await check(db, 'local admin', 'synthetic admin recognized', 'SELECT is_admin() AS admin', [{admin:true}], {identity:{role:'authenticated',claims:{sub:'user_2xdHwRCAiBFmMlY8X7L4Ei83HoE',role:'authenticated'}}});
+  console.info('Synthetic local seed: repeatable, ownership/admin/Storage SQL checks passed (not a signed Clerk browser test).');
+}
+
 const db = new PGlite({ extensions: { unaccent } });
 let expectedTarget;
 try {
@@ -179,6 +203,7 @@ try {
   await seed(fresh);
   await matrix(fresh);
   console.info('Second empty database: same catalog, no application data, permission matrix passed again.');
+  await verifyDeveloperSeed(fresh);
 } finally { await fresh.close(); }
 
 if (process.argv.includes('--supabase-local')) {
@@ -190,12 +215,15 @@ if (process.argv.includes('--supabase-local')) {
   try {
     const address = (await client.query('select inet_server_addr()::text as addr')).rows[0].addr;
     assert.ok(address, 'Expected local container database');
+    assert.deepEqual((await client.query('SELECT version FROM supabase_migrations.schema_migrations ORDER BY version')).rows.map(r => r.version),
+      migrations.map(file => file.split('_')[0]), 'Local CLI migration history must contain exactly the two reviewed migrations');
     await sequences(native);
     assert.deepEqual(await catalog(native), expectedTarget, 'Supabase CLI migrations differ from tested target');
     for (const t of source.tables) assert.equal((await client.query(`SELECT count(*)::int AS n FROM public."${t.name}"`)).rows[0].n,0,'Native DB must be empty before test fixtures');
     await seed(native);
     await matrix(native);
     console.info('Real local Supabase PostgreSQL: reconstructed catalog and permission matrix passed.');
+    await verifyDeveloperSeed(native);
   } finally { await client.end(); }
 }
 mkdirSync(new URL('../private-audit/',import.meta.url),{recursive:true});

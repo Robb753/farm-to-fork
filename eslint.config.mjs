@@ -131,7 +131,7 @@ export default [
   },
   // CLI diagnostics print names only; dynamic keys address environment/catalog metadata.
   {
-    files: ["scripts/**/*.mjs"],
+    files: ["scripts/**/*.mjs", "scripts/**/*.cjs"],
     languageOptions: { globals: globals.node },
     rules: {
       "no-console": "off",
