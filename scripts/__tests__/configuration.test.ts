@@ -32,6 +32,32 @@ describe("environment preflight", () => {
       "NEXT_PUBLIC_SUPABASE_URL / SUPABASE_URL: different origins",
     );
   });
+  it("requires the dedicated staging Supabase project on Vercel Preview", () => {
+    const result = validateEnvironment({
+      ...buildEnv,
+      VERCEL_ENV: "preview",
+      NEXT_PUBLIC_SUPABASE_URL: "https://eistpzpsdsbpvorgqxke.supabase.co",
+      SUPABASE_URL: "https://eistpzpsdsbpvorgqxke.supabase.co",
+    });
+    expect(result.errors).toEqual([]);
+  });
+  it("rejects Supabase Production on Vercel Preview", () => {
+    const result = validateEnvironment({
+      ...buildEnv,
+      VERCEL_ENV: "preview",
+      NEXT_PUBLIC_SUPABASE_URL: "https://reukdkgdlvgdvyuwuaub.supabase.co",
+      SUPABASE_URL: "https://reukdkgdlvgdvyuwuaub.supabase.co",
+    });
+    expect(result.errors).toContain("Supabase: Vercel Preview must never target Production");
+  });
+  it("rejects any non-staging Supabase target on Vercel Preview", () => {
+    const result = validateEnvironment({
+      ...buildEnv,
+      VERCEL_ENV: "preview",
+      NEXT_PUBLIC_SUPABASE_URL: "https://other.supabase.co",
+    });
+    expect(result.errors).toContain("NEXT_PUBLIC_SUPABASE_URL: Vercel Preview must use the dedicated staging project");
+  });
   it("rejects a CI Clerk key for a real build", () => {
     expect(validateEnvironment({ ...buildEnv, NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: `pk_test_${Buffer.from("clerk-ci.example.invalid$").toString("base64")}` }).errors.length).toBeGreaterThan(0);
   });
