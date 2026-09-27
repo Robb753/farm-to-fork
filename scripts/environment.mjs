@@ -5,6 +5,8 @@ import { pathToFileURL } from 'node:url';
 export function validateEnvironment(env, runtime = false) {
   const errors = [];
   const warnings = [];
+  const PRODUCTION_SUPABASE_ORIGIN = 'https://reukdkgdlvgdvyuwuaub.supabase.co';
+  const STAGING_SUPABASE_ORIGIN = 'https://eistpzpsdsbpvorgqxke.supabase.co';
   const required = [
     'NEXT_PUBLIC_APP_URL',
     'NEXT_PUBLIC_SUPABASE_URL',
@@ -37,6 +39,20 @@ export function validateEnvironment(env, runtime = false) {
   ]) {
     if (urls.has(a) && urls.has(b) && urls.get(a) !== urls.get(b)) {
       errors.push(`${a} / ${b}: different origins`);
+    }
+  }
+
+  if (env.VERCEL_ENV === 'preview') {
+    const publicSupabaseOrigin = urls.get('NEXT_PUBLIC_SUPABASE_URL');
+    const serverSupabaseOrigin = urls.get('SUPABASE_URL');
+    if (publicSupabaseOrigin !== STAGING_SUPABASE_ORIGIN) {
+      errors.push('NEXT_PUBLIC_SUPABASE_URL: Vercel Preview must use the dedicated staging project');
+    }
+    if (serverSupabaseOrigin && serverSupabaseOrigin !== STAGING_SUPABASE_ORIGIN) {
+      errors.push('SUPABASE_URL: Vercel Preview must use the dedicated staging project');
+    }
+    if (publicSupabaseOrigin === PRODUCTION_SUPABASE_ORIGIN || serverSupabaseOrigin === PRODUCTION_SUPABASE_ORIGIN) {
+      errors.push('Supabase: Vercel Preview must never target Production');
     }
   }
 
