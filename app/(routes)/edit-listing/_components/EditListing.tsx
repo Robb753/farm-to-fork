@@ -744,7 +744,6 @@ const EditListing: React.FC<EditListingProps> = ({
 
   const onSubmit = useCallback(
     async (values: EditListingFormValues, isPublishing: boolean = false) => {
-       console.error("onSubmit appelé", { values, isPublishing });
       if (!listing) return;
 
       setIsSubmitting(true);
@@ -1391,7 +1390,6 @@ const EditListing: React.FC<EditListingProps> = ({
                           onClick={handleSubmit(
                             (values) => onSubmit(values, true),
                             (errors) => {
-                              console.error("DEBUG validation errors:", errors);
                               if (errors.description) setCurrentStep(1);
                               else if (
                                 errors.product_type ||

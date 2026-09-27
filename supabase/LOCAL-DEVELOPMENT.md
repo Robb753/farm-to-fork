@@ -5,6 +5,10 @@ http://127.0.0.1:54321. No hosted database, Vercel setting or Clerk Dashboard ch
 The `getToken({ template: "supabase" })` contract is unchanged. Custom signing is
 disabled in the existing template: its Clerk signature must be accepted locally.
 
+**C1 accepted end to end on Windows/Docker, as reported by the user on 2026-09-27.**
+The earlier execution reports below are historical; final acceptance is recorded at
+the end of this document.
+
 ## Prerequisites and safety boundary
 
 - Node 24 / npm 11, Docker Desktop running (Linux containers), Git.
@@ -58,6 +62,29 @@ Clerk local support is configured in `config.toml`:
 enabled = true
 domain = "humane-buffalo-60.clerk.accounts.dev"
 ```
+
+### Applying runtime configuration changes
+
+After changing Supabase runtime configuration, especially `[auth.third_party.clerk]`,
+stop and start the local stack so its containers use the new configuration:
+
+```powershell
+npx --yes supabase@2.117.0 stop
+if ($LASTEXITCODE -ne 0) { throw "LOCAL stop failed" }
+npx --yes supabase@2.117.0 start
+if ($LASTEXITCODE -ne 0) { throw "LOCAL start failed" }
+```
+
+`db reset --local` rebuilds the database; it does **not** reconfigure existing
+PostgREST containers. Do not use `stop --no-backup` for this restart.
+
+In the C1 Windows acceptance test, old containers had been created before Clerk
+Third-Party Auth was configured. A valid Clerk RS256 token failed with
+`No suitable key or wrong key type`: the existing PostgREST JWKS lacked the Clerk
+RSA key. After stop/start, it contained the Clerk RS256 key alongside the local
+Supabase ES256 and legacy keys, and real browser authentication succeeded.
+This incident required no Clerk Dashboard change, migration or policy change.
+Never print/share the full `PGRST_JWT_SECRET` or tokens while diagnosing key metadata.
 
 This is an issuer hostname, never a secret key. The application still requests the
 existing `supabase` template, whose `sub` is the Clerk user ID and top-level `role`
@@ -314,3 +341,42 @@ assertions passed; `npm run build:ci` passed with Next.js 15.5.25 (38 static pag
 The inventory SQL was also checked against the PGlite fixture.
 Both migration SHA-256 values above remain unchanged. Native acceptance remains
 pending on the user's PC; no production access or remote deployment is involved.
+
+
+## Final C1 acceptance — 2026-09-27
+
+Evidence supplied by the user from Windows/Docker at commit `917fee4`:
+
+- Local API `127.0.0.1:54321`, database `127.0.0.1:54322`, PostgreSQL 17.
+- Empty local reset replayed both migrations successfully. The complete
+  `npm run db:check:supabase` passed, including PGlite and native PostgreSQL.
+- Seeded reset succeeded with `seed.local.sql` and synthetic farm `900001`.
+- `npm run env:local` succeeded; localhost:3000 started with local Supabase and
+  unchanged Clerk Development. The runtime restart issue above was resolved.
+- Real admin: `/account` and `/admin/notifications` loaded successfully.
+- Real owner: `/edit-listing/900001` loaded; publication persisted the description
+  `Fixture synthétique C1, aucune exploitation réelle. TEST C1` after reload.
+- Real test non-owner: editing showed `Accès producteur requis`, role user,
+  with no edit form (UI/authorization refusal).
+- Real owner uploaded an image via Photos & Finalisation; publication succeeded
+  and the image appeared on the local public listing.
+- Non-owner Storage POST to `900001/C1-nonowner-<uuid>.txt` returned HTTP 400;
+  a direct local query confirmed zero matching objects. This proves no object was
+  created in that attempt; HTTP status alone does not identify the rejection cause.
+  SQL RLS coverage is separately established by the passing native matrix.
+
+Final cleanup removes two debug `console.error` calls from the publication flow
+(`onSubmit appelé` and `DEBUG validation errors`). Validation feedback, step
+selection, publication behavior and genuine fetch-error logging are preserved.
+No migration, RLS policy or managed Storage schema changed.
+
+Final cleanup checks in Work: lint and TypeScript passed; all 161 unit tests and
+289 PGlite SQL assertions passed; `npm run build:ci` passed with Next.js 15.5.25
+and 38 static pages. Both migration SHA-256 values recorded above were verified
+unchanged against `917fee4`. Native Docker/browser acceptance is the user's
+evidence above; Work did not rerun those tests.
+
+**C1 is complete on the basis of the user's real local acceptance and the Work
+checks recorded for the final cleanup.** The browser evidence above was performed
+by the user, not replayed in Work. No production access, Clerk/Vercel change,
+remote branch publication or PR merge is part of this closure. C2 is out of scope.
