@@ -261,3 +261,56 @@ No native local reset or native test was attempted after that failure. Docker mi
 history, successful real-stack startup and signed Clerk/Storage browser tests remain
 pending on the user's PC. Windows execution of the helper is also pending there.
 **C1 implementation is ready for local acceptance; C1 is not yet verified end to end.**
+
+## C1 Storage harness compatibility — 2026-09-27
+
+The user confirmed local Docker startup, a successful empty local reset (both
+migrations applied), and `npm ci` at `dcffb57`. The native matrix then failed at
+`own storage upsert` with PostgreSQL `42P10`.
+
+The PGlite platform fixture supplies an unconditional `UNIQUE(bucket_id,name)`.
+The reported native error means PostgreSQL could not infer a usable conflict
+arbiter for that pair in the actual managed Storage schema. It does not identify
+the exact native index definition, and is not an RLS denial: conflict inference
+fails before testing the intended UPDATE policy. CLI version alone does not prove
+which Storage catalog is installed. Do not add an index or change managed schema.
+
+The matrix now uses an explicit owner UPDATE and checks the returned metadata.
+Owner INSERT/DELETE, cross-owner INSERT/UPDATE/DELETE denial, forbidden folder moves
+and the direct-delete guard remain mandatory. A second in-memory PGlite fixture
+omits the global unique constraint, reproduces `42P10` for the old statement, then
+passes the complete permission matrix. This variant never changes native Storage.
+No native error is swallowed or permission test skipped.
+
+Other Storage statements were reviewed: no other native SQL upsert/conflict-target
+assumption remains. Native INSERTs still rely on managed defaults; DELETE checks
+still exercise `storage.allow_delete_query` and the managed delete guard. These
+are explicit compatibility checks, not guarantees about future Storage versions;
+unexpected results must fail. SQL metadata fixtures do not test stored file bytes,
+signed Clerk sessions or API upsert. Real upload/upsert belongs to a disposable
+local Storage API/browser test, per
+https://supabase.com/docs/guides/storage/schema/design.
+
+After importing the follow-up bundle into a clean `codex/local-env-isolation`
+checkout at `dcffb57`, run these commands separately in PowerShell, stopping on
+any error. The reset clears only the disposable local test database; it is needed
+because the failed native run left its synthetic fixtures behind.
+
+```powershell
+node scripts/inspect-local-storage.mjs
+docker inspect supabase_storage_farm-to-fork-permissions --format '{{.Config.Image}}'
+npx --yes supabase@2.117.0 db reset --local --no-seed
+npm run db:check:supabase
+```
+
+The inventory script accepts no arguments and connects only to `127.0.0.1:54322`.
+It reads column defaults, constraints, index definitions/predicates/validity and
+triggers in a read-only transaction, without application rows or credentials.
+Retain its output with the native test result: the exact installed indexes have
+**not** been inspected in Work, where Docker is unavailable.
+
+Work follow-up validation: lint, TypeScript, 161 unit tests and 289 PGlite SQL
+assertions passed; `npm run build:ci` passed with Next.js 15.5.25 (38 static pages).
+The inventory SQL was also checked against the PGlite fixture.
+Both migration SHA-256 values above remain unchanged. Native acceptance remains
+pending on the user's PC; no production access or remote deployment is involved.

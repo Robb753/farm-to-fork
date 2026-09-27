@@ -132,7 +132,9 @@ async function matrix(db) {
       await check(db,actor,'no self promotion',`UPDATE profiles SET role='admin' WHERE user_id='user_${actor}' RETURNING role`,'P0001');
       await check(db,actor,'no farm reassignment',`UPDATE profiles SET farm_id=${other} WHERE user_id='user_${actor}' RETURNING farm_id`,'P0001');
       await check(db,actor,'own storage insert',`INSERT INTO storage.objects(bucket_id,name) VALUES ('listingImages','${own}/new.jpg') RETURNING name`,[{name:`${own}/new.jpg`}]);
-      await check(db,actor,'own storage upsert',`INSERT INTO storage.objects(bucket_id,name) VALUES ('listingImages','${own}/${own===1?'a':'b'}.jpg') ON CONFLICT(bucket_id,name) DO UPDATE SET metadata='{}' RETURNING name`,[{name:`${own}/${own===1?'a':'b'}.jpg`}]);
+      // SQL verifies UPDATE RLS, not Storage API upsert semantics. Managed Storage
+      // versions need not expose a global UNIQUE(bucket_id,name) conflict arbiter.
+      await check(db,actor,'own storage update',`UPDATE storage.objects SET metadata='{"rls_test":"owner-update"}'::jsonb WHERE bucket_id='listingImages' AND name='${own}/${own===1?'a':'b'}.jpg' RETURNING name,metadata`,[{name:`${own}/${own===1?'a':'b'}.jpg`,metadata:{rls_test:'owner-update'}}]);
       await check(db,actor,'no storage folder move',`UPDATE storage.objects SET name='${other}/moved.jpg' WHERE name='${own}/${own===1?'a':'b'}.jpg' RETURNING name`,'42501');
       await check(db,actor,'own storage delete via API SQL context',`DELETE FROM storage.objects WHERE name='${own}/${own===1?'a':'b'}.jpg' RETURNING name`,[{name:`${own}/${own===1?'a':'b'}.jpg`}],{storageApi:true});
       await check(db,actor,'storage direct delete protected',`DELETE FROM storage.objects WHERE name='${own}/${own===1?'a':'b'}.jpg' RETURNING name`,'42501');
@@ -194,13 +196,21 @@ try {
 // Second independent empty database: complete migration replay, without source data.
 const fresh = new PGlite({ extensions: { unaccent } });
 try {
-  await fresh.exec(read('supabase/tests/platform-fixture.sql'));
+  // Isolated PGlite-only compatibility variant: no global name conflict arbiter.
+  // Never alter the native Supabase-managed Storage schema to fit a SQL test.
+  const fixture = read('supabase/tests/platform-fixture.sql');
+  const oldUnique = 'ALTER TABLE storage.objects ADD UNIQUE (bucket_id,name);';
+  assert.ok(fixture.includes(oldUnique), 'Review Storage fixture compatibility variant');
+  await fresh.exec(fixture.replace(oldUnique, '-- No global bucket/name uniqueness in this test variant.'));
   await fresh.exec(read('supabase/tests/storage-triggers-fixture.sql'));
   for (const file of migrations) await fresh.exec(read(`supabase/migrations/${file}`));
   await sequences(fresh);
   assert.deepEqual(await catalog(fresh), expectedTarget, 'Empty rebuild differs from baseline + patch');
   for (const t of source.tables) assert.equal((await fresh.query(`SELECT count(*)::int AS n FROM public."${t.name}"`)).rows[0].n, 0);
   await seed(fresh);
+  // Reproduce the reported planner error, then prove the unchanged RLS matrix
+  // works without depending on that obsolete SQL upsert assumption.
+  await check(fresh,'A','old SQL upsert needs a conflict arbiter',"INSERT INTO storage.objects(bucket_id,name) VALUES ('listingImages','1/a.jpg') ON CONFLICT(bucket_id,name) DO UPDATE SET metadata='{}' RETURNING name",'42P10');
   await matrix(fresh);
   console.info('Second empty database: same catalog, no application data, permission matrix passed again.');
   await verifyDeveloperSeed(fresh);
