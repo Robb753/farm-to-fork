@@ -132,6 +132,7 @@ const baseConfig = {
       ...(isDev ? ["'unsafe-eval'"] : []),
       "https://*.clerk.com",
       "https://*.clerk.accounts.dev",
+      "https://clerk.farm2fork.fr",
     ].join(" ");
 
     const csp = [
@@ -145,6 +146,7 @@ const baseConfig = {
         "https://api.clerk.com",
         "https://*.clerk.com",
         "https://*.clerk.accounts.dev",
+        "https://clerk.farm2fork.fr",
         "https://clerk-telemetry.com",
         "https://api.mapbox.com",
         "https://events.mapbox.com",
