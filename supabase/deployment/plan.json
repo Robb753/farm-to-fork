@@ -1,0 +1,21 @@
+{
+  "reviewed_head": "6f491c8525d726be54632157ae92bdbc37bb77ac",
+  "ci92_commit": "4bbae2599114f5a5f74dceeb7f8ff28190a99363",
+  "ci93_run": 35567598268,
+  "project_ref": "reukdkgdlvgdvyuwuaub",
+  "remote_history_observed": [],
+  "pending_before_adoption": [
+    "20260920213943_verified_app_baseline.sql",
+    "20260921051759_targeted_permissions.sql"
+  ],
+  "planned_history_only_adoption": "20260920213943",
+  "pending_after_adoption": [
+    "20260921051759_targeted_permissions.sql"
+  ],
+  "files": {
+    "supabase/migrations/20260920213943_verified_app_baseline.sql": "8426e7b08dcbf22dad16d72d33c1915d3d3199f45e2284980b48e945e3c16b5a",
+    "supabase/migrations/20260921051759_targeted_permissions.sql": "7829e8524571761f86531665e059566f0acba5eae189653095374c2f359dbe5f"
+  },
+  "executed_remote_dry_run": false,
+  "note": "Offline plan derived from live empty history; CLI dry-run after repair is a mandatory gate, not yet executed."
+}

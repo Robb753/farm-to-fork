@@ -47,7 +47,6 @@ export default function FarmSelectedPanel() {
       {/* Image banner */}
       {imageUrl && (
         <div className="relative h-28 w-full overflow-hidden">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={imageUrl}
             alt={farm.name}
