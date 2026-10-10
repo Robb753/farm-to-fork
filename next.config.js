@@ -1,3 +1,4 @@
+const { assertProductionSupabaseEnvironment } = require("./scripts/environment.cjs");
 const { PHASE_PRODUCTION_BUILD } = require("next/constants");
 const withBundleAnalyzer = require("@next/bundle-analyzer")({
   enabled: process.env.ANALYZE === "true",
@@ -211,6 +212,7 @@ const baseConfig = {
 // Export principal --------------------------------------------------------
 // -------------------------------------------------------------------------
 module.exports = (phase) => {
+  assertProductionSupabaseEnvironment(process.env);
   const isProdBuild = phase === PHASE_PRODUCTION_BUILD;
 
   return withBundleAnalyzer({
