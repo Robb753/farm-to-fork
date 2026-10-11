@@ -2,6 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
+import { getPublicFarmUrl } from "@/lib/utils/farm-url";
 import { useEffect, useMemo, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
@@ -839,7 +840,7 @@ export default function FarmerDashboard(): JSX.Element {
                   )}
                   style={{ borderColor: COLORS.INFO, color: COLORS.INFO }}
                 >
-                  <Link href={`/farm/${listing!.id}`}>
+                  <Link href={getPublicFarmUrl(listing!)}>
                     <Eye className="h-4 w-4" />
                     Voir la fiche publique
                   </Link>

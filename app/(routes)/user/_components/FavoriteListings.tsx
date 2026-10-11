@@ -1,6 +1,7 @@
 // app/_components/FavoriteListings.tsx
 "use client";
 
+import { getPublicFarmUrl } from "@/lib/utils/farm-url";
 import { useEffect, useState, useCallback } from "react";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
@@ -370,7 +371,7 @@ export default function FavoriteListings(): JSX.Element {
 
                 {/* Actions */}
                 <div className="flex gap-2 pt-2">
-                  <Link href={`/farm/${listing.id}`} className="flex-1">
+                  <Link href={getPublicFarmUrl(listing)} className="flex-1">
                     <Button
                       size="sm"
                       variant="default"

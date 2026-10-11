@@ -1,5 +1,6 @@
 "use client";
 
+import { getPublicFarmUrl } from "@/lib/utils/farm-url";
 import React, { useCallback } from "react";
 import Image from "next/image";
 import { Heart } from "@/utils/icons";
@@ -102,7 +103,7 @@ function MarkerListingItem({
     if (onNavigate) {
       onNavigate(id);
     } else if (typeof window !== "undefined") {
-      window.location.href = `/farm/${item?.slug ?? id}`;
+      window.location.href = getPublicFarmUrl({ id, slug: item?.slug });
     }
   }, [id, onNavigate, item?.slug]);
 

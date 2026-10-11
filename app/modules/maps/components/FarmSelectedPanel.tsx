@@ -7,6 +7,7 @@
  * Remplace la mapboxgl.Popup inline de MapboxClusterLayer.
  */
 
+import { getPublicFarmUrl } from "@/lib/utils/farm-url";
 import { useUnifiedStore, useAllListings } from "@/lib/store";
 import { COLORS } from "@/lib/config";
 
@@ -199,7 +200,7 @@ export default function FarmSelectedPanel() {
       {/* Actions */}
       <div className="px-4 pb-4 flex gap-2">
         <a
-          href={`/farm/${farm.slug ?? farm.id}`}
+          href={getPublicFarmUrl(farm)}
           className="flex-1 py-2 px-3 rounded-lg text-center text-xs font-semibold text-white"
           style={{ background: COLORS.PRIMARY }}
         >

@@ -2,6 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
+import { getPublicFarmUrl } from "@/lib/utils/farm-url";
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -30,6 +31,7 @@ type Section = "profile" | "security" | "favorites" | "orders" | "producer";
 
 interface FavoriteItem {
   id: number;
+  slug: string | null;
   name: string;
   address: string | null;
   active: boolean | null;
@@ -116,7 +118,7 @@ export default function AccountPage(): JSX.Element {
 
       const { data: farms, error: farmsError } = await supabase
         .from("listing")
-        .select("id, name, address, active, clerk_user_id, osm_id")
+        .select("id, slug, name, address, active, clerk_user_id, osm_id")
         .in("id", favoriteIds);
 
       if (farmsError) throw farmsError;
@@ -485,7 +487,7 @@ function FavoritesSection({
 
                 <div className="flex items-center gap-2 shrink-0">
                   <Link
-                    href={`/farm/${farm.id}`}
+                    href={getPublicFarmUrl(farm)}
                     className="text-sm font-medium px-3 py-1.5 rounded-lg border transition-colors hover:bg-gray-50"
                     style={{ borderColor: COLORS.BORDER, color: COLORS.PRIMARY }}
                   >
