@@ -1,5 +1,6 @@
 "use client";
 
+import { getPublicFarmUrl } from "@/lib/utils/farm-url";
 import { MapPin, Award, Heart, Star } from "lucide-react";
 import React, {
   useState,
@@ -295,7 +296,7 @@ const ListItem = React.memo<ListItemProps>(
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
       >
-        <Link href={`/farm/${item.slug ?? item.id}`} className="flex w-full min-h-[100px]">
+        <Link href={getPublicFarmUrl(item)} className="flex w-full min-h-[100px]">
           {/* === IMAGE SECTION === */}
           <div className="relative w-32 flex-shrink-0 self-stretch rounded-l-xl overflow-hidden">
             {hasImage ? (

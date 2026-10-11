@@ -16,7 +16,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: Install
@@ -29,4 +29,11 @@ jobs:
         run: npm run typecheck
 
       - name: Build
+        env:
+          # Synthetic format-valid key for prerender only: base64("ci.clerk.invalid$").
+          # No Clerk instance or server secret; never use this build for deployment.
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_Y2kuY2xlcmsuaW52YWxpZCQ=
+          # Inert client configuration; no remote Supabase project or credentials.
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:9
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-build-placeholder
         run: npm run build

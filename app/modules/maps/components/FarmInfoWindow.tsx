@@ -1,5 +1,6 @@
 "use client";
 
+import { getPublicFarmUrl } from "@/lib/utils/farm-url";
 import React from "react";
 import { COLORS } from "@/lib/config";
 
@@ -437,7 +438,7 @@ function CompactVariant({
       {/* CTA */}
       <div style={{ padding: "10px 12px" }}>
         <a
-          href={`/farm/${listing.slug ?? listing.id}`}
+          href={getPublicFarmUrl(listing)}
           style={{
             display: "flex",
             alignItems: "center",
@@ -618,7 +619,7 @@ function CardVariant({
       {/* CTA */}
       <div style={{ padding: "10px 12px" }}>
         <a
-          href={`/farm/${listing.slug ?? listing.id}`}
+          href={getPublicFarmUrl(listing)}
           style={{
             display: "flex",
             alignItems: "center",

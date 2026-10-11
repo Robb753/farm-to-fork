@@ -1,5 +1,6 @@
 "use client";
 
+import { getPublicFarmUrl } from "@/lib/utils/farm-url";
 import React, {
   useEffect,
   useMemo,
@@ -237,7 +238,7 @@ const FarmCard = memo<FarmCardProps>(function FarmCard({
         e.currentTarget.style.borderColor = `${COLORS.PRIMARY}30`;
       }}
     >
-      <Link href={`/farm/${item.slug ?? item.id}`} prefetch={false} className="block">
+      <Link href={getPublicFarmUrl(item)} prefetch={false} className="block">
         <div
           className="relative h-40"
           style={{ backgroundColor: `${COLORS.PRIMARY}10` }}
