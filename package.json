@@ -90,6 +90,9 @@
     "webpack-bundle-analyzer": "^4.10.2"
   },
   "overrides": {
-    "undici": "^7.24.0"
+    "undici": "^7.24.0",
+    "isomorphic-dompurify": {
+      "jsdom": "26.1.0"
+    }
   }
 }
